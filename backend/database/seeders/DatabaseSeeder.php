@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             AiChatSettingSeeder::class,
             AreaCategorySeeder::class,
             ContentSeeder::class,
+            LineFriendSeeder::class,
         ]);
     }
 }

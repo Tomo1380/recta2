@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -39,6 +40,8 @@ class User extends Authenticatable
         'line_token_expires_at' => 'datetime',
     ];
 
+    protected $appends = ['is_line_friend'];
+
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
@@ -47,5 +50,14 @@ class User extends Authenticatable
     public function lineFriend(): HasOne
     {
         return $this->hasOne(LineFriend::class);
+    }
+
+    protected function isLineFriend(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->relationLoaded('lineFriend')
+                ? ($this->lineFriend?->is_following ?? false)
+                : false,
+        );
     }
 }

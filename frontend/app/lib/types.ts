@@ -30,6 +30,21 @@ export interface User {
   updated_at: string;
   reviews_count?: number;
   reviews?: Review[];
+  is_line_friend: boolean;
+  line_friend?: LineFriend | null;
+}
+
+export interface UserIndexResponse {
+  users: Paginated<User>;
+  line_stats: {
+    total_users: number;
+    line_friend_count: number;
+  };
+}
+
+export interface UserShowResponse {
+  user: User;
+  line_messages: LineMessage[];
 }
 
 export interface Store {

@@ -62,6 +62,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/users', [UserController::class, 'index']);
         Route::get('/users/{user}', [UserController::class, 'show']);
         Route::put('/users/{user}/status', [UserController::class, 'updateStatus']);
+        Route::post('/users/{user}/line-message', [UserController::class, 'sendLineMessage']);
 
         // 店舗管理
         Route::apiResource('/stores', StoreController::class);
