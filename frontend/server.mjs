@@ -19,7 +19,7 @@ app.use(express.static("build/client"));
 
 // Handle SSR with React Router
 const build = await import("./build/server/index.js");
-app.all("*", createRequestHandler({ build }));
+app.all("/{*splat}", createRequestHandler({ build }));
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
