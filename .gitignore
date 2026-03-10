@@ -1,0 +1,66 @@
+# Environment
+.env
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+frontend/node_modules
+backend/vendor
+
+# Build output
+dist
+dist-ssr
+frontend/build
+frontend/.react-router
+
+# Laravel
+backend/storage/*.key
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Docker
+db-store
+redis-store
+
+# OS
+Thumbs.db
+
+# Test scripts
+*-test.cjs
+*-screenshot.cjs
+
+# MCP
+.mcp.json
+
+# Claude
+.claude/
+
+# Legacy root SPA files (pre-monorepo)
+/src/
+/public/
+/index.html
+/tsconfig.app.json
+/tsconfig.node.json
+/vite.config.ts
+/eslint.config.js
+
+# Test results
+test-results/

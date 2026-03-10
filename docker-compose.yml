@@ -1,0 +1,146 @@
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx.dockerfile
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - laravel
+      - node
+    networks:
+      - recta2
+
+  node:
+    build:
+      context: .
+      dockerfile: docker/node.dockerfile
+    volumes:
+      - ./frontend:/app
+      - node-modules-store:/app/node_modules
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+    networks:
+      - recta2
+
+  laravel:
+    build:
+      context: .
+      dockerfile: docker/php.dockerfile
+    volumes:
+      - ./backend:/var/www/html
+      - laravel-vendor-store:/var/www/html/vendor
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-recta2}
+      - DB_USERNAME=${DB_USERNAME:-recta2}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - recta2
+
+  composer:
+    build:
+      context: .
+      dockerfile: docker/php.dockerfile
+    volumes:
+      - ./backend:/var/www/html
+      - laravel-vendor-store:/var/www/html/vendor
+    entrypoint: ["composer"]
+    networks:
+      - recta2
+    profiles:
+      - tools
+
+  artisan:
+    build:
+      context: .
+      dockerfile: docker/php.dockerfile
+    volumes:
+      - ./backend:/var/www/html
+      - laravel-vendor-store:/var/www/html/vendor
+    entrypoint: ["php", "artisan"]
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-recta2}
+      - DB_USERNAME=${DB_USERNAME:-recta2}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - recta2
+    profiles:
+      - tools
+
+  postgres:
+    image: postgres:18-alpine
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_DB=${DB_DATABASE:-recta2}
+      - POSTGRES_USER=${DB_USERNAME:-recta2}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-secret}
+    volumes:
+      - db-store:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-recta2}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - recta2
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-store:/data
+    networks:
+      - recta2
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php.dockerfile
+    volumes:
+      - ./backend:/var/www/html
+      - laravel-vendor-store:/var/www/html/vendor
+    entrypoint: ["/bin/sh", "-c", "while true; do php /var/www/html/artisan schedule:run --verbose --no-interaction & sleep 60; done"]
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-recta2}
+      - DB_USERNAME=${DB_USERNAME:-recta2}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - recta2
+
+networks:
+  recta2:
+    driver: bridge
+
+volumes:
+  db-store:
+  redis-store:
+  node-modules-store:
+  laravel-vendor-store:

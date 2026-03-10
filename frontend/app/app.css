@@ -1,0 +1,11 @@
+@import "./styles/fonts.css";
+@import "tailwindcss" source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+@import "tw-animate-css";
+@import "./styles/theme.css";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-heading: "Outfit", "Noto Sans JP", sans-serif;
+}
