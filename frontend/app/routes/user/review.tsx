@@ -70,8 +70,7 @@ export default function ReviewPage() {
 
     setSubmitting(true);
     try {
-      await userApi.post("/user/reviews", {
-        store_id: storeId,
+      await userApi.post(`/stores/${storeId}/reviews`, {
         rating,
         body,
       });

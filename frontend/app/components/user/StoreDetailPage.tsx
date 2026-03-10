@@ -21,7 +21,6 @@ import {
   Building,
   Utensils,
   Award,
-  Play,
   Navigation,
   TrendingUp,
   Sparkles,
@@ -664,7 +663,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               boxShadow: "0 4px 16px rgba(200,96,128,0.35)",
             }}
             onClick={() => {
-              /* LINE apply handler */
+              window.location.href = "/login";
             }}
           >
             <Heart size={18} fill="white" />
@@ -918,10 +917,19 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 border: "1px solid rgba(27,37,40,0.06)",
               }}
             >
-              <div className="px-5 pt-5 pb-3">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
                 <SectionHeading icon={<Star size={20} style={{ color: "#d4af37" }} />}>
                   リアルな声・口コミ ({store.reviews_count ?? 0}件)
                 </SectionHeading>
+                <a
+                  href={`/stores/${store.id}/review`}
+                  className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                  style={{
+                    background: "linear-gradient(135deg, #d4af37 0%, #c5a028 100%)",
+                  }}
+                >
+                  口コミを書く
+                </a>
               </div>
               <div className="relative px-5 pb-5">
                 {/* Review content - blurred */}
@@ -975,7 +983,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
                     style={{ backgroundColor: "#06C755" }}
                     onClick={() => {
-                      /* LINE login handler */
+                      window.location.href = "/login";
                     }}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -1205,7 +1213,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             boxShadow: "0 2px 8px rgba(6,199,85,0.3)",
           }}
           onClick={() => {
-            /* LINE apply handler */
+            window.location.href = "/login";
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">

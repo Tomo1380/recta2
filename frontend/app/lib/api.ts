@@ -50,6 +50,45 @@ export async function apiFetch<T = unknown>(
   return res.json();
 }
 
+// Upload helper - sends FormData without Content-Type header (browser sets boundary)
+export async function apiUpload<T = unknown>(
+  path: string,
+  formData: FormData,
+): Promise<T> {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("admin_token");
+      localStorage.removeItem("admin_user");
+      window.location.href = "/admin/login";
+    }
+    throw new ApiError(401, { message: "Unauthorized" });
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data);
+  }
+
+  return res.json();
+}
+
 // Convenience methods (admin)
 export const api = {
   get: <T = unknown>(path: string) => apiFetch<T>(path),
@@ -59,6 +98,8 @@ export const api = {
     apiFetch<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T = unknown>(path: string) =>
     apiFetch<T>(path, { method: "DELETE" }),
+  upload: <T = unknown>(path: string, formData: FormData) =>
+    apiUpload<T>(path, formData),
 };
 
 // User-facing API fetch (uses user_token instead of admin_token)

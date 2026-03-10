@@ -20,18 +20,17 @@ class UserProfileController extends Controller
     public function update(Request $request)
     {
         $validated = $request->validate([
-            'nickname' => 'sometimes|string|max:50',
-            'age' => 'sometimes|nullable|integer|min:18|max:99',
-            'preferred_area' => 'sometimes|nullable|string|max:100',
-            'preferred_category' => 'sometimes|nullable|string|max:100',
-            'experience' => 'sometimes|nullable|string|max:100',
-            'bio' => 'sometimes|nullable|string|max:1000',
+            'nickname' => 'nullable|string|max:50',
+            'age' => 'nullable|integer|min:18|max:99',
+            'preferred_area' => 'nullable|string|max:50',
+            'preferred_category' => 'nullable|string|max:50',
+            'experience' => 'nullable|string|max:50',
+            'bio' => 'nullable|string|max:500',
         ]);
 
-        $user = $request->user();
-        $user->update($validated);
+        $request->user()->update($validated);
 
-        return response()->json($user->fresh());
+        return response()->json($request->user()->fresh());
     }
 
     /**

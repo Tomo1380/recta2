@@ -1,27 +1,27 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, Radio } from "lucide-react";
 import { api } from "~/lib/api";
 import type { User, Paginated, UserIndexResponse } from "~/lib/types";
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "\u2014";
+  if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("ja-JP");
 }
 
 function statusLabel(status: string): string {
-  return status === "active" ? "\u6709\u52B9" : "\u505C\u6B62";
+  return status === "active" ? "有効" : "停止";
 }
 
 function statusParam(filter: string): string | undefined {
-  if (filter === "\u6709\u52B9") return "active";
-  if (filter === "\u505C\u6B62") return "suspended";
+  if (filter === "有効") return "active";
+  if (filter === "停止") return "suspended";
   return undefined;
 }
 
 function lineStatusParam(filter: string): string | undefined {
-  if (filter === "LINE\u53CB\u3060\u3061") return "friend";
-  if (filter === "\u672A\u53CB\u3060\u3061") return "not_friend";
+  if (filter === "LINE友だち") return "friend";
+  if (filter === "未友だち") return "not_friend";
   return undefined;
 }
 
@@ -29,8 +29,8 @@ export function UsersPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("\u5168\u3066");
-  const [lineFilter, setLineFilter] = useState("\u5168\u3066");
+  const [statusFilter, setStatusFilter] = useState("全て");
+  const [lineFilter, setLineFilter] = useState("全て");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Paginated<User> | null>(null);
@@ -112,13 +112,13 @@ export function UsersPage() {
       return (
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
           <MessageCircle className="w-2.5 h-2.5" />
-          \u53CB\u3060\u3061
+          友だち
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-stone-50 text-stone-500 border border-stone-200">
-        \u672A\u53CB\u3060\u3061
+        未友だち
       </span>
     );
   };
@@ -128,23 +128,30 @@ export function UsersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-foreground" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}>
-            \u30E6\u30FC\u30B6\u30FC\u7BA1\u7406
+            ユーザー管理
           </h2>
           <p className="text-[13px] text-muted-foreground mt-0.5">
-            \u767B\u9332\u30E6\u30FC\u30B6\u30FC\u306E\u4E00\u89A7\u3068\u7BA1\u7406
+            登録ユーザーの一覧と管理
           </p>
         </div>
         <div className="flex items-center gap-4">
           {lineStats && (
             <span className="text-[12px] text-muted-foreground flex items-center gap-1.5">
               <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
-              LINE\u53CB\u3060\u3061 {lineStats.line_friend_count}\u540D
+              LINE友だち {lineStats.line_friend_count}名
             </span>
           )}
           <span className="text-[13px] text-muted-foreground flex items-center gap-1.5">
             <Users className="w-4 h-4" />
-            {total} \u540D
+            {total} 名
           </span>
+          <button
+            onClick={() => navigate("/admin/users/broadcast")}
+            className="px-3 py-1.5 rounded-lg bg-[#06C755] text-white text-[13px] hover:bg-[#05b04d] transition flex items-center gap-1.5"
+          >
+            <Radio className="w-3.5 h-3.5" />
+            一斉配信
+          </button>
         </div>
       </div>
 
@@ -156,12 +163,12 @@ export function UsersPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="\u540D\u524D\u3067\u691C\u7D22..."
+            placeholder="名前で検索..."
             className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
           />
         </div>
         <div className="flex gap-0.5 bg-muted p-0.5 rounded-lg">
-          {["\u5168\u3066", "\u6709\u52B9", "\u505C\u6B62"].map((s) => (
+          {["全て", "有効", "停止"].map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -176,7 +183,7 @@ export function UsersPage() {
           ))}
         </div>
         <div className="flex gap-0.5 bg-muted p-0.5 rounded-lg">
-          {["\u5168\u3066", "LINE\u53CB\u3060\u3061", "\u672A\u53CB\u3060\u3061"].map((s) => (
+          {["全て", "LINE友だち", "未友だち"].map((s) => (
             <button
               key={s}
               onClick={() => setLineFilter(s)}
@@ -206,25 +213,25 @@ export function UsersPage() {
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      \u30E6\u30FC\u30B6\u30FC
+                      ユーザー
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      \u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u540D
+                      メモ
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      LINE\u53CB\u3060\u3061
+                      LINE友だち
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      \u767B\u9332\u65E5
+                      登録日
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      \u6700\u7D42\u30ED\u30B0\u30A4\u30F3
+                      最終ログイン
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      \u53E3\u30B3\u30DF
+                      口コミ
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
-                      \u30B9\u30C6\u30FC\u30BF\u30B9
+                      ステータス
                     </th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider"></th>
                   </tr>
@@ -241,7 +248,7 @@ export function UsersPage() {
                           <span>{lineName(user)}</span>
                         </div>
                       </td>
-                      <td className="py-2.5 px-4 text-muted-foreground">{user.nickname || "\u2014"}</td>
+                      <td className="py-2.5 px-4 text-muted-foreground">{user.admin_notes ? (user.admin_notes.length > 20 ? user.admin_notes.slice(0, 20) + "…" : user.admin_notes) : "—"}</td>
                       <td className="py-2.5 px-4">{lineFriendBadge(user)}</td>
                       <td className="py-2.5 px-4 text-muted-foreground">{formatDate(user.created_at)}</td>
                       <td className="py-2.5 px-4 text-muted-foreground">{formatDate(user.last_login_at)}</td>
@@ -261,7 +268,7 @@ export function UsersPage() {
                           onClick={() => navigate(`/admin/users/${user.id}`)}
                           className="text-[12px] text-muted-foreground hover:text-foreground transition"
                         >
-                          \u8A73\u7D30 \u2192
+                          詳細 →
                         </button>
                       </td>
                     </tr>
@@ -289,8 +296,8 @@ export function UsersPage() {
                       />
                     </div>
                     <p className="text-[12px] text-muted-foreground mt-0.5">
-                      {user.nickname || "\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u672A\u8A2D\u5B9A"} \u00B7 \u53E3\u30B3\u30DF{" "}
-                      {user.reviews_count ?? 0}\u4EF6
+                      {user.admin_notes || "メモなし"} · 口コミ{" "}
+                      {user.reviews_count ?? 0}件
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-indigo-300" />
@@ -304,7 +311,7 @@ export function UsersPage() {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-[12px] text-muted-foreground">
-          {total} \u4EF6\u4E2D {users.length} \u4EF6\u8868\u793A
+          {total} 件中 {users.length} 件表示
         </p>
         <div className="flex items-center gap-0.5">
           <button

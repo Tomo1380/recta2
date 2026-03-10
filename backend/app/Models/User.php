@@ -26,6 +26,7 @@ class User extends Authenticatable
         'preferred_category',
         'experience',
         'bio',
+        'admin_notes',
         'status',
         'last_login_at',
     ];

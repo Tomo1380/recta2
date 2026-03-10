@@ -14,6 +14,11 @@ class LineMessage extends Model
         'message_type',
         'content',
         'line_message_id',
+        'read_at',
+    ];
+
+    protected $casts = [
+        'read_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

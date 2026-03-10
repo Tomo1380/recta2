@@ -441,7 +441,7 @@ export default function TopPage() {
                   boxShadow: "0px 3px 12px rgba(6,199,85,0.3)",
                 }}
                 onClick={() => {
-                  /* LINE login handler */
+                  window.location.href = "/login";
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">

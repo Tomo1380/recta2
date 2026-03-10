@@ -37,7 +37,7 @@ Route::post('/webhook/line', [LineWebhookController::class, 'handle']);
 // ========== ユーザー（エンドユーザー） ==========
 Route::middleware('auth:sanctum')->prefix('user')->group(function () {
     Route::get('/me', [UserProfileController::class, 'me']);
-    Route::put('/me', [UserProfileController::class, 'update']);
+    Route::put('/profile', [UserProfileController::class, 'update']);
     Route::post('/logout', [UserProfileController::class, 'logout']);
     Route::get('/reviews', [PublicReviewController::class, 'userReviews']);
 });
@@ -62,10 +62,15 @@ Route::prefix('admin')->group(function () {
         Route::get('/users', [UserController::class, 'index']);
         Route::get('/users/{user}', [UserController::class, 'show']);
         Route::put('/users/{user}/status', [UserController::class, 'updateStatus']);
+        Route::put('/users/{user}/notes', [UserController::class, 'updateNotes']);
         Route::post('/users/{user}/line-message', [UserController::class, 'sendLineMessage']);
+        Route::get('/users/{user}/messages', [UserController::class, 'messages']);
+        Route::post('/users/broadcast', [LineFriendController::class, 'broadcast']);
 
         // 店舗管理
         Route::apiResource('/stores', StoreController::class);
+        Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
+        Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);
 
         // 口コミ管理
         Route::get('/reviews', [ReviewController::class, 'index']);
@@ -114,12 +119,7 @@ Route::prefix('admin')->group(function () {
         Route::get('banner-settings', [ContentController::class, 'bannerSettings']);
         Route::put('banner-settings', [ContentController::class, 'updateBannerSettings']);
 
-        // LINE Messaging管理
-        Route::prefix('line')->group(function () {
-            Route::get('/friends', [LineFriendController::class, 'index']);
-            Route::get('/friends/{lineUserId}/messages', [LineFriendController::class, 'messages']);
-            Route::post('/push', [LineFriendController::class, 'push']);
-            Route::post('/broadcast', [LineFriendController::class, 'broadcast']);
-        });
+        // LINE一斉配信（ユーザー管理から利用）
+        // broadcast は上の /users/broadcast で定義済み
     });
 });

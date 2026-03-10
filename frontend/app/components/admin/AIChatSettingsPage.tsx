@@ -11,9 +11,10 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { GripVertical, Plus, X, MessageCircle, Bot, Save, Loader2, Zap, BookOpen } from "lucide-react";
+import { GripVertical, Plus, X, Save, Loader2, Zap, BookOpen } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AiChatSetting, AiChatStats } from "~/lib/types";
+import AiChatPanel from "~/components/user/AiChatPanel";
 
 // --- Tone mapping ---
 const TONE_TO_LABEL: Record<AiChatSetting["tone"], string> = {
@@ -94,49 +95,6 @@ function SubTabs({
   );
 }
 
-function SuggestPreview({ buttons }: { buttons: string[] }) {
-  return (
-    <div className="bg-muted/40 border border-border rounded-lg p-4">
-      <p className="text-[11px] text-muted-foreground mb-3 uppercase tracking-wider">Preview</p>
-      <div className="bg-white rounded-lg border border-border shadow-sm max-w-sm mx-auto overflow-hidden">
-        <div className="bg-foreground text-white px-4 py-2.5 flex items-center gap-2">
-          <Bot className="w-4 h-4" />
-          <span className="text-[13px]">Recta Chat</span>
-        </div>
-        <div className="p-4 space-y-3">
-          <div className="flex gap-2">
-            <div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center shrink-0">
-              <Bot className="w-3.5 h-3.5 text-stone-500" />
-            </div>
-            <div className="bg-stone-50 rounded-lg rounded-tl-sm px-3 py-2 text-[13px]">
-              こんにちは！何かお手伝いできることはありますか？
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5 pl-8">
-            {buttons
-              .filter((b) => b.trim())
-              .map((btn, i) => (
-                <span
-                  key={i}
-                  className="px-2.5 py-1 border border-border text-foreground rounded-full text-[11px] cursor-default hover:bg-indigo-50 transition"
-                >
-                  {btn}
-                </span>
-              ))}
-          </div>
-        </div>
-        <div className="border-t border-border px-4 py-2.5 flex items-center gap-2">
-          <div className="flex-1 bg-stone-50 rounded-md px-3 py-1.5 text-[11px] text-muted-foreground">
-            メッセージを入力...
-          </div>
-          <div className="w-6 h-6 bg-foreground rounded-md flex items-center justify-center">
-            <MessageCircle className="w-3 h-3 text-white" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function SaveToast({ message }: { message: string }) {
   return (
@@ -470,56 +428,70 @@ export function AIChatSettingsPage() {
       {activeTab === "prompts" && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <SubTabs active={promptSubTab} onChange={setPromptSubTab} />
-          <div className="p-5 space-y-5 max-w-3xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-[13px]">チャット有効/無効</label>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  このページでのチャット機能を切り替え
-                </p>
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="space-y-5 max-w-3xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-[13px]">チャット有効/無効</label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      このページでのチャット機能を切り替え
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={currentPrompt.enabled}
+                    onChange={() =>
+                      updatePromptConfig(promptSubTab, "enabled", !currentPrompt.enabled)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[13px] mb-1.5">システムプロンプト</label>
+                  <textarea
+                    value={currentPrompt.prompt}
+                    onChange={(e) => updatePromptConfig(promptSubTab, "prompt", e.target.value)}
+                    rows={8}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-y font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {currentPrompt.prompt.length} 文字
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] mb-1.5">トーン</label>
+                  <select
+                    value={currentPrompt.tone}
+                    onChange={(e) => updatePromptConfig(promptSubTab, "tone", e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 max-w-xs"
+                  >
+                    <option>カジュアル</option>
+                    <option>フォーマル</option>
+                    <option>フレンドリー</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => savePromptConfig(promptSubTab)}
+                  disabled={saving}
+                  className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  保存
+                </button>
               </div>
-              <Toggle
-                checked={currentPrompt.enabled}
-                onChange={() =>
-                  updatePromptConfig(promptSubTab, "enabled", !currentPrompt.enabled)
-                }
-              />
-            </div>
 
-            <div>
-              <label className="block text-[13px] mb-1.5">システムプロンプト</label>
-              <textarea
-                value={currentPrompt.prompt}
-                onChange={(e) => updatePromptConfig(promptSubTab, "prompt", e.target.value)}
-                rows={8}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-y font-mono"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                {currentPrompt.prompt.length} 文字
-              </p>
+              <div className="bg-muted/40 border border-border rounded-lg p-4">
+                <p className="text-[11px] text-muted-foreground mb-3 uppercase tracking-wider">Preview</p>
+                <AiChatPanel
+                  pageType={promptSubTab}
+                  preview
+                  previewSuggestButtons={suggestButtons[promptSubTab].filter((b) => b.trim())}
+                  className="max-w-sm mx-auto"
+                />
+              </div>
             </div>
-
-            <div>
-              <label className="block text-[13px] mb-1.5">トーン</label>
-              <select
-                value={currentPrompt.tone}
-                onChange={(e) => updatePromptConfig(promptSubTab, "tone", e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 max-w-xs"
-              >
-                <option>カジュアル</option>
-                <option>フォーマル</option>
-                <option>フレンドリー</option>
-              </select>
-            </div>
-
-            <button
-              onClick={() => savePromptConfig(promptSubTab)}
-              disabled={saving}
-              className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              保存
-            </button>
           </div>
         </div>
       )}
@@ -598,7 +570,15 @@ export function AIChatSettingsPage() {
                 </button>
               </div>
 
-              <SuggestPreview buttons={currentButtons} />
+              <div className="bg-muted/40 border border-border rounded-lg p-4">
+                <p className="text-[11px] text-muted-foreground mb-3 uppercase tracking-wider">Preview</p>
+                <AiChatPanel
+                  pageType={suggestSubTab}
+                  preview
+                  previewSuggestButtons={currentButtons.filter((b) => b.trim())}
+                  className="max-w-sm mx-auto"
+                />
+              </div>
             </div>
           </div>
         </div>

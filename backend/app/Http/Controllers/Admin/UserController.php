@@ -19,7 +19,7 @@ class UserController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('line_display_name', 'ilike', "%{$search}%")
-                  ->orWhere('nickname', 'ilike', "%{$search}%");
+                  ->orWhere('admin_notes', 'ilike', "%{$search}%");
             });
         }
 
@@ -88,6 +88,17 @@ class UserController extends Controller
         return response()->json($user);
     }
 
+    public function updateNotes(Request $request, User $user): JsonResponse
+    {
+        $request->validate([
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $user->update(['admin_notes' => $request->admin_notes]);
+
+        return response()->json($user);
+    }
+
     /**
      * Send a LINE push message to a user via their line_user_id.
      */
@@ -135,5 +146,30 @@ class UserController extends Controller
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get paginated LINE messages for a user.
+     */
+    public function messages(Request $request, User $user): JsonResponse
+    {
+        $friend = $user->lineFriend;
+
+        $messages = LineMessage::where('line_user_id', $user->line_user_id)
+            ->orderByDesc('created_at')
+            ->paginate($request->input('per_page', 50));
+
+        return response()->json([
+            'friend' => $friend ? [
+                'id' => $friend->id,
+                'line_user_id' => $friend->line_user_id,
+                'display_name' => $user->line_display_name,
+                'picture_url' => $user->line_picture_url,
+                'is_following' => $friend->is_following,
+                'followed_at' => $friend->followed_at,
+                'user' => $user,
+            ] : null,
+            'messages' => $messages,
+        ]);
     }
 }

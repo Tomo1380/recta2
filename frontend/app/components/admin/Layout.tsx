@@ -15,7 +15,6 @@ import {
   LayoutGrid,
   MapPin,
   Loader2,
-  MessageCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "~/lib/auth";
@@ -27,7 +26,6 @@ const menuItems = [
   { path: "/admin/reviews", label: "口コミ管理", icon: MessageSquare },
   { path: "/admin/ai-chat", label: "AIチャット設定", icon: Bot },
   { path: "/admin/content", label: "コンテンツ管理", icon: LayoutGrid },
-  { path: "/admin/line", label: "LINE管理", icon: MessageCircle },
   { path: "/admin/area-category", label: "エリア・カテゴリ", icon: MapPin },
   { path: "/admin/admin-users", label: "管理ユーザー", icon: KeyRound },
 ];
@@ -39,20 +37,12 @@ const breadcrumbMap: Record<string, string> = {
   "/admin/reviews": "口コミ管理",
   "/admin/ai-chat": "AIチャット設定",
   "/admin/content": "コンテンツ管理",
-  "/admin/line": "LINE管理",
   "/admin/area-category": "エリア・カテゴリ",
   "/admin/admin-users": "管理ユーザー",
 };
 
 function getBreadcrumbs(pathname: string) {
   const crumbs: { label: string; path: string }[] = [];
-
-  if (pathname === "/admin") {
-    crumbs.push({ label: "ダッシュボード", path: "/admin" });
-    return crumbs;
-  }
-
-  crumbs.push({ label: "ダッシュボード", path: "/admin" });
 
   const segments = pathname.split("/").filter(Boolean);
   let currentPath = "";
@@ -62,18 +52,16 @@ function getBreadcrumbs(pathname: string) {
 
     if (breadcrumbMap[currentPath]) {
       crumbs.push({ label: breadcrumbMap[currentPath], path: currentPath });
+    } else if (segments[i - 1] === "users" && segments[i] === "broadcast") {
+      crumbs.push({ label: "一斉配信", path: currentPath });
+    } else if (segments[i] === "messages" && segments[i - 2] === "users") {
+      crumbs.push({ label: "メッセージ", path: currentPath });
     } else if (segments[i - 1] === "users") {
       crumbs.push({ label: "ユーザー詳細", path: currentPath });
     } else if (segments[i - 1] === "shops" && segments[i] === "new") {
       crumbs.push({ label: "店舗作成", path: currentPath });
     } else if (segments[i - 1] === "shops") {
       crumbs.push({ label: "店舗編集", path: currentPath });
-    } else if (segments[i - 1] === "line" && segments[i] === "broadcast") {
-      crumbs.push({ label: "一斉配信", path: currentPath });
-    } else if (segments[i - 1] === "line" && segments[i + 1] === "messages") {
-      // skip the lineUserId segment itself
-    } else if (segments[i] === "messages" && segments[i - 2] === "line") {
-      crumbs.push({ label: "メッセージ", path: currentPath });
     }
   }
 

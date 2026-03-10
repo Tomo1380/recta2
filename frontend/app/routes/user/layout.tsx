@@ -1,7 +1,7 @@
 import { Outlet, Link } from "react-router";
 import { UserAuthProvider, useUserAuth } from "~/lib/user-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { User, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 
 function UserHeaderAuth() {
   const { isAuthenticated, user, loading } = useUserAuth();

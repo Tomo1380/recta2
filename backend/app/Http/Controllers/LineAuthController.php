@@ -27,7 +27,7 @@ class LineAuthController extends Controller
 
         $url = $this->lineLoginService->getAuthorizationUrl($state);
 
-        return response()->json(['url' => $url]);
+        return redirect($url);
     }
 
     /**

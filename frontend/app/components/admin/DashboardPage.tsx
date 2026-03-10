@@ -23,71 +23,9 @@ import {
 } from "recharts";
 
 import { useId, useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { api } from "~/lib/api";
 import type { DashboardData } from "~/lib/types";
-
-// TODO: LINE messages, activity logs, and LINE stats will be populated
-// when LINE integration API is added. Using placeholder data for now.
-const lineMessages = [
-  {
-    id: 1,
-    name: "山田 美咲",
-    avatar: "M",
-    message: "面接の予約をしたいのですが、来週の火曜日は空いていますか？",
-    time: "14:32",
-    unread: true,
-  },
-  {
-    id: 2,
-    name: "佐藤 あゆみ",
-    avatar: "A",
-    message: "体入の時給について詳しく教えてください",
-    time: "13:15",
-    unread: true,
-  },
-  {
-    id: 3,
-    name: "高橋 ゆい",
-    avatar: "Y",
-    message: "ありがとうございます！確認しました。",
-    time: "12:48",
-    unread: false,
-  },
-  {
-    id: 4,
-    name: "田中 りさ",
-    avatar: "R",
-    message: "新宿エリアで未経験OKのお店はありますか？",
-    time: "11:20",
-    unread: false,
-  },
-  {
-    id: 5,
-    name: "中村 さくら",
-    avatar: "S",
-    message: "明日の面接、よろしくお願いします！",
-    time: "10:05",
-    unread: false,
-  },
-];
-
-// TODO: Will be populated when activity log API is added.
-const activityLogs = [
-  { time: "14:32", user: "田中太郎", action: "店舗「CLUB LUNA」を更新", type: "update" },
-  { time: "14:15", user: "佐藤花子", action: "口コミ #892 を承認", type: "approve" },
-  { time: "13:48", user: "山本一郎", action: "新規ユーザー登録", type: "create" },
-  { time: "13:20", user: "鈴木美咲", action: "AIチャット設定を変更", type: "update" },
-  { time: "12:55", user: "高橋健太", action: "店舗「Lounge ARIA」を新規作成", type: "create" },
-  { time: "12:30", user: "伊藤あゆみ", action: "ユーザー #456 を停止", type: "warning" },
-];
-
-// TODO: Will be populated when LINE integration API is added.
-const lineStats = {
-  friends: 2847,
-  friendsChange: "+128",
-  todayAdded: 12,
-  unreadMessages: 8,
-};
 
 const typeColors: Record<string, string> = {
   update: "bg-blue-500",
@@ -99,6 +37,7 @@ const typeColors: Record<string, string> = {
 export function DashboardPage() {
   const rawId = useId();
   const chartId = rawId.replace(/:/g, "");
+  const navigate = useNavigate();
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -212,21 +151,21 @@ export function DashboardPage() {
               <div>
                 <p className="text-white/60 text-[11px] uppercase tracking-wider">友だち数</p>
                 <p className="text-3xl text-white mt-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}>
-                  {lineStats.friends.toLocaleString()}
+                  {data.line_stats.friends.toLocaleString()}
                 </p>
                 <p className="text-[12px] text-white/70 mt-1 flex items-center gap-1">
                   <UserPlus className="w-3 h-3 text-white" />
-                  <span className="text-white">今月 {lineStats.friendsChange}</span>
+                  <span className="text-white">今月 {data.line_stats.friends_change}</span>
                 </p>
               </div>
               <div className="flex gap-4">
                 <div>
                   <p className="text-white/60 text-[11px]">本日追加</p>
-                  <p className="text-lg text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600 }}>{lineStats.todayAdded}</p>
+                  <p className="text-lg text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600 }}>{data.line_stats.today_added}</p>
                 </div>
                 <div>
                   <p className="text-white/60 text-[11px]">未読</p>
-                  <p className="text-lg text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600 }}>{lineStats.unreadMessages}</p>
+                  <p className="text-lg text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600 }}>{data.line_stats.unread_messages}</p>
                 </div>
               </div>
             </div>
@@ -282,17 +221,21 @@ export function DashboardPage() {
             <div className="flex items-center gap-2">
               <h3 className="text-sm">メッセージ</h3>
               <span className="text-[11px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-md">
-                {lineStats.unreadMessages}件
+                {data.line_stats.unread_messages}件
               </span>
             </div>
-            <button className="text-[12px] text-muted-foreground hover:text-foreground transition flex items-center gap-0.5">
+            <button
+              onClick={() => navigate("/admin/line-messages")}
+              className="text-[12px] text-muted-foreground hover:text-foreground transition flex items-center gap-0.5"
+            >
               すべて表示 <ArrowUpRight className="w-3 h-3" />
             </button>
           </div>
           <div className="divide-y divide-border">
-            {lineMessages.map((msg) => (
+            {data.recent_messages.map((msg) => (
               <div
                 key={msg.id}
+                onClick={() => navigate(msg.user_id ? `/admin/users/${msg.user_id}` : "/admin/line-messages")}
                 className={`px-4 sm:px-5 py-3 flex items-start gap-3 hover:bg-muted/40 transition cursor-pointer ${
                   msg.unread ? "bg-indigo-50/50" : ""
                 }`}
@@ -373,7 +316,7 @@ export function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {activityLogs.map((log, i) => (
+              {data.activity_logs.map((log, i) => (
                 <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20 transition">
                   <td className="py-2.5 px-5 text-muted-foreground whitespace-nowrap">{log.time}</td>
                   <td className="py-2.5 px-5">
@@ -390,7 +333,7 @@ export function DashboardPage() {
         </div>
         {/* Mobile card list */}
         <div className="sm:hidden divide-y divide-border">
-          {activityLogs.map((log, i) => (
+          {data.activity_logs.map((log, i) => (
             <div key={i} className="px-4 py-3 space-y-0.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

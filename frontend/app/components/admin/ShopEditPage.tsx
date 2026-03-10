@@ -347,6 +347,60 @@ function SliderField({
   );
 }
 
+function ImageUploadZone({
+  onUpload,
+  uploading,
+  disabled,
+}: {
+  onUpload: (files: FileList) => void;
+  uploading?: boolean;
+  disabled?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      onClick={() => !disabled && !uploading && inputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!disabled && !uploading && e.dataTransfer.files.length > 0) {
+          onUpload(e.dataTransfer.files);
+        }
+      }}
+      className={`border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-stone-400 hover:bg-muted/30 transition-all cursor-pointer group ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            onUpload(e.target.files);
+            e.target.value = "";
+          }
+        }}
+      />
+      <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:bg-primary/10 transition">
+        {uploading ? (
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
+        ) : (
+          <Upload className="w-6 h-6 text-muted-foreground group-hover:text-primary transition" />
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {uploading ? "アップロード中..." : disabled ? "先に店舗を保存してください" : "ドラッグ&ドロップまたはクリックしてアップロード"}
+      </p>
+      <p className="text-xs text-muted-foreground/60 mt-1.5">
+        PNG, JPG, WEBP（最大5MB）
+      </p>
+    </div>
+  );
+}
+
+// Legacy wrapper for sections not yet connected to upload (champagne/transport)
 function ImageUpload() {
   return (
     <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-stone-400 hover:bg-muted/30 transition-all cursor-pointer group">
@@ -555,6 +609,10 @@ export function ShopEditPage() {
   const [staffComment, setStaffComment] = useState("");
   const [supportItems, setSupportItems] = useState<string[]>([]);
 
+  const [publishStatus, setPublishStatus] = useState<"published" | "unpublished" | "draft">("draft");
+  const [storeImages, setStoreImages] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -659,6 +717,10 @@ export function ShopEditPage() {
     // Spots
     setAfterSpots((store.after_spots as any[] || []).map(s => ({ label: s.name || s.label || "", value: s.genre ? `${s.genre}（${s.distance || ""}）` : s.value || "" })));
     setDohanSpots((store.companion_spots as any[] || []).map(s => ({ label: s.name || s.label || "", value: s.genre ? `${s.genre}（${s.distance || ""}）` : s.value || "" })));
+
+    // Publish status & images
+    setPublishStatus(store.publish_status || "draft");
+    setStoreImages(store.images || []);
   }, []);
 
   useEffect(() => {
@@ -746,8 +808,8 @@ export function ShopEditPage() {
     },
     after_spots: afterSpots.filter(i => i.label).map(i => ({ label: i.label, value: i.value })),
     companion_spots: dohanSpots.filter(i => i.label).map(i => ({ label: i.label, value: i.value })),
-    publish_status: "draft",
-  }), [shopName, area, address, station, category, hours, holiday, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewTime, sameDayTrial, tags, description, featureText, documents, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, scheduleHours, scheduleHoliday, shiftInfo, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, afterSpots, dohanSpots]);
+    publish_status: publishStatus,
+  }), [shopName, area, address, station, category, hours, holiday, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewTime, sameDayTrial, tags, description, featureText, documents, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, scheduleHours, scheduleHoliday, shiftInfo, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, afterSpots, dohanSpots, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -770,6 +832,42 @@ export function ShopEditPage() {
       setSaving(false);
     }
   }, [isNew, id, buildPayload, navigate]);
+
+  const handleImageUpload = useCallback(async (files: FileList) => {
+    if (isNew || !id) {
+      setSaveError("画像をアップロードするには、まず店舗を保存してください。");
+      return;
+    }
+    setUploadingImage(true);
+    setSaveError(null);
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("image", file);
+        const res = await api.upload<{ url: string; images: string[] }>(
+          `/admin/stores/${id}/images`,
+          formData,
+        );
+        setStoreImages(res.images);
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "画像のアップロードに失敗しました");
+    } finally {
+      setUploadingImage(false);
+    }
+  }, [id, isNew]);
+
+  const handleImageDelete = useCallback(async (index: number) => {
+    if (!id) return;
+    try {
+      const res = await api.delete<{ images: string[] }>(
+        `/admin/stores/${id}/images/${index}`,
+      );
+      setStoreImages(res.images);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "画像の削除に失敗しました");
+    }
+  }, [id]);
 
   const handleNext = useCallback(() => {
     setCompletedSteps((prev) => new Set([...prev, currentStep]));
@@ -891,9 +989,33 @@ export function ShopEditPage() {
         <div className="space-y-5">
           <Field
             label="店舗画像"
-            hint="最大10枚まで。1枚目がサムネイルになります。"
+            hint={isNew ? "店舗を保存した後に画像をアップロードできます。" : "最大10枚まで。1枚目がサムネイルになります。"}
           >
-            <ImageUpload />
+            {storeImages.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {storeImages.map((url, idx) => (
+                  <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-square">
+                    <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
+                        サムネイル
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleImageDelete(idx)}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <ImageUploadZone
+              onUpload={handleImageUpload}
+              uploading={uploadingImage}
+              disabled={isNew}
+            />
           </Field>
           <Field label="動画URL">
             <TextInput
@@ -1531,11 +1653,15 @@ export function ShopEditPage() {
       <SectionCard title="公開設定" icon={Globe}>
         <div className="space-y-5">
           <Field label="公開ステータス" required>
-            <SelectInput
-              value="公開中"
-              onChange={() => {}}
-              options={["下書き", "公開中", "非公開", "レビュー待ち"]}
-            />
+            <select
+              value={publishStatus}
+              onChange={(e) => setPublishStatus(e.target.value as "published" | "unpublished" | "draft")}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
+            >
+              <option value="draft">下書き</option>
+              <option value="published">公開中</option>
+              <option value="unpublished">非公開</option>
+            </select>
           </Field>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Field label="公開開始日時">
@@ -1730,7 +1856,7 @@ export function ShopEditPage() {
                   feature_tags: tags,
                   description: description,
                   features_text: featureText,
-                  images: null,
+                  images: storeImages.length > 0 ? storeImages.map((url, i) => ({ url, order: i })) : null,
                   video_url: videoUrl,
                   analysis: {
                     experience_level: expLevel,
@@ -1773,6 +1899,7 @@ export function ShopEditPage() {
                         examples: h.examples,
                       }))
                     : null,
+                  recent_hires_summary: hiringTotal,
                   popular_features: popularFeatures.length > 0
                     ? { features: popularFeatures, hint: otherHint }
                     : null,

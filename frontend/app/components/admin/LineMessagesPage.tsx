@@ -13,7 +13,7 @@ import type { LineFriend, LineMessage, Paginated } from "~/lib/types";
 
 export function LineMessagesPage() {
   const navigate = useNavigate();
-  const { lineUserId } = useParams<{ lineUserId: string }>();
+  const { userId } = useParams<{ userId: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [friend, setFriend] = useState<LineFriend | null>(null);
@@ -26,7 +26,7 @@ export function LineMessagesPage() {
 
   const fetchMessages = useCallback(
     async (pageNum = 1, append = false) => {
-      if (!lineUserId) return;
+      if (!userId) return;
       try {
         if (!append) setLoading(true);
         setError(null);
@@ -34,7 +34,7 @@ export function LineMessagesPage() {
         const data = await api.get<{
           friend: LineFriend;
           messages: Paginated<LineMessage>;
-        }>(`/admin/line/friends/${lineUserId}/messages?page=${pageNum}&per_page=50`);
+        }>(`/admin/users/${userId}/messages?page=${pageNum}&per_page=50`);
 
         setFriend(data.friend);
 
@@ -57,7 +57,7 @@ export function LineMessagesPage() {
         setLoading(false);
       }
     },
-    [lineUserId]
+    [userId]
   );
 
   useEffect(() => {
@@ -72,26 +72,26 @@ export function LineMessagesPage() {
   }, [loading]);
 
   const handleSend = async () => {
-    if (!messageText.trim() || !lineUserId || sending) return;
+    if (!messageText.trim() || !userId || sending) return;
 
     try {
       setSending(true);
       setError(null);
 
-      await api.post("/admin/line/push", {
-        line_user_id: lineUserId,
+      await api.post(`/admin/users/${userId}/line-message`, {
         message: messageText.trim(),
       });
 
       // Add message to local state immediately
       const newMessage: LineMessage = {
         id: Date.now(),
-        line_user_id: lineUserId,
+        line_user_id: userId,
         user_id: null,
         direction: "outbound",
         message_type: "text",
         content: messageText.trim(),
         line_message_id: null,
+        read_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -177,7 +177,7 @@ export function LineMessagesPage() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-4">
         <button
-          onClick={() => navigate("/admin/line")}
+          onClick={() => navigate("/admin/users")}
           className="p-2 rounded-lg hover:bg-muted transition"
         >
           <ArrowLeft className="w-5 h-5" />

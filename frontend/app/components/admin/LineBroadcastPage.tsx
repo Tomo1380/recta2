@@ -72,6 +72,7 @@ export function LineBroadcastPage() {
         message_type: "text",
         content: messageText.trim(),
         line_message_id: null,
+        read_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -161,7 +162,7 @@ export function LineBroadcastPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate("/admin/line")}
+          onClick={() => navigate("/admin/users")}
           className="p-2 rounded-lg hover:bg-muted transition"
         >
           <ArrowLeft className="w-5 h-5" />

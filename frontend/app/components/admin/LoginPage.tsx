@@ -112,7 +112,7 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@recta.jp"
+                placeholder="admin@recta2.jp"
                 required
                 className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all text-sm"
               />

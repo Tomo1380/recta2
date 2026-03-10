@@ -14,11 +14,7 @@ return new class extends Migration
             $table->string('line_user_id')->unique();
             $table->string('line_display_name');
             $table->string('line_picture_url')->nullable();
-            $table->string('nickname')->nullable();
-            $table->integer('age')->nullable();
-            $table->string('preferred_area')->nullable();
-            $table->string('preferred_category')->nullable();
-            $table->string('experience')->nullable();
+            $table->text('admin_notes')->nullable();
             $table->enum('status', ['active', 'suspended'])->default('active');
             $table->timestamp('last_login_at')->nullable();
             $table->timestamps();

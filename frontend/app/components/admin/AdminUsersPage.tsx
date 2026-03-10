@@ -263,7 +263,7 @@ export function AdminUsersPage() {
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="email@recta.jp"
+                  placeholder="email@recta2.jp"
                   className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
                 />
               </div>

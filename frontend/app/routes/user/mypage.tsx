@@ -100,7 +100,7 @@ export default function MyPage() {
       setPreferredArea(user.preferred_area ?? "");
       setPreferredCategory(user.preferred_category ?? "");
       setExperience(user.experience ?? "");
-      setBio((user as User & { bio?: string }).bio ?? "");
+      setBio(user.bio ?? "");
     }
   }, [user]);
 

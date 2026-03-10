@@ -4,10 +4,6 @@ import {
   Loader2,
   Star,
   MapPin,
-  HelpCircle,
-  MessageSquare,
-  Shield,
-  SlidersHorizontal,
   Sparkles,
   Zap,
   BookOpen,
@@ -15,6 +11,8 @@ import {
   Hash,
   Wrench,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +24,10 @@ interface AiChatPanelProps {
   storeId?: number;
   storeName?: string;
   className?: string;
+  /** Preview mode: disables API calls, uses provided suggest buttons */
+  preview?: boolean;
+  /** Override suggest buttons (used in preview mode) */
+  previewSuggestButtons?: string[];
 }
 
 interface StoreCard {
@@ -145,25 +147,21 @@ function formatWage(min?: number, max?: number): string {
 
 const SUGGEST_ACTIONS = [
   {
-    icon: HelpCircle,
     title: "質問する",
     subtitle: "AIに直接聞いてみる",
     message: "お仕事について質問があります",
   },
   {
-    icon: MessageSquare,
     title: "状況を話す",
     subtitle: "自分の状況をAIに伝える",
     message: "今の状況についてお話しします",
   },
   {
-    icon: Shield,
     title: "不安を解消",
     subtitle: "本音の心配をそのまま",
     message: "不安な点を相談したいです",
   },
   {
-    icon: SlidersHorizontal,
     title: "条件で絞る",
     subtitle: "希望条件をそのまま入力",
     message: "希望条件でお店を探したいです",
@@ -265,6 +263,138 @@ function MetaBadge({ meta }: { meta: MessageMeta }) {
 }
 
 // ---------------------------------------------------------------------------
+// Suggest actions carousel (touch-scroll on mobile, arrow buttons on PC)
+// ---------------------------------------------------------------------------
+
+function SuggestActionsCarousel({
+  actions,
+  isLoading,
+  onSend,
+}: {
+  actions: typeof SUGGEST_ACTIONS;
+  isLoading: boolean;
+  onSend: (text: string) => void;
+}) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      ro.disconnect();
+    };
+  }, [checkScroll]);
+
+  const scroll = (direction: "left" | "right") => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction === "left" ? -150 : 150, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative group">
+      <style>{`.suggest-carousel::-webkit-scrollbar { display: none; }`}</style>
+      <div
+        ref={scrollContainerRef}
+        className="suggest-carousel flex gap-2 px-5 pb-3 overflow-x-auto"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {actions.map((action, idx) => (
+          <button
+            key={action.title}
+            type="button"
+            onClick={() => onSend(action.message)}
+            disabled={isLoading}
+            className="flex shrink-0 flex-col items-start gap-px rounded-[10px] bg-white pl-3 pr-3 py-[7px] text-left transition-all hover:shadow-md disabled:opacity-50"
+            style={{
+              border: idx === 0
+                ? "0.5px solid rgba(27,37,40,0.22)"
+                : "0.5px solid rgba(27,37,40,0.15)",
+              boxShadow: idx === 0
+                ? "0px 1.5px 6px rgba(27,37,40,0.13), 0px 0.5px 2px rgba(27,37,40,0.08)"
+                : "none",
+            }}
+          >
+            <span
+              className="text-[11px] leading-tight whitespace-nowrap"
+              style={{
+                color: idx === 0 ? "#1b2528" : "rgba(27,37,40,0.7)",
+                fontWeight: idx === 0 ? 500 : 400,
+              }}
+            >
+              {action.title}
+            </span>
+            <span
+              className="text-[9px] leading-tight whitespace-nowrap"
+              style={{
+                color: idx === 0 ? "rgba(27,37,40,0.45)" : "rgba(27,37,40,0.32)",
+                letterSpacing: "0.18px",
+              }}
+            >
+              {action.subtitle}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Left arrow (PC hover) */}
+      {canScrollLeft && (
+        <button
+          type="button"
+          onClick={() => scroll("left")}
+          className="absolute left-1 top-1/2 -translate-y-1/2 hidden sm:flex size-7 items-center justify-center rounded-full bg-white/90 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+          style={{ border: "0.5px solid rgba(27,37,40,0.12)" }}
+        >
+          <ChevronLeft className="size-4" style={{ color: "rgba(27,37,40,0.6)" }} />
+        </button>
+      )}
+
+      {/* Right arrow (PC hover) */}
+      {canScrollRight && (
+        <button
+          type="button"
+          onClick={() => scroll("right")}
+          className="absolute right-1 top-1/2 -translate-y-1/2 hidden sm:flex size-7 items-center justify-center rounded-full bg-white/90 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+          style={{ border: "0.5px solid rgba(27,37,40,0.12)" }}
+        >
+          <ChevronRight className="size-4" style={{ color: "rgba(27,37,40,0.6)" }} />
+        </button>
+      )}
+
+      {/* Right fade hint */}
+      {canScrollRight && (
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-10"
+          style={{ background: "linear-gradient(270deg, white 0%, transparent 100%)" }}
+        />
+      )}
+
+      {/* Left fade hint */}
+      {canScrollLeft && (
+        <div
+          className="pointer-events-none absolute left-0 top-0 bottom-0 w-10"
+          style={{ background: "linear-gradient(90deg, white 0%, transparent 100%)" }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -273,6 +403,8 @@ export default function AiChatPanel({
   storeId,
   storeName,
   className,
+  preview = false,
+  previewSuggestButtons,
 }: AiChatPanelProps) {
   const introScript = getIntroScript(pageType, storeName);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -300,6 +432,7 @@ export default function AiChatPanel({
 
   // ---- Detect user area from geolocation (best-effort, once) ----
   useEffect(() => {
+    if (preview) return;
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -328,17 +461,27 @@ export default function AiChatPanel({
 
   // ---- Load config ----
   useEffect(() => {
+    if (preview) return;
     fetchConfig(pageType)
       .then((cfg) => {
         setEnabled(cfg.enabled);
         setSuggestButtons(cfg.suggest_buttons ?? []);
       })
       .catch(() => {});
-  }, [pageType]);
+  }, [pageType, preview]);
+
+  // In preview mode, use previewSuggestButtons directly
+  const activeSuggestButtons = preview ? (previewSuggestButtons ?? []) : suggestButtons;
 
   // ---- Intro animation: IntersectionObserver ----
   useEffect(() => {
     if (introPlayed || messages.length > 0) return;
+
+    // In preview mode, start intro immediately
+    if (preview) {
+      if (introPhase === "idle") setIntroPhase("typing-user");
+      return;
+    }
 
     const el = panelRef.current;
     if (!el) return;
@@ -355,7 +498,7 @@ export default function AiChatPanel({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [introPlayed, introPhase, messages.length]);
+  }, [introPlayed, introPhase, messages.length, preview]);
 
   // ---- Intro animation: typewriter effect ----
   useEffect(() => {
@@ -420,7 +563,7 @@ export default function AiChatPanel({
   const handleSend = useCallback(
     async (text?: string) => {
       const msg = (text ?? input).trim();
-      if (!msg || isLoading || limitReached) return;
+      if (!msg || isLoading || limitReached || preview) return;
 
       if (introPhase !== "done" && introPhase !== "idle") {
         setIntroPhase("done");
@@ -491,106 +634,73 @@ export default function AiChatPanel({
   return (
     <div
       ref={panelRef}
-      className={`overflow-hidden rounded-[16px] bg-white ${className ?? ""}`}
+      className={`overflow-hidden rounded-[14px] bg-white ${className ?? ""}`}
       style={{
-        border: "1px solid rgba(27,37,40,0.08)",
-        boxShadow:
-          "0px 4px 24px rgba(0,0,0,0.06), 0px 1px 4px rgba(0,0,0,0.03)",
+        border: "0.5px solid rgba(212,175,55,0.28)",
       }}
     >
-      {/* ---- Header with mode switch ---- */}
-      <div className="px-5 pt-5 pb-4">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2.5">
-            <h3
-              className="text-[17px] font-bold"
-              style={{ color: "#1b2528" }}
-            >
-              AIに相談する
-            </h3>
-            <span
-              className="rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white"
-              style={{
-                background:
-                  "linear-gradient(135deg, #d4af37 0%, #c5a028 100%)",
-              }}
-            >
-              NEW
-            </span>
-          </div>
-
-          {/* Mode toggle */}
-          <div
-            className="flex rounded-full p-0.5"
+      {/* ---- Header ---- */}
+      <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block w-1 h-4 rounded-full"
+            style={{ background: "linear-gradient(180deg, #d4af37 0%, #c8960c 100%)" }}
+          />
+          <h3
+            className="text-[16px] font-bold tracking-[-0.32px]"
+            style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+          >
+            AIに相談する
+          </h3>
+          <span
+            className="rounded-[4px] px-2 py-0.5 text-[8.5px] font-semibold tracking-[1.02px]"
             style={{
-              backgroundColor: "rgba(27,37,40,0.06)",
-              border: "1px solid rgba(27,37,40,0.08)",
+              background: "linear-gradient(156deg, #1b2528 0%, #2c3e46 100%)",
+              color: "#d4af37",
+              border: "0.5px solid rgba(212,175,55,0.4)",
+              fontFamily: "'Outfit', sans-serif",
             }}
           >
-            <button
-              type="button"
-              onClick={() => setMode("agent")}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
-              style={{
-                backgroundColor:
-                  mode === "agent" ? "white" : "transparent",
-                color:
-                  mode === "agent" ? "#d4af37" : "rgba(27,37,40,0.45)",
-                boxShadow:
-                  mode === "agent"
-                    ? "0px 1px 3px rgba(0,0,0,0.1)"
-                    : "none",
-              }}
-            >
-              <Zap className="size-2.5" />
-              Agent
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("finetuned")}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all"
-              style={{
-                backgroundColor:
-                  mode === "finetuned" ? "white" : "transparent",
-                color:
-                  mode === "finetuned"
-                    ? "#6366f1"
-                    : "rgba(27,37,40,0.45)",
-                boxShadow:
-                  mode === "finetuned"
-                    ? "0px 1px 3px rgba(0,0,0,0.1)"
-                    : "none",
-              }}
-            >
-              <BookOpen className="size-2.5" />
-              Fine-tuned
-            </button>
-          </div>
+            NEW
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex size-[22px] shrink-0 items-center justify-center rounded-[10px]"
+            style={{ background: "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)" }}
+          >
+            <Sparkles className="size-3.5 text-white" />
+          </div>
           <span
-            className="inline-block size-2 rounded-full"
-            style={{ backgroundColor: "#d4af37" }}
-          />
-          <span
-            className="text-xs"
-            style={{ color: "rgba(27,37,40,0.5)" }}
+            className="text-[13px] font-bold"
+            style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
           >
             Recta AI
           </span>
-          <span
-            className="text-[10px] ml-1"
-            style={{ color: "rgba(27,37,40,0.3)" }}
-          >
-            — {mode === "agent" ? "Function Calling" : "Tuned Model"}
+          <span className="relative size-1.5">
+            <span
+              className="absolute -inset-[1.5px] rounded-full opacity-30"
+              style={{ backgroundColor: "#d4af37" }}
+            />
+            <span
+              className="absolute inset-0 rounded-full"
+              style={{ backgroundColor: "#d4af37" }}
+            />
           </span>
         </div>
       </div>
 
       {/* ---- Intro animation ---- */}
       {showIntro && !hasMessages && (
-        <div className="px-5 pb-3">
-          <div className="flex flex-col gap-3">
+        <div
+          className="px-4 py-3.5"
+          style={{
+            backgroundColor: "#faf9f7",
+            borderTop: "0.5px solid rgba(27,37,40,0.05)",
+            borderBottom: "0.5px solid rgba(27,37,40,0.05)",
+          }}
+        >
+          <div className="flex flex-col gap-2.5">
             {(introPhase === "typing-user" ||
               introPhase === "show-user" ||
               introPhase === "typing-ai" ||
@@ -598,10 +708,11 @@ export default function AiChatPanel({
               introPhase === "done") && (
               <div className="flex justify-end">
                 <div
-                  className="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[13px] leading-relaxed"
+                  className="max-w-[85%] rounded-bl-[18px] rounded-br-[4px] rounded-tl-[18px] rounded-tr-[18px] px-3.5 py-2.5 text-[13px] leading-relaxed"
                   style={{
-                    backgroundColor: "#f5f5f5",
+                    backgroundColor: "#eae7e3",
                     color: "rgba(27,37,40,0.88)",
+                    boxShadow: "0px 1px 3px rgba(27,37,40,0.06)",
                   }}
                 >
                   {introPhase === "typing-user"
@@ -680,73 +791,31 @@ export default function AiChatPanel({
         </div>
       )}
 
-      {/* ---- Suggest actions ---- */}
-      {!hasMessages && (
-        <div className="px-5 pb-3">
-          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide -mx-5 px-5">
-            {SUGGEST_ACTIONS.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.title}
-                  type="button"
-                  onClick={() => handleSend(action.message)}
-                  disabled={isLoading}
-                  className="flex shrink-0 items-center gap-2 rounded-[10px] bg-white px-3 py-2 text-left transition-all hover:shadow-md disabled:opacity-50"
-                  style={{
-                    border: "0.5px solid rgba(27,37,40,0.22)",
-                    boxShadow:
-                      "0px 1.5px 6px rgba(27,37,40,0.13), 0px 0.5px 2px rgba(27,37,40,0.08)",
-                  }}
-                >
-                  <Icon
-                    className="size-3.5 shrink-0"
-                    style={{ color: "#d4af37" }}
-                  />
-                  <div className="min-w-0">
-                    <div
-                      className="text-[11px] font-medium leading-tight whitespace-nowrap"
-                      style={{ color: "#1b2528" }}
-                    >
-                      {action.title}
-                    </div>
-                    <div
-                      className="text-[9px] leading-tight whitespace-nowrap"
-                      style={{
-                        color: "rgba(27,37,40,0.45)",
-                        letterSpacing: "0.18px",
-                      }}
-                    >
-                      {action.subtitle}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {/* ---- Suggest actions (top page only) ---- */}
+      {!hasMessages && pageType === "top" && (
+        <SuggestActionsCarousel
+          actions={SUGGEST_ACTIONS}
+          isLoading={isLoading}
+          onSend={handleSend}
+        />
       )}
 
       {/* ---- Quick question pills ---- */}
-      {!hasMessages && suggestButtons.length > 0 && (
+      {!hasMessages && activeSuggestButtons.length > 0 && (
         <div className="px-5 pb-4">
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {suggestButtons.map((q) => (
+          <div className="flex flex-wrap gap-2">
+            {activeSuggestButtons.map((q) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => handleSend(q)}
                 disabled={isLoading}
-                className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors hover:opacity-80 disabled:opacity-50"
+                className="flex items-center justify-center rounded-full bg-white px-3.5 py-1.5 text-[11px] transition-all hover:shadow-md disabled:opacity-50"
                 style={{
-                  backgroundColor: "rgba(200,96,128,0.12)",
-                  color: "#c86080",
+                  color: "#1b2528",
+                  boxShadow: "0px 1px 4px rgba(27,37,40,0.13), 0px 0px 0px rgba(27,37,40,0.07)",
                 }}
               >
-                <span
-                  className="inline-block size-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: "#c86080" }}
-                />
                 {q}
               </button>
             ))}
@@ -759,9 +828,14 @@ export default function AiChatPanel({
         <div
           ref={scrollRef}
           className="max-h-[360px] overflow-y-auto"
-          style={{ scrollBehavior: "smooth" }}
+          style={{
+            scrollBehavior: "smooth",
+            backgroundColor: "#faf9f7",
+            borderTop: "0.5px solid rgba(27,37,40,0.05)",
+            borderBottom: "0.5px solid rgba(27,37,40,0.05)",
+          }}
         >
-          <div className="flex flex-col gap-3 px-5 pb-3">
+          <div className="flex flex-col gap-3 px-4 py-3.5">
             {messages.map((msg, i) => {
               const isLimitMsg = limitReached && msg.role === "ai" && i === messages.length - 1;
               return (
@@ -782,16 +856,17 @@ export default function AiChatPanel({
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] px-4 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed ${
+                    className={`max-w-[80%] px-3.5 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed ${
                       msg.role === "user"
-                        ? "rounded-2xl rounded-br-md text-white"
+                        ? "rounded-bl-[18px] rounded-br-[4px] rounded-tl-[18px] rounded-tr-[18px]"
                         : "rounded-bl-[18px] rounded-br-[18px] rounded-tl-[4px] rounded-tr-[18px]"
                     }`}
                     style={
                       msg.role === "user"
                         ? {
-                            background:
-                              "linear-gradient(135deg, #d4af37 0%, #c5a028 100%)",
+                            backgroundColor: "#eae7e3",
+                            color: "rgba(27,37,40,0.88)",
+                            boxShadow: "0px 1px 3px rgba(27,37,40,0.06)",
                           }
                         : isLimitMsg
                           ? {
@@ -803,7 +878,7 @@ export default function AiChatPanel({
                           : {
                               backgroundColor: "white",
                               color: "#1b2528",
-                              border: "1px solid rgba(212,175,55,0.25)",
+                              border: "0.5px solid rgba(212,175,55,0.25)",
                               boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
                             }
                     }
@@ -979,10 +1054,10 @@ export default function AiChatPanel({
                     key={label}
                     type="button"
                     onClick={() => handleSend(label)}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+                    className="rounded-full bg-white px-3.5 py-1.5 text-[11px] transition-all hover:shadow-md"
                     style={{
-                      backgroundColor: "rgba(200,96,128,0.12)",
-                      color: "#c86080",
+                      color: "#1b2528",
+                      boxShadow: "0px 1px 4px rgba(27,37,40,0.13), 0px 0px 0px rgba(27,37,40,0.07)",
                     }}
                   >
                     {label}

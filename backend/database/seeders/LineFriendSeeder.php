@@ -69,35 +69,53 @@ class LineFriendSeeder extends Seeder
         }
 
         // LINE-friend-only records (people who added OA but haven't logged in via LINE Login)
-        $friendOnlyRecords = [
-            [
-                'user_id' => null,
-                'line_user_id' => 'Uf1234567890abcdef1234567890abcde',
-                'display_name' => 'かなこ',
-                'picture_url' => 'https://profile.line-scdn.net/sample_f1.jpg',
-                'followed_at' => now()->subDays(10),
-                'is_following' => true,
-            ],
-            [
-                'user_id' => null,
-                'line_user_id' => 'Uf2345678901abcdef2345678901abcde',
-                'display_name' => 'えみ',
-                'picture_url' => null,
-                'followed_at' => now()->subDays(7),
-                'is_following' => true,
-            ],
-            [
-                'user_id' => null,
-                'line_user_id' => 'Uf3456789012abcdef3456789012abcde',
-                'display_name' => 'りさ',
-                'picture_url' => 'https://profile.line-scdn.net/sample_f3.jpg',
-                'followed_at' => now()->subDays(3),
-                'is_following' => true,
-            ],
+        // These users exist in the users table (created by UserSeeder) so we link them
+        $friendOnlyLineIds = [
+            'Uf1234567890abcdef1234567890abcde',
+            'Uf2345678901abcdef2345678901abcde',
+            'Uf3456789012abcdef3456789012abcde',
         ];
 
-        foreach ($friendOnlyRecords as $record) {
-            LineFriend::create($record);
+        foreach ($friendOnlyLineIds as $i => $lineUserId) {
+            $user = User::where('line_user_id', $lineUserId)->first();
+            $friend = LineFriend::create([
+                'user_id' => $user?->id,
+                'line_user_id' => $lineUserId,
+                'display_name' => $user?->line_display_name ?? $lineUserId,
+                'picture_url' => $user?->line_picture_url,
+                'followed_at' => now()->subDays(10 - $i * 3),
+                'is_following' => true,
+            ]);
+
+            // Add sample messages for friend-only users
+            if ($user && $i === 0) {
+                LineMessage::create([
+                    'line_user_id' => $lineUserId,
+                    'user_id' => $user->id,
+                    'direction' => 'inbound',
+                    'message_type' => 'text',
+                    'content' => '友だち追加しました！お仕事探してます。',
+                    'created_at' => now()->subDays(10),
+                ]);
+            }
+            if ($user && $i === 2) {
+                LineMessage::create([
+                    'line_user_id' => $lineUserId,
+                    'user_id' => $user->id,
+                    'direction' => 'inbound',
+                    'message_type' => 'text',
+                    'content' => '渋谷のガールズバーで働きたいんですが、おすすめありますか？',
+                    'created_at' => now()->subDays(3),
+                ]);
+                LineMessage::create([
+                    'line_user_id' => $lineUserId,
+                    'user_id' => $user->id,
+                    'direction' => 'outbound',
+                    'message_type' => 'text',
+                    'content' => 'ご連絡ありがとうございます！渋谷エリアのガールズバーをいくつかご紹介しますね。',
+                    'created_at' => now()->subDays(3)->addMinutes(15),
+                ]);
+            }
         }
     }
 }

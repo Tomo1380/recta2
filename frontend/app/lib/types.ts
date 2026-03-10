@@ -24,6 +24,8 @@ export interface User {
   preferred_area: string | null;
   preferred_category: string | null;
   experience: string | null;
+  bio: string | null;
+  admin_notes: string | null;
   status: "active" | "suspended";
   last_login_at: string | null;
   created_at: string;
@@ -81,6 +83,7 @@ export interface Store {
   required_documents: { notes: string; documents: string[] } | null;
   schedule: Record<string, unknown> | null;
   recent_hires: Record<string, unknown>[] | null;
+  recent_hires_summary: string | null;
   popular_features: string[] | null;
   champagne_images: string[] | null;
   transport_images: string[] | null;
@@ -138,6 +141,27 @@ export interface DashboardData {
   };
   user_trend: { month: string; count: number }[];
   chat_trend: { date: string; count: number }[];
+  line_stats: {
+    friends: number;
+    friends_change: string;
+    today_added: number;
+    unread_messages: number;
+  };
+  recent_messages: {
+    id: number;
+    user_id: number | null;
+    name: string;
+    avatar: string;
+    message: string;
+    time: string;
+    unread: boolean;
+  }[];
+  activity_logs: {
+    time: string;
+    user: string;
+    action: string;
+    type: string;
+  }[];
 }
 
 export interface LineFriend {
@@ -163,8 +187,62 @@ export interface LineMessage {
   message_type: string;
   content: string;
   line_message_id: string | null;
+  read_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Area & Category management
+export interface Area {
+  id: number;
+  name: string;
+  slug: string;
+  tier: "gold" | "standard";
+  visible: boolean;
+  sort_order: number;
+  shop_count: number;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  color: string;
+  visible: boolean;
+  sort_order: number;
+  shop_count: number;
+}
+
+// Content management
+export interface PickupShop {
+  id: number;
+  store_id: number;
+  sort_order: number;
+  is_pr: boolean;
+  visible: boolean;
+  store: {
+    id: number;
+    name: string;
+    area: string;
+    category: string | null;
+  };
+  average_rating: number | null;
+}
+
+export interface Consultation {
+  id: number;
+  question: string;
+  tag: string;
+  count: number;
+  visible: boolean;
+  sort_order: number;
+}
+
+export interface BannerSettings {
+  hero_tagline: string;
+  hero_subtitle: string;
+  hero_badge: string;
+  hero_ai_label: string;
 }
 
 export interface AiChatStats {
