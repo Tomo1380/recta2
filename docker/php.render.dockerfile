@@ -30,14 +30,10 @@ RUN composer dump-autoload --optimize \
     && php artisan view:clear \
     && chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
 
-# Parse DATABASE_URL into individual DB_* vars, then run migrations + serve
+# Use DATABASE_URL directly via Laravel's DB_URL support
 CMD sh -c '\
     if [ -n "$DATABASE_URL" ]; then \
-        export DB_HOST=$(echo $DATABASE_URL | sed -E "s|.*@([^:/]+).*|\1|"); \
-        export DB_PORT=$(echo $DATABASE_URL | sed -E "s|.*:([0-9]+)/.*|\1|"); \
-        export DB_DATABASE=$(echo $DATABASE_URL | sed -E "s|.*/([^?]+).*|\1|"); \
-        export DB_USERNAME=$(echo $DATABASE_URL | sed -E "s|.*://([^:]+):.*|\1|"); \
-        export DB_PASSWORD=$(echo $DATABASE_URL | sed -E "s|.*://[^:]+:([^@]+)@.*|\1|"); \
+        export DB_URL="$DATABASE_URL"; \
     fi && \
     php artisan migrate --force && \
     php artisan serve --host=0.0.0.0 --port=${PORT:-8080}'

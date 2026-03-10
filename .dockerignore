@@ -1,0 +1,45 @@
+# Dependencies (installed in container)
+node_modules
+frontend/node_modules
+backend/vendor
+
+# Build output
+frontend/build
+frontend/.react-router
+dist
+
+# Git
+.git
+.gitignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE / Editor
+.vscode
+.idea
+.DS_Store
+
+# Claude / MCP
+.claude
+.mcp.json
+
+# Legacy root files
+src/
+public/
+index.html
+
+# Test
+test-results/
+*-test.cjs
+*-screenshot.cjs
+
+# Docker (avoid recursion)
+docker-compose.yml
+
+# Docs
+docs/
+README.md
+CLAUDE.md
