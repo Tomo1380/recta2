@@ -6,11 +6,16 @@ use App\Http\Controllers\Admin\AreaCategoryController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ContentController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\LineFriendController;
 use App\Http\Controllers\Admin\ReviewController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PublicStoreController;
 use App\Http\Controllers\AiChatController;
+use App\Http\Controllers\LineAuthController;
+use App\Http\Controllers\LineWebhookController;
+use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\PublicReviewController;
 use Illuminate\Support\Facades\Route;
 
 // ========== 公開API ==========
@@ -21,6 +26,25 @@ Route::get('/areas', [PublicStoreController::class, 'areas']);
 Route::get('/categories', [PublicStoreController::class, 'categories']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
 Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');
+
+// ========== LINE認証 ==========
+Route::get('/auth/line', [LineAuthController::class, 'redirect']);
+Route::get('/auth/line/callback', [LineAuthController::class, 'callback']);
+
+// ========== LINE Webhook (公開、署名検証あり) ==========
+Route::post('/webhook/line', [LineWebhookController::class, 'handle']);
+
+// ========== ユーザー（エンドユーザー） ==========
+Route::middleware('auth:sanctum')->prefix('user')->group(function () {
+    Route::get('/me', [UserProfileController::class, 'me']);
+    Route::put('/me', [UserProfileController::class, 'update']);
+    Route::post('/logout', [UserProfileController::class, 'logout']);
+    Route::get('/reviews', [PublicReviewController::class, 'userReviews']);
+});
+
+// ========== 口コミ投稿・削除（エンドユーザー） ==========
+Route::middleware('auth:sanctum')->post('/stores/{store}/reviews', [PublicReviewController::class, 'store']);
+Route::middleware('auth:sanctum')->delete('/user/reviews/{review}', [PublicReviewController::class, 'destroy']);
 
 // ========== 管理画面 ==========
 Route::prefix('admin')->group(function () {
@@ -51,6 +75,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/ai-chat/settings', [AiChatSettingController::class, 'index']);
         Route::put('/ai-chat/settings/{ai_chat_setting}', [AiChatSettingController::class, 'update']);
         Route::get('/ai-chat/stats', [AiChatSettingController::class, 'stats']);
+        Route::get('/ai-chat/limits', [AiChatSettingController::class, 'limits']);
+        Route::put('/ai-chat/limits', [AiChatSettingController::class, 'updateLimits']);
 
         // 管理ユーザー
         Route::get('/admin-users', [AdminUserController::class, 'index']);
@@ -86,5 +112,13 @@ Route::prefix('admin')->group(function () {
 
         Route::get('banner-settings', [ContentController::class, 'bannerSettings']);
         Route::put('banner-settings', [ContentController::class, 'updateBannerSettings']);
+
+        // LINE Messaging管理
+        Route::prefix('line')->group(function () {
+            Route::get('/friends', [LineFriendController::class, 'index']);
+            Route::get('/friends/{lineUserId}/messages', [LineFriendController::class, 'messages']);
+            Route::post('/push', [LineFriendController::class, 'push']);
+            Route::post('/broadcast', [LineFriendController::class, 'broadcast']);
+        });
     });
 });

@@ -6,6 +6,10 @@ export default [
     index("routes/user/top.tsx"),
     route("stores", "routes/user/stores.tsx"),
     route("stores/:id", "routes/user/store-detail.tsx"),
+    route("login", "routes/user/login.tsx"),
+    route("auth/callback", "routes/user/auth-callback.tsx"),
+    route("mypage", "routes/user/mypage.tsx"),
+    route("stores/:id/review", "routes/user/review.tsx"),
   ]),
 
   // 管理画面
@@ -22,5 +26,8 @@ export default [
     route("admin/admin-users", "routes/admin/admin-users.tsx"),
     route("admin/area-category", "routes/admin/area-category.tsx"),
     route("admin/content", "routes/admin/content.tsx"),
+    route("admin/line", "routes/admin/line-friends.tsx"),
+    route("admin/line/broadcast", "routes/admin/line-broadcast.tsx"),
+    route("admin/line/:lineUserId/messages", "routes/admin/line-messages.tsx"),
   ]),
 ] satisfies RouteConfig;

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiChatLimit;
 use App\Models\AiChatLog;
 use App\Models\AiChatSetting;
 use App\Models\Area;
@@ -263,14 +264,14 @@ class AiChatController extends Controller
         $mode = $request->input('mode', 'agent');
         $userArea = $request->input('user_area') ?? '';
 
-        // Rate limit: 30 messages per hour per IP
-        $rateLimitKey = 'chat:' . $ip;
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 30)) {
-            return response()->json([
-                'error' => 'メッセージの送信回数が上限に達しました。しばらくしてからお試しください。',
-            ], 429);
+        // Resolve authenticated user (optional auth — no middleware required)
+        $user = auth('sanctum')->user();
+
+        // --- Usage limit checks ---
+        $limitCheck = $this->checkUsageLimits($user, $ip);
+        if ($limitCheck) {
+            return $limitCheck;
         }
-        RateLimiter::hit($rateLimitKey, 3600);
 
         // Get system prompt
         $setting = AiChatSetting::where('page_type', $pageType)->first();
@@ -287,16 +288,75 @@ class AiChatController extends Controller
 
         $startTime = microtime(true);
 
+        $userId = $user?->id;
+
         try {
             if ($mode === 'finetuned') {
-                return $this->handleFinetunedMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea);
+                return $this->handleFinetunedMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea, $userId);
             }
 
-            return $this->handleAgentMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea);
+            return $this->handleAgentMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea, $userId);
         } catch (\Exception $e) {
             \Log::error('AiChat error', ['mode' => $mode, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return $this->mockResponse($userMessage, $pageType, $storeId, $mode);
+            return $this->mockResponse($userMessage, $pageType, $storeId, $mode, $userId);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Usage limit enforcement
+    // -----------------------------------------------------------------------
+
+    private function checkUsageLimits(?object $user, string $ip): ?JsonResponse
+    {
+        $limits = AiChatLimit::current();
+        $today = now()->toDateString();
+        $monthStart = now()->startOfMonth();
+
+        // 1. Global daily limit
+        $globalToday = AiChatLog::whereDate('created_at', $today)->count();
+        if ($globalToday >= $limits->global_daily_limit) {
+            return response()->json([
+                'message' => $limits->limit_reached_message,
+                'limit_type' => 'global_daily',
+            ], 429);
+        }
+
+        if ($user) {
+            // 2. Authenticated user daily limit
+            $userToday = AiChatLog::where('user_id', $user->id)
+                ->whereDate('created_at', $today)
+                ->count();
+            if ($userToday >= $limits->user_daily_limit) {
+                return response()->json([
+                    'message' => $limits->limit_reached_message,
+                    'limit_type' => 'user_daily',
+                ], 429);
+            }
+
+            // 3. Authenticated user monthly limit
+            $userMonth = AiChatLog::where('user_id', $user->id)
+                ->where('created_at', '>=', $monthStart)
+                ->count();
+            if ($userMonth >= $limits->user_monthly_limit) {
+                return response()->json([
+                    'message' => $limits->limit_reached_message,
+                    'limit_type' => 'user_monthly',
+                ], 429);
+            }
+        } else {
+            // 4. Unauthenticated IP daily limit
+            $ipToday = AiChatLog::where('ip_address', $ip)
+                ->whereDate('created_at', $today)
+                ->count();
+            if ($ipToday >= $limits->ip_daily_limit) {
+                return response()->json([
+                    'message' => $limits->limit_reached_message,
+                    'limit_type' => 'ip_daily',
+                ], 429);
+            }
+        }
+
+        return null;
     }
 
     // -----------------------------------------------------------------------
@@ -313,6 +373,7 @@ class AiChatController extends Controller
         string $ip,
         float $startTime,
         string $userArea = '',
+        ?int $userId = null,
     ): JsonResponse {
         $storeContext = $this->buildStoreContext($pageType, $storeId);
         $systemPrompt = $this->buildAgentSystemPrompt($setting, $storeContext, $userArea);
@@ -381,6 +442,7 @@ class AiChatController extends Controller
 
                 // Log
                 AiChatLog::create([
+                    'user_id' => $userId,
                     'ip_address' => $ip,
                     'page_type' => $pageType,
                     'user_message' => $userMessage,
@@ -492,6 +554,7 @@ class AiChatController extends Controller
         string $ip,
         float $startTime,
         string $userArea = '',
+        ?int $userId = null,
     ): JsonResponse {
         $storeContext = $this->buildStoreContext($pageType, $storeId);
         $systemPrompt = $this->buildSystemPrompt($setting, $storeContext, $userArea);
@@ -539,6 +602,7 @@ class AiChatController extends Controller
 
         // Log
         AiChatLog::create([
+            'user_id' => $userId,
             'ip_address' => $ip,
             'page_type' => $pageType,
             'user_message' => $userMessage,
@@ -725,7 +789,7 @@ class AiChatController extends Controller
     /**
      * Fallback response when Gemini API key is not configured.
      */
-    private function mockResponse(string $message, string $pageType, ?int $storeId, string $mode): JsonResponse
+    private function mockResponse(string $message, string $pageType, ?int $storeId, string $mode, ?int $userId = null): JsonResponse
     {
         $startTime = microtime(true);
 
@@ -808,6 +872,7 @@ class AiChatController extends Controller
         $elapsed = round((microtime(true) - $startTime) * 1000);
 
         AiChatLog::create([
+            'user_id' => $userId,
             'ip_address' => request()->ip(),
             'page_type' => $pageType,
             'user_message' => $message,

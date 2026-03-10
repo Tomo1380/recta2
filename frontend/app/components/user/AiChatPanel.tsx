@@ -14,6 +14,7 @@ import {
   Clock,
   Hash,
   Wrench,
+  AlertTriangle,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,11 @@ async function fetchConfig(pageType: string): Promise<ChatConfigResponse> {
   return res.json();
 }
 
+interface LimitError {
+  message: string;
+  limit_type: string;
+}
+
 async function sendMessage(
   message: string,
   pageType: string,
@@ -91,9 +97,19 @@ async function sendMessage(
   storeId?: number,
   userArea?: string,
 ): Promise<ChatApiResponse> {
+  // Include user token if available for optional auth
+  const token = typeof window !== "undefined" ? localStorage.getItem("user_token") : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers,
     body: JSON.stringify({
       message,
       page_type: pageType,
@@ -103,6 +119,14 @@ async function sendMessage(
       user_area: userArea,
     }),
   });
+
+  if (res.status === 429) {
+    const data: LimitError = await res.json();
+    const err = new Error(data.message) as Error & { limitType?: string };
+    err.limitType = data.limit_type;
+    throw err;
+  }
+
   if (!res.ok) throw new Error("Failed to send message");
   return res.json();
 }
@@ -258,6 +282,7 @@ export default function AiChatPanel({
   const [followUpButtons, setFollowUpButtons] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
   const [mode, setMode] = useState<ChatMode>("agent");
+  const [limitReached, setLimitReached] = useState(false);
 
   // Intro animation state
   const [introPhase, setIntroPhase] = useState<
@@ -395,7 +420,7 @@ export default function AiChatPanel({
   const handleSend = useCallback(
     async (text?: string) => {
       const msg = (text ?? input).trim();
-      if (!msg || isLoading) return;
+      if (!msg || isLoading || limitReached) return;
 
       if (introPhase !== "done" && introPhase !== "idle") {
         setIntroPhase("done");
@@ -424,18 +449,29 @@ export default function AiChatPanel({
         };
         setMessages((prev) => [...prev, aiMessage]);
         setFollowUpButtons(res.follow_ups ?? []);
-      } catch {
-        const errMessage: ChatMessage = {
-          role: "ai",
-          content:
-            "申し訳ございません。エラーが発生しました。もう一度お試しください。",
-        };
-        setMessages((prev) => [...prev, errMessage]);
+      } catch (err) {
+        const error = err as Error & { limitType?: string };
+        if (error.limitType) {
+          // Usage limit reached
+          const limitMessage: ChatMessage = {
+            role: "ai",
+            content: error.message,
+          };
+          setMessages((prev) => [...prev, limitMessage]);
+          setLimitReached(true);
+        } else {
+          const errMessage: ChatMessage = {
+            role: "ai",
+            content:
+              "申し訳ございません。エラーが発生しました。もう一度お試しください。",
+          };
+          setMessages((prev) => [...prev, errMessage]);
+        }
       } finally {
         setIsLoading(false);
       }
     },
-    [input, isLoading, messages, pageType, storeId, introPhase, mode, userArea],
+    [input, isLoading, messages, pageType, storeId, introPhase, mode, userArea, limitReached],
   );
 
   if (!enabled) return null;
@@ -726,7 +762,9 @@ export default function AiChatPanel({
           style={{ scrollBehavior: "smooth" }}
         >
           <div className="flex flex-col gap-3 px-5 pb-3">
-            {messages.map((msg, i) => (
+            {messages.map((msg, i) => {
+              const isLimitMsg = limitReached && msg.role === "ai" && i === messages.length - 1;
+              return (
               <div key={i}>
                 <div
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -735,11 +773,12 @@ export default function AiChatPanel({
                     <div
                       className="mr-2 mt-auto flex size-6 shrink-0 items-center justify-center rounded-[10px]"
                       style={{
-                        background:
-                          "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)",
+                        background: isLimitMsg
+                          ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                          : "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)",
                       }}
                     >
-                      <Sparkles className="size-3.5 text-white" />
+                      {isLimitMsg ? <AlertTriangle className="size-3.5 text-white" /> : <Sparkles className="size-3.5 text-white" />}
                     </div>
                   )}
                   <div
@@ -754,12 +793,19 @@ export default function AiChatPanel({
                             background:
                               "linear-gradient(135deg, #d4af37 0%, #c5a028 100%)",
                           }
-                        : {
-                            backgroundColor: "white",
-                            color: "#1b2528",
-                            border: "1px solid rgba(212,175,55,0.25)",
-                            boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
-                          }
+                        : isLimitMsg
+                          ? {
+                              backgroundColor: "#fffbeb",
+                              color: "#92400e",
+                              border: "1px solid rgba(245,158,11,0.35)",
+                              boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
+                            }
+                          : {
+                              backgroundColor: "white",
+                              color: "#1b2528",
+                              border: "1px solid rgba(212,175,55,0.25)",
+                              boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
+                            }
                     }
                   >
                     {msg.content}
@@ -886,7 +932,8 @@ export default function AiChatPanel({
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
 
             {/* Loading indicator */}
             {isLoading && (
@@ -979,8 +1026,8 @@ export default function AiChatPanel({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="あなたも話しかけてみてください…"
-              disabled={isLoading}
+              placeholder={limitReached ? "利用上限に達しました" : "あなたも話しかけてみてください…"}
+              disabled={isLoading || limitReached}
               className="h-full w-full bg-transparent text-[13px] outline-none disabled:opacity-50"
               style={{
                 color: "#1b2528",
@@ -989,7 +1036,7 @@ export default function AiChatPanel({
             />
             <button
               type="submit"
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || limitReached}
               className="flex size-8 shrink-0 items-center justify-center rounded-[14px] transition-opacity disabled:opacity-30"
               style={{
                 backgroundColor: "rgba(27,37,40,0.1)",

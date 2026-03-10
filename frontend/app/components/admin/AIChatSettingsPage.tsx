@@ -212,14 +212,15 @@ export function AIChatSettingsPage() {
     setDragIdx(null);
   };
 
-  // NOTE: Limits tab has no API endpoint yet - kept as local state
-  const [dailyLimit, setDailyLimit] = useState("20");
-  const [monthlyLimit, setMonthlyLimit] = useState("200");
-  const [ipLimit, setIpLimit] = useState("5");
-  const [globalDailyLimit, setGlobalDailyLimit] = useState("5000");
+  // Limits state (connected to API)
+  const [dailyLimit, setDailyLimit] = useState("50");
+  const [monthlyLimit, setMonthlyLimit] = useState("500");
+  const [ipLimit, setIpLimit] = useState("10");
+  const [globalDailyLimit, setGlobalDailyLimit] = useState("10000");
   const [limitMessage, setLimitMessage] = useState(
-    "本日のチャット利用上限に達しました。明日以降に再度お試しください。"
+    "本日のチャット上限に達しました。明日またご利用ください。"
   );
+  const [limitsLoading, setLimitsLoading] = useState(false);
 
   // Stats state
   const [stats, setStats] = useState<AiChatStats | null>(null);
@@ -289,6 +290,58 @@ export function AIChatSettingsPage() {
       fetchStats();
     }
   }, [activeTab, stats, fetchStats]);
+
+  // --- Fetch limits ---
+  const fetchLimits = useCallback(async () => {
+    try {
+      setLimitsLoading(true);
+      const data = await api.get<{
+        user_daily_limit: number;
+        user_monthly_limit: number;
+        ip_daily_limit: number;
+        global_daily_limit: number;
+        limit_reached_message: string;
+      }>("/admin/ai-chat/limits");
+      setDailyLimit(String(data.user_daily_limit));
+      setMonthlyLimit(String(data.user_monthly_limit));
+      setIpLimit(String(data.ip_daily_limit));
+      setGlobalDailyLimit(String(data.global_daily_limit));
+      setLimitMessage(data.limit_reached_message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "制限設定の取得に失敗しました";
+      setError(message);
+    } finally {
+      setLimitsLoading(false);
+    }
+  }, []);
+
+  const [limitsFetched, setLimitsFetched] = useState(false);
+  useEffect(() => {
+    if (activeTab === "limits" && !limitsFetched) {
+      setLimitsFetched(true);
+      fetchLimits();
+    }
+  }, [activeTab, limitsFetched, fetchLimits]);
+
+  // --- Save limits ---
+  const saveLimits = async () => {
+    try {
+      setSaving(true);
+      await api.put("/admin/ai-chat/limits", {
+        user_daily_limit: parseInt(dailyLimit, 10),
+        user_monthly_limit: parseInt(monthlyLimit, 10),
+        ip_daily_limit: parseInt(ipLimit, 10),
+        global_daily_limit: parseInt(globalDailyLimit, 10),
+        limit_reached_message: limitMessage,
+      });
+      showToast("保存しました");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "保存に失敗しました";
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // --- Save prompt settings ---
   const savePromptConfig = async (page: PageKey) => {
@@ -552,61 +605,78 @@ export function AIChatSettingsPage() {
       )}
 
       {/* Tab 3: Limits */}
-      {/* NOTE: Limits tab has no API endpoint yet - kept as local state */}
       {activeTab === "limits" && (
         <div className="bg-card border border-border rounded-xl p-5 space-y-5 max-w-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[13px] mb-1.5">1ユーザー日次上限</label>
-              <input
-                type="number"
-                value={dailyLimit}
-                onChange={(e) => setDailyLimit(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
+          {limitsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
             </div>
-            <div>
-              <label className="block text-[13px] mb-1.5">1ユーザー月次上限</label>
-              <input
-                type="number"
-                value={monthlyLimit}
-                onChange={(e) => setMonthlyLimit(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] mb-1.5">未ログインIP制限</label>
-              <input
-                type="number"
-                value={ipLimit}
-                onChange={(e) => setIpLimit(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] mb-1.5">全体日次上限</label>
-              <input
-                type="number"
-                value={globalDailyLimit}
-                onChange={(e) => setGlobalDailyLimit(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] mb-1.5">1ユーザー日次上限</label>
+                  <input
+                    type="number"
+                    value={dailyLimit}
+                    onChange={(e) => setDailyLimit(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">ログインユーザーの1日あたりの送信上限</p>
+                </div>
+                <div>
+                  <label className="block text-[13px] mb-1.5">1ユーザー月次上限</label>
+                  <input
+                    type="number"
+                    value={monthlyLimit}
+                    onChange={(e) => setMonthlyLimit(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">ログインユーザーの月間送信上限</p>
+                </div>
+                <div>
+                  <label className="block text-[13px] mb-1.5">未ログインIP制限</label>
+                  <input
+                    type="number"
+                    value={ipLimit}
+                    onChange={(e) => setIpLimit(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">未ログインユーザーのIPあたり1日の送信上限</p>
+                </div>
+                <div>
+                  <label className="block text-[13px] mb-1.5">全体日次上限</label>
+                  <input
+                    type="number"
+                    value={globalDailyLimit}
+                    onChange={(e) => setGlobalDailyLimit(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">サービス全体の1日あたりの送信上限</p>
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-[13px] mb-1.5">制限到達時メッセージ</label>
-            <textarea
-              value={limitMessage}
-              onChange={(e) => setLimitMessage(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-y"
-            />
-          </div>
+              <div>
+                <label className="block text-[13px] mb-1.5">制限到達時メッセージ</label>
+                <textarea
+                  value={limitMessage}
+                  onChange={(e) => setLimitMessage(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-y"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">ユーザーに表示される制限到達時のメッセージ</p>
+              </div>
 
-          <button className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition">
-            保存
-          </button>
+              <button
+                onClick={saveLimits}
+                disabled={saving}
+                className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                保存
+              </button>
+            </>
+          )}
         </div>
       )}
 

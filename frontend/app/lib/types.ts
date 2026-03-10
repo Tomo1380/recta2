@@ -125,6 +125,33 @@ export interface DashboardData {
   chat_trend: { date: string; count: number }[];
 }
 
+export interface LineFriend {
+  id: number;
+  user_id: number | null;
+  line_user_id: string;
+  display_name: string | null;
+  picture_url: string | null;
+  followed_at: string | null;
+  unfollowed_at: string | null;
+  is_following: boolean;
+  created_at: string;
+  updated_at: string;
+  messages_count?: number;
+  user?: User;
+}
+
+export interface LineMessage {
+  id: number;
+  line_user_id: string;
+  user_id: number | null;
+  direction: "inbound" | "outbound";
+  message_type: string;
+  content: string;
+  line_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AiChatStats {
   daily_stats: { date: string; count: number; total_tokens: number }[];
   top_users: { name: string; count: number }[];
