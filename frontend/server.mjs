@@ -6,6 +6,10 @@ const app = express();
 
 // Proxy /api requests to Laravel backend
 const apiTarget = process.env.API_BASE_URL || "http://localhost:8080";
+app.use("/api", (req, res, next) => {
+  console.log(`[proxy] ${req.method} ${req.originalUrl} → ${apiTarget}${req.originalUrl}`);
+  next();
+});
 app.use(
   "/api",
   createProxyMiddleware({
