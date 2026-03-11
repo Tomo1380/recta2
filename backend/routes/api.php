@@ -18,6 +18,9 @@ use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\PublicReviewController;
 use Illuminate\Support\Facades\Route;
 
+// ========== ヘルスチェック ==========
+Route::get('/', fn () => response()->json(['status' => 'ok']));
+
 // ========== 公開API ==========
 Route::get('/home', [PublicStoreController::class, 'home']);
 Route::get('/stores', [PublicStoreController::class, 'index']);
