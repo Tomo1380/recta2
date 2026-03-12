@@ -25,52 +25,68 @@ class AiChatController extends Controller
         return [
             [
                 'name' => 'search_stores',
-                'description' => '条件に合う店舗を検索する。エリア、カテゴリ、時給、特徴タグなどで絞り込みが可能。',
+                'description' => '条件に合うナイトワーク求人を検索する。エリア・カテゴリ・時給・特徴タグ・最寄り駅・体入・保証制度などで絞り込み可能。条件が曖昧な場合はkeywordでフリーワード検索を使う。必ず何かしらの検索を実行すること。',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
                         'area' => [
                             'type' => 'string',
-                            'description' => 'エリア名（例: 新宿, 六本木, 銀座）',
+                            'description' => 'エリア名1つ（例: 新宿, 六本木, 銀座, 渋谷, 池袋, 恵比寿, 麻布十番, 表参道）',
                         ],
                         'category' => [
                             'type' => 'string',
-                            'description' => 'カテゴリ名（例: キャバクラ, ラウンジ, クラブ, ガールズバー）',
+                            'description' => '業種カテゴリ（例: キャバクラ, ラウンジ, ガールズバー, コンカフェ, クラブ, ニュークラブ）',
                         ],
                         'min_hourly' => [
                             'type' => 'integer',
-                            'description' => '最低時給（例: 3000）',
+                            'description' => '最低時給の下限（例: 3000 → 時給3000円以上のお店）',
+                        ],
+                        'max_hourly' => [
+                            'type' => 'integer',
+                            'description' => '時給の上限（例: 5000 → 時給5000円以下のお店。初心者向けなど）',
                         ],
                         'tags' => [
                             'type' => 'array',
                             'items' => ['type' => 'string'],
-                            'description' => '特徴タグ（例: ["未経験歓迎", "日払いOK", "ノルマなし"]）',
+                            'description' => '特徴タグで絞り込み（例: ["未経験歓迎", "日払いあり", "送りあり", "終電上がりOK", "ノルマなし", "体入全額日払い", "髪色自由", "ネイルOK", "経験者優遇", "高時給", "駅チカ"]）',
+                        ],
+                        'nearest_station' => [
+                            'type' => 'string',
+                            'description' => '最寄り駅名（例: 六本木駅, 新宿駅, 銀座駅）',
+                        ],
+                        'same_day_trial' => [
+                            'type' => 'boolean',
+                            'description' => '当日体験入店（体入）可能なお店のみ検索する場合true',
+                        ],
+                        'has_guarantee' => [
+                            'type' => 'boolean',
+                            'description' => '保証制度（保証期間）ありのお店のみ検索する場合true',
                         ],
                         'keyword' => [
                             'type' => 'string',
-                            'description' => 'フリーワード検索（店名、説明文など）',
+                            'description' => 'フリーワード検索。店名・説明文・最寄り駅・特徴テキスト・住所を横断検索。条件が特定できない場合に使う',
                         ],
                         'sort' => [
                             'type' => 'string',
                             'enum' => ['newest', 'hourly_desc', 'hourly_asc', 'popular'],
-                            'description' => 'ソート順',
+                            'description' => 'ソート順（newest: 新着順, hourly_desc: 時給高い順, hourly_asc: 時給低い順, popular: 人気順）',
                         ],
                         'limit' => [
                             'type' => 'integer',
-                            'description' => '取得件数（デフォルト5）',
+                            'description' => '取得件数（デフォルト5、最大10）',
                         ],
                     ],
                 ],
             ],
             [
                 'name' => 'get_store_detail',
-                'description' => '特定の店舗の詳細情報を取得する。時給、バック、ノルマ、体入、雰囲気など。',
+                'description' => '特定の店舗の全詳細情報を取得する。時給・バック・ノルマ・保証・体入・雰囲気・営業時間・スタッフコメントなど。search_storesの結果から店舗IDを指定。比較質問やより詳しい情報が必要な場合に使う。',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
                         'store_id' => [
                             'type' => 'integer',
-                            'description' => '店舗ID',
+                            'description' => '店舗ID（search_storesの結果に含まれるid）',
                         ],
                     ],
                     'required' => ['store_id'],
@@ -78,7 +94,7 @@ class AiChatController extends Controller
             ],
             [
                 'name' => 'get_areas',
-                'description' => '利用可能なエリア一覧を取得する。',
+                'description' => '利用可能なエリア一覧を取得する。ユーザーがエリアについて聞いた時や、どんなエリアがあるか知りたい場合に使う。',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => (object)[],
@@ -86,7 +102,7 @@ class AiChatController extends Controller
             ],
             [
                 'name' => 'get_categories',
-                'description' => '利用可能な業種カテゴリ一覧を取得する。',
+                'description' => '利用可能な業種カテゴリ一覧を取得する。ユーザーが業種について聞いた時や、どんな業種があるか知りたい場合に使う。',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => (object)[],
@@ -123,17 +139,35 @@ class AiChatController extends Controller
         if (!empty($args['min_hourly'])) {
             $query->where('hourly_min', '>=', (int)$args['min_hourly']);
         }
+        if (!empty($args['max_hourly'])) {
+            $query->where('hourly_min', '<=', (int)$args['max_hourly']);
+        }
+        if (!empty($args['nearest_station'])) {
+            $query->where('nearest_station', 'ilike', "%{$args['nearest_station']}%");
+        }
+        if (!empty($args['same_day_trial'])) {
+            $query->where('same_day_trial', true);
+        }
+        if (!empty($args['has_guarantee'])) {
+            $query->whereNotNull('guarantee_period')->where('guarantee_period', '!=', '');
+        }
         if (!empty($args['keyword'])) {
             $kw = $args['keyword'];
             $query->where(function ($q) use ($kw) {
                 $q->where('name', 'ilike', "%{$kw}%")
                   ->orWhere('description', 'ilike', "%{$kw}%")
-                  ->orWhere('nearest_station', 'ilike', "%{$kw}%");
+                  ->orWhere('nearest_station', 'ilike', "%{$kw}%")
+                  ->orWhere('features_text', 'ilike', "%{$kw}%")
+                  ->orWhere('address', 'ilike', "%{$kw}%");
             });
         }
         if (!empty($args['tags'])) {
             foreach ($args['tags'] as $tag) {
-                $query->whereJsonContains('feature_tags', trim($tag));
+                $tag = trim($tag);
+                $query->where(function ($q) use ($tag) {
+                    $q->whereJsonContains('feature_tags', $tag)
+                      ->orWhere('features_text', 'ilike', "%{$tag}%");
+                });
             }
         }
 
@@ -158,8 +192,12 @@ class AiChatController extends Controller
                 'nearest_station' => $s->nearest_station,
                 'hourly_min' => $s->hourly_min,
                 'hourly_max' => $s->hourly_max,
+                'daily_estimate' => $s->daily_estimate,
+                'same_day_trial' => $s->same_day_trial,
+                'trial_hourly' => $s->trial_hourly,
+                'guarantee_period' => $s->guarantee_period,
                 'feature_tags' => $s->feature_tags ?? [],
-                'description' => mb_substr($s->description ?? '', 0, 100),
+                'description' => mb_substr($s->description ?? '', 0, 150),
                 'images' => $s->images ?? [],
                 'average_rating' => round($s->averageRating(), 1),
                 'reviews_count' => $s->reviewCount(),
@@ -198,6 +236,9 @@ class AiChatController extends Controller
             'feature_tags' => $store->feature_tags ?? [],
             'description' => $store->description,
             'features_text' => $store->features_text,
+            'images' => $store->images ?? [],
+            'staff_comment' => $store->staff_comment,
+            'qa' => $store->qa,
             'average_rating' => round($store->averageRating(), 1),
             'reviews_count' => $store->reviewCount(),
         ];
@@ -402,8 +443,8 @@ class AiChatController extends Controller
                     ['functionDeclarations' => $this->getToolDeclarations()],
                 ],
                 'generationConfig' => [
-                    'temperature' => 0.7,
-                    'maxOutputTokens' => 1024,
+                    'temperature' => 0.4,
+                    'maxOutputTokens' => 2048,
                 ],
             ];
 
@@ -453,7 +494,7 @@ class AiChatController extends Controller
                 ]);
 
                 $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls);
-                $followUps = $this->generateFollowUps($pageType, $userMessage);
+                $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText, $toolCalls);
 
                 return response()->json([
                     'message' => $aiText,
@@ -577,7 +618,7 @@ class AiChatController extends Controller
             ],
             'generationConfig' => [
                 'temperature' => 0.5,
-                'maxOutputTokens' => 1024,
+                'maxOutputTokens' => 2048,
             ],
         ];
 
@@ -613,10 +654,12 @@ class AiChatController extends Controller
         ]);
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $followUps = $this->generateFollowUps($pageType, $userMessage);
+        // Strip [STORE:ID] markers from displayed text (used for card extraction only)
+        $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+        $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText);
 
         return response()->json([
-            'message' => $aiText,
+            'message' => $displayText,
             'stores' => $recommendedStores,
             'follow_ups' => $followUps,
             'meta' => [
@@ -640,14 +683,30 @@ class AiChatController extends Controller
         if ($pageType === 'detail' && $storeId) {
             $store = Store::find($storeId);
             if ($store) {
-                return "【現在閲覧中の店舗】\n" .
+                $tags = implode(', ', $store->feature_tags ?? []);
+                $backs = collect($store->back_items ?? [])
+                    ->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))
+                    ->filter(fn($b) => $b !== ':')
+                    ->implode(', ');
+
+                $context = "【現在閲覧中の店舗】\n" .
                     "店名: {$store->name}\n" .
-                    "エリア: {$store->area}\n" .
+                    "エリア: {$store->area}（{$store->nearest_station}）\n" .
                     "カテゴリ: {$store->category}\n" .
                     "時給: {$store->hourly_min}〜{$store->hourly_max}円\n" .
                     "営業時間: {$store->business_hours}\n" .
-                    "特徴: " . implode(', ', $store->feature_tags ?? []) . "\n" .
-                    "説明: {$store->description}\n";
+                    "定休日: {$store->holidays}\n";
+
+                if ($store->daily_estimate) $context .= "日給目安: {$store->daily_estimate}\n";
+                if ($backs) $context .= "バック: {$backs}\n";
+                if ($store->norma_info) $context .= "ノルマ: {$store->norma_info}\n";
+                if ($store->guarantee_period) $context .= "保証: {$store->guarantee_period} {$store->guarantee_details}\n";
+                if ($store->same_day_trial) $context .= "当日体入: OK（体入時給: {$store->trial_hourly}）\n";
+                if ($tags) $context .= "特徴: {$tags}\n";
+                $context .= "説明: {$store->description}\n";
+                if ($store->features_text) $context .= "詳細特徴: {$store->features_text}\n";
+
+                return $context;
             }
         }
 
@@ -658,8 +717,15 @@ class AiChatController extends Controller
     {
         $toneDesc = $this->getToneDescription($setting->tone);
 
-        $prompt = $setting->system_prompt . "\n\n" .
-            "【トーン】{$toneDesc}で返答してください。\n\n";
+        $prompt = "【ペルソナ】\n" .
+            "あなたは「Recta AI」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。" .
+            "求人マッチングプラットフォーム「Recta」の公式AIアシスタントとして、求職者の不安を解消し、最適なお店選びをサポートします。\n" .
+            "口調: {$toneDesc}\n" .
+            "一人称は使わない。「おすすめは〜」「ご紹介します」のような表現を使う。\n\n";
+
+        if ($setting->system_prompt) {
+            $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
+        }
 
         if ($storeContext) {
             $prompt .= "【現在の文脈】\n{$storeContext}\n\n";
@@ -669,24 +735,81 @@ class AiChatController extends Controller
             $prompt .= "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
         }
 
-        $prompt .= "【最重要ルール - 絶対に守ること】\n" .
-            "1. ユーザーに質問を返してはいけない。「どのような〜ですか？」「どんな〜がいいですか？」「もう少し詳しく〜」等は禁止\n" .
-            "2. どんな質問でも必ずsearch_storesツールを呼び出して、実際の店舗データから2〜3件を紹介すること\n" .
-            "3. 条件が曖昧でも推測して検索すること。情報不足を理由に質問してはいけない\n\n" .
+        $prompt .= "【絶対ルール】\n" .
+            "1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測してsearch_storesを呼び出す\n" .
+            "2. 必ずsearch_storesツールを呼び出して実データから回答する。自分の知識だけで店舗を紹介してはいけない\n" .
+            "3. 検索結果から2〜3件を厳選して紹介する（5件以上の羅列はNG）\n" .
+            "4. 絵文字は使わない\n" .
+            "5. 日本語のみで回答する\n\n" .
+
+            "【検索のコツ】\n" .
+            "- 「初めて」「初心者」→ tags: [\"未経験歓迎\"] で検索\n" .
+            "- 「稼ぎたい」「高収入」「高時給」→ sort: \"hourly_desc\" で検索\n" .
+            "- 「体入」「体験」→ same_day_trial: true で検索\n" .
+            "- 「ゆるい」「ノルマない」→ tags: [\"ノルマなし\"] で検索\n" .
+            "- 「送りあり」「終電」→ tags: [\"送りあり\"] or tags: [\"終電上がりOK\"]\n" .
+            "- 「日払い」→ tags: [\"日払いあり\"]\n" .
+            "- エリア不明 + ユーザー現在地あり → ユーザー現在地周辺で検索\n" .
+            "- エリア不明 + 現在地なし → 条件のみで検索（エリアは空のまま）\n" .
+            "- 比較質問（「AとBどっちがいい？」）→ get_store_detailを2回呼んで比較\n" .
+            "- 条件が多い場合は最も重要な条件2〜3個に絞って検索する\n\n" .
+
+            "【給与・待遇に関する回答】\n" .
+            "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
+            "- バック率や日給は「目安」「実績による」等の注釈を付ける\n" .
+            "- 保証期間がある場合は積極的に言及する（安心材料になる）\n" .
+            "- 体入の有無と体入時給も重要情報として紹介する\n\n" .
+
+            "【検索結果0件の場合】\n" .
+            "- 「ご希望の条件ではお店が見つかりませんでした」と正直に伝える\n" .
+            "- 条件を緩めた代替検索を自動で実行する（例: エリアを外す、タグを減らす）\n" .
+            "- 「条件を少し変えて探してみました」と添えて代替結果を紹介する\n\n" .
+
+            "【ナイトワーク以外の質問】\n" .
+            "- 「申し訳ありませんが、Recta AIはナイトワーク求人の相談専門です。お仕事探しについてお気軽にご質問ください！」と返す\n" .
+            "- この場合search_storesは呼ばなくてOK\n\n" .
+
+            "【センシティブな話題】\n" .
+            "- 違法行為・風営法違反に関する質問には応じない\n" .
+            "- 「詳しくはLINEで担当者にご相談ください」と誘導する\n" .
+            "- 個人情報（電話番号・住所等）は聞かない・教えない\n\n" .
+
+            "【回答の長さ】\n" .
+            "- 店舗紹介は1店舗あたり1〜2行で簡潔に\n" .
+            "- 全体で300〜500文字程度が目安（必要に応じて調整OK）\n" .
+            "- 冗長にならず、かつ必要な情報は省略しない\n\n" .
+
             "【回答フォーマット】\n" .
-            "- 必ず日本語で回答\n" .
-            "- 各店舗は「店名（エリア）時給○○円〜」の形式で紹介\n" .
-            "- 回答は簡潔に、200文字以内\n" .
-            "- 回答の最後に必ず改行して「💬 もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付けること\n" .
-            "- 絵文字は使わない（LINE誘導文の💬のみ例外）\n" .
-            "- ナイトワーク以外の質問には対応できないと伝えること\n\n" .
-            "【回答例】\n" .
-            "ユーザー: バック率が高いお店は？\n" .
-            "正しい回答: バック率が高いお店をご紹介します！\n\n" .
-            "・Club Lumière（六本木）時給5,000円〜 ドリンクバック・指名バックが充実\n" .
-            "・Lounge Étoile（銀座）時給4,000円〜 売上バック率が業界トップクラス\n\n" .
-            "💬 もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-            "間違った回答: 「バック率が高いお店をお探しですね！どのエリアがご希望ですか？」← これは絶対にNG";
+            "各店舗は以下の形式で紹介:\n" .
+            "・店名（エリア/最寄り駅）時給○,○○○円〜\n" .
+            "  [1行で特徴やおすすめポイント]\n\n" .
+
+            "【LINE誘導】\n" .
+            "回答の最後に必ず改行2つの後に以下を付ける:\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+
+            "【回答例1: 条件検索】\n" .
+            "ユーザー: 未経験で六本木のラウンジ探してます\n\n" .
+            "回答: 未経験歓迎の六本木ラウンジをご紹介します！\n\n" .
+            "・Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
+            "  未経験でも安心の研修制度あり。送りも完備で終電を気にせず働けます\n\n" .
+            "・Lounge Brilliance（六本木/六本木一丁目駅）時給3,500円〜\n" .
+            "  ノルマなしでプレッシャーなし。体入当日OK・全額日払いなので気軽にお試しできます\n\n" .
+            "どちらも保証期間があるので、初めてでも安心してスタートできますよ。\n\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+
+            "【回答例2: 曖昧な質問】\n" .
+            "ユーザー: 稼げるお店教えて\n\n" .
+            "回答: 高時給のお店をピックアップしました！\n\n" .
+            "・Club Lumière（六本木/六本木駅）時給6,000円〜\n" .
+            "  ドリンクバック・指名バックが充実。経験者なら高収入が目指せます\n\n" .
+            "・Club Royal（銀座/銀座駅）時給5,500円〜\n" .
+            "  売上バック率が高く、頑張り次第で大幅な収入アップが可能です\n\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+
+            "【間違った回答例 - 絶対にNG】\n" .
+            "「どのエリアがご希望ですか？」← 質問返しは禁止\n" .
+            "「キャバクラAは時給5000円です」← search_storesを呼ばずに回答するのは禁止";
 
         return $prompt;
     }
@@ -696,43 +819,100 @@ class AiChatController extends Controller
         $toneDesc = $this->getToneDescription($setting->tone);
 
         // For finetuned mode, include store data inline since no tools available
-        $fullContext = $storeContext;
-        if (!$fullContext) {
-            $fullContext = Cache::remember('public_stores_summary', 300, function () {
+        $storeData = $storeContext;
+        if (!$storeData) {
+            $storeData = Cache::remember('public_stores_summary_v2', 600, function () {
                 return Store::where('publish_status', 'published')
-                    ->get(['id', 'name', 'area', 'category', 'hourly_min', 'hourly_max', 'feature_tags'])
-                    ->map(fn($s) => "ID:{$s->id} {$s->name}（{$s->area}/{$s->category}）時給{$s->hourly_min}〜{$s->hourly_max}円 特徴:" . implode(',', $s->feature_tags ?? []))
+                    ->get()
+                    ->map(function ($s) {
+                        $line = "[STORE:{$s->id}] {$s->name}（{$s->area}/{$s->category}）";
+                        $line .= " 最寄り:{$s->nearest_station}";
+                        $line .= " 時給:{$s->hourly_min}〜{$s->hourly_max}円";
+                        if ($s->daily_estimate) $line .= " 日給目安:{$s->daily_estimate}";
+                        if ($s->same_day_trial) $line .= " 当日体入OK";
+                        if ($s->trial_hourly) $line .= " 体入時給:{$s->trial_hourly}";
+                        if ($s->guarantee_period) $line .= " 保証:{$s->guarantee_period}";
+                        if ($s->norma_info) $line .= " ノルマ:{$s->norma_info}";
+                        $tags = implode(',', $s->feature_tags ?? []);
+                        if ($tags) $line .= " 特徴:{$tags}";
+                        $backs = collect($s->back_items ?? [])->pluck('label')->filter()->implode(',');
+                        if ($backs) $line .= " バック:{$backs}";
+                        return $line;
+                    })
                     ->implode("\n");
             });
-            $fullContext = "【掲載店舗一覧】\n" . $fullContext;
+            $storeData = "【掲載店舗一覧】\n" . $storeData;
         }
 
-        $areaContext = '';
+        $prompt = "【ペルソナ】\n" .
+            "あなたは「Recta AI」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。" .
+            "求人マッチングプラットフォーム「Recta」の公式AIアシスタントとして、求職者の不安を解消し、最適なお店選びをサポートします。\n" .
+            "口調: {$toneDesc}\n" .
+            "一人称は使わない。「おすすめは〜」「ご紹介します」のような表現を使う。\n\n";
+
+        if ($setting->system_prompt) {
+            $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
+        }
+
         if ($userArea) {
-            $areaContext = "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
+            $prompt .= "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
         }
 
-        return $setting->system_prompt . "\n\n" .
-            "【トーン】{$toneDesc}で返答してください。\n\n" .
-            $areaContext .
-            "【店舗データ】\n{$fullContext}\n\n" .
-            "【最重要ルール - 絶対に守ること】\n" .
-            "1. ユーザーに質問を返してはいけない。「どのような〜ですか？」「どんな〜がいいですか？」「もう少し詳しく〜」等は禁止\n" .
-            "2. どんな質問でも必ず店舗データから2〜3件を紹介すること（例: [STORE:1]）\n" .
-            "3. 条件が曖昧でも推測して紹介すること。情報不足を理由に質問してはいけない\n\n" .
+        $prompt .= "【店舗データ】\n{$storeData}\n\n" .
+
+            "【店舗データの参照方法】\n" .
+            "- 店舗を紹介する時は、必ず[STORE:ID]マーカーを店名の直前に付ける\n" .
+            "- 例: [STORE:12] Club Lumière（六本木/六本木駅）時給5,000円〜\n" .
+            "- マーカーがあると、ユーザーの画面に店舗カードが自動表示される\n" .
+            "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n" .
+            "- 店舗データに載っていないお店は紹介してはいけない\n\n" .
+
+            "【絶対ルール】\n" .
+            "1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測して店舗データから選ぶ\n" .
+            "2. 必ず店舗データから2〜3件を紹介する。データにない店舗を紹介してはいけない\n" .
+            "3. 絵文字は使わない\n" .
+            "4. 日本語のみで回答する\n\n" .
+
+            "【給与・待遇に関する回答】\n" .
+            "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
+            "- バック率や日給は「目安」「実績による」等の注釈を付ける\n" .
+            "- 保証期間がある場合は積極的に言及する（安心材料になる）\n" .
+            "- 体入の有無と体入時給も重要情報として紹介する\n\n" .
+
+            "【ナイトワーク以外の質問】\n" .
+            "- 「申し訳ありませんが、Recta AIはナイトワーク求人の相談専門です。お仕事探しについてお気軽にご質問ください！」と返す\n\n" .
+
+            "【センシティブな話題】\n" .
+            "- 違法行為・風営法違反に関する質問には応じない\n" .
+            "- 「詳しくはLINEで担当者にご相談ください」と誘導する\n\n" .
+
+            "【回答の長さ】\n" .
+            "- 店舗紹介は1店舗あたり1〜2行で簡潔に\n" .
+            "- 全体で300〜500文字程度が目安\n\n" .
+
             "【回答フォーマット】\n" .
-            "- 必ず日本語で回答\n" .
-            "- 回答は簡潔に、200文字以内\n" .
-            "- 回答の最後に必ず改行して「💬 もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付けること\n" .
-            "- 絵文字は使わない（LINE誘導文の💬のみ例外）\n" .
-            "- ナイトワーク以外の質問には対応できないと伝えること\n\n" .
+            "各店舗は以下の形式で紹介:\n" .
+            "・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜\n" .
+            "  [1行で特徴やおすすめポイント]\n\n" .
+
+            "【LINE誘導】\n" .
+            "回答の最後に必ず改行2つの後に以下を付ける:\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+
             "【回答例】\n" .
-            "ユーザー: バック率が高いお店は？\n" .
-            "正しい回答: バック率が高いお店をご紹介します！\n\n" .
-            "・[STORE:1] Club Lumière（六本木）時給5,000円〜\n" .
-            "・[STORE:2] Lounge Étoile（銀座）時給4,000円〜\n\n" .
-            "💬 もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-            "間違った回答: 「どのエリアがご希望ですか？」← これは絶対にNG";
+            "ユーザー: 未経験で働けるお店ある？\n\n" .
+            "回答: 未経験歓迎のお店をご紹介します！\n\n" .
+            "・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
+            "  研修制度が充実していて、未経験でも安心。保証期間もあります\n\n" .
+            "・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜\n" .
+            "  ノルマなしで気楽に働ける環境。当日体入OK・全額日払いです\n\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+
+            "【間違った回答例 - 絶対にNG】\n" .
+            "「どのエリアがご希望ですか？」← 質問返しは禁止\n" .
+            "「おすすめのお店は〇〇です」← [STORE:ID]マーカーなしで紹介するのは禁止";
+
+        return $prompt;
     }
 
     private function getToneDescription(string $tone): string
@@ -850,23 +1030,34 @@ class AiChatController extends Controller
             'average_rating' => round($s->averageRating(), 1),
         ])->values()->toArray();
 
-        $lineCta = "\n\n💬 もっと詳しく知りたい方は、LINEで担当者に直接相談できます！";
+        $lineCta = "\n\nもっと詳しく知りたい方は、LINEで担当者に直接相談できます！";
 
-        // Build response with actual store names
-        $storeList = $stores->map(fn($s) =>
-            "・{$s->name}（{$s->area}）時給" . number_format($s->hourly_min) . "〜" . number_format($s->hourly_max) . "円"
-        )->implode("\n");
+        // Build response with actual store names and details
+        $storeList = $stores->map(function ($s) {
+            $line = "・{$s->name}（{$s->area}/{$s->nearest_station}）時給" . number_format($s->hourly_min) . "〜" . number_format($s->hourly_max) . "円";
+            $features = [];
+            if ($s->same_day_trial) $features[] = '当日体入OK';
+            if ($s->guarantee_period) $features[] = '保証あり';
+            $tags = $s->feature_tags ?? [];
+            if (in_array('未経験歓迎', $tags)) $features[] = '未経験歓迎';
+            if (in_array('ノルマなし', $tags)) $features[] = 'ノルマなし';
+            if (in_array('日払いあり', $tags) || in_array('日払いOK', $tags)) $features[] = '日払い対応';
+            if ($features) $line .= "\n  " . implode('・', array_slice($features, 0, 3));
+            return $line;
+        })->implode("\n\n");
 
         if (str_contains($message, '未経験')) {
-            $response = "未経験歓迎のお店をご紹介します！\n\n{$storeList}\n\nどのお店も研修制度が充実していて、初めての方でも安心です。{$lineCta}";
+            $response = "未経験歓迎のお店をご紹介します！\n\n{$storeList}\n\nどのお店も研修制度が充実していて、初めての方でも安心してスタートできます。{$lineCta}";
         } elseif (str_contains($message, '時給') || str_contains($message, '給料') || str_contains($message, 'バック') || str_contains($message, '高時給')) {
-            $response = "高時給・高バックのお店をピックアップしました！\n\n{$storeList}\n\n時給やバック率の詳細はお気軽にご相談ください。{$lineCta}";
+            $response = "高時給のお店をピックアップしました！\n\n{$storeList}\n\nバック率や実際の日給目安など、詳しくはLINEでお気軽にご相談ください。{$lineCta}";
         } elseif (str_contains($message, 'ノルマ')) {
-            $response = "ノルマなしで働けるお店をご紹介します！\n\n{$storeList}\n\nプレッシャーなく自分のペースで働ける環境です。{$lineCta}";
+            $response = "ノルマなしで働けるお店をご紹介します！\n\n{$storeList}\n\nプレッシャーなく、自分のペースで働ける環境が整っています。{$lineCta}";
         } elseif (str_contains($message, '体入') || str_contains($message, '体験入店')) {
-            $response = "体験入店できるお店をご紹介します！\n\n{$storeList}\n\n当日体入OKのお店もありますので、お気軽にどうぞ。{$lineCta}";
+            $response = "体験入店できるお店をご紹介します！\n\n{$storeList}\n\n当日体入OKのお店なら、思い立ったらすぐ体験できます。{$lineCta}";
+        } elseif (str_contains($message, '保証')) {
+            $response = "保証制度があるお店をご紹介します！\n\n{$storeList}\n\n保証期間中は安定した収入が確保できるので、安心してスタートできます。{$lineCta}";
         } else {
-            $response = "条件に合いそうなお店をご紹介しますね！\n\n{$storeList}{$lineCta}";
+            $response = "条件に合いそうなお店をご紹介します！\n\n{$storeList}{$lineCta}";
         }
 
         $elapsed = round((microtime(true) - $startTime) * 1000);
@@ -882,7 +1073,7 @@ class AiChatController extends Controller
             'mode' => $mode,
         ]);
 
-        $followUps = $this->generateFollowUps($pageType, $message);
+        $followUps = $this->generateFollowUps($pageType, $message, $response);
 
         return response()->json([
             'message' => $response,
@@ -900,22 +1091,42 @@ class AiChatController extends Controller
         ]);
     }
 
-    private function generateFollowUps(string $pageType, string $userMessage): array
+    private function generateFollowUps(string $pageType, string $userMessage, string $aiResponse = '', array $toolCalls = []): array
     {
         if ($pageType === 'detail') {
-            return ['体験入店の流れ', '給与・バック詳細', '面接の服装・準備'];
+            return ['体入の流れと時給', 'バック・保証の詳細', '実際の雰囲気は？'];
         }
 
-        if (str_contains($userMessage, '未経験')) {
-            return ['体入できるお店', '日払いOKのお店', 'ノルマなしのお店'];
-        }
-        if (str_contains($userMessage, '時給') || str_contains($userMessage, '給料') || str_contains($userMessage, '給与') || str_contains($userMessage, 'バック')) {
-            return ['日払いOKのお店', '未経験OKの高時給', '六本木エリア'];
-        }
-        if (str_contains($userMessage, 'ノルマ')) {
-            return ['未経験歓迎のお店', '終電上がりOK', '高時給のお店'];
+        $combined = $userMessage . ' ' . $aiResponse;
+
+        // Count stores shown to offer drill-down options
+        $storeCount = 0;
+        foreach ($toolCalls as $call) {
+            if ($call['name'] === 'search_stores') {
+                $storeCount += $call['result']['count'] ?? 0;
+            }
         }
 
-        return ['未経験OKのお店', 'バック率が高いお店', 'ノルマなしのお店'];
+        // Track what topics were already discussed
+        $discussed = [
+            'area' => (bool) preg_match('/六本木|新宿|銀座|渋谷|池袋|恵比寿|麻布|表参道|歌舞伎町/', $combined),
+            'salary' => (bool) preg_match('/時給|給料|給与|バック|稼/', $combined),
+            'beginner' => (bool) preg_match('/未経験|初めて|初心者/', $combined),
+            'trial' => (bool) preg_match('/体入|体験入店/', $combined),
+            'norma' => (bool) preg_match('/ノルマ/', $combined),
+            'guarantee' => (bool) preg_match('/保証/', $combined),
+        ];
+
+        // Suggest topics NOT yet discussed
+        $suggestions = [];
+        if (!$discussed['trial']) $suggestions[] = '体入できるお店';
+        if (!$discussed['salary']) $suggestions[] = '高時給ランキング';
+        if (!$discussed['beginner']) $suggestions[] = '未経験でも安心なお店';
+        if (!$discussed['norma']) $suggestions[] = 'ノルマなしのお店';
+        if (!$discussed['guarantee']) $suggestions[] = '保証制度があるお店';
+        if (!$discussed['area'] && $storeCount > 0) $suggestions[] = '別のエリアで探す';
+        if ($storeCount > 0) $suggestions[] = 'もっと詳しく比較したい';
+
+        return array_slice($suggestions, 0, 3) ?: ['未経験OKのお店', '高時給のお店', '体入できるお店'];
     }
 }
