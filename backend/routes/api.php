@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AreaCategoryController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ContentController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FineTuningController;
 use App\Http\Controllers\Admin\LineFriendController;
 use App\Http\Controllers\Admin\ReviewController;
 use App\Http\Controllers\Admin\StoreController;
@@ -121,6 +122,17 @@ Route::prefix('admin')->group(function () {
 
         Route::get('banner-settings', [ContentController::class, 'bannerSettings']);
         Route::put('banner-settings', [ContentController::class, 'updateBannerSettings']);
+
+        // Fine-tuning管理
+        Route::get('/ai-chat/fine-tuning/status', [FineTuningController::class, 'status']);
+        Route::post('/ai-chat/fine-tuning/generate', [FineTuningController::class, 'generateTrainingData']);
+        Route::post('/ai-chat/fine-tuning/start', [FineTuningController::class, 'startTraining']);
+        Route::get('/ai-chat/fine-tuning/job', [FineTuningController::class, 'jobStatus']);
+        Route::put('/ai-chat/fine-tuning/model', [FineTuningController::class, 'updateModel']);
+        Route::get('/ai-chat/fine-tuning/data', [FineTuningController::class, 'trainingData']);
+        Route::put('/ai-chat/fine-tuning/data', [FineTuningController::class, 'updateTrainingPair']);
+        Route::delete('/ai-chat/fine-tuning/data/{index}', [FineTuningController::class, 'deleteTrainingPair']);
+        Route::post('/ai-chat/fine-tuning/data', [FineTuningController::class, 'addTrainingPair']);
 
         // LINE一斉配信（ユーザー管理から利用）
         // broadcast は上の /users/broadcast で定義済み

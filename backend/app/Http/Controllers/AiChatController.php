@@ -756,7 +756,7 @@ class AiChatController extends Controller
      */
     private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = ''): string
     {
-        $prompt = 'あなたはRecta AIです。ナイトワーク（キャバクラ・ラウンジ・ガールズバー・クラブ・コンカフェ）専門のキャリアアドバイザーとして、求職者の相談に親身に応えてください。丁寧だけどフレンドリーな口調で、具体的なお店の情報を交えて回答します。ナイトワーク以外の話題にはやんわりお断りしてください。';
+        $prompt = 'あなたはRecta AIです。ナイトワーク（キャバクラ・ラウンジ・ガールズバー・クラブ・コンカフェ）専門のキャリアアドバイザーとして、求職者の相談に親身に応えてください。丁寧だけどフレンドリーな口調で、具体的なお店の情報を交えて回答します。ナイトワーク以外の話題にはやんわりお断りしてください。回答の最後には必ず「もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付けてください。';
 
         if ($setting->system_prompt) {
             $prompt .= "\n\n運営追加指示: {$setting->system_prompt}";
