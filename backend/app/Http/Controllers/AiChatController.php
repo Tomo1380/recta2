@@ -597,48 +597,49 @@ class AiChatController extends Controller
         string $userArea = '',
         ?int $userId = null,
     ): JsonResponse {
-        $storeContext = $this->buildStoreContext($pageType, $storeId);
-        $systemPrompt = $this->buildSystemPrompt($setting, $storeContext, $userArea);
-        $geminiHistory = $this->buildGeminiHistory($history);
+        // OpenAI Fine-tuned model
+        $openaiKey = config('services.openai.api_key');
+        $openaiModel = config('services.openai.finetuned_model');
 
-        // Use tuned model if configured, otherwise fall back to base model
-        $tunedModelId = config('services.gemini.tuned_model_id');
-        $model = $tunedModelId ?: 'gemini-3.1-flash-lite-preview';
-        $endpoint = $tunedModelId
-            ? "https://generativelanguage.googleapis.com/v1beta/{$tunedModelId}:generateContent?key={$apiKey}"
-            : "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-
-        $payload = [
-            'contents' => [
-                ...$geminiHistory,
-                [
-                    'role' => 'user',
-                    'parts' => [['text' => $userMessage]],
-                ],
-            ],
-            'generationConfig' => [
-                'temperature' => 0.5,
-                'maxOutputTokens' => 2048,
-            ],
-        ];
-
-        // Tuned models may not support system_instruction
-        if (!$tunedModelId) {
-            $payload['system_instruction'] = [
-                'parts' => [['text' => $systemPrompt]],
-            ];
+        if (!$openaiKey || !$openaiModel) {
+            // Fallback to Gemini prompt-embedding mode if OpenAI not configured
+            return $this->handleFinetunedModeFallback(
+                $apiKey, $setting, $userMessage, $history,
+                $pageType, $storeId, $ip, $startTime, $userArea, $userId
+            );
         }
 
-        $response = Http::timeout(30)->post($endpoint, $payload);
+        $storeContext = $this->buildStoreContext($pageType, $storeId);
+        $systemPrompt = $this->buildOpenAiSystemPrompt($setting, $storeContext, $userArea);
+
+        // Build OpenAI messages array
+        $messages = [['role' => 'system', 'content' => $systemPrompt]];
+        foreach ($history as $msg) {
+            $role = ($msg['role'] ?? '') === 'user' ? 'user' : 'assistant';
+            $messages[] = ['role' => $role, 'content' => $msg['content'] ?? ''];
+        }
+        $messages[] = ['role' => 'user', 'content' => $userMessage];
+
+        $response = Http::timeout(30)
+            ->withHeaders([
+                'Authorization' => "Bearer {$openaiKey}",
+                'Content-Type' => 'application/json',
+            ])
+            ->post('https://api.openai.com/v1/chat/completions', [
+                'model' => $openaiModel,
+                'messages' => $messages,
+                'temperature' => 0.4,
+                'max_tokens' => 2048,
+            ]);
 
         if (!$response->successful()) {
-            throw new \Exception('Gemini API error: ' . $response->status());
+            throw new \Exception('OpenAI API error: ' . $response->status() . ' ' . $response->body());
         }
 
         $data = $response->json();
-        $aiText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-        $inputTokens = $data['usageMetadata']['promptTokenCount'] ?? 0;
-        $outputTokens = $data['usageMetadata']['candidatesTokenCount'] ?? 0;
+        $aiText = $data['choices'][0]['message']['content'] ?? '';
+        $inputTokens = $data['usage']['prompt_tokens'] ?? 0;
+        $outputTokens = $data['usage']['completion_tokens'] ?? 0;
         $elapsed = round((microtime(true) - $startTime) * 1000);
 
         // Log
@@ -654,7 +655,6 @@ class AiChatController extends Controller
         ]);
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
-        // Strip [STORE:ID] markers from displayed text (used for card extraction only)
         $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
         $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText);
 
@@ -664,7 +664,7 @@ class AiChatController extends Controller
             'follow_ups' => $followUps,
             'meta' => [
                 'mode' => 'finetuned',
-                'model' => $tunedModelId ?: $model,
+                'model' => $openaiModel,
                 'input_tokens' => $inputTokens,
                 'output_tokens' => $outputTokens,
                 'total_tokens' => $inputTokens + $outputTokens,
@@ -672,6 +672,105 @@ class AiChatController extends Controller
                 'tool_calls' => 0,
             ],
         ]);
+    }
+
+    /**
+     * Fallback: Gemini prompt-embedding mode (when OpenAI not configured)
+     */
+    private function handleFinetunedModeFallback(
+        string $apiKey,
+        AiChatSetting $setting,
+        string $userMessage,
+        array $history,
+        string $pageType,
+        ?int $storeId,
+        string $ip,
+        float $startTime,
+        string $userArea = '',
+        ?int $userId = null,
+    ): JsonResponse {
+        $storeContext = $this->buildStoreContext($pageType, $storeId);
+        $systemPrompt = $this->buildSystemPrompt($setting, $storeContext, $userArea);
+        $geminiHistory = $this->buildGeminiHistory($history);
+
+        $model = 'gemini-3.1-flash-lite-preview';
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+
+        $payload = [
+            'contents' => [
+                ...$geminiHistory,
+                ['role' => 'user', 'parts' => [['text' => $userMessage]]],
+            ],
+            'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
+            'generationConfig' => [
+                'temperature' => 0.5,
+                'maxOutputTokens' => 2048,
+            ],
+        ];
+
+        $response = Http::timeout(30)->post($endpoint, $payload);
+
+        if (!$response->successful()) {
+            throw new \Exception('Gemini API error: ' . $response->status());
+        }
+
+        $data = $response->json();
+        $aiText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        $inputTokens = $data['usageMetadata']['promptTokenCount'] ?? 0;
+        $outputTokens = $data['usageMetadata']['candidatesTokenCount'] ?? 0;
+        $elapsed = round((microtime(true) - $startTime) * 1000);
+
+        AiChatLog::create([
+            'user_id' => $userId,
+            'ip_address' => $ip,
+            'page_type' => $pageType,
+            'user_message' => $userMessage,
+            'ai_response' => $aiText,
+            'input_tokens' => $inputTokens,
+            'output_tokens' => $outputTokens,
+            'mode' => 'finetuned',
+        ]);
+
+        $recommendedStores = $this->extractStoreRecommendations($aiText);
+        $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+        $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText);
+
+        return response()->json([
+            'message' => $displayText,
+            'stores' => $recommendedStores,
+            'follow_ups' => $followUps,
+            'meta' => [
+                'mode' => 'finetuned',
+                'model' => $model,
+                'input_tokens' => $inputTokens,
+                'output_tokens' => $outputTokens,
+                'total_tokens' => $inputTokens + $outputTokens,
+                'response_ms' => $elapsed,
+                'tool_calls' => 0,
+            ],
+        ]);
+    }
+
+    /**
+     * System prompt for OpenAI fine-tuned model (lighter than Gemini prompt-embedding)
+     */
+    private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = ''): string
+    {
+        $prompt = 'あなたはRecta AIです。ナイトワーク（キャバクラ・ラウンジ・ガールズバー・クラブ・コンカフェ）専門のキャリアアドバイザーとして、求職者の相談に親身に応えてください。丁寧だけどフレンドリーな口調で、具体的なお店の情報を交えて回答します。ナイトワーク以外の話題にはやんわりお断りしてください。';
+
+        if ($setting->system_prompt) {
+            $prompt .= "\n\n運営追加指示: {$setting->system_prompt}";
+        }
+
+        if ($userArea) {
+            $prompt .= "\n\nユーザーは{$userArea}付近にいます。エリア指定がない場合は近くのお店を優先してください。";
+        }
+
+        if ($storeContext) {
+            $prompt .= "\n\n参考店舗データ:\n{$storeContext}";
+        }
+
+        return $prompt;
     }
 
     // -----------------------------------------------------------------------
