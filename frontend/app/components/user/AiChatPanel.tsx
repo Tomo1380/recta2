@@ -678,6 +678,19 @@ export default function AiChatPanel({
           >
             Recta AI
           </span>
+          {/* Mode toggle */}
+          <button
+            type="button"
+            onClick={() => setMode(mode === "agent" ? "finetuned" : "agent")}
+            className="rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors"
+            style={{
+              backgroundColor: mode === "agent" ? "rgba(154,122,32,0.12)" : "rgba(99,102,241,0.12)",
+              color: mode === "agent" ? "#9a7a20" : "#6366f1",
+              border: `0.5px solid ${mode === "agent" ? "rgba(154,122,32,0.3)" : "rgba(99,102,241,0.3)"}`,
+            }}
+          >
+            {mode === "agent" ? "Agent" : "FT"}
+          </button>
           <span className="relative size-1.5">
             <span
               className="absolute -inset-[1.5px] rounded-full opacity-30"
