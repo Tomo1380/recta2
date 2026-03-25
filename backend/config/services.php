@@ -35,7 +35,6 @@ return [
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
-        'finetuned_model' => env('OPENAI_FINETUNED_MODEL'),
     ],
 
     'slack' => [

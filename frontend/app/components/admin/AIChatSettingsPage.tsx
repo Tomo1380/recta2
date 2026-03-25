@@ -221,6 +221,8 @@ export function AIChatSettingsPage() {
   const [ftJobs, setFtJobs] = useState<any[]>([]);
   const [ftPolling, setFtPolling] = useState(false);
   const [ftMessage, setFtMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [ftModelInput, setFtModelInput] = useState("");
+  const [ftModelSaving, setFtModelSaving] = useState(false);
 
   // Training data state
   type TrainingPair = { index: number; user: string; assistant: string };
@@ -490,6 +492,17 @@ export function AIChatSettingsPage() {
       }
     } catch (err) {
       setFtMessage({ type: "error", text: err instanceof Error ? err.message : "更新に失敗しました" });
+    }
+  };
+
+  const handleSaveModelId = async () => {
+    if (!ftModelInput.trim()) return;
+    try {
+      setFtModelSaving(true);
+      await handleApplyModel(ftModelInput.trim());
+      setFtModelInput("");
+    } finally {
+      setFtModelSaving(false);
     }
   };
 
@@ -1312,14 +1325,39 @@ export function AIChatSettingsPage() {
                 </div>
               )}
 
-              {/* Current status */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">現在のモデル</p>
-                  <p className="text-sm text-foreground mt-2 font-mono break-all">
-                    {ftStatus?.current_model || "未設定"}
-                  </p>
+              {/* Fine-tuned Model ID */}
+              <div className="bg-card border border-border rounded-xl p-5">
+                <label className="block text-[12px] text-muted-foreground mb-1.5">Fine-tuned モデルID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ftModelInput}
+                    onChange={(e) => setFtModelInput(e.target.value)}
+                    placeholder={ftStatus?.current_model || "ft:gpt-4o-mini:..."}
+                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+                  />
+                  <button
+                    onClick={handleSaveModelId}
+                    disabled={ftModelSaving || !ftModelInput.trim()}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
+                  >
+                    {ftModelSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    保存
+                  </button>
                 </div>
+                {ftStatus?.current_model ? (
+                  <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-mono break-all">
+                    <CheckCircle2 className="w-3 h-3 shrink-0" /> {ftStatus.current_model}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-amber-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> 未設定
+                  </p>
+                )}
+              </div>
+
+              {/* Stats cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="bg-card border border-border rounded-xl p-5">
                   <p className="text-[11px] text-muted-foreground uppercase tracking-wider">公開店舗数</p>
                   <p className="text-3xl text-foreground mt-2" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}>
@@ -1334,17 +1372,6 @@ export function AIChatSettingsPage() {
                   </p>
                 </div>
               </div>
-
-              {/* OpenAI check */}
-              {!ftStatus?.openai_configured && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-[13px] text-amber-800 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium">OpenAI APIキーが未設定です</p>
-                    <p className="mt-1 text-amber-700">.envファイルに OPENAI_API_KEY を設定してください。</p>
-                  </div>
-                </div>
-              )}
 
               {/* Step 1: Generate training data */}
               <div className="bg-card border border-border rounded-xl p-5">

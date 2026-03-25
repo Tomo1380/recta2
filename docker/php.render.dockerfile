@@ -35,6 +35,5 @@ CMD sh -c '\
     if [ -n "$DATABASE_URL" ]; then \
         export DB_URL="$DATABASE_URL"; \
     fi && \
-    php artisan migrate --force && \
-    php artisan db:seed --class=RenderSeeder --force 2>/dev/null || true && \
+    php artisan migrate:fresh --seed --force && \
     php artisan serve --host=0.0.0.0 --port=${PORT:-8080}'

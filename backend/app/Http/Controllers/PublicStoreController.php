@@ -21,11 +21,15 @@ class PublicStoreController extends Controller
         $query = Store::where('publish_status', 'published');
 
         if ($area = $request->input('area')) {
-            $query->where('area', $area);
+            // Support both slug (from frontend selects) and name
+            $areaName = Area::where('slug', $area)->value('name') ?? $area;
+            $query->where('area', $areaName);
         }
 
         if ($category = $request->input('category')) {
-            $query->where('category', $category);
+            // Support both slug (from frontend selects) and name
+            $categoryName = Category::where('slug', $category)->value('name') ?? $category;
+            $query->where('category', $categoryName);
         }
 
         if ($search = $request->input('q')) {

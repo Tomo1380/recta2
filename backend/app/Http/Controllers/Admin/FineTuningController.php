@@ -17,8 +17,9 @@ class FineTuningController extends Controller
      */
     public function status(): JsonResponse
     {
+        $setting = \App\Models\AiChatSetting::first();
         $openaiKey = config('services.openai.api_key');
-        $currentModel = config('services.openai.finetuned_model');
+        $currentModel = trim($setting->openai_finetuned_model ?? '') ?: null;
 
         // Check if training data file exists
         $filePath = storage_path('app/training_data_openai.jsonl');
@@ -91,6 +92,7 @@ class FineTuningController extends Controller
      */
     public function startTraining(Request $request): JsonResponse
     {
+        $setting = \App\Models\AiChatSetting::first();
         $openaiKey = trim(config('services.openai.api_key') ?? '');
         if (empty($openaiKey)) {
             return response()->json([
@@ -179,6 +181,7 @@ class FineTuningController extends Controller
      */
     public function jobStatus(Request $request): JsonResponse
     {
+        $setting = \App\Models\AiChatSetting::first();
         $openaiKey = trim(config('services.openai.api_key') ?? '');
         if (empty($openaiKey)) {
             return response()->json([
@@ -232,7 +235,7 @@ class FineTuningController extends Controller
     }
 
     /**
-     * Update the active fine-tuned model ID in .env
+     * Update the active fine-tuned model ID (stored in DB)
      */
     public function updateModel(Request $request): JsonResponse
     {
@@ -242,24 +245,8 @@ class FineTuningController extends Controller
 
         $modelId = $request->input('model_id');
 
-        // Update .env file
-        $envPath = base_path('.env');
-        $envContent = file_get_contents($envPath);
-
-        if (preg_match('/^OPENAI_FINETUNED_MODEL=.*/m', $envContent)) {
-            $envContent = preg_replace(
-                '/^OPENAI_FINETUNED_MODEL=.*/m',
-                "OPENAI_FINETUNED_MODEL={$modelId}",
-                $envContent
-            );
-        } else {
-            $envContent .= "\nOPENAI_FINETUNED_MODEL={$modelId}\n";
-        }
-
-        file_put_contents($envPath, $envContent);
-
-        // Clear config cache
-        Artisan::call('config:clear');
+        // Save to all ai_chat_settings rows
+        \App\Models\AiChatSetting::query()->update(['openai_finetuned_model' => $modelId]);
 
         return response()->json([
             'success' => true,
@@ -415,25 +402,35 @@ class FineTuningController extends Controller
      */
     /**
      * Build the system prompt for fine-tuning training data.
-     * Includes full store JSON so the model learns to interpret store data.
+     * No store data — the FT model learns store knowledge from training pairs directly.
+     * System prompt only controls tone, format, and page-type behavior.
      */
     private function buildTrainingSystemPrompt(): string
     {
-        $storeJson = $this->getStoreJson();
-
-        return "あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。\n\n"
-            . "【ルール】\n"
+        $prompt = "あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。\n\n"
+            . "【回答ルール】\n"
             . "- 求職者に寄り添い、親しみやすく丁寧に回答する\n"
-            . "- 店舗を紹介する際は [STORE:店舗ID] マーカーを必ず含める\n"
+            . "- 店舗を紹介する際は [STORE:店舗ID] マーカーを必ず店名の前に付ける（例: [STORE:1]【Club Lumière】）\n"
             . "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n"
             . "- ユーザーに質問を返さない（条件が曖昧でも推測して店舗を選ぶ）\n"
             . "- ナイトワーク以外の質問は丁寧にお断り\n"
-            . "- 回答の最後に「もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付ける\n"
-            . "- 300〜500文字程度で簡潔に。絵文字は使わない\n\n"
+            . "- 下記の店舗データから情報を読み取って回答すること。データにない店舗を紹介してはいけない\n"
+            . "- 300〜500文字程度で簡潔に\n\n"
             . "【雰囲気の解釈】\n"
-            . "曖昧な表現はdescription・features_text・staff_commentから読み取って判断:\n"
-            . "「わいわい系」→アットホーム・明るい雰囲気の店、「落ち着いた」→高級・会員制、「ゆるい」→ノルマなし・自由シフト\n\n"
-            . "【店舗データ】\n" . $storeJson;
+            . "「わいわい系」→アットホーム・明るい雰囲気の店\n"
+            . "「落ち着いた」→高級・会員制\n"
+            . "「ゆるい」→ノルマなし・自由シフト\n\n"
+            . "【ページ別の振る舞い】\n"
+            . "- トップページ: 幅広い提案。エリアやカテゴリの希望がなければ人気店から紹介\n"
+            . "- 店舗一覧ページ: 条件を絞り込む手伝い。エリア・カテゴリ・タグで提案\n"
+            . "- 店舗詳細ページ: その店舗のみについて回答。他店舗は紹介しない\n\n";
+
+        // Include full store data so the FT model learns to read from it
+        $prompt .= "【全店舗データ】\n";
+        $prompt .= $this->getStoreJson();
+        $prompt .= "\n";
+
+        return $prompt;
     }
 
     private function getStoreJson(): string

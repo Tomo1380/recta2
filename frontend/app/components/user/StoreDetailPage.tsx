@@ -14,7 +14,6 @@ import {
   Clock,
   Phone,
   ExternalLink,
-  ChevronLeft,
   ChevronRight,
   FileText,
   Users,
@@ -23,9 +22,8 @@ import {
   Utensils,
   Award,
   Navigation,
-  TrendingUp,
   Sparkles,
-  Heart,
+
 } from "lucide-react";
 import StoreCard from "~/components/user/shared/StoreCard";
 import Footer from "~/components/user/shared/Footer";
@@ -303,7 +301,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const [data, setData] = useState<StoreDetailResponse | null>(previewData ?? null);
   const [loading, setLoading] = useState(!previewData);
   const [error, setError] = useState<string | null>(null);
-  const [scrollY, setScrollY] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Keep preview data in sync when form changes
@@ -341,12 +338,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
     };
   }, [id, previewData]);
 
-  // Parallax scroll tracking for hero video
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   if (loading) return <LoadingSkeleton />;
 
@@ -369,8 +360,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
   const { store, related } = data;
   const heroHeight = 220;
-  const videoScale = 1 + scrollY * 0.0005;
-  const videoOpacity = Math.max(0, 1 - scrollY / (heroHeight * 1.5));
+
+
 
   return (
     <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#fafeff" }}>
@@ -379,7 +370,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       {/* ============================================================ */}
       {store.video_url && (
         <div
-          className="sticky top-0 z-0 w-full overflow-hidden"
+          className="fixed top-0 left-0 right-0 z-20 w-full overflow-hidden"
           style={{ height: `${heroHeight}px` }}
         >
           <video
@@ -389,10 +380,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             loop
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
-            style={{
-              transform: `scale(${videoScale})`,
-              opacity: videoOpacity,
-            }}
           >
             <source src={store.video_url} type="video/mp4" />
           </video>
@@ -406,49 +393,12 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       )}
 
       {/* ============================================================ */}
-      {/* Fixed Header Bar */}
-      {/* ============================================================ */}
-      <div
-        className="fixed top-0 left-0 right-0 z-30 flex items-center px-4"
-        style={{
-          height: "56px",
-          backgroundColor: scrollY > heroHeight * 0.5 ? "rgba(255,255,255,0.95)" : "transparent",
-          backdropFilter: scrollY > heroHeight * 0.5 ? "blur(12px)" : "none",
-          borderBottom: scrollY > heroHeight * 0.5 ? "1px solid rgba(27,37,40,0.08)" : "none",
-          transition: "background-color 0.3s, backdrop-filter 0.3s",
-        }}
-      >
-        <button
-          onClick={() => window.history.back()}
-          className="flex h-9 w-9 items-center justify-center rounded-full"
-          style={{
-            backgroundColor: scrollY > heroHeight * 0.5 ? "transparent" : "rgba(0,0,0,0.3)",
-          }}
-        >
-          <ChevronLeft
-            size={24}
-            style={{ color: scrollY > heroHeight * 0.5 ? "#1b2528" : "#ffffff" }}
-          />
-        </button>
-        <span
-          className="ml-3 truncate text-base font-bold transition-opacity"
-          style={{
-            fontFamily: "'Domine', 'Noto Sans JP', sans-serif",
-            color: "#1b2528",
-            opacity: scrollY > heroHeight * 0.5 ? 1 : 0,
-          }}
-        >
-          {store.name}
-        </span>
-      </div>
-
-      {/* ============================================================ */}
       {/* Main content - overlaps video on scroll */}
       {/* ============================================================ */}
       <div
         className="relative z-10"
         style={{
-          marginTop: store.video_url ? `-20px` : "0",
+          marginTop: store.video_url ? `${heroHeight - 20}px` : "0",
           borderTopLeftRadius: store.video_url ? "20px" : "0",
           borderTopRightRadius: store.video_url ? "20px" : "0",
           backgroundColor: "#fafeff",
@@ -456,117 +406,26 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       >
         <div className="mx-auto max-w-3xl space-y-5 px-4 pb-24 pt-6">
           {/* ============================================================ */}
-          {/* 2. Shop Intro Card */}
+          {/* 2. AI Chat (replaces old Shop Intro Card — chat intro summarizes store info) */}
           {/* ============================================================ */}
-          <div
-            className="overflow-hidden rounded-[16px] bg-white p-5"
-            style={{
-              boxShadow: "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
-              border: "1px solid rgba(27,37,40,0.06)",
+          <AiChatPanel
+            pageType="detail"
+            storeId={store.id}
+            storeName={store.name}
+            storeInfo={{
+              name: store.name,
+              area: store.area,
+              category: store.category,
+              nearest_station: store.nearest_station,
+              hourly_min: store.hourly_min,
+              hourly_max: store.hourly_max,
+              feature_tags: store.feature_tags,
+              description: store.description,
+              business_hours: store.business_hours,
+              same_day_trial: store.same_day_trial,
+              trial_hourly: store.trial_hourly,
             }}
-          >
-            {/* Store name */}
-            <h1
-              className="font-heading text-xl font-bold leading-tight"
-              style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif", color: "#1b2528" }}
-            >
-              {store.name}のご紹介です
-            </h1>
-
-            {/* Description */}
-            {store.description && (
-              <p
-                className="mt-3 text-sm leading-relaxed"
-                style={{ color: "rgba(27,37,40,0.65)" }}
-              >
-                {store.description}
-              </p>
-            )}
-
-            {/* Quick info row */}
-            <div
-              className="mt-4 space-y-2 rounded-[12px] p-3"
-              style={{ backgroundColor: "rgba(27,37,40,0.02)" }}
-            >
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin size={14} style={{ color: "#D4AF37" }} />
-                <span style={{ color: "rgba(27,37,40,0.5)" }}>エリア:</span>
-                <span className="font-medium" style={{ color: "#1b2528" }}>
-                  {store.area}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <TrendingUp size={14} style={{ color: "#D4AF37" }} />
-                <span style={{ color: "rgba(27,37,40,0.5)" }}>時給:</span>
-                <span className="font-medium" style={{ color: "#1b2528" }}>
-                  時給{formatCurrency(store.hourly_min)}〜{formatCurrency(store.hourly_max)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Clock size={14} style={{ color: "#D4AF37" }} />
-                <span style={{ color: "rgba(27,37,40,0.5)" }}>勤務時間:</span>
-                <span className="font-medium" style={{ color: "#1b2528" }}>
-                  {store.business_hours}
-                  {store.schedule?.shift_info ? `（${store.schedule.shift_info.split("。")[0]}）` : ""}
-                </span>
-              </div>
-            </div>
-
-            {/* Benefits */}
-            {store.feature_tags && store.feature_tags.length > 0 && (
-              <div className="mt-4">
-                <p
-                  className="mb-2 text-sm font-bold"
-                  style={{ color: "#1b2528" }}
-                >
-                  【主な待遇】
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {store.feature_tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-                      style={{
-                        border: "1px solid rgba(212,175,55,0.3)",
-                        color: "#D4AF37",
-                        backgroundColor: "rgba(212,175,55,0.06)",
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Category + Rating badges */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {store.category && (
-                <span
-                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                  style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
-                >
-                  {store.category}
-                </span>
-              )}
-              {(store.average_rating ?? 0) > 0 && (
-                <span className="inline-flex items-center gap-1 text-sm">
-                  {renderStars(store.average_rating ?? 0, 14)}
-                  <span className="font-semibold" style={{ color: "#1b2528" }}>
-                    {(store.average_rating ?? 0).toFixed(1)}
-                  </span>
-                  <span style={{ color: "rgba(27,37,40,0.45)" }}>
-                    ({store.reviews_count ?? 0}件)
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* ============================================================ */}
-          {/* 3. AI Chat */}
-          {/* ============================================================ */}
-          <AiChatPanel pageType="detail" storeId={store.id} storeName={store.name} />
+          />
 
           {/* ============================================================ */}
           {/* 4. Experience Entry (体験入店情報) */}
@@ -654,23 +513,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               </div>
             )}
           </SectionCard>
-
-          {/* ============================================================ */}
-          {/* CTA Button - 体験入店してみる */}
-          {/* ============================================================ */}
-          <button
-            className="flex w-full items-center justify-center gap-2 rounded-full py-4 text-base font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
-            style={{
-              background: "linear-gradient(135deg, rgba(200,96,128,1) 0%, rgba(180,76,108,1) 100%)",
-              boxShadow: "0 4px 16px rgba(200,96,128,0.35)",
-            }}
-            onClick={() => {
-              window.location.href = "/login";
-            }}
-          >
-            <Heart size={18} fill="white" />
-            体験入店してみる
-          </button>
 
           {/* ============================================================ */}
           {/* 5. Detailed Info - Shop Features */}

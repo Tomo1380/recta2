@@ -20,10 +20,26 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
+interface StoreInfo {
+  name: string;
+  area?: string;
+  category?: string;
+  nearest_station?: string;
+  hourly_min?: number;
+  hourly_max?: number;
+  feature_tags?: string[];
+  description?: string;
+  business_hours?: string;
+  same_day_trial?: boolean;
+  trial_hourly?: string | number | null;
+}
+
 interface AiChatPanelProps {
   pageType: "top" | "list" | "detail";
   storeId?: number;
   storeName?: string;
+  /** Store data for detail page intro summary */
+  storeInfo?: StoreInfo;
   className?: string;
   /** Preview mode: disables API calls, uses provided suggest buttons */
   preview?: boolean;
@@ -174,11 +190,45 @@ const SUGGEST_ACTIONS = [
 // Intro animation script (per page type)
 // ---------------------------------------------------------------------------
 
-function getIntroScript(pageType: string, storeName?: string) {
+function formatCurrencyShort(n?: number) {
+  if (!n) return "";
+  return n.toLocaleString();
+}
+
+function getIntroScript(
+  pageType: string,
+  storeName?: string,
+  storeInfo?: StoreInfo,
+) {
+  if (pageType === "detail" && storeInfo) {
+    const s = storeInfo;
+    const hourly =
+      s.hourly_min && s.hourly_max
+        ? `時給${formatCurrencyShort(s.hourly_min)}〜${formatCurrencyShort(s.hourly_max)}円`
+        : "";
+    const location = [s.area, s.nearest_station].filter(Boolean).join("・");
+    const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
+    const trial = s.same_day_trial
+      ? `体入OK${s.trial_hourly ? `（体入時給: ${s.trial_hourly}）` : ""}`
+      : "";
+
+    let summary = `${s.name}の情報をまとめますね！\n\n`;
+    if (s.category && location) summary += `${s.category} ／ ${location}\n`;
+    if (hourly) summary += `${hourly}\n`;
+    if (s.business_hours) summary += `営業: ${s.business_hours}\n`;
+    if (trial) summary += `${trial}\n`;
+    if (tags) summary += `特徴: ${tags}\n`;
+    summary += `\n気になることがあれば何でも聞いてくださいね。`;
+
+    return {
+      userMessage: `${s.name}について教えて`,
+      aiMessage: summary,
+    };
+  }
   if (pageType === "detail" && storeName) {
     return {
-      userMessage: `${storeName}ってどんなお店ですか？`,
-      aiMessage: `${storeName}についてお答えします！時給や待遇、雰囲気など気になることがあれば何でも聞いてくださいね。`,
+      userMessage: `${storeName}について教えて`,
+      aiMessage: `${storeName}の情報をお伝えしますね！時給や待遇、雰囲気など気になることがあれば何でも聞いてください。`,
     };
   }
   if (pageType === "list") {
@@ -191,7 +241,7 @@ function getIntroScript(pageType: string, storeName?: string) {
   return {
     userMessage: "Rectaで良いお店みつかりますか？",
     aiMessage:
-      "はい、ご安心ください！Rectaには全国1,200件以上のお店が掲載されており、条件に合った求人をAIが丁寧にご提案します。",
+      "こんにちは！Rectaへようこそ。\nお仕事探しや業界についてのご相談、何でもお気軽にお聞きください！",
   };
 }
 
@@ -442,11 +492,12 @@ export default function AiChatPanel({
   pageType,
   storeId,
   storeName,
+  storeInfo,
   className,
   preview = false,
   previewSuggestButtons,
 }: AiChatPanelProps) {
-  const introScript = getIntroScript(pageType, storeName);
+  const introScript = getIntroScript(pageType, storeName, storeInfo);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -727,43 +778,87 @@ export default function AiChatPanel({
         </div>
       </div>
 
-      {/* ---- Intro greeting (Figma-style beige box with typing animation) ---- */}
+      {/* ---- Intro greeting (chat bubble style with typing animation) ---- */}
       {!hasMessages && introPhase !== "idle" && (
-        <div
-          className="mx-3 rounded-[16px] px-3 py-2.5"
-          style={{ backgroundColor: "#f3f2ee" }}
-        >
-          {/* Typing dots while AI is "thinking" */}
-          {(introPhase === "typing-user" || introPhase === "show-user" || introPhase === "typing-ai") && (
-            <div className="flex items-center gap-1 py-1">
-              <span
-                className="size-1.5 rounded-full animate-bounce [animation-delay:0ms]"
-                style={{ backgroundColor: "rgba(27,37,40,0.35)" }}
-              />
-              <span
-                className="size-1.5 rounded-full animate-bounce [animation-delay:150ms]"
-                style={{ backgroundColor: "rgba(27,37,40,0.35)" }}
-              />
-              <span
-                className="size-1.5 rounded-full animate-bounce [animation-delay:300ms]"
-                style={{ backgroundColor: "rgba(27,37,40,0.35)" }}
-              />
+        <div className="flex flex-col gap-3 px-4 py-3.5">
+          {/* User bubble */}
+          {(introPhase === "show-user" || introPhase === "typing-ai" || introPhase === "show-ai" || introPhase === "done") && (
+            <div className="flex justify-end">
+              <div
+                className="max-w-[80%] px-3.5 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed rounded-bl-[18px] rounded-br-[4px] rounded-tl-[18px] rounded-tr-[18px]"
+                style={{
+                  backgroundColor: "#eae7e3",
+                  color: "rgba(27,37,40,0.88)",
+                  boxShadow: "0px 1px 3px rgba(27,37,40,0.06)",
+                }}
+              >
+                {introPhase === "show-user" ? introUserText : introScript.userMessage}
+              </div>
             </div>
           )}
-          {/* AI text streaming in */}
+          {/* Typing dots */}
+          {(introPhase === "typing-user") && (
+            <div className="flex justify-end">
+              <div
+                className="px-3.5 py-2.5 rounded-bl-[18px] rounded-br-[4px] rounded-tl-[18px] rounded-tr-[18px]"
+                style={{ backgroundColor: "#eae7e3" }}
+              >
+                <div className="flex items-center gap-1 py-0.5">
+                  <span className="size-1.5 rounded-full animate-bounce [animation-delay:0ms]" style={{ backgroundColor: "rgba(27,37,40,0.35)" }} />
+                  <span className="size-1.5 rounded-full animate-bounce [animation-delay:150ms]" style={{ backgroundColor: "rgba(27,37,40,0.35)" }} />
+                  <span className="size-1.5 rounded-full animate-bounce [animation-delay:300ms]" style={{ backgroundColor: "rgba(27,37,40,0.35)" }} />
+                </div>
+              </div>
+            </div>
+          )}
+          {/* AI typing dots */}
+          {introPhase === "typing-ai" && (
+            <div className="flex justify-start">
+              <div
+                className="mr-2 mt-auto flex size-6 shrink-0 items-center justify-center rounded-[10px]"
+                style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
+              >
+                <Sparkles className="size-3.5 text-white" />
+              </div>
+              <div
+                className="px-3.5 py-2.5 rounded-bl-[18px] rounded-br-[18px] rounded-tl-[4px] rounded-tr-[18px]"
+                style={{ backgroundColor: "white", border: "0.5px solid rgba(212,175,55,0.25)", boxShadow: "0px 2px 8px rgba(27,37,40,0.07)" }}
+              >
+                <div className="flex items-center gap-1 py-0.5">
+                  <span className="size-1.5 rounded-full animate-bounce [animation-delay:0ms]" style={{ backgroundColor: "rgba(212,175,55,0.5)" }} />
+                  <span className="size-1.5 rounded-full animate-bounce [animation-delay:150ms]" style={{ backgroundColor: "rgba(212,175,55,0.5)" }} />
+                  <span className="size-1.5 rounded-full animate-bounce [animation-delay:300ms]" style={{ backgroundColor: "rgba(212,175,55,0.5)" }} />
+                </div>
+              </div>
+            </div>
+          )}
+          {/* AI bubble */}
           {(introPhase === "show-ai" || introPhase === "done") && (
-            <p
-              className="whitespace-pre-line text-[13px] leading-[1.35]"
-              style={{ color: "#1b2528", fontFamily: "'Noto Sans JP', sans-serif" }}
-            >
-              {introAiText}
-              {introPhase === "show-ai" && (
-                <span
-                  className="inline-block w-0.5 h-3.5 ml-0.5 align-text-bottom animate-pulse"
-                  style={{ backgroundColor: "rgba(27,37,40,0.4)" }}
-                />
-              )}
-            </p>
+            <div className="flex justify-start">
+              <div
+                className="mr-2 mt-auto flex size-6 shrink-0 items-center justify-center rounded-[10px]"
+                style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
+              >
+                <Sparkles className="size-3.5 text-white" />
+              </div>
+              <div
+                className="max-w-[80%] px-3.5 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed rounded-bl-[18px] rounded-br-[18px] rounded-tl-[4px] rounded-tr-[18px]"
+                style={{
+                  backgroundColor: "white",
+                  color: "#1b2528",
+                  border: "0.5px solid rgba(212,175,55,0.25)",
+                  boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
+                }}
+              >
+                {introAiText}
+                {introPhase === "show-ai" && (
+                  <span
+                    className="inline-block w-0.5 h-3.5 ml-0.5 align-text-bottom animate-pulse"
+                    style={{ backgroundColor: "rgba(212,175,55,0.4)" }}
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -395,7 +395,7 @@ export default function TopPage() {
 
         {/* ══ HERO ══ */}
         <div className="relative w-full" style={{ height: "82vw", maxHeight: "360px", minHeight: "260px" }}>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1b2528 0%, #2a3a3f 60%, #1b2528 100%)" }} />
+          <img src="/hero-top.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,rgba(8,6,16,.52) 0%,rgba(8,6,16,.1) 45%,rgba(8,6,16,.78) 100%)" }} />
           <div className="absolute bottom-0 left-0 right-0" style={{ height: "1.5px", background: `linear-gradient(90deg,transparent,rgba(212,175,55,.9) 30%,#ffe066 50%,rgba(212,175,55,.9) 70%,transparent)` }} />
           <div className="absolute top-5 left-5">

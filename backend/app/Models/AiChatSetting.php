@@ -11,6 +11,7 @@ class AiChatSetting extends Model
         'enabled',
         'system_prompt',
         'tone',
+        'openai_finetuned_model',
         'suggest_buttons',
     ];
 

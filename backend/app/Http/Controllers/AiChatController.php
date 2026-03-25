@@ -171,15 +171,16 @@ class AiChatController extends Controller
             $keywords = preg_split('/[\s　,、]+/u', trim($args['keyword']));
             $keywords = array_filter($keywords, fn($k) => mb_strlen($k) > 0);
             // OR across keywords: any keyword matching any field is a hit
+            // Uses unaccent() for accent-insensitive matching (e.g. Lumière = Lumiere)
             $query->where(function ($q) use ($keywords) {
                 foreach ($keywords as $kw) {
                     $q->orWhere(function ($sub) use ($kw) {
-                        $sub->where('name', 'ilike', "%{$kw}%")
-                            ->orWhere('description', 'ilike', "%{$kw}%")
+                        $sub->whereRaw("unaccent(name) ILIKE unaccent(?)", ["%{$kw}%"])
+                            ->orWhereRaw("unaccent(COALESCE(description,'')) ILIKE unaccent(?)", ["%{$kw}%"])
                             ->orWhere('nearest_station', 'ilike', "%{$kw}%")
-                            ->orWhere('features_text', 'ilike', "%{$kw}%")
+                            ->orWhereRaw("unaccent(COALESCE(features_text,'')) ILIKE unaccent(?)", ["%{$kw}%"])
                             ->orWhere('address', 'ilike', "%{$kw}%")
-                            ->orWhereRaw("staff_comment::text ILIKE ?", ["%{$kw}%"]);
+                            ->orWhereRaw("unaccent(COALESCE(staff_comment::text,'')) ILIKE unaccent(?)", ["%{$kw}%"]);
                     });
                 }
             });
@@ -596,7 +597,7 @@ class AiChatController extends Controller
                     'mode' => 'agent',
                 ]);
 
-                $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls);
+                $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
                 $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText, $toolCalls);
 
                 return response()->json([
@@ -648,7 +649,7 @@ class AiChatController extends Controller
     /**
      * Extract store data from tool call results for inline cards.
      */
-    private function extractStoreIdsFromToolCalls(array $toolCalls): array
+    private function extractStoreIdsFromToolCalls(array $toolCalls, string $aiText = ''): array
     {
         $stores = [];
         $seenIds = [];
@@ -681,6 +682,19 @@ class AiChatController extends Controller
             }
         }
 
+        // Prioritize stores mentioned in AI text so cards match the response
+        if ($aiText && count($stores) > 1) {
+            usort($stores, function ($a, $b) use ($aiText) {
+                $aPos = mb_strpos($aiText, $a['name']);
+                $bPos = mb_strpos($aiText, $b['name']);
+                // Mentioned stores come first, in order of appearance
+                if ($aPos === false && $bPos === false) return 0;
+                if ($aPos === false) return 1;
+                if ($bPos === false) return -1;
+                return $aPos <=> $bPos;
+            });
+        }
+
         return $stores;
     }
 
@@ -700,9 +714,9 @@ class AiChatController extends Controller
         string $userArea = '',
         ?int $userId = null,
     ): JsonResponse {
-        // OpenAI Fine-tuned model
+        // OpenAI Fine-tuned model — read from DB first, fallback to .env
         $openaiKey = trim(config('services.openai.api_key') ?? '');
-        $openaiModel = trim(config('services.openai.finetuned_model') ?? '');
+        $openaiModel = trim($setting->openai_finetuned_model ?? '');
 
         if (!$openaiKey || !$openaiModel) {
             // Fallback to Gemini prompt-embedding mode if OpenAI not configured
@@ -855,55 +869,24 @@ class AiChatController extends Controller
     }
 
     /**
-     * System prompt for OpenAI fine-tuned model (lighter than Gemini prompt-embedding)
+     * System prompt for OpenAI fine-tuned model.
+     * Store knowledge is baked into the FT model via training — no store JSON at runtime.
      */
     private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
-        // For OpenAI fine-tuned model, include full store JSON for atmosphere interpretation
-        $storeJson = Cache::remember('public_stores_full_json_v1', 600, function () {
-            $stores = Store::where('publish_status', 'published')
-                ->get()
-                ->map(function ($s) {
-                    $data = [
-                        'id' => $s->id,
-                        'name' => $s->name,
-                        'area' => $s->area,
-                        'category' => $s->category,
-                        'nearest_station' => $s->nearest_station,
-                        'business_hours' => $s->business_hours,
-                        'hourly_min' => $s->hourly_min,
-                        'hourly_max' => $s->hourly_max,
-                        'daily_estimate' => $s->daily_estimate,
-                        'same_day_trial' => $s->same_day_trial,
-                        'trial_hourly' => $s->trial_hourly,
-                        'guarantee_period' => $s->guarantee_period,
-                        'norma_info' => $s->norma_info,
-                        'feature_tags' => $s->feature_tags ?? [],
-                        'back_items' => collect($s->back_items ?? [])->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))->filter(fn($b) => $b !== ':')->values()->toArray(),
-                        'description' => $s->description,
-                        'features_text' => $s->features_text,
-                        'staff_comment' => $s->staff_comment,
-                    ];
-                    return array_filter($data, fn($v) => $v !== null && $v !== '' && $v !== []);
-                })
-                ->values()
-                ->toArray();
-            return json_encode($stores, JSON_UNESCAPED_UNICODE);
-        });
+        $prompt = "あなたはRecta AIです。ナイトワーク専門のキャリアアドバイザーです。\n\n";
 
-        $prompt = "あなたはRecta AIです。ナイトワーク（キャバクラ・ラウンジ・ガールズバー・クラブ・コンカフェ）専門のキャリアアドバイザーです。\n\n" .
-            "【ルール】\n" .
-            "- 丁寧だけどフレンドリーな口調で回答\n" .
-            "- 必ず以下の店舗データから2〜3件を選んで紹介する。データにない店舗は紹介禁止\n" .
-            "- 店舗紹介時は [STORE:ID] マーカーを店名の前に付ける\n" .
-            "- ユーザーに質問を返さない（「どのエリアですか？」等は禁止）\n" .
-            "- ナイトワーク以外の話題にはやんわりお断り\n" .
-            "- 回答の最後に「もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付ける\n" .
-            "- 300〜500文字程度で簡潔に\n" .
-            "- 絵文字は使わない\n\n" .
-            "【雰囲気の解釈】\n" .
-            "曖昧な表現はdescription・features_text・staff_commentから読み取って判断:\n" .
-            "「わいわい系」→アットホーム・明るい雰囲気の店、「落ち着いた」→高級・会員制、「ゆるい」→ノルマなし・自由シフト\n\n";
+        // Page-type specific behavior
+        $prompt .= match ($pageType) {
+            'detail' => "【現在のページ: 店舗詳細】\n" .
+                "ユーザーはこの店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
+                "他の店舗を紹介しない。\n",
+            'list' => "【現在のページ: 店舗一覧】\n" .
+                "ユーザーは店舗一覧ページにいます。条件を絞り込んでお店を探すお手伝いをしてください。\n",
+            default => "【現在のページ: トップ】\n" .
+                "幅広い提案をしてください。エリアやカテゴリの希望がなければ人気店から紹介。\n",
+        };
+        $prompt .= "\n";
 
         if ($setting->system_prompt) {
             $prompt .= "運営追加指示: {$setting->system_prompt}\n\n";
@@ -916,14 +899,6 @@ class AiChatController extends Controller
         if ($storeContext) {
             $prompt .= "閲覧中の店舗:\n{$storeContext}\n\n";
         }
-
-        if ($pageType === 'detail' && $storeContext) {
-            $prompt .= "【店舗詳細ページ（最優先）】\n" .
-                "ユーザーは上記の店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
-                "この店舗のデータのみを使って回答する。他の店舗を紹介しない。[STORE:ID]マーカーもこの店舗のみ付ける。\n\n";
-        }
-
-        $prompt .= "【店舗データ】\n{$storeJson}";
 
         return $prompt;
     }

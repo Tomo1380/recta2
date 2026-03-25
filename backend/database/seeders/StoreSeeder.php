@@ -194,6 +194,15 @@ class StoreSeeder extends Seeder
         ['q' => '罰金やペナルティはありますか？', 'a' => '当店は罰金・ペナルティ一切なしです。安心してお越しください。'],
     ];
 
+    // Free-to-use Pexels bar/lounge ambient videos (short, HD)
+    private const SAMPLE_VIDEOS = [
+        'https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4',
+        'https://videos.pexels.com/video-files/3121459/3121459-uhd_2560_1440_24fps.mp4',
+        'https://videos.pexels.com/video-files/2795173/2795173-uhd_2560_1440_25fps.mp4',
+        'https://videos.pexels.com/video-files/4691586/4691586-uhd_2560_1440_25fps.mp4',
+        'https://videos.pexels.com/video-files/3773486/3773486-uhd_2560_1440_30fps.mp4',
+    ];
+
     private array $usedNames = [];
 
     // -----------------------------------------------------------------------
@@ -311,6 +320,10 @@ class StoreSeeder extends Seeder
         }
         if ($this->chance(0.3)) {
             $store['staff_comment'] = $this->randomStaffComment();
+        }
+        // Video URL — 60% of stores have a promo video
+        if ($this->chance(0.6)) {
+            $store['video_url'] = self::SAMPLE_VIDEOS[array_rand(self::SAMPLE_VIDEOS)];
         }
         if ($this->chance(0.25)) {
             $store['schedule'] = [
