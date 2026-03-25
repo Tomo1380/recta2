@@ -59,6 +59,7 @@ interface ChatMessage {
   stores?: StoreCard[];
   follow_ups?: string[];
   meta?: MessageMeta;
+  showLineCta?: boolean;
 }
 
 type ChatMode = "agent" | "finetuned";
@@ -150,22 +151,22 @@ const SUGGEST_ACTIONS = [
   {
     title: "質問する",
     subtitle: "AIに直接聞いてみる",
-    message: "お仕事について質問があります",
+    chips: ["未経験でも大丈夫？", "ノルマなしのお店は？", "給与の相場を教えて", "日払いできる？", "昼職と掛け持ちできる？"],
   },
   {
     title: "状況を話す",
     subtitle: "自分の状況をAIに伝える",
-    message: "今の状況についてお話しします",
+    chips: ["週2〜3日だけ働きたい", "昼職があって夜も働きたい", "人見知りでも大丈夫？", "子育て中でも働ける？", "体験入店が怖い"],
   },
   {
     title: "不安を解消",
     subtitle: "本音の心配をそのまま",
-    message: "不安な点を相談したいです",
+    chips: ["バレないか心配", "安全なお店を探したい", "初日の流れは？", "面接はどんな感じ？", "体験入店って何？"],
   },
   {
     title: "条件で絞る",
     subtitle: "希望条件をそのまま入力",
-    message: "希望条件でお店を探したいです",
+    chips: ["渋谷・恵比寿エリア", "月収50万以上", "送迎あり", "個室あり", "ノルマなし・自由出勤"],
   },
 ];
 
@@ -209,7 +210,7 @@ function MetaBadge({ meta }: { meta: MessageMeta }) {
             meta.mode === "agent"
               ? "rgba(212,175,55,0.12)"
               : "rgba(99,102,241,0.12)",
-          color: meta.mode === "agent" ? "#9a7a20" : "#6366f1",
+          color: meta.mode === "agent" ? "#D4AF37" : "#6366f1",
         }}
       >
         {meta.mode === "agent" ? (
@@ -279,6 +280,7 @@ function SuggestActionsCarousel({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(0);
 
   const checkScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -306,91 +308,128 @@ function SuggestActionsCarousel({
     el.scrollBy({ left: direction === "left" ? -150 : 150, behavior: "smooth" });
   };
 
+  const selectedChips = actions[selectedIdx]?.chips ?? [];
+
   return (
-    <div className="relative group">
-      <style>{`.suggest-carousel::-webkit-scrollbar { display: none; }`}</style>
-      <div
-        ref={scrollContainerRef}
-        className="suggest-carousel flex gap-2 px-5 pb-3 overflow-x-auto"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {actions.map((action, idx) => (
+    <div>
+      {/* Category tabs */}
+      <div className="relative group">
+        <style>{`.suggest-carousel::-webkit-scrollbar { display: none; }`}</style>
+        <div
+          ref={scrollContainerRef}
+          className="suggest-carousel flex gap-2 px-5 pb-2 overflow-x-auto"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {actions.map((action, idx) => {
+            const active = selectedIdx === idx;
+            return (
+              <button
+                key={action.title}
+                type="button"
+                onClick={() => setSelectedIdx(idx)}
+                disabled={isLoading}
+                className="flex shrink-0 flex-col items-start gap-px rounded-[10px] bg-white pl-3 pr-3 py-[7px] text-left transition-all hover:shadow-md disabled:opacity-50"
+                style={{
+                  border: active
+                    ? "0.5px solid rgba(27,37,40,0.22)"
+                    : "0.5px solid rgba(27,37,40,0.15)",
+                  boxShadow: active
+                    ? "0px 1.5px 6px rgba(27,37,40,0.13), 0px 0.5px 2px rgba(27,37,40,0.08)"
+                    : "none",
+                }}
+              >
+                <span
+                  className="text-[11px] leading-tight whitespace-nowrap"
+                  style={{
+                    color: active ? "#1b2528" : "rgba(27,37,40,0.7)",
+                    fontWeight: active ? 500 : 400,
+                  }}
+                >
+                  {action.title}
+                </span>
+                <span
+                  className="text-[9px] leading-tight whitespace-nowrap"
+                  style={{
+                    color: active ? "rgba(27,37,40,0.45)" : "rgba(27,37,40,0.32)",
+                    letterSpacing: "0.18px",
+                  }}
+                >
+                  {action.subtitle}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Left arrow (PC hover) */}
+        {canScrollLeft && (
           <button
-            key={action.title}
             type="button"
-            onClick={() => onSend(action.message)}
-            disabled={isLoading}
-            className="flex shrink-0 flex-col items-start gap-px rounded-[10px] bg-white pl-3 pr-3 py-[7px] text-left transition-all hover:shadow-md disabled:opacity-50"
-            style={{
-              border: idx === 0
-                ? "0.5px solid rgba(27,37,40,0.22)"
-                : "0.5px solid rgba(27,37,40,0.15)",
-              boxShadow: idx === 0
-                ? "0px 1.5px 6px rgba(27,37,40,0.13), 0px 0.5px 2px rgba(27,37,40,0.08)"
-                : "none",
-            }}
+            onClick={() => scroll("left")}
+            className="absolute left-1 top-1/2 -translate-y-1/2 hidden sm:flex size-7 items-center justify-center rounded-full bg-white/90 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+            style={{ border: "0.5px solid rgba(27,37,40,0.12)" }}
           >
-            <span
-              className="text-[11px] leading-tight whitespace-nowrap"
-              style={{
-                color: idx === 0 ? "#1b2528" : "rgba(27,37,40,0.7)",
-                fontWeight: idx === 0 ? 500 : 400,
-              }}
-            >
-              {action.title}
-            </span>
-            <span
-              className="text-[9px] leading-tight whitespace-nowrap"
-              style={{
-                color: idx === 0 ? "rgba(27,37,40,0.45)" : "rgba(27,37,40,0.32)",
-                letterSpacing: "0.18px",
-              }}
-            >
-              {action.subtitle}
-            </span>
+            <ChevronLeft className="size-4" style={{ color: "rgba(27,37,40,0.6)" }} />
           </button>
-        ))}
+        )}
+
+        {/* Right arrow (PC hover) */}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scroll("right")}
+            className="absolute right-1 top-1/2 -translate-y-1/2 hidden sm:flex size-7 items-center justify-center rounded-full bg-white/90 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+            style={{ border: "0.5px solid rgba(27,37,40,0.12)" }}
+          >
+            <ChevronRight className="size-4" style={{ color: "rgba(27,37,40,0.6)" }} />
+          </button>
+        )}
+
+        {/* Right fade hint */}
+        {canScrollRight && (
+          <div
+            className="pointer-events-none absolute right-0 top-0 bottom-0 w-10"
+            style={{ background: "linear-gradient(270deg, white 0%, transparent 100%)" }}
+          />
+        )}
+
+        {/* Left fade hint */}
+        {canScrollLeft && (
+          <div
+            className="pointer-events-none absolute left-0 top-0 bottom-0 w-10"
+            style={{ background: "linear-gradient(90deg, white 0%, transparent 100%)" }}
+          />
+        )}
       </div>
 
-      {/* Left arrow (PC hover) */}
-      {canScrollLeft && (
-        <button
-          type="button"
-          onClick={() => scroll("left")}
-          className="absolute left-1 top-1/2 -translate-y-1/2 hidden sm:flex size-7 items-center justify-center rounded-full bg-white/90 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-          style={{ border: "0.5px solid rgba(27,37,40,0.12)" }}
-        >
-          <ChevronLeft className="size-4" style={{ color: "rgba(27,37,40,0.6)" }} />
-        </button>
-      )}
-
-      {/* Right arrow (PC hover) */}
-      {canScrollRight && (
-        <button
-          type="button"
-          onClick={() => scroll("right")}
-          className="absolute right-1 top-1/2 -translate-y-1/2 hidden sm:flex size-7 items-center justify-center rounded-full bg-white/90 shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-          style={{ border: "0.5px solid rgba(27,37,40,0.12)" }}
-        >
-          <ChevronRight className="size-4" style={{ color: "rgba(27,37,40,0.6)" }} />
-        </button>
-      )}
-
-      {/* Right fade hint */}
-      {canScrollRight && (
-        <div
-          className="pointer-events-none absolute right-0 top-0 bottom-0 w-10"
-          style={{ background: "linear-gradient(270deg, white 0%, transparent 100%)" }}
-        />
-      )}
-
-      {/* Left fade hint */}
-      {canScrollLeft && (
-        <div
-          className="pointer-events-none absolute left-0 top-0 bottom-0 w-10"
-          style={{ background: "linear-gradient(90deg, white 0%, transparent 100%)" }}
-        />
-      )}
+      {/* Chips grid */}
+      <div style={{ padding: "0 20px 14px" }}>
+        <div style={{ overflowX: "auto", overflowY: "visible", scrollbarWidth: "none" as const, padding: "3px", margin: "-3px" }}>
+          <div style={{ display: "grid", gridTemplateRows: "repeat(2, 30px)", gridAutoFlow: "column", gridAutoColumns: "max-content", gap: "8px" }}>
+            {selectedChips.map((chip, i) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => onSend(chip)}
+                disabled={isLoading}
+                className="flex items-center justify-center rounded-full bg-white transition-all active:scale-95 hover:shadow-md disabled:opacity-50"
+                style={{
+                  height: "30px",
+                  padding: "0 13px",
+                  border: "none",
+                  boxShadow: "0px 1px 4px rgba(27,37,40,0.13), 0px 0px 0px 0.5px rgba(27,37,40,0.07)",
+                  fontSize: "11px",
+                  color: "#1b2528",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -584,12 +623,19 @@ export default function AiChatPanel({
 
         const res = await sendMessage(msg, pageType, history, mode, storeId, userArea);
 
+        // Strip LINE boilerplate from AI text (CTA card handles it visually)
+        const cleanedMessage = res.message
+          .replace(/\n*もっと詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
+          .replace(/\n*より詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
+          .trim();
+
         const aiMessage: ChatMessage = {
           role: "ai",
-          content: res.message,
+          content: cleanedMessage,
           stores: res.stores,
           follow_ups: res.follow_ups,
           meta: res.meta,
+          showLineCta: true,
         };
         setMessages((prev) => [...prev, aiMessage]);
         setFollowUpButtons(res.follow_ups ?? []);
@@ -632,190 +678,109 @@ export default function AiChatPanel({
     messages.length > 0 &&
     messages[messages.length - 1]?.role === "ai";
 
+  // Whether category chips are shown (top page, no messages yet)
+  const showCategoryChips = !hasMessages && pageType === "top";
+
   return (
     <div
       ref={panelRef}
-      className={`overflow-hidden rounded-[14px] bg-white ${className ?? ""}`}
+      className={`overflow-hidden rounded-[16px] ${className ?? ""}`}
       style={{
-        border: "0.5px solid rgba(212,175,55,0.28)",
+        backgroundColor: "#ffffff",
+        border: "1px solid rgba(73,100,110,0.2)",
+        boxShadow: "0px 4px 16px rgba(0,0,0,0.12), 0px 1px 4px rgba(0,0,0,0.08)",
+        position: "relative",
+        zIndex: 3,
+        isolation: "isolate",
       }}
     >
       {/* ---- Header ---- */}
-      <div className="flex items-center justify-between px-5 py-3">
-        <div className="flex items-center gap-2">
-          <span
-            className="inline-block w-1 h-4 rounded-full"
-            style={{ background: "linear-gradient(180deg, #d4af37 0%, #c8960c 100%)" }}
-          />
-          <h3
-            className="text-[16px] font-bold tracking-[-0.32px]"
-            style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
-          >
-            AIに相談する
-          </h3>
-          <span
-            className="rounded-[4px] px-2 py-0.5 text-[8.5px] font-semibold tracking-[1.02px]"
-            style={{
-              background: "linear-gradient(156deg, #1b2528 0%, #2c3e46 100%)",
-              color: "#d4af37",
-              border: "0.5px solid rgba(212,175,55,0.4)",
-              fontFamily: "'Outfit', sans-serif",
-            }}
-          >
-            NEW
-          </span>
-        </div>
+      <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <div
             className="flex size-[22px] shrink-0 items-center justify-center rounded-[10px]"
-            style={{ background: "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)" }}
+            style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
           >
             <Sparkles className="size-3.5 text-white" />
           </div>
           <span
-            className="text-[13px] font-bold"
-            style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
+            className="text-[14px] font-bold"
+            style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
           >
             Recta AI
           </span>
+        </div>
+        <div className="flex items-center gap-2">
           {/* Mode toggle */}
           <button
             type="button"
             onClick={() => setMode(mode === "agent" ? "finetuned" : "agent")}
             className="rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors"
             style={{
-              backgroundColor: mode === "agent" ? "rgba(154,122,32,0.12)" : "rgba(99,102,241,0.12)",
-              color: mode === "agent" ? "#9a7a20" : "#6366f1",
-              border: `0.5px solid ${mode === "agent" ? "rgba(154,122,32,0.3)" : "rgba(99,102,241,0.3)"}`,
+              backgroundColor: mode === "agent" ? "rgba(212,175,55,0.12)" : "rgba(99,102,241,0.12)",
+              color: mode === "agent" ? "#D4AF37" : "#6366f1",
+              border: `0.5px solid ${mode === "agent" ? "rgba(212,175,55,0.3)" : "rgba(99,102,241,0.3)"}`,
             }}
           >
             {mode === "agent" ? "Agent" : "FT"}
           </button>
-          <span className="relative size-1.5">
-            <span
-              className="absolute -inset-[1.5px] rounded-full opacity-30"
-              style={{ backgroundColor: "#d4af37" }}
-            />
-            <span
-              className="absolute inset-0 rounded-full"
-              style={{ backgroundColor: "#d4af37" }}
-            />
-          </span>
         </div>
       </div>
 
-      {/* ---- Intro animation ---- */}
-      {showIntro && !hasMessages && (
+      {/* ---- Intro greeting (Figma-style beige box with typing animation) ---- */}
+      {!hasMessages && introPhase !== "idle" && (
         <div
-          className="px-4 py-3.5"
-          style={{
-            backgroundColor: "#faf9f7",
-            borderTop: "0.5px solid rgba(27,37,40,0.05)",
-            borderBottom: "0.5px solid rgba(27,37,40,0.05)",
-          }}
+          className="mx-3 rounded-[16px] px-3 py-2.5"
+          style={{ backgroundColor: "#f3f2ee" }}
         >
-          <div className="flex flex-col gap-2.5">
-            {(introPhase === "typing-user" ||
-              introPhase === "show-user" ||
-              introPhase === "typing-ai" ||
-              introPhase === "show-ai" ||
-              introPhase === "done") && (
-              <div className="flex justify-end">
-                <div
-                  className="max-w-[85%] rounded-bl-[18px] rounded-br-[4px] rounded-tl-[18px] rounded-tr-[18px] px-3.5 py-2.5 text-[13px] leading-relaxed"
-                  style={{
-                    backgroundColor: "#eae7e3",
-                    color: "rgba(27,37,40,0.88)",
-                    boxShadow: "0px 1px 3px rgba(27,37,40,0.06)",
-                  }}
-                >
-                  {introPhase === "typing-user"
-                    ? introUserText
-                    : introScript.userMessage}
-                  {introPhase === "typing-user" && (
-                    <span
-                      className="inline-block w-0.5 h-4 ml-0.5 align-text-bottom animate-pulse"
-                      style={{ backgroundColor: "rgba(27,37,40,0.4)" }}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-
-            {introPhase === "typing-ai" && (
-              <div className="flex items-end gap-2">
-                <div
-                  className="flex size-6 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)",
-                  }}
-                >
-                  <Sparkles className="size-3.5 text-white" />
-                </div>
-                <div
-                  className="rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1"
-                  style={{
-                    backgroundColor: "white",
-                    border: "1px solid rgba(212,175,55,0.25)",
-                    boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
-                  }}
-                >
-                  <span
-                    className="size-2 rounded-full animate-bounce [animation-delay:0ms]"
-                    style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
-                  />
-                  <span
-                    className="size-2 rounded-full animate-bounce [animation-delay:150ms]"
-                    style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
-                  />
-                  <span
-                    className="size-2 rounded-full animate-bounce [animation-delay:300ms]"
-                    style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {(introPhase === "show-ai" || introPhase === "done") && (
-              <div className="flex items-end gap-2">
-                <div
-                  className="flex size-6 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)",
-                  }}
-                >
-                  <Sparkles className="size-3.5 text-white" />
-                </div>
-                <div
-                  className="max-w-[80%] rounded-bl-[18px] rounded-br-[18px] rounded-tl-[4px] rounded-tr-[18px] px-4 py-2.5 text-[13px] leading-relaxed"
-                  style={{
-                    backgroundColor: "white",
-                    color: "#1b2528",
-                    border: "1px solid rgba(212,175,55,0.25)",
-                    boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
-                  }}
-                >
-                  {introAiText}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Typing dots while AI is "thinking" */}
+          {(introPhase === "typing-user" || introPhase === "show-user" || introPhase === "typing-ai") && (
+            <div className="flex items-center gap-1 py-1">
+              <span
+                className="size-1.5 rounded-full animate-bounce [animation-delay:0ms]"
+                style={{ backgroundColor: "rgba(27,37,40,0.35)" }}
+              />
+              <span
+                className="size-1.5 rounded-full animate-bounce [animation-delay:150ms]"
+                style={{ backgroundColor: "rgba(27,37,40,0.35)" }}
+              />
+              <span
+                className="size-1.5 rounded-full animate-bounce [animation-delay:300ms]"
+                style={{ backgroundColor: "rgba(27,37,40,0.35)" }}
+              />
+            </div>
+          )}
+          {/* AI text streaming in */}
+          {(introPhase === "show-ai" || introPhase === "done") && (
+            <p
+              className="whitespace-pre-line text-[13px] leading-[1.35]"
+              style={{ color: "#1b2528", fontFamily: "'Noto Sans JP', sans-serif" }}
+            >
+              {introAiText}
+              {introPhase === "show-ai" && (
+                <span
+                  className="inline-block w-0.5 h-3.5 ml-0.5 align-text-bottom animate-pulse"
+                  style={{ backgroundColor: "rgba(27,37,40,0.4)" }}
+                />
+              )}
+            </p>
+          )}
         </div>
       )}
 
       {/* ---- Suggest actions (top page only) ---- */}
-      {!hasMessages && pageType === "top" && (
-        <SuggestActionsCarousel
-          actions={SUGGEST_ACTIONS}
-          isLoading={isLoading}
-          onSend={handleSend}
-        />
+      {showCategoryChips && (
+        <div className="pt-3">
+          <SuggestActionsCarousel
+            actions={SUGGEST_ACTIONS}
+            isLoading={isLoading}
+            onSend={handleSend}
+          />
+        </div>
       )}
 
-      {/* ---- Quick question pills ---- */}
-      {!hasMessages && activeSuggestButtons.length > 0 && (
+      {/* ---- Quick question pills (hidden when category chips are shown) ---- */}
+      {!hasMessages && !showCategoryChips && activeSuggestButtons.length > 0 && (
         <div className="px-5 pt-2 pb-4">
           <div className="flex flex-wrap gap-2">
             {activeSuggestButtons.map((q) => (
@@ -844,9 +809,6 @@ export default function AiChatPanel({
           className="max-h-[360px] overflow-y-auto"
           style={{
             scrollBehavior: "smooth",
-            backgroundColor: "#faf9f7",
-            borderTop: "0.5px solid rgba(27,37,40,0.05)",
-            borderBottom: "0.5px solid rgba(27,37,40,0.05)",
           }}
         >
           <div className="flex flex-col gap-3 px-4 py-3.5">
@@ -863,7 +825,7 @@ export default function AiChatPanel({
                       style={{
                         background: isLimitMsg
                           ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-                          : "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)",
+                          : "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
                       }}
                     >
                       {isLimitMsg ? <AlertTriangle className="size-3.5 text-white" /> : <Sparkles className="size-3.5 text-white" />}
@@ -901,8 +863,8 @@ export default function AiChatPanel({
                   </div>
                 </div>
 
-                {/* Meta info badge (for AI messages) */}
-                {msg.role === "ai" && msg.meta && (
+                {/* Meta info badge — hidden on top page where category chips exist */}
+                {msg.role === "ai" && msg.meta && pageType !== "top" && (
                   <MetaBadge meta={msg.meta} />
                 )}
 
@@ -956,7 +918,7 @@ export default function AiChatPanel({
                             </div>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
                               {(store.hourly_min != null || store.hourly_max != null) && (
-                                <span className="font-medium" style={{ color: "#d4af37" }}>
+                                <span className="font-medium" style={{ color: "#D4AF37" }}>
                                   {formatWage(store.hourly_min, store.hourly_max)}
                                 </span>
                               )}
@@ -988,8 +950,8 @@ export default function AiChatPanel({
                   </div>
                 )}
 
-                {/* LINE CTA card (always shown after AI response with stores) */}
-                {msg.role === "ai" && (msg.stores ?? []).length > 0 && (
+                {/* LINE CTA card — shown when stores are returned OR AI mentioned LINE */}
+                {msg.role === "ai" && msg.showLineCta && (
                   <div className="mt-2 ml-8">
                     <div
                       className="rounded-[16px] px-4 py-3.5"
@@ -1029,7 +991,7 @@ export default function AiChatPanel({
                   className="flex size-6 shrink-0 items-center justify-center rounded-[10px]"
                   style={{
                     background:
-                      "linear-gradient(135deg, #d4af37 0%, #9a7a20 100%)",
+                      "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
                   }}
                 >
                   <Sparkles className="size-3.5 text-white" />
@@ -1081,17 +1043,8 @@ export default function AiChatPanel({
         </div>
       )}
 
-      {/* ---- Divider ---- */}
-      <div
-        className="mx-4 h-px"
-        style={{
-          backgroundImage:
-            "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(27,37,40,0.07) 18%, rgba(27,37,40,0.07) 82%, rgba(0,0,0,0) 100%)",
-        }}
-      />
-
       {/* ---- Chat input ---- */}
-      <div className="px-4 pb-4 pt-3">
+      <div className="px-4 pb-3 pt-3">
         <form
           className="flex items-center gap-2.5"
           onSubmit={(e) => {
@@ -1102,10 +1055,9 @@ export default function AiChatPanel({
           <div
             className="relative flex flex-1 items-center rounded-[16px] px-4"
             style={{
-              backgroundColor: "#f4f3f1",
-              height: "48px",
-              border: "1px solid rgba(27,37,40,0.32)",
-              boxShadow: "0px 0px 0px rgba(27,37,40,0.06)",
+              backgroundColor: "#ffffff",
+              height: "32px",
+              border: "1px solid rgba(0,0,0,0.2)",
             }}
           >
             <input
@@ -1113,7 +1065,7 @@ export default function AiChatPanel({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={limitReached ? "利用上限に達しました" : "あなたも話しかけてみてください…"}
+              placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください"}
               disabled={isLoading || limitReached}
               className="h-full w-full bg-transparent text-[13px] outline-none disabled:opacity-50"
               style={{

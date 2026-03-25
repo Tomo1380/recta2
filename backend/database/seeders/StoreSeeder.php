@@ -202,6 +202,9 @@ class StoreSeeder extends Seeder
 
     public function run(): void
     {
+        // Fixed seed for deterministic output (Fine-tuning data must match seeded stores)
+        mt_srand(12345);
+
         // Keep anchor stores (first 5) + generate 75 more
         $anchors = $this->getAnchorStores();
         $generated = [];

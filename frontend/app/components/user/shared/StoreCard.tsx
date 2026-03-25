@@ -52,11 +52,10 @@ export default function StoreCard({
   return (
     <Link
       to={`/stores/${id}`}
-      className={`group block overflow-hidden rounded-[16px] bg-white transition-shadow hover:shadow-lg ${className ?? "w-[270px]"}`}
+      className={`group block overflow-hidden rounded-xl bg-[#fcfeff] transition-shadow hover:shadow-lg ${className ?? "w-[270px]"}`}
       style={{
-        boxShadow:
-          "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
-        border: "1px solid rgba(27,37,40,0.06)",
+        boxShadow: "0px 2px 12px rgba(0,0,0,0.04), 0px 1px 2px rgba(0,0,0,0.03)",
+        border: "1px solid rgba(73,100,110,0.2)",
       }}
     >
       {/* Image section */}
@@ -74,7 +73,7 @@ export default function StoreCard({
           >
             <span
               className="text-3xl font-bold"
-              style={{ color: "#d4af37", fontFamily: "Outfit, sans-serif" }}
+              style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
             >
               {name.charAt(0)}
             </span>
@@ -85,15 +84,14 @@ export default function StoreCard({
         <div
           className="absolute inset-x-0 bottom-0 h-[60%]"
           style={{
-            background:
-              "linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)",
+            background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)",
           }}
         />
 
         {/* Category badge */}
         {category && (
           <span
-            className="absolute left-2.5 top-2.5 rounded-[6px] px-2 py-0.5 text-[10px] font-semibold text-white"
+            className="absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-[10px] font-semibold text-white"
             style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
           >
             {category}
@@ -103,8 +101,8 @@ export default function StoreCard({
         {/* PR badge */}
         {is_pr && (
           <span
-            className="absolute right-2.5 top-2.5 rounded-[6px] px-2 py-0.5 text-[10px] font-bold text-white"
-            style={{ backgroundColor: "#d4af37" }}
+            className="absolute right-2.5 top-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold text-white"
+            style={{ backgroundColor: "#D4AF37" }}
           >
             PR
           </span>
@@ -123,14 +121,14 @@ export default function StoreCard({
         {/* Store name */}
         <h3
           className="mb-1 truncate text-sm font-bold"
-          style={{ color: "#1b2528" }}
+          style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
         >
           {name}
         </h3>
 
         {/* Area */}
         {area && (
-          <p className="mb-2 text-xs" style={{ color: "rgba(27,37,40,0.5)" }}>
+          <p className="mb-2 text-xs" style={{ color: "rgba(20,39,46,0.62)" }}>
             {area}
           </p>
         )}
@@ -140,38 +138,20 @@ export default function StoreCard({
           <div className="mb-2 flex items-center gap-1">
             <div className="flex items-center">
               {Array.from({ length: fullStars }).map((_, i) => (
-                <Star
-                  key={`full-${i}`}
-                  className="size-3.5"
-                  style={{ color: "#d4af37", fill: "#d4af37" }}
-                />
+                <Star key={`full-${i}`} className="size-3.5" style={{ color: "#D4AF37", fill: "#D4AF37" }} />
               ))}
               {hasHalfStar && (
-                <Star
-                  key="half"
-                  className="size-3.5"
-                  style={{ color: "#d4af37", fill: "#d4af37", opacity: 0.5 }}
-                />
+                <Star key="half" className="size-3.5" style={{ color: "#D4AF37", fill: "#D4AF37", opacity: 0.5 }} />
               )}
               {Array.from({ length: emptyStars }).map((_, i) => (
-                <Star
-                  key={`empty-${i}`}
-                  className="size-3.5"
-                  style={{ color: "#d4af37", fill: "none" }}
-                />
+                <Star key={`empty-${i}`} className="size-3.5" style={{ color: "#D4AF37", fill: "none" }} />
               ))}
             </div>
-            <span
-              className="text-xs font-medium"
-              style={{ color: "#1b2528" }}
-            >
+            <span className="text-xs font-medium" style={{ color: "#1b2528" }}>
               {rating.toFixed(1)}
             </span>
             {reviews_count !== undefined && (
-              <span
-                className="text-[10px]"
-                style={{ color: "rgba(27,37,40,0.4)" }}
-              >
+              <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.4)" }}>
                 ({reviews_count}件)
               </span>
             )}
@@ -187,7 +167,7 @@ export default function StoreCard({
                 className="rounded-full px-2 py-0.5 text-[10px]"
                 style={{
                   border: "1px solid rgba(212,175,55,0.3)",
-                  color: "#d4af37",
+                  color: "#D4AF37",
                 }}
               >
                 {tag}

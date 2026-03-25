@@ -7,6 +7,7 @@ use App\Models\AiChatLog;
 use App\Models\AiChatSetting;
 use App\Models\Area;
 use App\Models\Category;
+use App\Models\IndustryKnowledge;
 use App\Models\Store;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,7 +65,7 @@ class AiChatController extends Controller
                         ],
                         'keyword' => [
                             'type' => 'string',
-                            'description' => 'フリーワード検索。店名・説明文・最寄り駅・特徴テキスト・住所を横断検索。条件が特定できない場合に使う',
+                            'description' => 'フリーワード検索。店名・説明文・特徴テキスト・スタッフコメント・最寄り駅・住所を横断検索。スペース区切りで複数キーワードOR検索可能（例: "アットホーム 明るい"）。雰囲気で探す場合に有効',
                         ],
                         'sort' => [
                             'type' => 'string',
@@ -108,6 +109,20 @@ class AiChatController extends Controller
                     'properties' => (object)[],
                 ],
             ],
+            [
+                'name' => 'get_industry_knowledge',
+                'description' => 'ナイトワーク業界の用語・仕組み・マナー・手続きの知識記事を取得する。ユーザーが業界用語（ノルマ、バック、体入、同伴、アフター、指名等）や業界の仕組み（税金、服装、キャバクラとラウンジの違い等）について質問した場合に使う。店舗検索ではなく業界知識が必要な質問専用。',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'topic' => [
+                            'type' => 'string',
+                            'description' => '知りたいトピック（例: "ノルマ", "体入", "キャバクラとラウンジの違い", "服装", "税金", "バック", "同伴", "指名"）',
+                        ],
+                    ],
+                    'required' => ['topic'],
+                ],
+            ],
         ];
     }
 
@@ -122,6 +137,7 @@ class AiChatController extends Controller
             'get_store_detail' => $this->toolGetStoreDetail($args),
             'get_areas' => $this->toolGetAreas(),
             'get_categories' => $this->toolGetCategories(),
+            'get_industry_knowledge' => $this->toolGetIndustryKnowledge($args),
             default => ['error' => "Unknown tool: {$name}"],
         };
     }
@@ -152,13 +168,20 @@ class AiChatController extends Controller
             $query->whereNotNull('guarantee_period')->where('guarantee_period', '!=', '');
         }
         if (!empty($args['keyword'])) {
-            $kw = $args['keyword'];
-            $query->where(function ($q) use ($kw) {
-                $q->where('name', 'ilike', "%{$kw}%")
-                  ->orWhere('description', 'ilike', "%{$kw}%")
-                  ->orWhere('nearest_station', 'ilike', "%{$kw}%")
-                  ->orWhere('features_text', 'ilike', "%{$kw}%")
-                  ->orWhere('address', 'ilike', "%{$kw}%");
+            $keywords = preg_split('/[\s　,、]+/u', trim($args['keyword']));
+            $keywords = array_filter($keywords, fn($k) => mb_strlen($k) > 0);
+            // OR across keywords: any keyword matching any field is a hit
+            $query->where(function ($q) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $q->orWhere(function ($sub) use ($kw) {
+                        $sub->where('name', 'ilike', "%{$kw}%")
+                            ->orWhere('description', 'ilike', "%{$kw}%")
+                            ->orWhere('nearest_station', 'ilike', "%{$kw}%")
+                            ->orWhere('features_text', 'ilike', "%{$kw}%")
+                            ->orWhere('address', 'ilike', "%{$kw}%")
+                            ->orWhereRaw("staff_comment::text ILIKE ?", ["%{$kw}%"]);
+                    });
+                }
             });
         }
         if (!empty($args['tags'])) {
@@ -197,7 +220,8 @@ class AiChatController extends Controller
                 'trial_hourly' => $s->trial_hourly,
                 'guarantee_period' => $s->guarantee_period,
                 'feature_tags' => $s->feature_tags ?? [],
-                'description' => mb_substr($s->description ?? '', 0, 150),
+                'description' => $s->description,
+                'features_text' => $s->features_text,
                 'images' => $s->images ?? [],
                 'average_rating' => round($s->averageRating(), 1),
                 'reviews_count' => $s->reviewCount(),
@@ -233,10 +257,20 @@ class AiChatController extends Controller
             'trial_avg_hourly' => $store->trial_avg_hourly,
             'trial_hourly' => $store->trial_hourly,
             'same_day_trial' => $store->same_day_trial,
+            'interview_hours' => $store->interview_hours,
+            'interview_info' => $store->interview_info,
+            'required_documents' => $store->required_documents,
+            'schedule' => $store->schedule,
+            'recent_hires_summary' => $store->recent_hires_summary,
+            'popular_features' => $store->popular_features,
+            'analysis' => $store->analysis,
+            'after_spots' => $store->after_spots,
+            'companion_spots' => $store->companion_spots,
             'feature_tags' => $store->feature_tags ?? [],
             'description' => $store->description,
             'features_text' => $store->features_text,
             'images' => $store->images ?? [],
+            'video_url' => $store->video_url,
             'staff_comment' => $store->staff_comment,
             'qa' => $store->qa,
             'average_rating' => round($store->averageRating(), 1),
@@ -254,6 +288,75 @@ class AiChatController extends Controller
     {
         $categories = Category::orderBy('sort_order')->get(['id', 'name', 'slug']);
         return ['categories' => $categories->toArray()];
+    }
+
+    private function toolGetIndustryKnowledge(array $args): array
+    {
+        $topic = trim($args['topic'] ?? '');
+        if (!$topic) {
+            return ['articles' => [], 'message' => 'トピックを指定してください'];
+        }
+
+        $allArticles = Cache::remember('industry_knowledges', 600, function () {
+            return IndustryKnowledge::where('is_active', true)
+                ->orderBy('sort_order')
+                ->get(['title', 'category', 'keywords', 'content'])
+                ->toArray();
+        });
+
+        $matched = [];
+
+        foreach ($allArticles as $article) {
+            $score = 0;
+            $keywords = $article['keywords'] ?? [];
+
+            // Exact keyword match
+            foreach ($keywords as $kw) {
+                if (mb_strtolower($kw) === mb_strtolower($topic)) {
+                    $score = 100;
+                    break;
+                }
+            }
+
+            // Partial keyword match
+            if ($score === 0) {
+                foreach ($keywords as $kw) {
+                    if (mb_stripos($kw, $topic) !== false || mb_stripos($topic, $kw) !== false) {
+                        $score = max($score, 80);
+                    }
+                }
+            }
+
+            // Title match
+            if ($score === 0 && mb_stripos($article['title'], $topic) !== false) {
+                $score = 60;
+            }
+
+            // Content match
+            if ($score === 0 && mb_stripos($article['content'], $topic) !== false) {
+                $score = 40;
+            }
+
+            if ($score > 0) {
+                $matched[] = [
+                    'title' => $article['title'],
+                    'category' => $article['category'],
+                    'content' => $article['content'],
+                    'score' => $score,
+                ];
+            }
+        }
+
+        // Sort by score descending, return top 3
+        usort($matched, fn($a, $b) => $b['score'] - $a['score']);
+        $results = array_slice($matched, 0, 3);
+        $results = array_map(fn($r) => ['title' => $r['title'], 'category' => $r['category'], 'content' => $r['content']], $results);
+
+        if (empty($results)) {
+            return ['articles' => [], 'message' => '該当するナレッジが見つかりませんでした。LINEで担当者にご相談ください。'];
+        }
+
+        return ['articles' => $results];
     }
 
     // -----------------------------------------------------------------------
@@ -417,7 +520,7 @@ class AiChatController extends Controller
         ?int $userId = null,
     ): JsonResponse {
         $storeContext = $this->buildStoreContext($pageType, $storeId);
-        $systemPrompt = $this->buildAgentSystemPrompt($setting, $storeContext, $userArea);
+        $systemPrompt = $this->buildAgentSystemPrompt($setting, $storeContext, $userArea, $pageType);
         $geminiHistory = $this->buildGeminiHistory($history);
 
         $contents = [
@@ -598,8 +701,8 @@ class AiChatController extends Controller
         ?int $userId = null,
     ): JsonResponse {
         // OpenAI Fine-tuned model
-        $openaiKey = config('services.openai.api_key');
-        $openaiModel = config('services.openai.finetuned_model');
+        $openaiKey = trim(config('services.openai.api_key') ?? '');
+        $openaiModel = trim(config('services.openai.finetuned_model') ?? '');
 
         if (!$openaiKey || !$openaiModel) {
             // Fallback to Gemini prompt-embedding mode if OpenAI not configured
@@ -610,7 +713,7 @@ class AiChatController extends Controller
         }
 
         $storeContext = $this->buildStoreContext($pageType, $storeId);
-        $systemPrompt = $this->buildOpenAiSystemPrompt($setting, $storeContext, $userArea);
+        $systemPrompt = $this->buildOpenAiSystemPrompt($setting, $storeContext, $userArea, $pageType);
 
         // Build OpenAI messages array
         $messages = [['role' => 'system', 'content' => $systemPrompt]];
@@ -690,7 +793,7 @@ class AiChatController extends Controller
         ?int $userId = null,
     ): JsonResponse {
         $storeContext = $this->buildStoreContext($pageType, $storeId);
-        $systemPrompt = $this->buildSystemPrompt($setting, $storeContext, $userArea);
+        $systemPrompt = $this->buildSystemPrompt($setting, $storeContext, $userArea, $pageType);
         $geminiHistory = $this->buildGeminiHistory($history);
 
         $model = 'gemini-3.1-flash-lite-preview';
@@ -754,21 +857,73 @@ class AiChatController extends Controller
     /**
      * System prompt for OpenAI fine-tuned model (lighter than Gemini prompt-embedding)
      */
-    private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = ''): string
+    private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
-        $prompt = 'あなたはRecta AIです。ナイトワーク（キャバクラ・ラウンジ・ガールズバー・クラブ・コンカフェ）専門のキャリアアドバイザーとして、求職者の相談に親身に応えてください。丁寧だけどフレンドリーな口調で、具体的なお店の情報を交えて回答します。ナイトワーク以外の話題にはやんわりお断りしてください。回答の最後には必ず「もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付けてください。';
+        // For OpenAI fine-tuned model, include full store JSON for atmosphere interpretation
+        $storeJson = Cache::remember('public_stores_full_json_v1', 600, function () {
+            $stores = Store::where('publish_status', 'published')
+                ->get()
+                ->map(function ($s) {
+                    $data = [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        'area' => $s->area,
+                        'category' => $s->category,
+                        'nearest_station' => $s->nearest_station,
+                        'business_hours' => $s->business_hours,
+                        'hourly_min' => $s->hourly_min,
+                        'hourly_max' => $s->hourly_max,
+                        'daily_estimate' => $s->daily_estimate,
+                        'same_day_trial' => $s->same_day_trial,
+                        'trial_hourly' => $s->trial_hourly,
+                        'guarantee_period' => $s->guarantee_period,
+                        'norma_info' => $s->norma_info,
+                        'feature_tags' => $s->feature_tags ?? [],
+                        'back_items' => collect($s->back_items ?? [])->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))->filter(fn($b) => $b !== ':')->values()->toArray(),
+                        'description' => $s->description,
+                        'features_text' => $s->features_text,
+                        'staff_comment' => $s->staff_comment,
+                    ];
+                    return array_filter($data, fn($v) => $v !== null && $v !== '' && $v !== []);
+                })
+                ->values()
+                ->toArray();
+            return json_encode($stores, JSON_UNESCAPED_UNICODE);
+        });
+
+        $prompt = "あなたはRecta AIです。ナイトワーク（キャバクラ・ラウンジ・ガールズバー・クラブ・コンカフェ）専門のキャリアアドバイザーです。\n\n" .
+            "【ルール】\n" .
+            "- 丁寧だけどフレンドリーな口調で回答\n" .
+            "- 必ず以下の店舗データから2〜3件を選んで紹介する。データにない店舗は紹介禁止\n" .
+            "- 店舗紹介時は [STORE:ID] マーカーを店名の前に付ける\n" .
+            "- ユーザーに質問を返さない（「どのエリアですか？」等は禁止）\n" .
+            "- ナイトワーク以外の話題にはやんわりお断り\n" .
+            "- 回答の最後に「もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付ける\n" .
+            "- 300〜500文字程度で簡潔に\n" .
+            "- 絵文字は使わない\n\n" .
+            "【雰囲気の解釈】\n" .
+            "曖昧な表現はdescription・features_text・staff_commentから読み取って判断:\n" .
+            "「わいわい系」→アットホーム・明るい雰囲気の店、「落ち着いた」→高級・会員制、「ゆるい」→ノルマなし・自由シフト\n\n";
 
         if ($setting->system_prompt) {
-            $prompt .= "\n\n運営追加指示: {$setting->system_prompt}";
+            $prompt .= "運営追加指示: {$setting->system_prompt}\n\n";
         }
 
         if ($userArea) {
-            $prompt .= "\n\nユーザーは{$userArea}付近にいます。エリア指定がない場合は近くのお店を優先してください。";
+            $prompt .= "ユーザーは{$userArea}付近にいます。エリア指定がない場合は近くのお店を優先。\n\n";
         }
 
         if ($storeContext) {
-            $prompt .= "\n\n参考店舗データ:\n{$storeContext}";
+            $prompt .= "閲覧中の店舗:\n{$storeContext}\n\n";
         }
+
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "【店舗詳細ページ（最優先）】\n" .
+                "ユーザーは上記の店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
+                "この店舗のデータのみを使って回答する。他の店舗を紹介しない。[STORE:ID]マーカーもこの店舗のみ付ける。\n\n";
+        }
+
+        $prompt .= "【店舗データ】\n{$storeJson}";
 
         return $prompt;
     }
@@ -812,7 +967,7 @@ class AiChatController extends Controller
         return '';
     }
 
-    private function buildAgentSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = ''): string
+    private function buildAgentSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
         $toneDesc = $this->getToneDescription($setting->tone);
 
@@ -828,6 +983,19 @@ class AiChatController extends Controller
 
         if ($storeContext) {
             $prompt .= "【現在の文脈】\n{$storeContext}\n\n";
+        }
+
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "【店舗詳細ページでのルール（最優先）】\n" .
+                "ユーザーは上記の「現在閲覧中の店舗」の詳細ページにいます。\n" .
+                "- ユーザーの質問はすべてこの店舗に関するものとして回答すること\n" .
+                "- 「体入できますか？」「時給は？」「ノルマは？」等の質問はこの店舗の情報を元に回答する\n" .
+                "- search_storesやget_store_detailを呼ぶ必要はない。上記の店舗データから直接回答する\n" .
+                "- 他の店舗を紹介しない。「他のお店も見てみたい場合は店舗一覧ページをご覧ください」と案内する\n" .
+                "- ただし業界用語の質問（「体入って何？」「ノルマとは？」）にはget_industry_knowledgeを使ってOK\n\n";
+        } elseif ($pageType === 'list') {
+            $prompt .= "【店舗一覧ページでのルール】\n" .
+                "ユーザーは店舗一覧ページにいます。条件を絞り込んでお店を探すお手伝いをしてください。\n\n";
         }
 
         if ($userArea) {
@@ -852,6 +1020,23 @@ class AiChatController extends Controller
             "- エリア不明 + 現在地なし → 条件のみで検索（エリアは空のまま）\n" .
             "- 比較質問（「AとBどっちがいい？」）→ get_store_detailを2回呼んで比較\n" .
             "- 条件が多い場合は最も重要な条件2〜3個に絞って検索する\n\n" .
+
+            "【雰囲気・曖昧表現の検索方法】\n" .
+            "ユーザーが「わいわい系」「落ち着いた」「ゆるめ」等の雰囲気で探している場合、keywordに類義語を入れて検索する。keywordは店名・説明文・特徴テキストを横断検索するため、雰囲気に関連する単語で検索できる。\n" .
+            "一度の検索で見つからない場合は、別の類義語でもう一度検索すること。\n" .
+            "- 「わいわい系」「にぎやか」→ keyword: \"アットホーム\" で検索。0件なら keyword: \"明るい\" で再検索\n" .
+            "- 「落ち着いた」「大人」「上品」→ keyword: \"落ち着い\" で検索。0件なら keyword: \"高級\" で再検索\n" .
+            "- 「ゆるい」「気楽」「プレッシャーなし」→ tags: [\"ノルマなし\"] + keyword: \"自由\" で検索\n" .
+            "- 「かわいい系」「ポップ」→ keyword: \"カジュアル\" やカテゴリでコンカフェ・ガールズバーを検索\n" .
+            "- 「高級感」「ハイクラス」→ keyword: \"会員制\" or keyword: \"高級\" で検索\n\n" .
+
+            "【業界知識の質問への対応】\n" .
+            "- ユーザーが業界用語（ノルマ、バック、体入、同伴、アフター、指名等）や業界の仕組み（税金、服装、キャバクラとラウンジの違い等）について質問した場合、get_industry_knowledgeツールを呼び出す\n" .
+            "- ツールから返された記事の内容を元に、フレンドリーな口調で要約して回答する\n" .
+            "- 知識の回答の後に「実際の条件はお店によって異なるので、気になるお店があればお気軽に聞いてください！」と添える\n" .
+            "- 業界知識の質問の場合はsearch_storesを呼ぶ必要はない（ただし「ノルマなしのお店教えて」など検索意図がある場合はsearch_storesも呼ぶ）\n" .
+            "- 知識回答でも最後のLINE誘導は必ず付ける\n" .
+            "- ナレッジが見つからない場合は「詳しくはLINEで担当者にご相談ください」と誘導する\n\n" .
 
             "【給与・待遇に関する回答】\n" .
             "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
@@ -913,34 +1098,49 @@ class AiChatController extends Controller
         return $prompt;
     }
 
-    private function buildSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = ''): string
+    private function buildSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
         $toneDesc = $this->getToneDescription($setting->tone);
 
-        // For finetuned mode, include store data inline since no tools available
+        // For finetuned mode, include full store data as JSON so AI can interpret
+        // ambiguous queries like "わいわい系" by reading description/features/atmosphere
         $storeData = $storeContext;
         if (!$storeData) {
-            $storeData = Cache::remember('public_stores_summary_v2', 600, function () {
-                return Store::where('publish_status', 'published')
+            $storeData = Cache::remember('public_stores_full_json_v1', 600, function () {
+                $stores = Store::where('publish_status', 'published')
                     ->get()
                     ->map(function ($s) {
-                        $line = "[STORE:{$s->id}] {$s->name}（{$s->area}/{$s->category}）";
-                        $line .= " 最寄り:{$s->nearest_station}";
-                        $line .= " 時給:{$s->hourly_min}〜{$s->hourly_max}円";
-                        if ($s->daily_estimate) $line .= " 日給目安:{$s->daily_estimate}";
-                        if ($s->same_day_trial) $line .= " 当日体入OK";
-                        if ($s->trial_hourly) $line .= " 体入時給:{$s->trial_hourly}";
-                        if ($s->guarantee_period) $line .= " 保証:{$s->guarantee_period}";
-                        if ($s->norma_info) $line .= " ノルマ:{$s->norma_info}";
-                        $tags = implode(',', $s->feature_tags ?? []);
-                        if ($tags) $line .= " 特徴:{$tags}";
-                        $backs = collect($s->back_items ?? [])->pluck('label')->filter()->implode(',');
-                        if ($backs) $line .= " バック:{$backs}";
-                        return $line;
+                        $data = [
+                            'id' => $s->id,
+                            'name' => $s->name,
+                            'area' => $s->area,
+                            'category' => $s->category,
+                            'nearest_station' => $s->nearest_station,
+                            'business_hours' => $s->business_hours,
+                            'holidays' => $s->holidays,
+                            'hourly_min' => $s->hourly_min,
+                            'hourly_max' => $s->hourly_max,
+                            'daily_estimate' => $s->daily_estimate,
+                            'same_day_trial' => $s->same_day_trial,
+                            'trial_hourly' => $s->trial_hourly,
+                            'guarantee_period' => $s->guarantee_period,
+                            'guarantee_details' => $s->guarantee_details,
+                            'norma_info' => $s->norma_info,
+                            'feature_tags' => $s->feature_tags ?? [],
+                            'back_items' => collect($s->back_items ?? [])->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))->filter(fn($b) => $b !== ':')->values()->toArray(),
+                            'fee_items' => collect($s->fee_items ?? [])->map(fn($f) => ($f['label'] ?? '') . ':' . ($f['amount'] ?? ''))->filter(fn($f) => $f !== ':')->values()->toArray(),
+                            'description' => $s->description,
+                            'features_text' => $s->features_text,
+                            'staff_comment' => $s->staff_comment,
+                        ];
+                        // Remove null/empty values to save tokens
+                        return array_filter($data, fn($v) => $v !== null && $v !== '' && $v !== []);
                     })
-                    ->implode("\n");
+                    ->values()
+                    ->toArray();
+                return json_encode($stores, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             });
-            $storeData = "【掲載店舗一覧】\n" . $storeData;
+            $storeData = "【掲載店舗一覧（JSON）】\n" . $storeData;
         }
 
         $prompt = "【ペルソナ】\n" .
@@ -957,6 +1157,12 @@ class AiChatController extends Controller
             $prompt .= "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
         }
 
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "【店舗詳細ページ（最優先）】\n" .
+                "ユーザーは閲覧中の店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
+                "この店舗のデータのみを使って回答する。他の店舗を紹介しない。\n\n";
+        }
+
         $prompt .= "【店舗データ】\n{$storeData}\n\n" .
 
             "【店舗データの参照方法】\n" .
@@ -965,6 +1171,15 @@ class AiChatController extends Controller
             "- マーカーがあると、ユーザーの画面に店舗カードが自動表示される\n" .
             "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n" .
             "- 店舗データに載っていないお店は紹介してはいけない\n\n" .
+
+            "【雰囲気・ニュアンスの解釈】\n" .
+            "ユーザーが曖昧な表現を使った場合、店舗のdescription・features_text・staff_commentから雰囲気を読み取って最適な店舗を選ぶこと:\n" .
+            "- 「わいわい系」「にぎやか」「楽しい」→ アットホーム、明るい雰囲気、スタッフ同士の仲が良い等の記述がある店\n" .
+            "- 「落ち着いた」「大人っぽい」「上品」→ 高級、会員制、落ち着いた雰囲気等の記述がある店\n" .
+            "- 「ゆるい」「気楽」「プレッシャーなし」→ ノルマなし、自由シフト、未経験歓迎等の記述がある店\n" .
+            "- 「稼ぎたい」「ガッツリ」→ 高時給、バック充実、経験者優遇等の店\n" .
+            "- 「初めて」「不安」→ 未経験歓迎、研修充実、アットホーム等の店\n" .
+            "店舗データのJSON全体を読み、description/features_text/staff_commentの内容を根拠に選定すること。タグや数値だけでなく文章の雰囲気も判断材料にする\n\n" .
 
             "【絶対ルール】\n" .
             "1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測して店舗データから選ぶ\n" .
@@ -1041,28 +1256,47 @@ class AiChatController extends Controller
 
     private function extractStoreRecommendations(string $text): array
     {
+        // Try [STORE:ID] markers first
         preg_match_all('/\[STORE:(\d+)\]/', $text, $matches);
-        if (empty($matches[1])) {
-            return [];
+        if (!empty($matches[1])) {
+            $ids = array_unique($matches[1]);
+            return Store::whereIn('id', $ids)
+                ->where('publish_status', 'published')
+                ->get()
+                ->map(fn($s) => $this->storeToCard($s))
+                ->values()
+                ->toArray();
         }
 
-        $ids = array_unique($matches[1]);
-        return Store::whereIn('id', $ids)
-            ->where('publish_status', 'published')
-            ->get()
-            ->map(fn($s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-                'area' => $s->area,
-                'category' => $s->category,
-                'hourly_min' => $s->hourly_min,
-                'hourly_max' => $s->hourly_max,
-                'feature_tags' => $s->feature_tags,
-                'images' => $s->images,
-                'average_rating' => round($s->averageRating(), 1),
-            ])
-            ->values()
-            ->toArray();
+        // Fallback: match store names in text (for FT mode where markers may be missing)
+        $stores = Store::where('publish_status', 'published')->get();
+        $matched = $stores->filter(fn($s) => str_contains($text, $s->name));
+
+        if ($matched->isNotEmpty()) {
+            return $matched->take(5)
+                ->map(fn($s) => $this->storeToCard($s))
+                ->values()
+                ->toArray();
+        }
+
+        return [];
+    }
+
+    private function storeToCard(Store $s): array
+    {
+        return [
+            'id' => $s->id,
+            'name' => $s->name,
+            'area' => $s->area,
+            'category' => $s->category,
+            'nearest_station' => $s->nearest_station,
+            'hourly_min' => $s->hourly_min,
+            'hourly_max' => $s->hourly_max,
+            'description' => $s->description,
+            'feature_tags' => $s->feature_tags,
+            'images' => $s->images,
+            'average_rating' => round($s->averageRating(), 1),
+        ];
     }
 
     /**

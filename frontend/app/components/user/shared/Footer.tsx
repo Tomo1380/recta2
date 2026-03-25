@@ -24,10 +24,10 @@ export default function Footer({ className }: FooterProps) {
         <div className="mb-8">
           <span
             className="text-2xl font-bold text-white"
-            style={{ fontFamily: "Outfit, sans-serif" }}
+            style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif" }}
           >
             Recta
-            <span style={{ color: "#d4af37" }}>●</span>
+            <span style={{ color: "#D4AF37" }}>●</span>
           </span>
           <p className="mt-3 text-[11px] leading-relaxed" style={{ color: "rgba(255,255,255,0.45)", fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 300, maxWidth: "274px" }}>
             AIがあなたにぴったりのナイトワークを提案。安心・安全な求人情報をお届けします。
@@ -69,7 +69,7 @@ export default function Footer({ className }: FooterProps) {
               </div>
             ))}
           </div>
-          <p className="text-[9px] tracking-wider" style={{ color: "rgba(255,255,255,0.2)", fontFamily: "Outfit, sans-serif" }}>
+          <p className="text-[9px] tracking-wider" style={{ color: "rgba(255,255,255,0.2)", fontFamily: "'Domine', 'Noto Sans JP', sans-serif" }}>
             &copy; 2026 Recta Inc.
           </p>
         </div>

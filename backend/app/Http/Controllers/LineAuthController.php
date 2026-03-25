@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiChatLog;
 use App\Models\User;
 use App\Services\LineLoginService;
 use Illuminate\Http\Request;
@@ -72,6 +73,12 @@ class LineAuthController extends Controller
                     'last_login_at' => now(),
                 ]
             );
+
+            // 同一IPの未紐づけAIチャット履歴をこのユーザーに紐づけ（直近24時間分）
+            AiChatLog::whereNull('user_id')
+                ->where('ip_address', $ip)
+                ->where('created_at', '>=', now()->subDay())
+                ->update(['user_id' => $user->id]);
 
             // Sanctumトークン発行
             $token = $user->createToken('line-auth')->plainTextToken;

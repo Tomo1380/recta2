@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ContentController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FineTuningController;
+use App\Http\Controllers\Admin\IndustryKnowledgeController;
 use App\Http\Controllers\Admin\LineFriendController;
 use App\Http\Controllers\Admin\ReviewController;
 use App\Http\Controllers\Admin\StoreController;
@@ -133,6 +134,13 @@ Route::prefix('admin')->group(function () {
         Route::put('/ai-chat/fine-tuning/data', [FineTuningController::class, 'updateTrainingPair']);
         Route::delete('/ai-chat/fine-tuning/data/{index}', [FineTuningController::class, 'deleteTrainingPair']);
         Route::post('/ai-chat/fine-tuning/data', [FineTuningController::class, 'addTrainingPair']);
+
+        // 業界ナレッジ管理
+        Route::get('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'index']);
+        Route::post('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'store']);
+        Route::put('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'update']);
+        Route::delete('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'destroy']);
+        Route::post('/ai-chat/knowledge/reorder', [IndustryKnowledgeController::class, 'reorder']);
 
         // LINE一斉配信（ユーザー管理から利用）
         // broadcast は上の /users/broadcast で定義済み

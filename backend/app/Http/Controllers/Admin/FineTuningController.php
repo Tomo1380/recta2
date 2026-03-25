@@ -7,6 +7,7 @@ use App\Models\Store;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 class FineTuningController extends Controller
@@ -90,7 +91,7 @@ class FineTuningController extends Controller
      */
     public function startTraining(Request $request): JsonResponse
     {
-        $openaiKey = config('services.openai.api_key');
+        $openaiKey = trim(config('services.openai.api_key') ?? '');
         if (empty($openaiKey)) {
             return response()->json([
                 'success' => false,
@@ -178,7 +179,7 @@ class FineTuningController extends Controller
      */
     public function jobStatus(Request $request): JsonResponse
     {
-        $openaiKey = config('services.openai.api_key');
+        $openaiKey = trim(config('services.openai.api_key') ?? '');
         if (empty($openaiKey)) {
             return response()->json([
                 'success' => false,
@@ -386,11 +387,7 @@ class FineTuningController extends Controller
         ]);
 
         $filePath = storage_path('app/training_data_openai.jsonl');
-
-        $systemPrompt = "あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。"
-            . "求職者に寄り添い、親しみやすく丁寧に、お店の情報や働き方のアドバイスを提供してください。"
-            . "店舗を紹介する際は [STORE:店舗ID] マーカーを必ず含めてください。"
-            . "ナイトワーク以外の質問は丁寧にお断りしてください。";
+        $systemPrompt = $this->buildTrainingSystemPrompt();
 
         $data = [
             'messages' => [
@@ -416,12 +413,66 @@ class FineTuningController extends Controller
     /**
      * Convert Gemini JSONL format to OpenAI ChatML format
      */
+    /**
+     * Build the system prompt for fine-tuning training data.
+     * Includes full store JSON so the model learns to interpret store data.
+     */
+    private function buildTrainingSystemPrompt(): string
+    {
+        $storeJson = $this->getStoreJson();
+
+        return "あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。\n\n"
+            . "【ルール】\n"
+            . "- 求職者に寄り添い、親しみやすく丁寧に回答する\n"
+            . "- 店舗を紹介する際は [STORE:店舗ID] マーカーを必ず含める\n"
+            . "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n"
+            . "- ユーザーに質問を返さない（条件が曖昧でも推測して店舗を選ぶ）\n"
+            . "- ナイトワーク以外の質問は丁寧にお断り\n"
+            . "- 回答の最後に「もっと詳しく知りたい方は、LINEで担当者に直接相談できます！」を付ける\n"
+            . "- 300〜500文字程度で簡潔に。絵文字は使わない\n\n"
+            . "【雰囲気の解釈】\n"
+            . "曖昧な表現はdescription・features_text・staff_commentから読み取って判断:\n"
+            . "「わいわい系」→アットホーム・明るい雰囲気の店、「落ち着いた」→高級・会員制、「ゆるい」→ノルマなし・自由シフト\n\n"
+            . "【店舗データ】\n" . $storeJson;
+    }
+
+    private function getStoreJson(): string
+    {
+        return Cache::remember('public_stores_full_json_v1', 600, function () {
+            $stores = Store::where('publish_status', 'published')
+                ->get()
+                ->map(function ($s) {
+                    $data = [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        'area' => $s->area,
+                        'category' => $s->category,
+                        'nearest_station' => $s->nearest_station,
+                        'business_hours' => $s->business_hours,
+                        'hourly_min' => $s->hourly_min,
+                        'hourly_max' => $s->hourly_max,
+                        'daily_estimate' => $s->daily_estimate,
+                        'same_day_trial' => $s->same_day_trial,
+                        'trial_hourly' => $s->trial_hourly,
+                        'guarantee_period' => $s->guarantee_period,
+                        'norma_info' => $s->norma_info,
+                        'feature_tags' => $s->feature_tags ?? [],
+                        'back_items' => collect($s->back_items ?? [])->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))->filter(fn($b) => $b !== ':')->values()->toArray(),
+                        'description' => $s->description,
+                        'features_text' => $s->features_text,
+                        'staff_comment' => $s->staff_comment,
+                    ];
+                    return array_filter($data, fn($v) => $v !== null && $v !== '' && $v !== []);
+                })
+                ->values()
+                ->toArray();
+            return json_encode($stores, JSON_UNESCAPED_UNICODE);
+        });
+    }
+
     private function convertToOpenAiFormat(string $geminiPath, string $openaiPath): void
     {
-        $systemPrompt = "あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。"
-            . "求職者に寄り添い、親しみやすく丁寧に、お店の情報や働き方のアドバイスを提供してください。"
-            . "店舗を紹介する際は [STORE:店舗ID] マーカーを必ず含めてください。"
-            . "ナイトワーク以外の質問は丁寧にお断りしてください。";
+        $systemPrompt = $this->buildTrainingSystemPrompt();
 
         $fp = fopen($geminiPath, 'r');
         $out = fopen($openaiPath, 'w');

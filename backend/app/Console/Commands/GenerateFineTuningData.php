@@ -12,6 +12,9 @@ class GenerateFineTuningData extends Command
 
     public function handle(): int
     {
+        // Fixed seed for deterministic training data
+        mt_srand(54321);
+
         $stores = Store::where('publish_status', 'published')->get();
         $this->info("Loaded {$stores->count()} stores");
 

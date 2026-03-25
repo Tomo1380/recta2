@@ -21,6 +21,7 @@ import {
 import { Search, Filter } from "lucide-react";
 import StoreCard from "~/components/user/shared/StoreCard";
 import Footer from "~/components/user/shared/Footer";
+import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import AiChatPanel from "~/components/user/AiChatPanel";
 
 // ---------------------------------------------------------------------------
@@ -98,10 +99,10 @@ function buildStoreApiUrl(params: URLSearchParams): string {
 function StoreCardSkeleton() {
   return (
     <div
-      className="overflow-hidden rounded-[16px] bg-white"
+      className="overflow-hidden rounded-xl bg-white"
       style={{
-        boxShadow: "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
-        border: "1px solid rgba(27,37,40,0.06)",
+        boxShadow: "0px 2px 12px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(73,100,110,0.15)",
       }}
     >
       <Skeleton className="h-[160px] w-full" />
@@ -190,7 +191,7 @@ function StorePagination({
                 className="cursor-pointer"
                 style={
                   page === currentPage
-                    ? { backgroundColor: "#d4af37", color: "#fff", borderColor: "#d4af37" }
+                    ? { backgroundColor: "#D4AF37", color: "#fff", borderColor: "#D4AF37" }
                     : { color: "#1b2528" }
                 }
               >
@@ -347,15 +348,15 @@ export default function StoreListPage() {
   const isEmpty = !loading && storeList.length === 0;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#f7f6f3" }}>
+    <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#fafeff" }}>
       {/* ------------------------------------------------------------------ */}
-      {/* Dark Header Banner                                                 */}
+      {/* Header Banner                                                      */}
       {/* ------------------------------------------------------------------ */}
       <div style={{ backgroundColor: "#1b2528" }} className="pb-6">
         <div className="mx-auto max-w-3xl px-4 pt-8 sm:px-6 lg:px-8">
           <h1
-            className="font-heading text-2xl font-bold text-white"
-            style={{ fontFamily: "Outfit, sans-serif" }}
+            className="text-2xl font-bold text-white"
+            style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif" }}
           >
             お店を探す
           </h1>
@@ -484,11 +485,11 @@ export default function StoreListPage() {
               className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
               style={{ backgroundColor: "rgba(212,175,55,0.1)" }}
             >
-              <Filter className="size-7" style={{ color: "#d4af37" }} />
+              <Filter className="size-7" style={{ color: "#D4AF37" }} />
             </div>
             <p
-              className="font-heading text-lg font-bold mb-2"
-              style={{ color: "#1b2528", fontFamily: "Outfit, sans-serif" }}
+              className="text-lg font-bold mb-2"
+              style={{ color: "#1b2528", fontFamily: "'Domine', 'Noto Sans JP', sans-serif" }}
             >
               条件に合うお店が見つかりませんでした
             </p>
@@ -498,9 +499,7 @@ export default function StoreListPage() {
             <button
               onClick={handleResetFilters}
               className="rounded-full px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{
-                background: "linear-gradient(135deg, #d4af37 0%, #c9a030 100%)",
-              }}
+              style={{ backgroundColor: "#D4AF37" }}
             >
               フィルターをリセット
             </button>
@@ -540,6 +539,9 @@ export default function StoreListPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Bottom Tab Bar */}
+      <BottomTabBar />
     </div>
   );
 }

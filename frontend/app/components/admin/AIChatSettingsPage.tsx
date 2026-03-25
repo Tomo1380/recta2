@@ -185,6 +185,28 @@ export function AIChatSettingsPage() {
   const [statsLoading, setStatsLoading] = useState(false);
 
   // Fine-tuning state
+  // Knowledge state
+  type KnowledgeArticle = {
+    id: number;
+    category: string;
+    slug: string;
+    title: string;
+    keywords: string[];
+    content: string;
+    sort_order: number;
+    is_active: boolean;
+  };
+  const [knowledgeArticles, setKnowledgeArticles] = useState<KnowledgeArticle[]>([]);
+  const [knowledgeLoading, setKnowledgeLoading] = useState(false);
+  const [knowledgeFetched, setKnowledgeFetched] = useState(false);
+  const [knowledgeCategory, setKnowledgeCategory] = useState("all");
+  const [knowledgeEditing, setKnowledgeEditing] = useState<KnowledgeArticle | null>(null);
+  const [knowledgeAdding, setKnowledgeAdding] = useState(false);
+  const [knowledgeSaving, setKnowledgeSaving] = useState(false);
+  const [knowledgeForm, setKnowledgeForm] = useState({ title: "", category: "用語解説", keywords: "", content: "", is_active: true });
+
+  const KNOWLEDGE_CATEGORIES = ["用語解説", "働き方", "手続き", "比較", "マナー"];
+
   const [ftStatus, setFtStatus] = useState<{
     openai_configured: boolean;
     current_model: string | null;
@@ -216,6 +238,7 @@ export function AIChatSettingsPage() {
   const tabs = [
     { key: "prompts", label: "プロンプト" },
     { key: "suggest", label: "サジェスト" },
+    { key: "knowledge", label: "ナレッジ" },
     { key: "limits", label: "利用制限" },
     { key: "stats", label: "統計" },
     { key: "finetune", label: "学習" },
@@ -346,6 +369,80 @@ export function AIChatSettingsPage() {
       fetchFtJobs();
     }
   }, [activeTab, ftFetched, fetchFtStatus, fetchFtJobs]);
+
+  // Knowledge fetch
+  const fetchKnowledge = useCallback(async () => {
+    try {
+      setKnowledgeLoading(true);
+      const data = await api.get<KnowledgeArticle[]>("/admin/ai-chat/knowledge");
+      setKnowledgeArticles(data);
+    } catch { /* silent */ } finally {
+      setKnowledgeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "knowledge" && !knowledgeFetched) {
+      setKnowledgeFetched(true);
+      fetchKnowledge();
+    }
+  }, [activeTab, knowledgeFetched, fetchKnowledge]);
+
+  const handleKnowledgeSave = async () => {
+    try {
+      setKnowledgeSaving(true);
+      const payload = {
+        title: knowledgeForm.title,
+        category: knowledgeForm.category,
+        keywords: knowledgeForm.keywords.split(",").map((k: string) => k.trim()).filter(Boolean),
+        content: knowledgeForm.content,
+        is_active: knowledgeForm.is_active,
+      };
+
+      if (knowledgeEditing) {
+        await api.put(`/admin/ai-chat/knowledge/${knowledgeEditing.id}`, payload);
+      } else {
+        await api.post("/admin/ai-chat/knowledge", payload);
+      }
+      setKnowledgeEditing(null);
+      setKnowledgeAdding(false);
+      setKnowledgeForm({ title: "", category: "用語解説", keywords: "", content: "", is_active: true });
+      await fetchKnowledge();
+    } catch { /* silent */ } finally {
+      setKnowledgeSaving(false);
+    }
+  };
+
+  const handleKnowledgeDelete = async (id: number) => {
+    if (!confirm("このナレッジ記事を削除しますか？")) return;
+    try {
+      await api.delete(`/admin/ai-chat/knowledge/${id}`);
+      await fetchKnowledge();
+    } catch { /* silent */ }
+  };
+
+  const handleKnowledgeToggle = async (article: KnowledgeArticle) => {
+    try {
+      await api.put(`/admin/ai-chat/knowledge/${article.id}`, { is_active: !article.is_active });
+      await fetchKnowledge();
+    } catch { /* silent */ }
+  };
+
+  const startEditKnowledge = (article: KnowledgeArticle) => {
+    setKnowledgeEditing(article);
+    setKnowledgeAdding(false);
+    setKnowledgeForm({
+      title: article.title,
+      category: article.category,
+      keywords: article.keywords.join(", "),
+      content: article.content,
+      is_active: article.is_active,
+    });
+  };
+
+  const filteredKnowledge = knowledgeCategory === "all"
+    ? knowledgeArticles
+    : knowledgeArticles.filter((a) => a.category === knowledgeCategory);
 
   const handleGenerateData = async () => {
     try {
@@ -987,6 +1084,206 @@ export function AIChatSettingsPage() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Tab: Knowledge */}
+      {activeTab === "knowledge" && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-[15px] font-semibold">業界ナレッジ管理</h3>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                AIチャットのAgentモードが業界知識の質問に回答する際に参照するナレッジベースです
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setKnowledgeAdding(true);
+                setKnowledgeEditing(null);
+                setKnowledgeForm({ title: "", category: "用語解説", keywords: "", content: "", is_active: true });
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
+            >
+              <Plus size={14} />
+              追加
+            </button>
+          </div>
+
+          {/* Category filter */}
+          <div className="flex gap-1.5 flex-wrap">
+            {["all", ...KNOWLEDGE_CATEGORIES].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setKnowledgeCategory(cat)}
+                className={`rounded-full px-3 py-1 text-[12px] transition-all ${
+                  knowledgeCategory === cat
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {cat === "all" ? "すべて" : cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Add/Edit form */}
+          {(knowledgeAdding || knowledgeEditing) && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <h4 className="text-[13px] font-semibold">
+                {knowledgeEditing ? "ナレッジ編集" : "ナレッジ追加"}
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[12px] text-muted-foreground">タイトル</label>
+                  <input
+                    type="text"
+                    value={knowledgeForm.title}
+                    onChange={(e) => setKnowledgeForm({ ...knowledgeForm, title: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px]"
+                    placeholder="例: ノルマとは？"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] text-muted-foreground">カテゴリ</label>
+                  <select
+                    value={knowledgeForm.category}
+                    onChange={(e) => setKnowledgeForm({ ...knowledgeForm, category: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px]"
+                  >
+                    {KNOWLEDGE_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[12px] text-muted-foreground">
+                  キーワード（カンマ区切り、AIがトピックマッチに使用）
+                </label>
+                <input
+                  type="text"
+                  value={knowledgeForm.keywords}
+                  onChange={(e) => setKnowledgeForm({ ...knowledgeForm, keywords: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px]"
+                  placeholder="例: ノルマ, norma, 売上目標"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] text-muted-foreground">内容</label>
+                <textarea
+                  value={knowledgeForm.content}
+                  onChange={(e) => setKnowledgeForm({ ...knowledgeForm, content: e.target.value })}
+                  rows={5}
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px]"
+                  placeholder="AIが回答の参考にする記事内容を記入..."
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-[12px]">
+                  <input
+                    type="checkbox"
+                    checked={knowledgeForm.is_active}
+                    onChange={(e) => setKnowledgeForm({ ...knowledgeForm, is_active: e.target.checked })}
+                  />
+                  有効
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setKnowledgeAdding(false); setKnowledgeEditing(null); }}
+                    className="rounded-lg border border-border px-3 py-1.5 text-[12px] hover:bg-muted"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleKnowledgeSave}
+                    disabled={knowledgeSaving || !knowledgeForm.title || !knowledgeForm.content || !knowledgeForm.keywords}
+                    className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                  >
+                    {knowledgeSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                    保存
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Articles list */}
+          {knowledgeLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="animate-spin text-muted-foreground" size={24} />
+            </div>
+          ) : filteredKnowledge.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-[13px]">
+              ナレッジ記事がありません
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredKnowledge.map((article) => (
+                <div
+                  key={article.id}
+                  className={`bg-card border border-border rounded-xl p-4 transition-all ${
+                    !article.is_active ? "opacity-50" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-[13px] font-semibold">{article.title}</h4>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                          {article.category}
+                        </span>
+                        {!article.is_active && (
+                          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] text-destructive">
+                            無効
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {article.keywords.map((kw, i) => (
+                          <span key={i} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[12px] text-muted-foreground line-clamp-2">
+                        {article.content}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleKnowledgeToggle(article)}
+                        className="rounded-lg p-1.5 hover:bg-muted"
+                        title={article.is_active ? "無効にする" : "有効にする"}
+                      >
+                        {article.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                      <button
+                        onClick={() => startEditKnowledge(article)}
+                        className="rounded-lg p-1.5 hover:bg-muted"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleKnowledgeDelete(article.id)}
+                        className="rounded-lg p-1.5 hover:bg-muted text-destructive"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Info box */}
+          <div className="bg-muted/50 rounded-xl p-4 text-[12px] text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">ナレッジの仕組み</p>
+            <p>Agentモードで「ノルマって何？」「体入の流れは？」等の業界知識の質問を受けた時、AIが自動的にこのナレッジベースを検索して回答に利用します。</p>
+            <p>キーワードはAIのトピックマッチに使われます。ユーザーが使いそうな言い回しや略語も追加しておくと精度が上がります。</p>
+          </div>
         </div>
       )}
 

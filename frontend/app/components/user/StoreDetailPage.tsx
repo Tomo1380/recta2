@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { openLineFriendAdd } from "~/lib/line";
+
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import StoreCard from "~/components/user/shared/StoreCard";
 import Footer from "~/components/user/shared/Footer";
+import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import AiChatPanel from "~/components/user/AiChatPanel";
 
 // ---------------------------------------------------------------------------
@@ -224,7 +225,7 @@ function renderStars(rating: number, size = 16) {
         <Star
           key={i}
           size={size}
-          style={{ color: "#d4af37", fill: "#d4af37" }}
+          style={{ color: "#D4AF37", fill: "#D4AF37" }}
         />,
       );
     } else if (i === full && hasHalf) {
@@ -232,7 +233,7 @@ function renderStars(rating: number, size = 16) {
         <Star
           key={i}
           size={size}
-          style={{ color: "#d4af37", fill: "#d4af37", opacity: 0.5 }}
+          style={{ color: "#D4AF37", fill: "#D4AF37", opacity: 0.5 }}
         />,
       );
     } else {
@@ -240,7 +241,7 @@ function renderStars(rating: number, size = 16) {
         <Star
           key={i}
           size={size}
-          style={{ color: "#d4af37", fill: "none" }}
+          style={{ color: "#D4AF37", fill: "none" }}
         />,
       );
     }
@@ -263,9 +264,9 @@ function SectionHeading({
     <h2
       className="font-heading flex items-center gap-2 pl-3 text-lg font-bold"
       style={{
-        fontFamily: "Outfit, sans-serif",
+        fontFamily: "'Domine', 'Noto Sans JP', sans-serif",
         color: "#1b2528",
-        borderLeft: "4px solid #d4af37",
+        borderLeft: "4px solid #D4AF37",
       }}
     >
       {icon}
@@ -358,7 +359,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
         <button
           onClick={() => window.location.reload()}
           className="rounded-full border px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-80"
-          style={{ borderColor: "#d4af37", color: "#d4af37" }}
+          style={{ borderColor: "#D4AF37", color: "#D4AF37" }}
         >
           再読み込み
         </button>
@@ -372,7 +373,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const videoOpacity = Math.max(0, 1 - scrollY / (heroHeight * 1.5));
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#f7f6f3" }}>
+    <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#fafeff" }}>
       {/* ============================================================ */}
       {/* 1. Sticky Hero Video */}
       {/* ============================================================ */}
@@ -432,7 +433,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
         <span
           className="ml-3 truncate text-base font-bold transition-opacity"
           style={{
-            fontFamily: "Outfit, sans-serif",
+            fontFamily: "'Domine', 'Noto Sans JP', sans-serif",
             color: "#1b2528",
             opacity: scrollY > heroHeight * 0.5 ? 1 : 0,
           }}
@@ -450,7 +451,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           marginTop: store.video_url ? `-20px` : "0",
           borderTopLeftRadius: store.video_url ? "20px" : "0",
           borderTopRightRadius: store.video_url ? "20px" : "0",
-          backgroundColor: "#f7f6f3",
+          backgroundColor: "#fafeff",
         }}
       >
         <div className="mx-auto max-w-3xl space-y-5 px-4 pb-24 pt-6">
@@ -467,7 +468,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             {/* Store name */}
             <h1
               className="font-heading text-xl font-bold leading-tight"
-              style={{ fontFamily: "Outfit, sans-serif", color: "#1b2528" }}
+              style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif", color: "#1b2528" }}
             >
               {store.name}のご紹介です
             </h1>
@@ -488,21 +489,21 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               style={{ backgroundColor: "rgba(27,37,40,0.02)" }}
             >
               <div className="flex items-center gap-2 text-sm">
-                <MapPin size={14} style={{ color: "#d4af37" }} />
+                <MapPin size={14} style={{ color: "#D4AF37" }} />
                 <span style={{ color: "rgba(27,37,40,0.5)" }}>エリア:</span>
                 <span className="font-medium" style={{ color: "#1b2528" }}>
                   {store.area}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <TrendingUp size={14} style={{ color: "#d4af37" }} />
+                <TrendingUp size={14} style={{ color: "#D4AF37" }} />
                 <span style={{ color: "rgba(27,37,40,0.5)" }}>時給:</span>
                 <span className="font-medium" style={{ color: "#1b2528" }}>
                   時給{formatCurrency(store.hourly_min)}〜{formatCurrency(store.hourly_max)}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <Clock size={14} style={{ color: "#d4af37" }} />
+                <Clock size={14} style={{ color: "#D4AF37" }} />
                 <span style={{ color: "rgba(27,37,40,0.5)" }}>勤務時間:</span>
                 <span className="font-medium" style={{ color: "#1b2528" }}>
                   {store.business_hours}
@@ -527,7 +528,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                       className="rounded-full px-2.5 py-0.5 text-xs font-medium"
                       style={{
                         border: "1px solid rgba(212,175,55,0.3)",
-                        color: "#d4af37",
+                        color: "#D4AF37",
                         backgroundColor: "rgba(212,175,55,0.06)",
                       }}
                     >
@@ -571,7 +572,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* 4. Experience Entry (体験入店情報) */}
           {/* ============================================================ */}
           <SectionCard
-            icon={<Sparkles size={20} style={{ color: "#d4af37" }} />}
+            icon={<Sparkles size={20} style={{ color: "#D4AF37" }} />}
             title="体験入店情報"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
@@ -615,14 +616,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     const barHeight = Math.max(20, (hire.count / maxCount) * 80);
                     return (
                       <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                        <span className="text-xs font-bold" style={{ color: "#d4af37" }}>
+                        <span className="text-xs font-bold" style={{ color: "#D4AF37" }}>
                           {hire.count}人
                         </span>
                         <div
                           className="w-full rounded-t-md"
                           style={{
                             height: `${barHeight}px`,
-                            background: "linear-gradient(to top, #d4af37, rgba(212,175,55,0.6))",
+                            background: "linear-gradient(to top, #D4AF37, rgba(212,175,55,0.6))",
                           }}
                         />
                         <span
@@ -644,7 +645,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     </p>
                     {store.recent_hires.flatMap((h) => h.examples ?? []).slice(0, 3).map((ex, i) => (
                       <p key={i} className="flex items-start gap-1.5 text-xs" style={{ color: "rgba(27,37,40,0.6)" }}>
-                        <span style={{ color: "#d4af37" }}>●</span>
+                        <span style={{ color: "#D4AF37" }}>●</span>
                         {ex}
                       </p>
                     ))}
@@ -675,7 +676,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* 5. Detailed Info - Shop Features */}
           {/* ============================================================ */}
           <SectionCard
-            icon={<Building size={20} style={{ color: "#d4af37" }} />}
+            icon={<Building size={20} style={{ color: "#D4AF37" }} />}
             title={`【${store.name}】の特徴は？`}
           >
             {store.features_text && (
@@ -698,7 +699,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* 6. Salary & Benefits */}
           {/* ============================================================ */}
           <SectionCard
-            icon={<Award size={20} style={{ color: "#d4af37" }} />}
+            icon={<Award size={20} style={{ color: "#D4AF37" }} />}
             title="給与・待遇"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
@@ -750,7 +751,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {store.images && store.images.length > 0 && (
             <SectionCard
-              icon={<Building size={20} style={{ color: "#d4af37" }} />}
+              icon={<Building size={20} style={{ color: "#D4AF37" }} />}
               title="店内写真"
             >
               <div className="grid grid-cols-2 gap-2">
@@ -777,7 +778,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {store.interview_info && (
             <SectionCard
-              icon={<FileText size={20} style={{ color: "#d4af37" }} />}
+              icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
               title="面接情報"
             >
               <div className="space-y-4">
@@ -803,7 +804,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                         <li key={i} className="flex items-start gap-2 text-sm">
                           <span
                             className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: "#d4af37" }}
+                            style={{ backgroundColor: "#D4AF37" }}
                           />
                           {tip}
                         </li>
@@ -858,7 +859,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {store.required_documents && (
             <SectionCard
-              icon={<FileText size={20} style={{ color: "#d4af37" }} />}
+              icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
               title="必要書類"
             >
               <div className="space-y-3">
@@ -866,7 +867,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                   <ul className="space-y-1.5">
                     {(store.required_documents.documents ?? []).map((doc, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm">
-                        <FileText size={14} className="shrink-0" style={{ color: "#d4af37" }} />
+                        <FileText size={14} className="shrink-0" style={{ color: "#D4AF37" }} />
                         {doc}
                       </li>
                     ))}
@@ -889,7 +890,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {store.qa && store.qa.length > 0 && (
             <SectionCard
-              icon={<MessageSquare size={20} style={{ color: "#d4af37" }} />}
+              icon={<MessageSquare size={20} style={{ color: "#D4AF37" }} />}
               title="よくある質問"
             >
               <Accordion type="multiple" className="w-full">
@@ -919,14 +920,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               }}
             >
               <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-                <SectionHeading icon={<Star size={20} style={{ color: "#d4af37" }} />}>
+                <SectionHeading icon={<Star size={20} style={{ color: "#D4AF37" }} />}>
                   リアルな声・口コミ ({store.reviews_count ?? 0}件)
                 </SectionHeading>
                 <a
                   href={`/stores/${store.id}/review`}
                   className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
                   style={{
-                    background: "linear-gradient(135deg, #d4af37 0%, #c5a028 100%)",
+                    background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
                   }}
                 >
                   口コミを書く
@@ -976,7 +977,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
                   <p
                     className="font-heading mb-4 text-center text-base font-bold"
-                    style={{ fontFamily: "Outfit, sans-serif", color: "#1b2528" }}
+                    style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif", color: "#1b2528" }}
                   >
                     クチコミを見るにはログインが必要です
                   </p>
@@ -1002,14 +1003,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {store.staff_comment && (
             <SectionCard
-              icon={<MessageSquare size={20} style={{ color: "#d4af37" }} />}
+              icon={<MessageSquare size={20} style={{ color: "#D4AF37" }} />}
               title="スタッフコメント"
             >
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold"
-                    style={{ backgroundColor: "rgba(212,175,55,0.12)", color: "#d4af37" }}
+                    style={{ backgroundColor: "rgba(212,175,55,0.12)", color: "#D4AF37" }}
                   >
                     {store.staff_comment.name.charAt(0)}
                   </div>
@@ -1031,7 +1032,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                       <span
                         key={i}
                         className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-                        style={{ border: "1px solid rgba(212,175,55,0.3)", color: "#d4af37" }}
+                        style={{ border: "1px solid rgba(212,175,55,0.3)", color: "#D4AF37" }}
                       >
                         {s}
                       </span>
@@ -1048,7 +1049,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {((store.after_spots && store.after_spots.length > 0) ||
             (store.companion_spots && store.companion_spots.length > 0)) && (
             <SectionCard
-              icon={<Utensils size={20} style={{ color: "#d4af37" }} />}
+              icon={<Utensils size={20} style={{ color: "#D4AF37" }} />}
               title="周辺スポット"
             >
               <div className="space-y-4">
@@ -1084,7 +1085,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* 15. Access / Map */}
           {/* ============================================================ */}
           <SectionCard
-            icon={<Navigation size={20} style={{ color: "#d4af37" }} />}
+            icon={<Navigation size={20} style={{ color: "#D4AF37" }} />}
             title="アクセス"
           >
             <div className="space-y-3">
@@ -1108,7 +1109,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                       <a
                         href={`tel:${store.phone}`}
                         className="inline-flex items-center gap-1 hover:underline"
-                        style={{ color: "#d4af37" }}
+                        style={{ color: "#D4AF37" }}
                       >
                         <Phone size={14} />
                         {store.phone}
@@ -1125,7 +1126,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 hover:underline"
-                        style={{ color: "#d4af37" }}
+                        style={{ color: "#D4AF37" }}
                       >
                         <ExternalLink size={14} />
                         公式サイト
@@ -1158,7 +1159,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {(related ?? []).length > 0 && (
             <section className="space-y-3">
-              <SectionHeading icon={<Building size={20} style={{ color: "#d4af37" }} />}>
+              <SectionHeading icon={<Building size={20} style={{ color: "#D4AF37" }} />}>
                 採用基準が近い店
               </SectionHeading>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
@@ -1187,40 +1188,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       </div>
 
       {/* ============================================================ */}
-      {/* Bottom Fixed CTA Bar */}
+      {/* Bottom Tab Bar */}
       {/* ============================================================ */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-3 px-4 py-3"
-        style={{
-          backgroundColor: "rgba(255,255,255,0.95)",
-          backdropFilter: "blur(12px)",
-          borderTop: "1px solid rgba(27,37,40,0.08)",
-        }}
-      >
-        <div className="flex gap-4">
-          <a href="/" className="flex flex-col items-center text-[10px]" style={{ color: "rgba(27,37,40,0.45)" }}>
-            <Building size={18} />
-            ホーム
-          </a>
-          <a href="/stores" className="flex flex-col items-center text-[10px]" style={{ color: "rgba(27,37,40,0.45)" }}>
-            <MapPin size={18} />
-            一覧
-          </a>
-        </div>
-        <button
-          className="flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-white"
-          style={{
-            backgroundColor: "#06C755",
-            boxShadow: "0 2px 8px rgba(6,199,85,0.3)",
-          }}
-          onClick={openLineFriendAdd}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-          </svg>
-          LINEで応募・相談する
-        </button>
-      </div>
+      <BottomTabBar />
     </div>
   );
 }
@@ -1284,7 +1254,7 @@ function SpotCard({ spot }: { spot: Spot }) {
         className="flex h-9 w-9 items-center justify-center rounded-full"
         style={{ backgroundColor: "rgba(212,175,55,0.1)" }}
       >
-        <Utensils size={16} style={{ color: "#d4af37" }} />
+        <Utensils size={16} style={{ color: "#D4AF37" }} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate" style={{ color: "#1b2528" }}>{spot.name}</p>
@@ -1304,7 +1274,7 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
     analysis.cast_style.natural || 1;
 
   const castSegments = [
-    { label: "綺麗系", value: analysis.cast_style.beauty, color: "#d4af37" },
+    { label: "綺麗系", value: analysis.cast_style.beauty, color: "#D4AF37" },
     { label: "可愛い系", value: analysis.cast_style.cute, color: "rgba(200,96,128,1)" },
     { label: "派手系", value: analysis.cast_style.glamour, color: "#1b2528" },
     { label: "素人系", value: analysis.cast_style.natural, color: "rgba(200,96,128,0.5)" },
@@ -1314,7 +1284,7 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
 
   return (
     <SectionCard
-      icon={<Award size={20} style={{ color: "#d4af37" }} />}
+      icon={<Award size={20} style={{ color: "#D4AF37" }} />}
       title="お店の分析"
     >
       <div className="space-y-5">
@@ -1327,7 +1297,7 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
           <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "rgba(27,37,40,0.06)" }}>
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${analysis.experience_level}%`, backgroundColor: "#d4af37" }}
+              style={{ width: `${analysis.experience_level}%`, backgroundColor: "#D4AF37" }}
             />
           </div>
           <div className="flex justify-between text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
@@ -1396,7 +1366,7 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
           <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "rgba(27,37,40,0.06)" }}>
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${analysis.drinking_style}%`, backgroundColor: "#d4af37" }}
+              style={{ width: `${analysis.drinking_style}%`, backgroundColor: "#D4AF37" }}
             />
           </div>
           <div className="flex justify-between text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
@@ -1423,7 +1393,7 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
                   >
                     <div
                       className="h-full rounded transition-all"
-                      style={{ width: `${(age.ratio / maxAge) * 100}%`, backgroundColor: "#d4af37" }}
+                      style={{ width: `${(age.ratio / maxAge) * 100}%`, backgroundColor: "#D4AF37" }}
                     />
                   </div>
                   <span className="w-10 text-xs" style={{ color: "rgba(27,37,40,0.45)" }}>
