@@ -278,7 +278,10 @@ class StoreSeeder extends Seeder
             'nearest_station' => $station,
             'category' => $category['name'],
             'business_hours' => "{$hoursStart}〜{$hoursEnd}",
+            'opening_time' => $hoursStart,
+            'closing_time' => $hoursEnd,
             'holidays' => $holidays,
+            'shift_info' => '週' . rand(1, 3) . '日〜OK。シフト自由制。',
             'phone' => '03-' . rand(1000, 9999) . '-' . rand(1000, 9999),
             'hourly_min' => $hourlyMin,
             'hourly_max' => $hourlyMax,
@@ -309,7 +312,13 @@ class StoreSeeder extends Seeder
         if ($this->chance(0.7)) {
             $store['trial_avg_hourly'] = number_format($hourlyMin + 500) . '円';
             $store['trial_hourly'] = number_format($hourlyMin) . '円';
-            $store['interview_hours'] = ['13:00〜18:00', '14:00〜19:00', '15:00〜20:00', '12:00〜17:00'][array_rand(['13:00〜18:00', '14:00〜19:00', '15:00〜20:00', '12:00〜17:00'])];
+            $interviewRanges = [
+                ['13:00', '18:00'], ['14:00', '19:00'], ['15:00', '20:00'], ['12:00', '17:00'],
+            ];
+            $interviewRange = $interviewRanges[array_rand($interviewRanges)];
+            $store['interview_hours'] = "{$interviewRange[0]}〜{$interviewRange[1]}";
+            $store['interview_start'] = $interviewRange[0];
+            $store['interview_end'] = $interviewRange[1];
             $store['same_day_trial'] = $this->chance(0.4);
         }
         if ($this->chance(0.4)) {
@@ -325,6 +334,33 @@ class StoreSeeder extends Seeder
         if ($this->chance(0.6)) {
             $store['video_url'] = self::SAMPLE_VIDEOS[array_rand(self::SAMPLE_VIDEOS)];
         }
+
+        // New columns
+        $store['rank'] = ['S', 'A', 'A', 'B', 'B', 'B', 'C'][array_rand(['S', 'A', 'A', 'B', 'B', 'B', 'C'])];
+        $store['gal_point'] = rand(0, 100);
+        $store['loose_point'] = rand(0, 100);
+        $store['age_point'] = rand(0, 100);
+        $store['waiwai_point'] = rand(0, 100);
+        $store['cute_point'] = rand(0, 100);
+        $store['unit_wage_type'] = ['時給', '時給', '時給', '日給'][array_rand(['時給', '時給', '時給', '日給'])];
+        $store['payroll_system_type'] = ['全額日払い', '日払い可', '月2回', '月末締め翌月払い'][array_rand(['全額日払い', '日払い可', '月2回', '月末締め翌月払い'])];
+        if ($this->chance(0.5)) {
+            $store['payroll_system_description'] = ['体入時も全額日払い。', '日払い・週払い選択可。', '月末締め翌月15日払い。前払い相談可。'][array_rand(['体入時も全額日払い。', '日払い・週払い選択可。', '月末締め翌月15日払い。前払い相談可。'])];
+        }
+        if ($this->chance(0.4)) {
+            $store['recruitment_standards'] = ['18歳以上（高校生不可）。明るい方歓迎。', '未経験者歓迎。容姿よりコミュ力重視。', '経験者優遇。20〜30代活躍中。'][array_rand(['18歳以上（高校生不可）。明るい方歓迎。', '未経験者歓迎。容姿よりコミュ力重視。', '経験者優遇。20〜30代活躍中。'])];
+        }
+        if ($this->chance(0.5)) {
+            $store['dress_code'] = ['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'][array_rand(['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'])];
+        }
+        if ($this->chance(0.4)) {
+            $store['champagne_description'] = ['モエ・エ・シャンドン、ヴーヴクリコなど各種あり。', 'ボトルバック10%〜。高級シャンパン多数取り揃え。', 'シャンパンタワー対応可。各種銘柄あり。'][array_rand(['モエ・エ・シャンドン、ヴーヴクリコなど各種あり。', 'ボトルバック10%〜。高級シャンパン多数取り揃え。', 'シャンパンタワー対応可。各種銘柄あり。'])];
+        }
+        if ($this->chance(0.5)) {
+            $store['transfer_description'] = ['都内近郊は無料送りあり。', '自宅近くまで無料送迎。', '終電後タクシー代支給。'][array_rand(['都内近郊は無料送りあり。', '自宅近くまで無料送迎。', '終電後タクシー代支給。'])];
+            $store['transfer_km'] = rand(10, 30) . 'km';
+        }
+
         if ($this->chance(0.25)) {
             $store['schedule'] = [
                 'hours' => $store['business_hours'],
@@ -522,7 +558,10 @@ class StoreSeeder extends Seeder
                 'nearest_station' => '六本木駅',
                 'category' => 'キャバクラ',
                 'business_hours' => '20:00〜LAST',
+                'opening_time' => '20:00',
+                'closing_time' => 'LAST',
                 'holidays' => '日曜日',
+                'shift_info' => '週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。',
                 'phone' => '03-1234-5678',
                 'hourly_min' => 4000,
                 'hourly_max' => 8000,
@@ -543,6 +582,8 @@ class StoreSeeder extends Seeder
                 'trial_avg_hourly' => '5,000円',
                 'trial_hourly' => '4,500円',
                 'interview_hours' => '14:00〜19:00',
+                'interview_start' => '14:00',
+                'interview_end' => '19:00',
                 'same_day_trial' => true,
                 'feature_tags' => ['未経験歓迎', '終電上がりOK', '日払いあり', 'ノルマなし', '送りあり', '体入全額日払い'],
                 'description' => '六本木の老舗キャバクラ。アットホームな雰囲気で未経験者も安心して働けます。スタッフのサポート体制が充実しており、接客マナーから会話術まで丁寧に指導します。',
@@ -587,14 +628,20 @@ class StoreSeeder extends Seeder
                 ],
                 'recent_hires_summary' => '直近2ヶ月で20名採用',
                 'popular_features' => ['features' => ['未経験歓迎', 'ノルマなし', '終電上がり'], 'hint' => '六本木エリアではノルマなしのお店が人気です'],
-                'after_spots' => [
-                    ['name' => '鳥貴族 六本木店', 'genre' => '居酒屋', 'distance' => '徒歩2分'],
-                    ['name' => 'すき家 六本木店', 'genre' => '牛丼', 'distance' => '徒歩3分'],
-                ],
-                'companion_spots' => [
-                    ['name' => 'リストランテ アマルフィ', 'genre' => 'イタリアン', 'distance' => '徒歩5分'],
-                    ['name' => '鮨 さいとう', 'genre' => '寿司', 'distance' => '徒歩8分'],
-                ],
+                'recruitment_standards' => '18歳以上（高校生不可）。容姿よりもコミュニケーション力を重視。未経験者歓迎。',
+                'rank' => 'A',
+                'gal_point' => 20,
+                'loose_point' => 40,
+                'age_point' => 30,
+                'waiwai_point' => 60,
+                'cute_point' => 70,
+                'unit_wage_type' => '時給',
+                'payroll_system_type' => '全額日払い',
+                'payroll_system_description' => '体験入店時も全額日払いOK。月末締め翌月払いも選択可。',
+                'dress_code' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
+                'champagne_description' => 'モエ・エ・シャンドン、ドンペリニヨン、クリュッグなど各種取り揃え。ボトルバック10%〜。',
+                'transfer_description' => '都内近郊は無料送りあり。終電後も安心。',
+                'transfer_km' => '20km',
                 'qa' => [
                     ['question' => 'お酒が飲めなくても大丈夫ですか？', 'answer' => 'はい、大丈夫です。ソフトドリンクやノンアルコールカクテルをご用意しています。'],
                     ['question' => '送りはどこまで出ますか？', 'answer' => '都内近郊であれば無料で送迎いたします。詳しくはお問い合わせください。'],
@@ -614,7 +661,10 @@ class StoreSeeder extends Seeder
                 'nearest_station' => '銀座駅',
                 'category' => 'ラウンジ',
                 'business_hours' => '19:00〜1:00',
+                'opening_time' => '19:00',
+                'closing_time' => '1:00',
                 'holidays' => '日曜・祝日',
+                'shift_info' => '週2日〜OK。シフト応相談。',
                 'phone' => '03-9876-5432',
                 'hourly_min' => 5000,
                 'hourly_max' => 12000,
@@ -632,6 +682,8 @@ class StoreSeeder extends Seeder
                 'trial_avg_hourly' => '6,000円',
                 'trial_hourly' => '5,500円',
                 'interview_hours' => '13:00〜18:00',
+                'interview_start' => '13:00',
+                'interview_end' => '18:00',
                 'same_day_trial' => false,
                 'feature_tags' => ['経験者優遇', '高時給', '落ち着いた雰囲気', 'ボトルバック高め'],
                 'description' => '銀座の高級ラウンジ。落ち着いた大人の空間で、品のある接客を心がけています。経営者や医師など、ハイクラスなお客様が中心です。',
@@ -661,7 +713,10 @@ class StoreSeeder extends Seeder
                 'nearest_station' => '渋谷駅',
                 'category' => 'ガールズバー',
                 'business_hours' => '18:00〜5:00',
+                'opening_time' => '18:00',
+                'closing_time' => '5:00',
                 'holidays' => '不定休',
+                'shift_info' => '週1日〜OK。完全自由シフト。',
                 'phone' => '03-5555-1234',
                 'hourly_min' => 2500,
                 'hourly_max' => 4000,
@@ -675,6 +730,8 @@ class StoreSeeder extends Seeder
                 'trial_avg_hourly' => '3,000円',
                 'trial_hourly' => '2,800円',
                 'interview_hours' => '15:00〜20:00',
+                'interview_start' => '15:00',
+                'interview_end' => '20:00',
                 'same_day_trial' => true,
                 'feature_tags' => ['未経験歓迎', '髪色自由', 'ネイルOK', 'ピアスOK', 'カウンター越し', '全額日払い'],
                 'description' => '渋谷の人気ガールズバー。カウンター越しの接客なので初めてでも安心！20代のスタッフが活躍中。友達同士の応募も大歓迎！',
@@ -695,7 +752,10 @@ class StoreSeeder extends Seeder
                 'nearest_station' => '新宿駅',
                 'category' => 'キャバクラ',
                 'business_hours' => '20:00〜LAST',
+                'opening_time' => '20:00',
+                'closing_time' => 'LAST',
                 'holidays' => '日曜日',
+                'shift_info' => '週2日〜OK。出勤日数相談可。',
                 'hourly_min' => 5000,
                 'hourly_max' => 10000,
                 'daily_estimate' => '40,000円〜70,000円',
@@ -710,7 +770,10 @@ class StoreSeeder extends Seeder
                 'nearest_station' => '恵比寿駅',
                 'category' => 'ラウンジ',
                 'business_hours' => '19:00〜1:00',
+                'opening_time' => '19:00',
+                'closing_time' => '1:00',
                 'holidays' => '日曜・月曜',
+                'shift_info' => '週1日〜OK。シフト自由制。',
                 'hourly_min' => 4000,
                 'hourly_max' => 7000,
                 'feature_tags' => ['未経験歓迎', '終電上がりOK', '少人数制', 'アットホーム'],

@@ -26,7 +26,6 @@ import {
   Star,
   Wine,
   Car,
-  MapPin,
   HelpCircle,
   MessageSquare,
   ChevronRight,
@@ -108,9 +107,8 @@ const steps: StepConfig[] = [
     gradient: "from-fuchsia-500 to-purple-500",
     sections: [
       { id: "popular", title: "人気の特徴", icon: Star },
-      { id: "champagne", title: "シャンパンメニュー", icon: Wine },
+      { id: "champagne", title: "シャンパン情報", icon: Wine },
       { id: "transport", title: "送り・交通サポート", icon: Car },
-      { id: "spots", title: "アフター・同伴スポット", icon: MapPin },
       { id: "qa", title: "Q&A", icon: HelpCircle },
       { id: "staff", title: "スタッフコメント", icon: MessageSquare },
       { id: "pickup", title: "ピックアップ設定", icon: Crown },
@@ -528,7 +526,8 @@ export function ShopEditPage() {
   const [address, setAddress] = useState("");
   const [station, setStation] = useState("");
   const [category, setCategory] = useState("");
-  const [hours, setHours] = useState("");
+  const [openingTime, setOpeningTime] = useState("");
+  const [closingTime, setClosingTime] = useState("");
   const [holiday, setHoliday] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
@@ -548,7 +547,8 @@ export function ShopEditPage() {
   const [normaInfo, setNormaInfo] = useState("");
   const [avgWage, setAvgWage] = useState("");
   const [trialWage, setTrialWage] = useState("");
-  const [interviewTime, setInterviewTime] = useState("");
+  const [interviewStart, setInterviewStart] = useState("");
+  const [interviewEnd, setInterviewEnd] = useState("");
   const [sameDayTrial, setSameDayTrial] = useState("可");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -579,8 +579,6 @@ export function ShopEditPage() {
   >([]);
   const [documents, setDocuments] = useState<string[]>([]);
   const [docNote, setDocNote] = useState("");
-  const [scheduleHours, setScheduleHours] = useState("");
-  const [scheduleHoliday, setScheduleHoliday] = useState("");
   const [shiftInfo, setShiftInfo] = useState("");
   const [hiringEntries, setHiringEntries] = useState<
     { month: string; count: string; examples: string[] }[]
@@ -597,12 +595,21 @@ export function ShopEditPage() {
   const [hiringTotal, setHiringTotal] = useState("直近5ヶ月で52名採用");
   const [popularFeatures, setPopularFeatures] = useState<string[]>([]);
   const [otherHint, setOtherHint] = useState("");
-  const [afterSpots, setAfterSpots] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [dohanSpots, setDohanSpots] = useState<
-    { label: string; value: string }[]
-  >([]);
+  // New schema fields
+  const [recruitmentStandards, setRecruitmentStandards] = useState("");
+  const [rank, setRank] = useState("");
+  const [galPoint, setGalPoint] = useState(50);
+  const [loosePoint, setLoosePoint] = useState(50);
+  const [agePoint, setAgePoint] = useState(50);
+  const [waiwaiPoint, setWaiwaiPoint] = useState(50);
+  const [cutePoint, setCutePoint] = useState(50);
+  const [transferDescription, setTransferDescription] = useState("");
+  const [transferKm, setTransferKm] = useState("");
+  const [unitWageType, setUnitWageType] = useState("");
+  const [dressCodeField, setDressCodeField] = useState("");
+  const [payrollSystemType, setPayrollSystemType] = useState("");
+  const [payrollSystemDescription, setPayrollSystemDescription] = useState("");
+  const [champagneDescription, setChampagneDescription] = useState("");
   const [qaItems, setQaItems] = useState<{ label: string; value: string }[]>([]);
   const [staffName, setStaffName] = useState("");
   const [staffRole, setStaffRole] = useState("");
@@ -625,7 +632,8 @@ export function ShopEditPage() {
     setAddress(store.address || "");
     setStation(store.nearest_station || "");
     setCategory(store.category || "");
-    setHours(store.business_hours || "");
+    setOpeningTime(store.opening_time || "");
+    setClosingTime(store.closing_time || "");
     setHoliday(store.holidays || "");
     setPhone(store.phone || "");
     setWebsite(store.website_url || "");
@@ -641,7 +649,8 @@ export function ShopEditPage() {
     setNormaInfo(store.norma_info || "");
     setAvgWage(store.trial_avg_hourly || "");
     setTrialWage(store.trial_hourly || "");
-    setInterviewTime(store.interview_hours || "");
+    setInterviewStart(store.interview_start || "");
+    setInterviewEnd(store.interview_end || "");
     setSameDayTrial(store.same_day_trial ? "可" : "不可");
     setTags(store.feature_tags || []);
     setDescription(store.description || "");
@@ -686,13 +695,8 @@ export function ShopEditPage() {
       setInterviewDialog((interview.dialog || []).map((d: any) => ({ label: d.text ?? d.label ?? "", value: d.speaker ?? d.value ?? "" })));
     }
 
-    // Schedule
-    const schedule = store.schedule as any;
-    if (schedule) {
-      setScheduleHours(schedule.hours || "");
-      setScheduleHoliday(schedule.holidays ?? schedule.holiday ?? "");
-      setShiftInfo(schedule.shift_info || "");
-    }
+    // shift_info（独立フィールド、scheduleオブジェクトからも互換読み込み）
+    setShiftInfo(store.shift_info || (store.schedule as any)?.shift_info || "");
 
     // Recent hires
     if (store.recent_hires) {
@@ -714,13 +718,25 @@ export function ShopEditPage() {
       setStaffComment(staffData);
     }
 
-    // Spots
-    setAfterSpots((store.after_spots as any[] || []).map(s => ({ label: s.name || s.label || "", value: s.genre ? `${s.genre}（${s.distance || ""}）` : s.value || "" })));
-    setDohanSpots((store.companion_spots as any[] || []).map(s => ({ label: s.name || s.label || "", value: s.genre ? `${s.genre}（${s.distance || ""}）` : s.value || "" })));
+    // New schema fields
+    setRecruitmentStandards((store as any).recruitment_standards || "");
+    setRank((store as any).rank || "");
+    setGalPoint((store as any).gal_point ?? 50);
+    setLoosePoint((store as any).loose_point ?? 50);
+    setAgePoint((store as any).age_point ?? 50);
+    setWaiwaiPoint((store as any).waiwai_point ?? 50);
+    setCutePoint((store as any).cute_point ?? 50);
+    setTransferDescription((store as any).transfer_description || "");
+    setTransferKm((store as any).transfer_km || "");
+    setUnitWageType((store as any).unit_wage_type || "");
+    setDressCodeField((store as any).dress_code || "");
+    setPayrollSystemType((store as any).payroll_system_type || "");
+    setPayrollSystemDescription((store as any).payroll_system_description || "");
+    setChampagneDescription((store as any).champagne_description || "");
 
     // Publish status & images
     setPublishStatus(store.publish_status || "draft");
-    setStoreImages(store.images || []);
+    setStoreImages((store.images || []).map((img: any) => typeof img === 'string' ? img : img.url));
   }, []);
 
   useEffect(() => {
@@ -745,8 +761,11 @@ export function ShopEditPage() {
     address,
     nearest_station: station,
     category,
-    business_hours: hours,
+    business_hours: openingTime && closingTime ? `${openingTime}〜${closingTime}` : null,
+    opening_time: openingTime || null,
+    closing_time: closingTime || null,
     holidays: holiday,
+    shift_info: shiftInfo || null,
     phone,
     website_url: website,
     video_url: videoUrl,
@@ -761,7 +780,9 @@ export function ShopEditPage() {
     norma_info: normaInfo,
     trial_avg_hourly: avgWage,
     trial_hourly: trialWage,
-    interview_hours: interviewTime,
+    interview_hours: interviewStart && interviewEnd ? `${interviewStart}〜${interviewEnd}` : null,
+    interview_start: interviewStart || null,
+    interview_end: interviewEnd || null,
     same_day_trial: sameDayTrial === "可",
     feature_tags: tags,
     description,
@@ -789,11 +810,7 @@ export function ShopEditPage() {
       criteria: hiringCriteria,
       dialog: interviewDialog.filter(i => i.label).map(i => ({ text: i.label, speaker: i.value })),
     },
-    schedule: {
-      hours: scheduleHours,
-      holidays: scheduleHoliday,
-      shift_info: shiftInfo,
-    },
+    schedule: shiftInfo ? { shift_info: shiftInfo } : null,
     recent_hires: hiringEntries.map(h => ({
       month: h.month,
       count: Number(h.count) || 0,
@@ -806,10 +823,22 @@ export function ShopEditPage() {
       comment: staffComment,
       supports: supportItems.filter(Boolean),
     },
-    after_spots: afterSpots.filter(i => i.label).map(i => ({ label: i.label, value: i.value })),
-    companion_spots: dohanSpots.filter(i => i.label).map(i => ({ label: i.label, value: i.value })),
+    recruitment_standards: recruitmentStandards,
+    rank: rank || null,
+    gal_point: galPoint,
+    loose_point: loosePoint,
+    age_point: agePoint,
+    waiwai_point: waiwaiPoint,
+    cute_point: cutePoint,
+    transfer_description: transferDescription,
+    transfer_km: transferKm,
+    unit_wage_type: unitWageType || null,
+    dress_code: dressCodeField,
+    payroll_system_type: payrollSystemType || null,
+    payroll_system_description: payrollSystemDescription,
+    champagne_description: champagneDescription,
     publish_status: publishStatus,
-  }), [shopName, area, address, station, category, hours, holiday, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewTime, sameDayTrial, tags, description, featureText, documents, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, scheduleHours, scheduleHoliday, shiftInfo, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, afterSpots, dohanSpots, publishStatus]);
+  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, recruitmentStandards, rank, galPoint, loosePoint, agePoint, waiwaiPoint, cutePoint, transferDescription, transferKm, unitWageType, dressCodeField, payrollSystemType, payrollSystemDescription, champagneDescription, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -952,11 +981,18 @@ export function ShopEditPage() {
               ]}
             />
           </Field>
-          <Field label="営業時間">
+          <Field label="営業時間（開始）">
             <TextInput
-              value={hours}
-              onChange={(e: any) => setHours(e.target.value)}
-              placeholder="例: 20:00〜LAST"
+              value={openingTime}
+              onChange={(e: any) => setOpeningTime(e.target.value)}
+              placeholder="例: 20:00"
+            />
+          </Field>
+          <Field label="営業時間（終了）">
+            <TextInput
+              value={closingTime}
+              onChange={(e: any) => setClosingTime(e.target.value)}
+              placeholder="例: 1:00 / LAST"
             />
           </Field>
           <Field label="定休日">
@@ -1087,6 +1123,32 @@ export function ShopEditPage() {
               placeholder="その他、給与に関する補足情報があれば入力してください"
             />
           </Field>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Field label="単価種別">
+              <SelectInput
+                value={unitWageType}
+                onChange={(e: any) => setUnitWageType(e.target.value)}
+                options={["時給", "日給", "月給"]}
+                placeholder="選択してください"
+              />
+            </Field>
+            <Field label="給与支払い方法">
+              <SelectInput
+                value={payrollSystemType}
+                onChange={(e: any) => setPayrollSystemType(e.target.value)}
+                options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
+                placeholder="選択してください"
+              />
+            </Field>
+          </div>
+          <Field label="給与支払い補足">
+            <TextArea
+              value={payrollSystemDescription}
+              onChange={(e: any) => setPayrollSystemDescription(e.target.value)}
+              placeholder="給与支払いに関する補足（例: 日払い上限5万円まで等）"
+              rows={2}
+            />
+          </Field>
         </div>
       </SectionCard>
 
@@ -1138,13 +1200,18 @@ export function ShopEditPage() {
               placeholder="例: 4,500円"
             />
           </Field>
-          <Field label="面接可能時間">
+          <Field label="面接可能時間（開始）">
             <TextInput
-              value={interviewTime}
-              onChange={(e: any) =>
-                setInterviewTime(e.target.value)
-              }
-              placeholder="例: 12:00〜20:00"
+              value={interviewStart}
+              onChange={(e: any) => setInterviewStart(e.target.value)}
+              placeholder="例: 14:00"
+            />
+          </Field>
+          <Field label="面接可能時間（終了）">
+            <TextInput
+              value={interviewEnd}
+              onChange={(e: any) => setInterviewEnd(e.target.value)}
+              placeholder="例: 19:00"
             />
           </Field>
           <Field label="当日体入可否">
@@ -1308,6 +1375,69 @@ export function ShopEditPage() {
           />
         </div>
       </SectionCard>
+
+      <SectionCard title="採用基準・ランク" icon={UserCheck}>
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Field label="店舗ランク">
+              <SelectInput
+                value={rank}
+                onChange={(e: any) => setRank(e.target.value)}
+                options={["S", "A", "B", "C"]}
+                placeholder="選択してください"
+              />
+            </Field>
+          </div>
+          <Field label="採用基準（詳細）" hint="求める人物像や採用ラインなどを記載してください">
+            <TextArea
+              value={recruitmentStandards}
+              onChange={(e: any) => setRecruitmentStandards(e.target.value)}
+              rows={4}
+              placeholder="例: 容姿端麗な方、接客経験者優遇、18〜28歳程度"
+            />
+          </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="キャストポイント分析" icon={BarChart3}>
+        <div className="space-y-6">
+          <SliderField
+            label="ギャルポイント"
+            value={galPoint}
+            onChange={(e: any) => setGalPoint(Number(e.target.value))}
+            leftLabel="清楚系"
+            rightLabel="ギャル系"
+          />
+          <SliderField
+            label="ゆるさポイント"
+            value={loosePoint}
+            onChange={(e: any) => setLoosePoint(Number(e.target.value))}
+            leftLabel="しっかり"
+            rightLabel="ゆるめ"
+          />
+          <SliderField
+            label="年齢ポイント"
+            value={agePoint}
+            onChange={(e: any) => setAgePoint(Number(e.target.value))}
+            leftLabel="若め"
+            rightLabel="大人め"
+          />
+          <SliderField
+            label="ワイワイポイント"
+            value={waiwaiPoint}
+            onChange={(e: any) => setWaiwaiPoint(Number(e.target.value))}
+            leftLabel="落ち着き"
+            rightLabel="ワイワイ"
+          />
+          <SliderField
+            label="かわいいポイント"
+            value={cutePoint}
+            onChange={(e: any) => setCutePoint(Number(e.target.value))}
+            leftLabel="クール"
+            rightLabel="かわいい"
+          />
+        </div>
+      </SectionCard>
     </div>
   );
 
@@ -1383,31 +1513,12 @@ export function ShopEditPage() {
 
       <SectionCard title="勤務スケジュール" icon={Calendar}>
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="営業時間">
-              <TextInput
-                value={scheduleHours}
-                onChange={(e: any) =>
-                  setScheduleHours(e.target.value)
-                }
-                placeholder="例: 20:00〜LAST"
-              />
-            </Field>
-            <Field label="定休日">
-              <TextInput
-                value={scheduleHoliday}
-                onChange={(e: any) =>
-                  setScheduleHoliday(e.target.value)
-                }
-                placeholder="例: 日曜日"
-              />
-            </Field>
-          </div>
+          <p className="text-xs text-muted-foreground">営業時間・定休日はStep1「基本情報」で設定してください。</p>
           <Field label="シフト情報">
             <TextArea
               value={shiftInfo}
               onChange={(e: any) => setShiftInfo(e.target.value)}
-              placeholder="シフトの柔軟性や出勤日数の目安を入力してください"
+              placeholder="例: 週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。"
             />
           </Field>
         </div>
@@ -1493,6 +1604,17 @@ export function ShopEditPage() {
 
   const renderStep5 = () => (
     <div className="space-y-6">
+      <SectionCard title="ドレスコード" icon={Star}>
+        <Field label="ドレスコード" hint="お店で働く際の服装ルールを記載してください">
+          <TextArea
+            value={dressCodeField}
+            onChange={(e: any) => setDressCodeField(e.target.value)}
+            rows={3}
+            placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 私服OK"
+          />
+        </Field>
+      </SectionCard>
+
       <SectionCard title="人気の特徴" icon={Star}>
         <div className="space-y-5">
           <Field label="特徴リスト">
@@ -1512,46 +1634,38 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="シャンパンメニュー" icon={Wine}>
+      <SectionCard title="シャンパン情報" icon={Wine}>
         <Field
-          label="メニュー画像"
-          hint="シャンパンメニューの画像をアップロードしてください"
+          label="シャンパン説明"
+          hint="シャンパンメニューや注文ルールなどを記載してください"
         >
-          <ImageUpload />
+          <TextArea
+            value={champagneDescription}
+            onChange={(e: any) => setChampagneDescription(e.target.value)}
+            rows={4}
+            placeholder="例: ドンペリ 50,000円〜 / モエシャン 30,000円〜 など"
+          />
         </Field>
       </SectionCard>
 
       <SectionCard title="送り・交通サポート" icon={Car}>
-        <Field
-          label="送りエリアマップ"
-          hint="送りエリアのマップ画像などをアップロードしてください"
-        >
-          <ImageUpload />
-        </Field>
-      </SectionCard>
-
-      <SectionCard title="アフタースポット・同伴スポット" icon={MapPin}>
         <div className="space-y-5">
           <Field
-            label="アフタースポット"
-            hint="アフター利用できる近隣のお店を登録してください"
+            label="送りの説明"
+            hint="送りサービスの詳細を記載してください"
           >
-            <DynamicPairList
-              items={afterSpots}
-              setItems={setAfterSpots}
-              labelPlaceholder="店名"
-              valuePlaceholder="ジャンル・距離"
+            <TextArea
+              value={transferDescription}
+              onChange={(e: any) => setTransferDescription(e.target.value)}
+              rows={3}
+              placeholder="例: 営業終了後、自宅まで無料送迎あり"
             />
           </Field>
-          <Field
-            label="同伴スポット"
-            hint="同伴に利用できる近隣のお店を登録してください"
-          >
-            <DynamicPairList
-              items={dohanSpots}
-              setItems={setDohanSpots}
-              labelPlaceholder="店名"
-              valuePlaceholder="ジャンル・距離"
+          <Field label="送り距離">
+            <TextInput
+              value={transferKm}
+              onChange={(e: any) => setTransferKm(e.target.value)}
+              placeholder="例: 20km圏内"
             />
           </Field>
         </div>
@@ -1836,8 +1950,11 @@ export function ShopEditPage() {
                   address: address,
                   nearest_station: station,
                   category: category,
-                  business_hours: hours,
+                  business_hours: openingTime && closingTime ? `${openingTime}〜${closingTime}` : "",
+                  opening_time: openingTime || null,
+                  closing_time: closingTime || null,
                   holidays: holiday,
+                  shift_info: shiftInfo || null,
                   phone: phone,
                   website_url: website,
                   hourly_min: Number(minWage) || 0,
@@ -1851,7 +1968,9 @@ export function ShopEditPage() {
                   norma_info: normaInfo,
                   trial_avg_hourly: Number(avgWage) || 0,
                   trial_hourly: Number(trialWage) || 0,
-                  interview_hours: interviewTime,
+                  interview_hours: interviewStart && interviewEnd ? `${interviewStart}〜${interviewEnd}` : "",
+                  interview_start: interviewStart || null,
+                  interview_end: interviewEnd || null,
                   same_day_trial: sameDayTrial === "可",
                   feature_tags: tags,
                   description: description,
@@ -1889,9 +2008,7 @@ export function ShopEditPage() {
                   required_documents: documents.length > 0 || docNote
                     ? { documents, notes: docNote }
                     : null,
-                  schedule: scheduleHours || scheduleHoliday || shiftInfo
-                    ? { hours: scheduleHours, holidays: scheduleHoliday, shift_info: shiftInfo }
-                    : null,
+                  schedule: shiftInfo ? { shift_info: shiftInfo } : null,
                   recent_hires: hiringEntries.length > 0
                     ? hiringEntries.map((h) => ({
                         month: h.month,
@@ -1914,17 +2031,24 @@ export function ShopEditPage() {
                         supports: supportItems,
                       }
                     : null,
-                  after_spots: afterSpots.length > 0
-                    ? afterSpots.map((s) => ({ name: s.label, genre: s.value, distance: "" }))
-                    : null,
-                  companion_spots: dohanSpots.length > 0
-                    ? dohanSpots.map((s) => ({ name: s.label, genre: s.value, distance: "" }))
-                    : null,
+                  recruitment_standards: recruitmentStandards || null,
+                  rank: rank || null,
+                  gal_point: galPoint,
+                  loose_point: loosePoint,
+                  age_point: agePoint,
+                  waiwai_point: waiwaiPoint,
+                  cute_point: cutePoint,
+                  transfer_description: transferDescription || null,
+                  transfer_km: transferKm || null,
+                  unit_wage_type: unitWageType || null,
+                  dress_code: dressCodeField || null,
+                  payroll_system_type: payrollSystemType || null,
+                  payroll_system_description: payrollSystemDescription || null,
+                  champagne_description: champagneDescription || null,
                   reviews_count: 0,
                   average_rating: 0,
                   reviews: [],
                 },
-                related: [],
               } satisfies StoreDetailResponse}
             />
                 </div>

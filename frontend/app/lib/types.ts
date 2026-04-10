@@ -56,8 +56,12 @@ export interface Store {
   address: string | null;
   nearest_station: string | null;
   category: string | null;
+  // 営業時間（文字列は後方互換、opening_time/closing_timeが正）
   business_hours: string | null;
+  opening_time: string | null;   // 例: "20:00"
+  closing_time: string | null;   // 例: "1:00", "LAST"
   holidays: string | null;
+  shift_info: string | null;     // 例: "週2日〜OK。シフト自由制。"
   phone: string | null;
   website_url: string | null;
   hourly_min: number | null;
@@ -69,14 +73,21 @@ export interface Store {
   guarantee_period: string | null;
   guarantee_details: string | null;
   norma_info: string | null;
+  unit_wage_type: string | null;
+  payroll_system_type: string | null;
+  payroll_system_description: string | null;
   trial_avg_hourly: string | null;
   trial_hourly: string | null;
+  // 面接可能時間（文字列は後方互換、interview_start/interview_endが正）
   interview_hours: string | null;
+  interview_start: string | null; // 例: "14:00"
+  interview_end: string | null;   // 例: "19:00"
   same_day_trial: boolean;
   feature_tags: string[] | null;
   description: string | null;
   features_text: string | null;
-  images: string[] | null;
+  dress_code: string | null;
+  images: { url: string; order: number }[] | null;
   video_url: string | null;
   analysis: Record<string, unknown> | null;
   interview_info: Record<string, unknown> | null;
@@ -85,12 +96,18 @@ export interface Store {
   recent_hires: Record<string, unknown>[] | null;
   recent_hires_summary: string | null;
   popular_features: string[] | null;
-  champagne_images: string[] | null;
-  transport_images: string[] | null;
-  after_spots: Record<string, unknown>[] | null;
-  companion_spots: Record<string, unknown>[] | null;
+  recruitment_standards: string | null;
+  rank: string | null;
+  gal_point: number | null;
+  loose_point: number | null;
+  age_point: number | null;
+  waiwai_point: number | null;
+  cute_point: number | null;
+  champagne_description: string | null;
+  transfer_description: string | null;
+  transfer_km: string | null;
   qa: { question: string; answer: string }[] | null;
-  staff_comment: string | null;
+  staff_comment: { name: string; role: string; comment: string; supports: string[] } | null;
   publish_status: "published" | "unpublished" | "draft";
   created_at: string;
   updated_at: string;

@@ -19,13 +19,12 @@ import {
   Users,
   MessageSquare,
   Building,
-  Utensils,
   Award,
   Navigation,
   Sparkles,
 
 } from "lucide-react";
-import StoreCard from "~/components/user/shared/StoreCard";
+
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import AiChatPanel from "~/components/user/AiChatPanel";
@@ -89,9 +88,9 @@ interface RequiredDocuments {
 }
 
 interface Schedule {
-  hours: string;
-  holidays: string;
-  shift_info: string;
+  hours?: string;
+  holidays?: string;
+  shift_info?: string;
 }
 
 interface RecentHire {
@@ -117,11 +116,6 @@ interface StaffComment {
   supports: string[];
 }
 
-interface Spot {
-  name: string;
-  genre: string;
-  distance: string;
-}
 
 interface ReviewUser {
   line_display_name: string;
@@ -144,7 +138,10 @@ export interface StoreDetailStore {
   nearest_station: string;
   category: string;
   business_hours: string;
+  opening_time: string | null;
+  closing_time: string | null;
   holidays: string;
+  shift_info: string | null;
   phone: string;
   website_url: string;
   hourly_min: number;
@@ -156,13 +153,19 @@ export interface StoreDetailStore {
   guarantee_period: string;
   guarantee_details: string;
   norma_info: string;
+  unit_wage_type: string | null;
+  payroll_system_type: string | null;
+  payroll_system_description: string | null;
   trial_avg_hourly: number;
   trial_hourly: number;
   interview_hours: string;
+  interview_start: string | null;
+  interview_end: string | null;
   same_day_trial: boolean;
   feature_tags: string[];
   description: string;
   features_text: string;
+  dress_code: string | null;
   images: StoreImage[] | null;
   video_url: string;
   analysis: Analysis | null;
@@ -174,28 +177,23 @@ export interface StoreDetailStore {
   popular_features: PopularFeatures | null;
   qa: QAItem[] | null;
   staff_comment: StaffComment | null;
-  after_spots: Spot[] | null;
-  companion_spots: Spot[] | null;
+  recruitment_standards: string | null;
+  rank: string | null;
+  gal_point: number;
+  loose_point: number;
+  age_point: number;
+  waiwai_point: number;
+  cute_point: number;
+  transfer_description: string | null;
+  transfer_km: string | null;
+  champagne_description: string | null;
   reviews_count: number;
   average_rating: number;
   reviews: Review[];
 }
 
-interface RelatedStore {
-  id: number;
-  name: string;
-  area: string;
-  category: string;
-  hourly_min: number;
-  hourly_max: number;
-  feature_tags: string[];
-  reviews_count: number;
-  average_rating: number;
-}
-
 export interface StoreDetailResponse {
   store: StoreDetailStore;
-  related: RelatedStore[];
 }
 
 interface StoreDetailPageProps {
@@ -358,7 +356,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
     );
   }
 
-  const { store, related } = data;
+  const { store } = data;
   const heroHeight = 220;
 
 
@@ -437,7 +435,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <InfoRow label="平均時給" value={formatCurrency(store.trial_avg_hourly ?? 0)} />
               <InfoRow label="体験時給" value={formatCurrency(store.trial_hourly ?? 0)} />
-              <InfoRow label="面接可能時間" value={store.interview_hours} />
+              <InfoRow
+                label="面接可能時間"
+                value={
+                  store.interview_start && store.interview_end
+                    ? `${store.interview_start}〜${store.interview_end}`
+                    : store.interview_hours
+                }
+              />
               <InfoRow
                 label="当日体験"
                 value={
@@ -532,8 +537,16 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               <InfoRow label="業種" value={store.category} />
               <InfoRow label="エリア" value={store.area} />
               <InfoRow label="最寄り駅" value={store.nearest_station} />
-              <InfoRow label="営業時間" value={store.business_hours} />
+              <InfoRow
+                label="営業時間"
+                value={
+                  store.opening_time && store.closing_time
+                    ? `${store.opening_time}〜${store.closing_time}`
+                    : store.business_hours
+                }
+              />
               {store.holidays && <InfoRow label="定休日" value={store.holidays} />}
+              {store.shift_info && <InfoRow label="シフト" value={store.shift_info} />}
             </div>
           </SectionCard>
 
@@ -573,6 +586,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                       ))}
                     </ul>
                   }
+                />
+              )}
+              {store.payroll_system_type && (
+                <InfoRow
+                  label="支払い方法"
+                  value={store.payroll_system_description
+                    ? `${store.payroll_system_type}／${store.payroll_system_description}`
+                    : store.payroll_system_type}
                 />
               )}
               {store.guarantee_period && (
@@ -728,7 +749,34 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 11. Q&A */}
+          {/* 11. Transfer / Dress code / Champagne */}
+          {/* ============================================================ */}
+          {(store.transfer_description || store.dress_code || store.champagne_description) && (
+            <SectionCard
+              icon={<Navigation size={20} style={{ color: "#D4AF37" }} />}
+              title="その他の情報"
+            >
+              <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+                {store.transfer_description && (
+                  <InfoRow
+                    label="送り"
+                    value={store.transfer_km
+                      ? `${store.transfer_description}（${store.transfer_km}以内）`
+                      : store.transfer_description}
+                  />
+                )}
+                {store.dress_code && (
+                  <InfoRow label="ドレスコード" value={store.dress_code} />
+                )}
+                {store.champagne_description && (
+                  <InfoRow label="シャンパン" value={store.champagne_description} />
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ============================================================ */}
+          {/* 12. Q&A */}
           {/* ============================================================ */}
           {store.qa && store.qa.length > 0 && (
             <SectionCard
@@ -886,44 +934,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 14. Nearby Spots */}
-          {/* ============================================================ */}
-          {((store.after_spots && store.after_spots.length > 0) ||
-            (store.companion_spots && store.companion_spots.length > 0)) && (
-            <SectionCard
-              icon={<Utensils size={20} style={{ color: "#D4AF37" }} />}
-              title="周辺スポット"
-            >
-              <div className="space-y-4">
-                {store.after_spots && store.after_spots.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
-                      アフタースポット
-                    </h3>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {store.after_spots.map((spot, i) => (
-                        <SpotCard key={i} spot={spot} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {store.companion_spots && store.companion_spots.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
-                      同伴スポット
-                    </h3>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {store.companion_spots.map((spot, i) => (
-                        <SpotCard key={i} spot={spot} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
-          )}
-
-          {/* ============================================================ */}
           {/* 15. Access / Map */}
           {/* ============================================================ */}
           <SectionCard
@@ -996,33 +1006,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             </div>
           </SectionCard>
 
-          {/* ============================================================ */}
-          {/* 16. Related Stores */}
-          {/* ============================================================ */}
-          {(related ?? []).length > 0 && (
-            <section className="space-y-3">
-              <SectionHeading icon={<Building size={20} style={{ color: "#D4AF37" }} />}>
-                採用基準が近い店
-              </SectionHeading>
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
-                {(related ?? []).map((r) => (
-                  <div key={r.id} className="flex-none snap-start">
-                    <StoreCard
-                      id={r.id}
-                      name={r.name}
-                      area={r.area}
-                      category={r.category}
-                      hourly_min={r.hourly_min}
-                      hourly_max={r.hourly_max}
-                      feature_tags={r.feature_tags}
-                      average_rating={r.average_rating}
-                      reviews_count={r.reviews_count}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
         </div>
 
         {/* Footer */}
@@ -1086,27 +1069,6 @@ function InfoRow({
   );
 }
 
-function SpotCard({ spot }: { spot: Spot }) {
-  return (
-    <div
-      className="flex items-center gap-3 rounded-[12px] p-3"
-      style={{ border: "1px solid rgba(27,37,40,0.06)" }}
-    >
-      <div
-        className="flex h-9 w-9 items-center justify-center rounded-full"
-        style={{ backgroundColor: "rgba(212,175,55,0.1)" }}
-      >
-        <Utensils size={16} style={{ color: "#D4AF37" }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" style={{ color: "#1b2528" }}>{spot.name}</p>
-        <p className="text-xs" style={{ color: "rgba(27,37,40,0.45)" }}>
-          {spot.genre} ・ {spot.distance}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function AnalysisSection({ analysis }: { analysis: Analysis }) {
   const castTotal =

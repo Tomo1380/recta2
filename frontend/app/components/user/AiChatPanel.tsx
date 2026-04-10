@@ -17,6 +17,41 @@ import {
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
+// Follow-up suggestion generator (client-side, replaces server-side logic)
+// ---------------------------------------------------------------------------
+
+function generateFollowUps(
+  pageType: "top" | "list" | "detail",
+  userMessage: string,
+  aiResponse: string,
+): string[] {
+  if (pageType === "detail") {
+    return ["体入の流れと時給", "バック・保証の詳細", "実際の雰囲気は？"];
+  }
+
+  const combined = userMessage + " " + aiResponse;
+  const discussed = {
+    area: /六本木|新宿|銀座|渋谷|池袋|恵比寿|麻布|表参道|歌舞伎町/.test(combined),
+    salary: /時給|給料|給与|バック|稼/.test(combined),
+    beginner: /未経験|初めて|初心者/.test(combined),
+    trial: /体入|体験入店/.test(combined),
+    norma: /ノルマ/.test(combined),
+    guarantee: /保証/.test(combined),
+  };
+
+  const suggestions: string[] = [];
+  if (!discussed.trial) suggestions.push("体入できるお店");
+  if (!discussed.salary) suggestions.push("高時給ランキング");
+  if (!discussed.beginner) suggestions.push("未経験でも安心なお店");
+  if (!discussed.norma) suggestions.push("ノルマなしのお店");
+  if (!discussed.guarantee) suggestions.push("保証制度があるお店");
+
+  return suggestions.slice(0, 3).length > 0
+    ? suggestions.slice(0, 3)
+    : ["未経験OKのお店", "高時給のお店", "体入できるお店"];
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -674,8 +709,9 @@ export default function AiChatPanel({
 
         const res = await sendMessage(msg, pageType, history, mode, storeId, userArea);
 
-        // Strip LINE boilerplate from AI text (CTA card handles it visually)
+        // Strip [STORE:ID] markers and LINE boilerplate from AI text
         const cleanedMessage = res.message
+          .replace(/\[STORE:\d+\]\s*/g, "")
           .replace(/\n*もっと詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
           .replace(/\n*より詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
           .trim();
@@ -689,7 +725,7 @@ export default function AiChatPanel({
           showLineCta: true,
         };
         setMessages((prev) => [...prev, aiMessage]);
-        setFollowUpButtons(res.follow_ups ?? []);
+        setFollowUpButtons(generateFollowUps(pageType, input, cleanedMessage));
       } catch (err) {
         const error = err as Error & { limitType?: string };
         if (error.limitType) {

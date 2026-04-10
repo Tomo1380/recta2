@@ -435,35 +435,42 @@ class FineTuningController extends Controller
 
     private function getStoreJson(): string
     {
-        return Cache::remember('public_stores_full_json_v1', 600, function () {
-            $stores = Store::where('publish_status', 'published')
-                ->get()
-                ->map(function ($s) {
-                    $data = [
-                        'id' => $s->id,
-                        'name' => $s->name,
-                        'area' => $s->area,
-                        'category' => $s->category,
-                        'nearest_station' => $s->nearest_station,
-                        'business_hours' => $s->business_hours,
-                        'hourly_min' => $s->hourly_min,
-                        'hourly_max' => $s->hourly_max,
-                        'daily_estimate' => $s->daily_estimate,
-                        'same_day_trial' => $s->same_day_trial,
-                        'trial_hourly' => $s->trial_hourly,
-                        'guarantee_period' => $s->guarantee_period,
-                        'norma_info' => $s->norma_info,
-                        'feature_tags' => $s->feature_tags ?? [],
-                        'back_items' => collect($s->back_items ?? [])->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))->filter(fn($b) => $b !== ':')->values()->toArray(),
-                        'description' => $s->description,
-                        'features_text' => $s->features_text,
-                        'staff_comment' => $s->staff_comment,
-                    ];
-                    return array_filter($data, fn($v) => $v !== null && $v !== '' && $v !== []);
-                })
-                ->values()
-                ->toArray();
-            return json_encode($stores, JSON_UNESCAPED_UNICODE);
+        return Cache::remember('ft_stores_pipe_v2', 600, function () {
+            $stores = Store::where('publish_status', 'published')->get();
+
+            $header = "ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|日払い体系|体入|保証|ノルマ|ランク|特徴タグ|説明|詳細";
+            $lines = [$header];
+
+            foreach ($stores as $s) {
+                $tags = implode(',', $s->feature_tags ?? []);
+                $payroll = $s->payroll_system_type ?? '';
+                $trial = $s->same_day_trial ? "当日OK({$s->trial_hourly})" : ($s->trial_hourly ? "体入{$s->trial_hourly}" : '');
+                $guarantee = $s->guarantee_period ? "{$s->guarantee_period}" : '';
+                $norma = $s->norma_info ?? '';
+                $rank = $s->rank ?? '';
+                $desc = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->description ?? ''), 0, 80);
+                $feat = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->features_text ?? ''), 0, 60);
+
+                $lines[] = implode('|', [
+                    $s->id,
+                    $s->name,
+                    $s->area,
+                    $s->nearest_station ?? '',
+                    $s->category ?? '',
+                    $s->hourly_min ?? '',
+                    $s->hourly_max ?? '',
+                    $payroll,
+                    $trial,
+                    $guarantee,
+                    $norma,
+                    $rank,
+                    $tags,
+                    $desc,
+                    $feat,
+                ]);
+            }
+
+            return implode("\n", $lines);
         });
     }
 

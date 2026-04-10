@@ -221,6 +221,13 @@ class AiChatController extends Controller
                 'trial_hourly' => $s->trial_hourly,
                 'guarantee_period' => $s->guarantee_period,
                 'feature_tags' => $s->feature_tags ?? [],
+                'business_hours' => $s->business_hours,
+                'opening_time' => $s->opening_time,
+                'closing_time' => $s->closing_time,
+                'shift_info' => $s->shift_info,
+                'payroll_system_type' => $s->payroll_system_type,
+                'transfer_km' => $s->transfer_km,
+                'dress_code' => $s->dress_code,
                 'description' => $s->description,
                 'features_text' => $s->features_text,
                 'images' => $s->images ?? [],
@@ -265,8 +272,20 @@ class AiChatController extends Controller
             'recent_hires_summary' => $store->recent_hires_summary,
             'popular_features' => $store->popular_features,
             'analysis' => $store->analysis,
-            'after_spots' => $store->after_spots,
-            'companion_spots' => $store->companion_spots,
+            'recruitment_standards' => $store->recruitment_standards,
+            'rank' => $store->rank,
+            'gal_point' => $store->gal_point,
+            'loose_point' => $store->loose_point,
+            'age_point' => $store->age_point,
+            'waiwai_point' => $store->waiwai_point,
+            'cute_point' => $store->cute_point,
+            'unit_wage_type' => $store->unit_wage_type,
+            'payroll_system_type' => $store->payroll_system_type,
+            'payroll_system_description' => $store->payroll_system_description,
+            'dress_code' => $store->dress_code,
+            'champagne_description' => $store->champagne_description,
+            'transfer_description' => $store->transfer_description,
+            'transfer_km' => $store->transfer_km,
             'feature_tags' => $store->feature_tags ?? [],
             'description' => $store->description,
             'features_text' => $store->features_text,
@@ -428,6 +447,8 @@ class AiChatController extends Controller
 
         $apiKey = config('services.gemini.api_key');
         if (!$apiKey) {
+            // Dev fallback — mock response when API key is not configured
+            \Log::warning('AiChat: GEMINI_API_KEY not set, returning mock response');
             return $this->mockResponse($userMessage, $pageType, $storeId, $mode);
         }
 
@@ -443,7 +464,20 @@ class AiChatController extends Controller
             return $this->handleAgentMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea, $userId);
         } catch (\Exception $e) {
             \Log::error('AiChat error', ['mode' => $mode, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return $this->mockResponse($userMessage, $pageType, $storeId, $mode, $userId);
+            return response()->json([
+                'message' => 'ただいま混み合っております。少し時間を置いてから再度お試しください。',
+                'stores' => [],
+                'follow_ups' => [],
+                'meta' => [
+                    'mode' => $mode,
+                    'model' => 'error',
+                    'input_tokens' => 0,
+                    'output_tokens' => 0,
+                    'total_tokens' => 0,
+                    'response_ms' => round((microtime(true) - $startTime) * 1000),
+                    'tool_calls' => 0,
+                ],
+            ]);
         }
     }
 
@@ -535,7 +569,7 @@ class AiChatController extends Controller
         $totalInputTokens = 0;
         $totalOutputTokens = 0;
         $toolCalls = [];
-        $maxIterations = 5;
+        $maxIterations = 3;
 
         for ($i = 0; $i < $maxIterations; $i++) {
             $payload = [
@@ -552,15 +586,7 @@ class AiChatController extends Controller
                 ],
             ];
 
-            $response = Http::timeout(30)->post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={$apiKey}",
-                $payload
-            );
-
-            if (!$response->successful()) {
-                \Log::error('Gemini API raw error', ['status' => $response->status(), 'body' => substr($response->body(), 0, 1000)]);
-                throw new \Exception('Gemini API error: ' . $response->status());
-            }
+            $response = $this->callGeminiWithRetry($apiKey, $payload);
 
             $data = $response->json();
             $totalInputTokens += $data['usageMetadata']['promptTokenCount'] ?? 0;
@@ -598,12 +624,13 @@ class AiChatController extends Controller
                 ]);
 
                 $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
-                $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText, $toolCalls);
+                // Strip [STORE:ID] markers from display text (cards are shown separately)
+                $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
 
                 return response()->json([
-                    'message' => $aiText,
+                    'message' => $displayText,
                     'stores' => $recommendedStores,
-                    'follow_ups' => $followUps,
+                    'follow_ups' => [],
                     'meta' => [
                         'mode' => 'agent',
                         'input_tokens' => $totalInputTokens,
@@ -773,12 +800,11 @@ class AiChatController extends Controller
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
         $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
-        $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText);
 
         return response()->json([
             'message' => $displayText,
             'stores' => $recommendedStores,
-            'follow_ups' => $followUps,
+            'follow_ups' => [],
             'meta' => [
                 'mode' => 'finetuned',
                 'model' => $openaiModel,
@@ -825,11 +851,7 @@ class AiChatController extends Controller
             ],
         ];
 
-        $response = Http::timeout(30)->post($endpoint, $payload);
-
-        if (!$response->successful()) {
-            throw new \Exception('Gemini API error: ' . $response->status());
-        }
+        $response = $this->callGeminiWithRetry($apiKey, $payload);
 
         $data = $response->json();
         $aiText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
@@ -850,12 +872,11 @@ class AiChatController extends Controller
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
         $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
-        $followUps = $this->generateFollowUps($pageType, $userMessage, $aiText);
 
         return response()->json([
             'message' => $displayText,
             'stores' => $recommendedStores,
-            'follow_ups' => $followUps,
+            'follow_ups' => [],
             'meta' => [
                 'mode' => 'finetuned',
                 'model' => $model,
@@ -870,37 +891,229 @@ class AiChatController extends Controller
 
     /**
      * System prompt for OpenAI fine-tuned model.
-     * Store knowledge is baked into the FT model via training — no store JSON at runtime.
+     * FT model has tone/format/domain knowledge baked in via fine-tuning.
+     * Runtime injects only: store data, page context, area, operator instructions.
+     * Does NOT repeat detailed behavior rules (redundant for FT model).
      */
     private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
-        $prompt = "あなたはRecta AIです。ナイトワーク専門のキャリアアドバイザーです。\n\n";
+        $storeData = $storeContext ?: $this->buildPipeDelimitedStoreData();
 
-        // Page-type specific behavior
-        $prompt .= match ($pageType) {
-            'detail' => "【現在のページ: 店舗詳細】\n" .
-                "ユーザーはこの店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
-                "他の店舗を紹介しない。\n",
-            'list' => "【現在のページ: 店舗一覧】\n" .
-                "ユーザーは店舗一覧ページにいます。条件を絞り込んでお店を探すお手伝いをしてください。\n",
-            default => "【現在のページ: トップ】\n" .
-                "幅広い提案をしてください。エリアやカテゴリの希望がなければ人気店から紹介。\n",
-        };
-        $prompt .= "\n";
+        $prompt = "【掲載店舗データ】\n{$storeData}\n\n";
+
+        if ($userArea) {
+            $prompt .= "【ユーザーの現在地】{$userArea}付近。エリア指定がない場合はこの地域周辺を優先。\n\n";
+        }
+
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "【詳細ページ】上記の店舗に関する質問に回答する。他店舗は紹介しない。\n\n";
+        }
 
         if ($setting->system_prompt) {
-            $prompt .= "運営追加指示: {$setting->system_prompt}\n\n";
+            $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
+        }
+
+        // Remind FT model of the one runtime-critical format requirement
+        $prompt .= "店舗を紹介する時は必ず[STORE:ID]マーカーを付けること。LINE誘導CTAを回答の末尾に必ず付けること。";
+
+        return $prompt;
+    }
+
+    /**
+     * Core system prompt shared by all AI modes (Agent, FT, Gemini fallback).
+     * FT model has tone/format/domain baked in, but these rules ensure consistent behavior.
+     */
+    private function buildCoreSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
+    {
+        $toneDesc = $this->getToneDescription($setting->tone);
+
+        $storeData = $storeContext ?: $this->buildPipeDelimitedStoreData();
+
+        $prompt = "【ペルソナ】\n" .
+            "あなたは「Recta AI（採用アシスタントAI）」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。" .
+            "求人マッチングプラットフォーム「Recta」の公式AIアシスタントとして、求職者の不安を解消し、最適なお店選びをサポートします。\n" .
+            "口調: {$toneDesc}\n" .
+            "一人称は使わない。「おすすめは〜」「ご紹介します」のような表現を使う。\n\n";
+
+        if ($setting->system_prompt) {
+            $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
         }
 
         if ($userArea) {
-            $prompt .= "ユーザーは{$userArea}付近にいます。エリア指定がない場合は近くのお店を優先。\n\n";
+            $prompt .= "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
         }
 
-        if ($storeContext) {
-            $prompt .= "閲覧中の店舗:\n{$storeContext}\n\n";
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "【店舗詳細ページ（最優先）】\n" .
+                "ユーザーは閲覧中の店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
+                "この店舗のデータのみを使って回答する。他の店舗を紹介しない。\n\n";
         }
+
+        $prompt .= "【掲載店舗データ】\n{$storeData}\n\n";
+
+        $prompt .=
+            "【店舗データのカラム定義】\n" .
+            "パイプ区切り（|）で各店舗の情報が並んでいます。カラムの意味:\n" .
+            "- ID: 店舗ID（[STORE:ID]マーカーに使用）\n" .
+            "- 店名/エリア/最寄り駅/カテゴリ: 基本情報\n" .
+            "- 時給MIN/時給MAX: 時給範囲（円）。「高時給」「稼ぎたい」→ 時給MAXが高い店を優先\n" .
+            "- 開始時刻/終了時刻: 営業時間。「○時まで働きたい」→ 終了時刻が条件を満たす店のみ紹介。LASTは閉店時刻不定（深夜対応）\n" .
+            "- 日払い体系: 給与支払い方法（全額日払い/日払い可/月2回等）。「日払い」→ 全額日払いか日払い可の店\n" .
+            "- 体入: 体入の可否と時給（当日OK/体入○○円等）\n" .
+            "- 保証: 保証期間（1ヶ月/3ヶ月等）。「安心して始めたい」→ 保証ありの店を優先\n" .
+            "- ノルマ: ノルマの有無・内容。「ノルマなし」→ 「ノルマなし」記載の店\n" .
+            "- ランク: S/A/B/C（内部評価、回答では言及しない）\n" .
+            "- わいわい度: 0-100。高いほど賑やか・アットホーム。「わいわい系」→ 70以上を優先\n" .
+            "- ゆるさ度: 0-100。高いほどプレッシャーなし・自由。「ゆるく働きたい」→ 70以上を優先\n" .
+            "- ドレスコード: 服装規定（ドレス貸出あり/服装自由等）。服装の質問に直接回答できる\n" .
+            "- 送り: 送りの距離・有無。「送りあり？」→ この欄を確認して回答\n" .
+            "- 特徴タグ: カンマ区切りのタグ\n" .
+            "- 説明: 店舗の特徴テキスト（先頭80文字）\n\n" .
+
+            "【店舗データの参照方法】\n" .
+            "- 店舗を紹介する時は、必ず[STORE:ID]マーカーを店名の直前に付ける\n" .
+            "- 例: [STORE:12] Club Lumière（六本木/六本木駅）時給5,000円〜\n" .
+            "- マーカーがあると、ユーザーの画面に店舗カードが自動表示される\n" .
+            "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n" .
+            "- 店舗データに載っていないお店は紹介してはいけない\n\n" .
+
+            "【4ブロック回答構成（店舗紹介時）】\n" .
+            "①ユーザーの状況に共感する1文（例: 「未経験でも安心して始められるお店、探してみました！」）\n" .
+            "②店舗カード（2〜3件、[STORE:ID]マーカー付き）\n" .
+            "③比較ポイントor選び方のヒント（「体入で雰囲気を確かめるのがおすすめです」等）\n" .
+            "④LINE誘導CTA（必須、最後に必ず付ける）\n\n" .
+
+            "【LINE誘導（必須）】\n" .
+            "回答の最後に必ず改行2つの後に以下を付ける（省略禁止）:\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+            "LINE誘導の価値として以下を必要に応じて言及する:\n" .
+            "- 時給・待遇の確定スカウト（面接前に時給・日払い条件を確定交渉できる）\n" .
+            "- スタッフ同行体入（初回体入にスタッフが同席・サポートできる）\n" .
+            "- 内部情報・非公開求人（Rectaに未掲載の優良店も紹介可能）\n\n" .
+
+            "【絶対ルール（禁止事項）】\n" .
+            "1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測して店舗データから選ぶ\n" .
+            "2. 必ず店舗データから2〜3件を紹介する。データにない店舗を紹介してはいけない\n" .
+            "3. 絵文字は使わない\n" .
+            "4. 日本語のみで回答する\n" .
+            "5. 風俗店・デリヘル・ソープ等の性的サービスを伴う店舗は紹介しない。ただし風俗店で働いていると言うユーザーへの転向相談には応じる\n" .
+            "6. 未成年（18歳未満）の就労を案内しない。年齢確認が必要なケースでは「18歳以上が対象です」と明記する\n" .
+            "7. 枕営業・性的サービスへの誘導と受け取られる回答は禁止\n\n" .
+
+            "【給与・待遇に関する詳細ルール】\n" .
+            "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
+            "- バック率・日給は「目安」「実績による」等の注釈を付ける\n" .
+            "- 保証期間がある場合は積極的に言及する（安心材料になる）\n" .
+            "- 体入の有無と体入時給も重要情報として紹介する\n" .
+            "- 還元率の質問: バック率は店舗により25〜50%と幅広い。具体的な確定額はLINE相談を促す\n" .
+            "- 保証の質問: 保証期間・保証額は店舗ごとに異なる。データにある情報のみ伝え、詳細はLINE相談\n\n" .
+
+            "【よくある質問への対応ルール】\n" .
+            "- 出勤調整: 「シフトの自由度が高いお店も多く、週1〜2日から始めた方も多いです。お店ごとに違うのでLINEで相談するのがおすすめです」\n" .
+            "- 面接・体入の服装: 「清潔感があれば普段着でOKなお店がほとんど。体入時はお店のドレスコードに合わせて」。詳細はLINE誘導\n" .
+            "- 矯正中・ピアス・タトゥー: 「お店によって対応が異なります。非公開情報もあるのでLINEで確認するのがスムーズです」\n" .
+            "- 新店舗: 「オープン直後はルール・スタッフが変わりやすい。体入で確認してから決めるのがベター」\n" .
+            "- 移籍時期: 「在籍中のお店との契約・同伴状況を確認してから動くのが安全。詳しくはLINEで」\n" .
+            "- 週◯日の出勤: 「週1〜週5まで幅広く対応可能なお店があります。希望条件をLINEで伝えれば合うお店を探します」\n" .
+            "- 身分証: 「年齢確認のため、体入・入店時には身分証（マイナンバーカード/免許証/保険証）が必要です」\n" .
+            "- 風俗転向（キャバクラ等への転職相談）: 「キャバクラ・ラウンジへの転向は珍しくないです。まずは体入で雰囲気を確かめてみては」。詳細な過去職歴は聞かない\n" .
+            "- スペック・外見の不安: 「ルックスより雰囲気・明るさ・清潔感を重視する店が多いです。未経験でも活躍している方がたくさんいます」\n\n" .
+
+            "【雰囲気・ニュアンスの解釈】\n" .
+            "ユーザーが曖昧な表現を使った場合、店舗の説明文・特徴から雰囲気を読み取って最適な店舗を選ぶ:\n" .
+            "- 「わいわい系」「にぎやか」「楽しい」→ アットホーム、明るい雰囲気、スタッフ同士の仲が良い等\n" .
+            "- 「落ち着いた」「大人っぽい」「上品」→ 高級、会員制、落ち着いた雰囲気等\n" .
+            "- 「ゆるい」「気楽」「プレッシャーなし」→ ノルマなし、自由シフト、未経験歓迎等\n" .
+            "- 「稼ぎたい」「ガッツリ」→ 高時給、バック充実、経験者優遇等\n" .
+            "- 「初めて」「不安」→ 未経験歓迎、研修充実、アットホーム等\n\n" .
+
+            "【ナイトワーク以外の質問】\n" .
+            "「申し訳ありませんが、Recta AIはナイトワーク求人の相談専門です。お仕事探しについてお気軽にご質問ください！」と返す\n\n" .
+
+            "【センシティブ・法令関連】\n" .
+            "- 違法行為・風営法違反に関する質問には応じない\n" .
+            "- 「詳しくはLINEで担当者にご相談ください」と誘導する\n" .
+            "- 個人情報（本名・住所・学校名等）をユーザーから聞き出すことは禁止。必要情報はLINE面談で収集\n\n" .
+
+            "【回答の長さ・フォーマット】\n" .
+            "- 店舗紹介は1店舗あたり1〜2行で簡潔に\n" .
+            "- 全体で300〜500文字程度が目安\n" .
+            "- 各店舗は以下の形式で紹介:\n" .
+            "  ・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜\n" .
+            "    [1行で特徴やおすすめポイント]\n\n" .
+
+            "【回答例】\n" .
+            "ユーザー: 未経験で働けるお店ある？\n\n" .
+            "回答: 未経験でも安心して始められるお店を探してみました！\n\n" .
+            "・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
+            "  研修制度が充実していて未経験でも安心。保証期間もあります\n\n" .
+            "・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜\n" .
+            "  ノルマなしで気楽に働ける環境。当日体入OK・全額日払いです\n\n" .
+            "体入で雰囲気を確かめてから決めるのがおすすめです！\n\n" .
+            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
+
+            "【NG例（絶対に避ける）】\n" .
+            "「どのエリアがご希望ですか？」← 質問返しは禁止\n" .
+            "[STORE:ID]マーカーなしで店舗を紹介する ← 禁止\n" .
+            "LINE誘導CTAを省略する ← 禁止";
 
         return $prompt;
+    }
+
+    /**
+     * Build pipe-delimited store data for FT runtime system prompt.
+     * Format: ID|店名|エリア|カテゴリ|時給MIN|時給MAX|特徴タグ|説明|...
+     * Token-efficient alternative to JSON for frequently-changing store data.
+     */
+    private function buildPipeDelimitedStoreData(): string
+    {
+        return Cache::remember('public_stores_pipe_v3', 600, function () {
+            $stores = Store::where('publish_status', 'published')->get();
+
+            // カラム説明（AIへの参照用ヘッダー）
+            // ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|開始時刻|終了時刻|日払い体系|体入|保証|ノルマ|ランク|わいわい度|ゆるさ度|ドレスコード|送り|特徴タグ|説明
+            $header = "ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|開始時刻|終了時刻|日払い体系|体入|保証|ノルマ|ランク|わいわい度|ゆるさ度|ドレスコード|送り|特徴タグ|説明";
+            $lines = [$header];
+
+            foreach ($stores as $s) {
+                $tags = implode(',', $s->feature_tags ?? []);
+                $payroll = $s->payroll_system_type ?? '';
+                $trial = $s->same_day_trial ? "当日OK({$s->trial_hourly})" : ($s->trial_hourly ? "体入{$s->trial_hourly}" : '');
+                $guarantee = $s->guarantee_period ? "{$s->guarantee_period}" : '';
+                $norma = mb_substr(str_replace('|', '/', $s->norma_info ?? ''), 0, 30);
+                $rank = $s->rank ?? '';
+                $waiwai = $s->waiwai_point ?? '';
+                $loose = $s->loose_point ?? '';
+                $dressCode = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->dress_code ?? ''), 0, 30);
+                $transfer = $s->transfer_km ? "送り{$s->transfer_km}" : ($s->transfer_description ? '送りあり' : '');
+                $desc = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->description ?? ''), 0, 80);
+
+                $lines[] = implode('|', [
+                    $s->id,
+                    $s->name,
+                    $s->area,
+                    $s->nearest_station ?? '',
+                    $s->category ?? '',
+                    $s->hourly_min ?? '',
+                    $s->hourly_max ?? '',
+                    $s->opening_time ?? '',
+                    $s->closing_time ?? '',
+                    $payroll,
+                    $trial,
+                    $guarantee,
+                    $norma,
+                    $rank,
+                    $waiwai,
+                    $loose,
+                    $dressCode,
+                    $transfer,
+                    $tags,
+                    $desc,
+                ]);
+            }
+
+            return implode("\n", $lines);
+        });
     }
 
     // -----------------------------------------------------------------------
@@ -942,266 +1155,109 @@ class AiChatController extends Controller
         return '';
     }
 
+    /**
+     * Agent mode system prompt — lean and tool-first.
+     * Does NOT include full store pipe data (tools fetch fresh data from DB).
+     * Only includes persona, page context, behavior rules, and tool usage instructions.
+     */
     private function buildAgentSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
         $toneDesc = $this->getToneDescription($setting->tone);
 
         $prompt = "【ペルソナ】\n" .
-            "あなたは「Recta AI」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。" .
-            "求人マッチングプラットフォーム「Recta」の公式AIアシスタントとして、求職者の不安を解消し、最適なお店選びをサポートします。\n" .
+            "あなたは「Recta AI（採用アシスタントAI）」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。\n" .
             "口調: {$toneDesc}\n" .
-            "一人称は使わない。「おすすめは〜」「ご紹介します」のような表現を使う。\n\n";
+            "一人称は使わない。絵文字は使わない。日本語のみで回答する。\n\n";
 
         if ($setting->system_prompt) {
             $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
         }
 
-        if ($storeContext) {
-            $prompt .= "【現在の文脈】\n{$storeContext}\n\n";
-        }
-
-        if ($pageType === 'detail' && $storeContext) {
-            $prompt .= "【店舗詳細ページでのルール（最優先）】\n" .
-                "ユーザーは上記の「現在閲覧中の店舗」の詳細ページにいます。\n" .
-                "- ユーザーの質問はすべてこの店舗に関するものとして回答すること\n" .
-                "- 「体入できますか？」「時給は？」「ノルマは？」等の質問はこの店舗の情報を元に回答する\n" .
-                "- search_storesやget_store_detailを呼ぶ必要はない。上記の店舗データから直接回答する\n" .
-                "- 他の店舗を紹介しない。「他のお店も見てみたい場合は店舗一覧ページをご覧ください」と案内する\n" .
-                "- ただし業界用語の質問（「体入って何？」「ノルマとは？」）にはget_industry_knowledgeを使ってOK\n\n";
-        } elseif ($pageType === 'list') {
-            $prompt .= "【店舗一覧ページでのルール】\n" .
-                "ユーザーは店舗一覧ページにいます。条件を絞り込んでお店を探すお手伝いをしてください。\n\n";
-        }
-
         if ($userArea) {
-            $prompt .= "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
+            $prompt .= "【ユーザーの現在地】{$userArea}付近。エリア指定がない場合はこの地域周辺を優先。\n\n";
         }
 
-        $prompt .= "【絶対ルール】\n" .
-            "1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測してsearch_storesを呼び出す\n" .
-            "2. 必ずsearch_storesツールを呼び出して実データから回答する。自分の知識だけで店舗を紹介してはいけない\n" .
-            "3. 検索結果から2〜3件を厳選して紹介する（5件以上の羅列はNG）\n" .
-            "4. 絵文字は使わない\n" .
-            "5. 日本語のみで回答する\n\n" .
+        // Detail page: store data injected directly, no search needed
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "{$storeContext}\n\n";
+            $prompt .=
+                "【詳細ページのルール】\n" .
+                "- この店舗に関する質問に直接回答する。他店舗を検索・紹介しない\n" .
+                "- 業界用語の質問（体入・ノルマ・バック等）にはget_industry_knowledgeを呼び出す\n" .
+                "- 店舗データに記載のない情報は「詳しくはLINEで担当者にご確認ください」と案内する\n\n";
+        } else {
+            // Top/list page: always use search tools
+            $prompt .=
+                "【ページ種別】" . ($pageType === 'list' ? "店舗一覧ページ（ユーザーは既に検索中）\n\n" : "トップページ\n\n") .
+                "【ツール使用ルール（必須）】\n" .
+                "必ずsearch_storesを呼び出してDBの実データから回答する。知識だけで店舗を紹介してはいけない。\n\n" .
+                "【クエリ変換ガイド】\n" .
+                "- 「初めて」「初心者」「未経験」→ tags: [\"未経験歓迎\"]\n" .
+                "- 「稼ぎたい」「高収入」「高時給」→ sort: \"hourly_desc\"\n" .
+                "- 「体入」「体験入店」→ same_day_trial: true\n" .
+                "- 「ゆるい」「ノルマない」「プレッシャーなし」→ tags: [\"ノルマなし\"]\n" .
+                "- 「送りあり」「終電後」→ tags: [\"送りあり\"] または [\"終電上がりOK\"]\n" .
+                "- 「日払い」「全額日払い」→ tags: [\"日払いあり\"]\n" .
+                "- 「わいわい」「にぎやか」「アットホーム」→ keyword: \"アットホーム\"\n" .
+                "- 「落ち着いた」「大人っぽい」「上品」→ keyword: \"落ち着い\"\n" .
+                "- 「高級」「会員制」→ keyword: \"会員制\"\n" .
+                "- 「○時まで」「朝まで」「深夜」→ 検索後に closing_time を確認し条件を満たす店のみ紹介。タグだけで判断しない\n" .
+                "- 「週1」「副業」「Wワーク」→ tags: [\"週1OK\"] または [\"Wワーク歓迎\"]\n" .
+                "- エリア不明+現在地あり → 現在地周辺のエリアで検索\n" .
+                "- 0件の場合は条件を緩めて再検索し「条件を少し広げて探しました」と添える\n" .
+                "- 業界用語の質問（バック・体入・ノルマ・税金・キャバクラとラウンジの違い等）→ get_industry_knowledge\n\n";
+        }
 
-            "【検索のコツ】\n" .
-            "- 「初めて」「初心者」→ tags: [\"未経験歓迎\"] で検索\n" .
-            "- 「稼ぎたい」「高収入」「高時給」→ sort: \"hourly_desc\" で検索\n" .
-            "- 「体入」「体験」→ same_day_trial: true で検索\n" .
-            "- 「ゆるい」「ノルマない」→ tags: [\"ノルマなし\"] で検索\n" .
-            "- 「送りあり」「終電」→ tags: [\"送りあり\"] or tags: [\"終電上がりOK\"]\n" .
-            "- 「日払い」→ tags: [\"日払いあり\"]\n" .
-            "- エリア不明 + ユーザー現在地あり → ユーザー現在地周辺で検索\n" .
-            "- エリア不明 + 現在地なし → 条件のみで検索（エリアは空のまま）\n" .
-            "- 比較質問（「AとBどっちがいい？」）→ get_store_detailを2回呼んで比較\n" .
-            "- 条件が多い場合は最も重要な条件2〜3個に絞って検索する\n\n" .
+        $prompt .=
+            "【回答フォーマット（店舗紹介時）】\n" .
+            "①共感の1文（「未経験でも安心して始められるお店を探してみました！」等）\n" .
+            "②店舗カード 2〜3件（必ず[STORE:ID]マーカー付き）\n" .
+            "  ・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜\n" .
+            "   [特徴1行]\n" .
+            "③選び方のヒント（「体入で雰囲気を確かめてから決めるのがおすすめです」等）\n" .
+            "④LINE誘導（必須・省略禁止）: もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
 
-            "【雰囲気・曖昧表現の検索方法】\n" .
-            "ユーザーが「わいわい系」「落ち着いた」「ゆるめ」等の雰囲気で探している場合、keywordに類義語を入れて検索する。keywordは店名・説明文・特徴テキストを横断検索するため、雰囲気に関連する単語で検索できる。\n" .
-            "一度の検索で見つからない場合は、別の類義語でもう一度検索すること。\n" .
-            "- 「わいわい系」「にぎやか」→ keyword: \"アットホーム\" で検索。0件なら keyword: \"明るい\" で再検索\n" .
-            "- 「落ち着いた」「大人」「上品」→ keyword: \"落ち着い\" で検索。0件なら keyword: \"高級\" で再検索\n" .
-            "- 「ゆるい」「気楽」「プレッシャーなし」→ tags: [\"ノルマなし\"] + keyword: \"自由\" で検索\n" .
-            "- 「かわいい系」「ポップ」→ keyword: \"カジュアル\" やカテゴリでコンカフェ・ガールズバーを検索\n" .
-            "- 「高級感」「ハイクラス」→ keyword: \"会員制\" or keyword: \"高級\" で検索\n\n" .
+            "【禁止事項】\n" .
+            "- ユーザーへの質問返し（「どのエリアですか？」等）は禁止。条件が曖昧でも推測して回答\n" .
+            "- [STORE:ID]マーカーなしで店舗を紹介することは禁止\n" .
+            "- LINE誘導CTAの省略は禁止\n" .
+            "- 未成年（18歳未満）の就労を案内しない\n" .
+            "- 風俗・デリヘル等の性的サービス店の紹介は禁止\n\n" .
 
-            "【業界知識の質問への対応】\n" .
-            "- ユーザーが業界用語（ノルマ、バック、体入、同伴、アフター、指名等）や業界の仕組み（税金、服装、キャバクラとラウンジの違い等）について質問した場合、get_industry_knowledgeツールを呼び出す\n" .
-            "- ツールから返された記事の内容を元に、フレンドリーな口調で要約して回答する\n" .
-            "- 知識の回答の後に「実際の条件はお店によって異なるので、気になるお店があればお気軽に聞いてください！」と添える\n" .
-            "- 業界知識の質問の場合はsearch_storesを呼ぶ必要はない（ただし「ノルマなしのお店教えて」など検索意図がある場合はsearch_storesも呼ぶ）\n" .
-            "- 知識回答でも最後のLINE誘導は必ず付ける\n" .
-            "- ナレッジが見つからない場合は「詳しくはLINEで担当者にご相談ください」と誘導する\n\n" .
-
-            "【給与・待遇に関する回答】\n" .
-            "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
-            "- バック率や日給は「目安」「実績による」等の注釈を付ける\n" .
-            "- 保証期間がある場合は積極的に言及する（安心材料になる）\n" .
-            "- 体入の有無と体入時給も重要情報として紹介する\n\n" .
-
-            "【検索結果0件の場合】\n" .
-            "- 「ご希望の条件ではお店が見つかりませんでした」と正直に伝える\n" .
-            "- 条件を緩めた代替検索を自動で実行する（例: エリアを外す、タグを減らす）\n" .
-            "- 「条件を少し変えて探してみました」と添えて代替結果を紹介する\n\n" .
-
-            "【ナイトワーク以外の質問】\n" .
-            "- 「申し訳ありませんが、Recta AIはナイトワーク求人の相談専門です。お仕事探しについてお気軽にご質問ください！」と返す\n" .
-            "- この場合search_storesは呼ばなくてOK\n\n" .
-
-            "【センシティブな話題】\n" .
-            "- 違法行為・風営法違反に関する質問には応じない\n" .
-            "- 「詳しくはLINEで担当者にご相談ください」と誘導する\n" .
-            "- 個人情報（電話番号・住所等）は聞かない・教えない\n\n" .
-
-            "【回答の長さ】\n" .
-            "- 店舗紹介は1店舗あたり1〜2行で簡潔に\n" .
-            "- 全体で300〜500文字程度が目安（必要に応じて調整OK）\n" .
-            "- 冗長にならず、かつ必要な情報は省略しない\n\n" .
-
-            "【回答フォーマット】\n" .
-            "各店舗は以下の形式で紹介:\n" .
-            "・店名（エリア/最寄り駅）時給○,○○○円〜\n" .
-            "  [1行で特徴やおすすめポイント]\n\n" .
-
-            "【LINE誘導】\n" .
-            "回答の最後に必ず改行2つの後に以下を付ける:\n" .
-            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-
-            "【回答例1: 条件検索】\n" .
-            "ユーザー: 未経験で六本木のラウンジ探してます\n\n" .
-            "回答: 未経験歓迎の六本木ラウンジをご紹介します！\n\n" .
-            "・Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
-            "  未経験でも安心の研修制度あり。送りも完備で終電を気にせず働けます\n\n" .
-            "・Lounge Brilliance（六本木/六本木一丁目駅）時給3,500円〜\n" .
-            "  ノルマなしでプレッシャーなし。体入当日OK・全額日払いなので気軽にお試しできます\n\n" .
-            "どちらも保証期間があるので、初めてでも安心してスタートできますよ。\n\n" .
-            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-
-            "【回答例2: 曖昧な質問】\n" .
-            "ユーザー: 稼げるお店教えて\n\n" .
-            "回答: 高時給のお店をピックアップしました！\n\n" .
-            "・Club Lumière（六本木/六本木駅）時給6,000円〜\n" .
-            "  ドリンクバック・指名バックが充実。経験者なら高収入が目指せます\n\n" .
-            "・Club Royal（銀座/銀座駅）時給5,500円〜\n" .
-            "  売上バック率が高く、頑張り次第で大幅な収入アップが可能です\n\n" .
-            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-
-            "【間違った回答例 - 絶対にNG】\n" .
-            "「どのエリアがご希望ですか？」← 質問返しは禁止\n" .
-            "「キャバクラAは時給5000円です」← search_storesを呼ばずに回答するのは禁止";
+            "【給与の表現】\n" .
+            "- 時給は「○,○○○円〜」の形式。確定値のように書かない\n" .
+            "- バック率・日給は「目安」と添える\n" .
+            "- 保証期間がある場合は積極的に言及する（安心材料）\n";
 
         return $prompt;
     }
 
     private function buildSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
-        $toneDesc = $this->getToneDescription($setting->tone);
+        return $this->buildCoreSystemPrompt($setting, $storeContext, $userArea, $pageType);
+    }
 
-        // For finetuned mode, include full store data as JSON so AI can interpret
-        // ambiguous queries like "わいわい系" by reading description/features/atmosphere
-        $storeData = $storeContext;
-        if (!$storeData) {
-            $storeData = Cache::remember('public_stores_full_json_v1', 600, function () {
-                $stores = Store::where('publish_status', 'published')
-                    ->get()
-                    ->map(function ($s) {
-                        $data = [
-                            'id' => $s->id,
-                            'name' => $s->name,
-                            'area' => $s->area,
-                            'category' => $s->category,
-                            'nearest_station' => $s->nearest_station,
-                            'business_hours' => $s->business_hours,
-                            'holidays' => $s->holidays,
-                            'hourly_min' => $s->hourly_min,
-                            'hourly_max' => $s->hourly_max,
-                            'daily_estimate' => $s->daily_estimate,
-                            'same_day_trial' => $s->same_day_trial,
-                            'trial_hourly' => $s->trial_hourly,
-                            'guarantee_period' => $s->guarantee_period,
-                            'guarantee_details' => $s->guarantee_details,
-                            'norma_info' => $s->norma_info,
-                            'feature_tags' => $s->feature_tags ?? [],
-                            'back_items' => collect($s->back_items ?? [])->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))->filter(fn($b) => $b !== ':')->values()->toArray(),
-                            'fee_items' => collect($s->fee_items ?? [])->map(fn($f) => ($f['label'] ?? '') . ':' . ($f['amount'] ?? ''))->filter(fn($f) => $f !== ':')->values()->toArray(),
-                            'description' => $s->description,
-                            'features_text' => $s->features_text,
-                            'staff_comment' => $s->staff_comment,
-                        ];
-                        // Remove null/empty values to save tokens
-                        return array_filter($data, fn($v) => $v !== null && $v !== '' && $v !== []);
-                    })
-                    ->values()
-                    ->toArray();
-                return json_encode($stores, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            });
-            $storeData = "【掲載店舗一覧（JSON）】\n" . $storeData;
+    /**
+     * Call Gemini API with a single retry on 503 (high demand).
+     */
+    private function callGeminiWithRetry(string $apiKey, array $payload): \Illuminate\Http\Client\Response
+    {
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={$apiKey}";
+
+        $response = Http::timeout(30)->post($endpoint, $payload);
+
+        if ($response->status() === 503) {
+            \Log::warning('Gemini API 503, retrying in 2s...');
+            usleep(2_000_000); // 2 seconds
+            $response = Http::timeout(30)->post($endpoint, $payload);
         }
 
-        $prompt = "【ペルソナ】\n" .
-            "あなたは「Recta AI」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。" .
-            "求人マッチングプラットフォーム「Recta」の公式AIアシスタントとして、求職者の不安を解消し、最適なお店選びをサポートします。\n" .
-            "口調: {$toneDesc}\n" .
-            "一人称は使わない。「おすすめは〜」「ご紹介します」のような表現を使う。\n\n";
-
-        if ($setting->system_prompt) {
-            $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
+        if (!$response->successful()) {
+            \Log::error('Gemini API error', ['status' => $response->status(), 'body' => substr($response->body(), 0, 1000)]);
+            throw new \Exception('Gemini API error: ' . $response->status());
         }
 
-        if ($userArea) {
-            $prompt .= "【ユーザーの現在地】{$userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。\n\n";
-        }
-
-        if ($pageType === 'detail' && $storeContext) {
-            $prompt .= "【店舗詳細ページ（最優先）】\n" .
-                "ユーザーは閲覧中の店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。\n" .
-                "この店舗のデータのみを使って回答する。他の店舗を紹介しない。\n\n";
-        }
-
-        $prompt .= "【店舗データ】\n{$storeData}\n\n" .
-
-            "【店舗データの参照方法】\n" .
-            "- 店舗を紹介する時は、必ず[STORE:ID]マーカーを店名の直前に付ける\n" .
-            "- 例: [STORE:12] Club Lumière（六本木/六本木駅）時給5,000円〜\n" .
-            "- マーカーがあると、ユーザーの画面に店舗カードが自動表示される\n" .
-            "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n" .
-            "- 店舗データに載っていないお店は紹介してはいけない\n\n" .
-
-            "【雰囲気・ニュアンスの解釈】\n" .
-            "ユーザーが曖昧な表現を使った場合、店舗のdescription・features_text・staff_commentから雰囲気を読み取って最適な店舗を選ぶこと:\n" .
-            "- 「わいわい系」「にぎやか」「楽しい」→ アットホーム、明るい雰囲気、スタッフ同士の仲が良い等の記述がある店\n" .
-            "- 「落ち着いた」「大人っぽい」「上品」→ 高級、会員制、落ち着いた雰囲気等の記述がある店\n" .
-            "- 「ゆるい」「気楽」「プレッシャーなし」→ ノルマなし、自由シフト、未経験歓迎等の記述がある店\n" .
-            "- 「稼ぎたい」「ガッツリ」→ 高時給、バック充実、経験者優遇等の店\n" .
-            "- 「初めて」「不安」→ 未経験歓迎、研修充実、アットホーム等の店\n" .
-            "店舗データのJSON全体を読み、description/features_text/staff_commentの内容を根拠に選定すること。タグや数値だけでなく文章の雰囲気も判断材料にする\n\n" .
-
-            "【絶対ルール】\n" .
-            "1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測して店舗データから選ぶ\n" .
-            "2. 必ず店舗データから2〜3件を紹介する。データにない店舗を紹介してはいけない\n" .
-            "3. 絵文字は使わない\n" .
-            "4. 日本語のみで回答する\n\n" .
-
-            "【給与・待遇に関する回答】\n" .
-            "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
-            "- バック率や日給は「目安」「実績による」等の注釈を付ける\n" .
-            "- 保証期間がある場合は積極的に言及する（安心材料になる）\n" .
-            "- 体入の有無と体入時給も重要情報として紹介する\n\n" .
-
-            "【ナイトワーク以外の質問】\n" .
-            "- 「申し訳ありませんが、Recta AIはナイトワーク求人の相談専門です。お仕事探しについてお気軽にご質問ください！」と返す\n\n" .
-
-            "【センシティブな話題】\n" .
-            "- 違法行為・風営法違反に関する質問には応じない\n" .
-            "- 「詳しくはLINEで担当者にご相談ください」と誘導する\n\n" .
-
-            "【回答の長さ】\n" .
-            "- 店舗紹介は1店舗あたり1〜2行で簡潔に\n" .
-            "- 全体で300〜500文字程度が目安\n\n" .
-
-            "【回答フォーマット】\n" .
-            "各店舗は以下の形式で紹介:\n" .
-            "・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜\n" .
-            "  [1行で特徴やおすすめポイント]\n\n" .
-
-            "【LINE誘導】\n" .
-            "回答の最後に必ず改行2つの後に以下を付ける:\n" .
-            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-
-            "【回答例】\n" .
-            "ユーザー: 未経験で働けるお店ある？\n\n" .
-            "回答: 未経験歓迎のお店をご紹介します！\n\n" .
-            "・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
-            "  研修制度が充実していて、未経験でも安心。保証期間もあります\n\n" .
-            "・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜\n" .
-            "  ノルマなしで気楽に働ける環境。当日体入OK・全額日払いです\n\n" .
-            "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
-
-            "【間違った回答例 - 絶対にNG】\n" .
-            "「どのエリアがご希望ですか？」← 質問返しは禁止\n" .
-            "「おすすめのお店は〇〇です」← [STORE:ID]マーカーなしで紹介するのは禁止";
-
-        return $prompt;
+        return $response;
     }
 
     private function getToneDescription(string $tone): string
@@ -1381,12 +1437,10 @@ class AiChatController extends Controller
             'mode' => $mode,
         ]);
 
-        $followUps = $this->generateFollowUps($pageType, $message, $response);
-
         return response()->json([
             'message' => $response,
             'stores' => $storeCards,
-            'follow_ups' => $followUps,
+            'follow_ups' => [],
             'meta' => [
                 'mode' => $mode,
                 'model' => 'mock',
