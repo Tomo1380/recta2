@@ -14,7 +14,7 @@
 set -euo pipefail
 
 : "${RECTA2_DOMAIN:?RECTA2_DOMAIN is required (e.g. recta.isayama-dev.com)}"
-: "${RECTA2_EMAIL:?RECTA2_EMAIL is required for Let's Encrypt registration}"
+: "${RECTA2_EMAIL:?RECTA2_EMAIL is required for Letsencrypt registration}"
 
 APP_DIR="${RECTA2_APP_DIR:-/opt/recta2}"
 cd "$APP_DIR"
@@ -60,5 +60,4 @@ docker compose -f docker-compose.prod.yml exec -T laravel php artisan view:cache
 
 echo
 echo "Done. Visit https://$RECTA2_DOMAIN"
-echo "Set up cert auto-renewal with: sudo crontab -e"
-echo "  0 4 * * * cd $APP_DIR && docker run --rm -v \$(docker volume inspect -f '{{ .Mountpoint }}' recta2_certbot-webroot):/var/www/certbot -v /etc/letsencrypt:/etc/letsencrypt certbot/certbot:latest renew --quiet && docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload"
+echo "Set up cert auto-renewal by adding a cron entry — see docs/deploy-aws.md"
