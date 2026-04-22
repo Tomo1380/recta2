@@ -83,6 +83,10 @@ services:
     # Postgres reads POSTGRES_* from env_file directly — set those in .env.prod.
     env_file:
       - .env.prod
+    environment:
+      # Postgres 18 recommends keeping data in a subdirectory to allow
+      # pg_upgrade --link across image versions without mount point issues.
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - db-store:/var/lib/postgresql/data
     healthcheck:
