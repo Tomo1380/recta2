@@ -25,8 +25,10 @@ if [ ! -f .env.prod ]; then
 fi
 
 echo "=== Step 1/5: Bring up nginx with bootstrap config to serve ACME challenge ==="
-# Temporarily swap default.conf → bootstrap.conf so nginx can start without certs.
-cp docker/nginx-prod/default.conf docker/nginx-prod/default.conf.real
+# Swap default.conf → bootstrap.conf so nginx can start without certs.
+# Using cp (not a pre-move "real" rename) so this step is idempotent and
+# recoverable if an earlier run was interrupted: the source of truth for the
+# production config is git, not a sibling file on disk.
 cp docker/nginx-prod/bootstrap.conf docker/nginx-prod/default.conf
 
 docker compose -f docker-compose.prod.yml up -d --build nginx
@@ -46,7 +48,9 @@ docker run --rm \
     --agree-tos --no-eff-email --non-interactive
 
 echo "=== Step 3/5: Swap nginx to production config ==="
-mv docker/nginx-prod/default.conf.real docker/nginx-prod/default.conf
+# Restore the checked-in production config from git — this is safe to run
+# repeatedly and doesn't depend on a sibling file surviving across retries.
+git checkout -- docker/nginx-prod/default.conf
 docker compose -f docker-compose.prod.yml up -d --build nginx
 
 echo "=== Step 4/5: Start the rest of the stack ==="
@@ -58,6 +62,15 @@ docker compose -f docker-compose.prod.yml exec -T laravel php artisan config:cac
 docker compose -f docker-compose.prod.yml exec -T laravel php artisan route:cache
 docker compose -f docker-compose.prod.yml exec -T laravel php artisan view:cache
 
+echo "=== Install cert auto-renewal cron ==="
+# Idempotent: overwrites the file each run.
+CERTBOT_VOL=$(docker volume inspect -f '{{.Mountpoint}}' recta2_certbot-webroot)
+cat > /etc/cron.d/recta2-certbot <<CRON
+# Renew Let's Encrypt certs daily at 04:10 UTC; reload nginx on success.
+10 4 * * * root docker run --rm -v "$CERTBOT_VOL":/var/www/certbot -v /etc/letsencrypt:/etc/letsencrypt certbot/certbot:latest renew --quiet --deploy-hook "docker compose -f $APP_DIR/docker-compose.prod.yml exec -T nginx nginx -s reload" >> /var/log/recta2-certbot.log 2>&1
+CRON
+chmod 644 /etc/cron.d/recta2-certbot
+systemctl restart cron
+
 echo
 echo "Done. Visit https://$RECTA2_DOMAIN"
-echo "Set up cert auto-renewal by adding a cron entry — see docs/deploy-aws.md"
