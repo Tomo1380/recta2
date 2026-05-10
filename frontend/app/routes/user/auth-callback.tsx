@@ -20,9 +20,20 @@ export default function AuthCallbackPage() {
       return;
     }
 
+    // バックエンドから return_to が付与されていればそこへ。なければ
+    // sessionStorage の保存値、それも無ければ /mypage。
+    const returnFromQuery = searchParams.get("return_to");
+    const returnFromStorage = typeof window !== "undefined"
+      ? sessionStorage.getItem("recta:login-return-to")
+      : null;
+    if (typeof window !== "undefined") sessionStorage.removeItem("recta:login-return-to");
+
+    const candidate = returnFromQuery || returnFromStorage || "/mypage";
+    const target = candidate.startsWith("/") && !candidate.startsWith("//") ? candidate : "/mypage";
+
     login(token)
       .then(() => {
-        navigate("/mypage");
+        navigate(target);
       })
       .catch(() => {
         setError(true);

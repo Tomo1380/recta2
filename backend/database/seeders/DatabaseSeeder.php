@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             AreaCategorySeeder::class,
             ContentSeeder::class,
             LineFriendSeeder::class,
+            FineTuningQaSeeder::class,
         ]);
     }
 }

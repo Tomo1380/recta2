@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ContentController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FineTuningController;
+use App\Http\Controllers\Admin\FineTuningQaController;
 use App\Http\Controllers\Admin\IndustryKnowledgeController;
 use App\Http\Controllers\Admin\LineFriendController;
 use App\Http\Controllers\Admin\ReviewController;
@@ -140,6 +141,14 @@ Route::prefix('admin')->group(function () {
         Route::put('/ai-chat/fine-tuning/data', [FineTuningController::class, 'updateTrainingPair']);
         Route::delete('/ai-chat/fine-tuning/data/{index}', [FineTuningController::class, 'deleteTrainingPair']);
         Route::post('/ai-chat/fine-tuning/data', [FineTuningController::class, 'addTrainingPair']);
+
+        // Fine-tuning Q&A 管理（DB管理 — 修正フロー用）
+        Route::get('/fine-tuning/qa/export-jsonl', [FineTuningQaController::class, 'exportJsonl']);
+        Route::get('/fine-tuning/qa', [FineTuningQaController::class, 'index']);
+        Route::post('/fine-tuning/qa', [FineTuningQaController::class, 'store']);
+        Route::get('/fine-tuning/qa/{qa}', [FineTuningQaController::class, 'show']);
+        Route::put('/fine-tuning/qa/{qa}', [FineTuningQaController::class, 'update']);
+        Route::delete('/fine-tuning/qa/{qa}', [FineTuningQaController::class, 'destroy']);
 
         // コラム記事管理
         Route::apiResource('articles', ArticleController::class);

@@ -33,6 +33,7 @@ import {
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
+import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import { pushViewedStore } from "~/lib/viewed-stores";
 
@@ -2133,13 +2134,11 @@ function ReviewItem({ review }: { review: Review }) {
         {review.body}
       </p>
       {review.tweet_id && review.tweet_author_screen_name && (
-        <div className="pl-11">
-          <blockquote className="twitter-tweet" data-conversation="none">
-            <a href={`https://x.com/${review.tweet_author_screen_name}/status/${review.tweet_id}`}>
-              ツイートを表示
-            </a>
-          </blockquote>
-        </div>
+        <XPostEmbed
+          postId={review.tweet_id}
+          authorHandle={review.tweet_author_screen_name}
+          className="pl-11"
+        />
       )}
       <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
     </div>

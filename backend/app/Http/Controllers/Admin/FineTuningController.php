@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\FineTuningQa;
 use App\Models\Store;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,9 @@ class FineTuningController extends Controller
             fclose($fp);
         }
 
+        $qaActiveCount = FineTuningQa::where('status', FineTuningQa::STATUS_ACTIVE)->count();
+        $qaTotalCount = FineTuningQa::count();
+
         return response()->json([
             'openai_configured' => !empty($openaiKey),
             'current_model' => $currentModel,
@@ -43,6 +47,8 @@ class FineTuningController extends Controller
             'training_data_size' => $trainingDataSize,
             'training_pair_count' => $trainingPairCount,
             'store_count' => Store::where('publish_status', 'published')->count(),
+            'qa_active_count' => $qaActiveCount,
+            'qa_total_count' => $qaTotalCount,
         ]);
     }
 
@@ -88,7 +94,12 @@ class FineTuningController extends Controller
     }
 
     /**
-     * Upload training data to OpenAI and start fine-tuning job
+     * Upload training data to OpenAI and start fine-tuning job.
+     *
+     * NOTE: as of the QA-management refactor, the training payload is built
+     * in-memory from the active rows in `fine_tuning_qa` (managed via the
+     * admin UI), instead of reading a static training_data_openai.jsonl
+     * file on disk. The legacy file is still written for inspection.
      */
     public function startTraining(Request $request): JsonResponse
     {
@@ -101,21 +112,27 @@ class FineTuningController extends Controller
             ], 422);
         }
 
-        $filePath = storage_path('app/training_data_openai.jsonl');
-        if (!file_exists($filePath)) {
+        // Build the JSONL payload from the DB-managed Q&A (status=active).
+        $jsonl = $this->buildJsonlFromDb();
+        $pairCount = substr_count($jsonl, "\n");
+        if ($pairCount === 0) {
             return response()->json([
                 'success' => false,
-                'message' => '訓練データがありません。先にデータを生成してください。',
+                'message' => '有効なQ&Aが0件です。先に管理画面でQ&Aを登録してください。',
             ], 422);
         }
 
+        // Persist a snapshot for inspection / fallback.
+        $filePath = storage_path('app/training_data_openai.jsonl');
+        @file_put_contents($filePath, $jsonl);
+
         try {
-            // Step 1: Upload file to OpenAI
+            // Step 1: Upload file to OpenAI (in-memory)
             $uploadResponse = Http::withHeaders([
                 'Authorization' => "Bearer {$openaiKey}",
             ])->attach(
                 'file',
-                file_get_contents($filePath),
+                $jsonl,
                 'training_data_openai.jsonl'
             )->post('https://api.openai.com/v1/files', [
                 'purpose' => 'fine-tune',
@@ -405,6 +422,42 @@ class FineTuningController extends Controller
      * No store data — the FT model learns store knowledge from training pairs directly.
      * System prompt only controls tone, format, and page-type behavior.
      */
+    /**
+     * Public accessor for the training system prompt — used by
+     * FineTuningQaController::exportJsonl().
+     */
+    public function buildPublicTrainingSystemPrompt(): string
+    {
+        return $this->buildTrainingSystemPrompt();
+    }
+
+    /**
+     * Build the OpenAI ChatML JSONL payload from the DB-managed Q&A
+     * (rows where status=active). Returned as a single string.
+     */
+    private function buildJsonlFromDb(): string
+    {
+        $systemPrompt = $this->buildTrainingSystemPrompt();
+        $buffer = '';
+
+        FineTuningQa::query()
+            ->where('status', FineTuningQa::STATUS_ACTIVE)
+            ->orderBy('id')
+            ->chunkById(200, function ($rows) use (&$buffer, $systemPrompt) {
+                foreach ($rows as $row) {
+                    $buffer .= json_encode([
+                        'messages' => [
+                            ['role' => 'system', 'content' => $systemPrompt],
+                            ['role' => 'user', 'content' => $row->question],
+                            ['role' => 'assistant', 'content' => $row->answer],
+                        ],
+                    ], JSON_UNESCAPED_UNICODE) . "\n";
+                }
+            });
+
+        return $buffer;
+    }
+
     private function buildTrainingSystemPrompt(): string
     {
         $prompt = "あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。\n\n"

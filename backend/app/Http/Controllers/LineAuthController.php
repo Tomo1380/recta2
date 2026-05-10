@@ -24,6 +24,14 @@ class LineAuthController extends Controller
         $state = Str::random(40);
         $ip = $request->ip();
 
+        // Optional: caller can pass ?return_to=/some/path so we land them
+        // back where they were after the OAuth round-trip. Restricted to
+        // same-origin paths to prevent open-redirect abuse.
+        $returnTo = $request->query('return_to');
+        if (is_string($returnTo) && str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//')) {
+            Cache::put("line_oauth_return_to:{$state}", $returnTo, 300);
+        }
+
         Cache::put("line_oauth_state:{$ip}", $state, 300);
 
         $url = $this->lineLoginService->getAuthorizationUrl($state);
@@ -83,7 +91,12 @@ class LineAuthController extends Controller
             // Sanctumトークン発行
             $token = $user->createToken('line-auth')->plainTextToken;
 
-            return redirect(config('app.url') . "/auth/callback?token={$token}");
+            $returnTo = Cache::pull("line_oauth_return_to:{$cachedState}");
+            $returnQuery = (is_string($returnTo) && str_starts_with($returnTo, '/') && ! str_starts_with($returnTo, '//'))
+                ? '&return_to=' . rawurlencode($returnTo)
+                : '';
+
+            return redirect(config('app.url') . "/auth/callback?token={$token}{$returnQuery}");
         } catch (\Exception $e) {
             Log::error('LINE OAuth callback failed', [
                 'error' => $e->getMessage(),

@@ -27,7 +27,7 @@ class PublicReviewController extends Controller
                 $tweetId = $m[2];
             } else {
                 return response()->json([
-                    'message' => 'Xのツイート URL を正しく貼り付けてください',
+                    'message' => 'XのポストURLを正しく貼り付けてください',
                 ], 422);
             }
         }

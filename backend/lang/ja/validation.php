@@ -136,7 +136,7 @@ return [
         'body' => '口コミ本文',
         'email' => 'メールアドレス',
         'password' => 'パスワード',
-        'tweet_url' => 'XツイートURL',
+        'tweet_url' => 'XポストURL',
         'title' => 'タイトル',
         'slug' => 'スラッグ',
         'message' => 'メッセージ',

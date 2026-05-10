@@ -28,18 +28,29 @@ function LineIcon({ className }: { className?: string }) {
   );
 }
 
+// Sessionストレージのキー（auth-callback と共有）
+const RETURN_TO_KEY = "recta:login-return-to";
+
 export default function LoginPage() {
   const { isAuthenticated } = useUserAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/mypage");
+      const returnTo = sessionStorage.getItem(RETURN_TO_KEY);
+      sessionStorage.removeItem(RETURN_TO_KEY);
+      navigate(returnTo && returnTo.startsWith("/") ? returnTo : "/mypage");
     }
   }, [isAuthenticated, navigate]);
 
   const handleLineLogin = () => {
-    window.location.href = "/api/auth/line";
+    // 直前にいた画面（保護されたページから飛ばされた場合）に戻れるよう、
+    // sessionStorage に保存した path を OAuth round-trip でも持ち回す。
+    const returnTo = sessionStorage.getItem(RETURN_TO_KEY);
+    const url = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? `/api/auth/line?return_to=${encodeURIComponent(returnTo)}`
+      : "/api/auth/line";
+    window.location.href = url;
   };
 
   return (

@@ -94,6 +94,8 @@ export default function MyPage() {
   // Redirect if not authenticated
   useEffect(() => {
     if (hydrated && !authLoading && !isAuthenticated) {
+      // mypage 自体は認証必須なので、ログイン後は mypage に戻るのが自然。
+      sessionStorage.setItem("recta:login-return-to", "/mypage");
       navigate("/login");
     }
   }, [hydrated, authLoading, isAuthenticated, navigate]);

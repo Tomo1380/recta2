@@ -1,10 +1,17 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { Star, ArrowLeft, Loader2, Twitter } from "lucide-react";
+import { Star, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
+import XPostEmbed from "~/components/user/shared/XPostEmbed";
+
+const XLogo = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
 import {
   Card,
   CardContent,
@@ -43,28 +50,14 @@ export default function ReviewPage() {
   const tweetId = tweetIdMatch?.[2];
   const tweetAuthor = tweetIdMatch?.[1];
 
-  useEffect(() => {
-    if (!tweetId) return;
-    if (typeof window === "undefined") return;
-    const win = window as unknown as { twttr?: { widgets?: { load: (el?: HTMLElement) => void } } };
-    if (win.twttr?.widgets) {
-      win.twttr.widgets.load();
-      return;
-    }
-    if (document.getElementById("twitter-wjs")) return;
-    const s = document.createElement("script");
-    s.id = "twitter-wjs";
-    s.src = "https://platform.twitter.com/widgets.js";
-    s.async = true;
-    document.body.appendChild(s);
-  }, [tweetId]);
-
   // Redirect if not authenticated
   useEffect(() => {
     if (hydrated && !authLoading && !isAuthenticated) {
+      // ログイン後にこの口コミ投稿フォームへ自動で戻れるよう、return-to を保存。
+      sessionStorage.setItem("recta:login-return-to", `/stores/${storeId}/review`);
       navigate(`/login`);
     }
-  }, [hydrated, authLoading, isAuthenticated, navigate]);
+  }, [hydrated, authLoading, isAuthenticated, navigate, storeId]);
 
   // Fetch store info
   useEffect(() => {
@@ -92,7 +85,7 @@ export default function ReviewPage() {
       return;
     }
     if (tweetUrl && !tweetIdMatch) {
-      setError("X(旧Twitter)のツイートURLを正しく貼り付けてください");
+      setError("XのポストURLを正しく貼り付けてください");
       return;
     }
 
@@ -216,11 +209,11 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {/* X tweet quote (optional) */}
+            {/* X post quote (optional) */}
             <div className="space-y-2">
               <Label htmlFor="tweet-url" className="flex items-center gap-1.5">
-                <Twitter className="size-3.5" />
-                Xのツイートを引用
+                <XLogo size={14} />
+                Xのポストを引用
                 <span className="text-xs font-normal text-muted-foreground">（任意）</span>
               </Label>
               <Input
@@ -230,19 +223,15 @@ export default function ReviewPage() {
                 onChange={(e) => setTweetUrl(e.target.value)}
                 placeholder="https://x.com/username/status/1234567890..."
               />
-              {tweetId ? (
+              {tweetId && tweetAuthor ? (
                 <div className="rounded-lg border bg-white p-3">
-                  <blockquote className="twitter-tweet" data-conversation="none">
-                    <a href={`https://x.com/${tweetAuthor}/status/${tweetId}`}>
-                      ツイートを読み込み中...
-                    </a>
-                  </blockquote>
+                  <XPostEmbed postId={tweetId} authorHandle={tweetAuthor} />
                 </div>
               ) : tweetUrl ? (
                 <p className="text-xs text-destructive">URLの形式が正しくありません</p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Xのツイート個別ページのURLを貼り付けると、口コミに引用埋め込みできます。
+                  XのポストURL（個別ページ）を貼り付けると、口コミに埋め込み表示できます。
                 </p>
               )}
             </div>
