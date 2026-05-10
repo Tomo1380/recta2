@@ -1,0 +1,2 @@
+Trigger: 2026-05-10 — bootstrap production DB after destructive stores rebuild
+Remove this file in the next commit after the deploy succeeds.
