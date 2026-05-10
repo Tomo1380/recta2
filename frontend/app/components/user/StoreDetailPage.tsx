@@ -34,6 +34,7 @@ import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
+import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import { pushViewedStore } from "~/lib/viewed-stores";
 
@@ -127,7 +128,9 @@ interface StaffComment {
 
 interface ReviewUser {
   line_display_name: string;
-  line_picture_url: string;
+  line_picture_url: string | null;
+  use_line_avatar?: boolean;
+  nickname?: string | null;
 }
 
 interface Review {
@@ -397,6 +400,21 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const [loading, setLoading] = useState(!previewData);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoMode, setVideoMode] = useState<"hero" | "mini">("hero");
+  const [videoDismissed, setVideoDismissed] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setVideoMode(window.scrollY > 180 ? "mini" : "hero");
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (videoMode === "hero") setVideoDismissed(false);
+  }, [videoMode]);
 
   // Keep preview data in sync when form changes
   useEffect(() => {
@@ -433,6 +451,22 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       cancelled = true;
     };
   }, [id, previewData]);
+
+  // After data loads, honor URL hash (#reviews etc) by scrolling the
+  // matching element into view. React Router doesn't auto-scroll to
+  // hashes, and the target may not exist until the API response paints.
+  useEffect(() => {
+    if (!data?.store) return;
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash?.slice(1);
+    if (!hash) return;
+    // Wait one frame for the section to mount, then scroll.
+    const handle = window.requestAnimationFrame(() => {
+      const target = document.getElementById(hash);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [data?.store]);
 
   // Persist this store to "recently viewed" history (skip preview mode)
   useEffect(() => {
@@ -505,10 +539,18 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       {/* ============================================================ */}
       {/* 1. Sticky Hero Video */}
       {/* ============================================================ */}
-      {store.video_url && (
+      {store.video_url && !(videoMode === "mini" && videoDismissed) && (
         <div
-          className="fixed top-0 left-0 right-0 z-20 w-full overflow-hidden"
-          style={{ height: `${heroHeight}px` }}
+          className={
+            videoMode === "hero"
+              ? "fixed top-0 left-0 right-0 z-20 w-full overflow-hidden"
+              : "fixed bottom-20 right-3 z-30 overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/20"
+          }
+          style={
+            videoMode === "hero"
+              ? { height: `${heroHeight}px` }
+              : { width: "140px", height: "80px" }
+          }
         >
           <video
             ref={videoRef}
@@ -520,12 +562,23 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           >
             <source src={store.video_url} type="video/mp4" />
           </video>
-          <div
-            className="absolute inset-0"
-            style={{
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.4) 100%)",
-            }}
-          />
+          {videoMode === "hero" ? (
+            <div
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.4) 100%)",
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="動画を閉じる"
+              onClick={() => setVideoDismissed(true)}
+              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white text-xs hover:bg-black/80"
+            >
+              ×
+            </button>
+          )}
         </div>
       )}
 
@@ -2034,7 +2087,8 @@ function ReviewsSection({
 
   return (
     <div
-      className="overflow-hidden rounded-[16px] bg-white"
+      id="reviews"
+      className="overflow-hidden rounded-[16px] bg-white scroll-mt-20"
       style={{
         boxShadow: "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
         border: "1px solid rgba(27,37,40,0.06)",
@@ -2101,26 +2155,19 @@ function ReviewsSection({
 }
 
 function ReviewItem({ review }: { review: Review }) {
+  const displayName = review.user?.nickname || review.user?.line_display_name || "匿名";
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        {review.user?.line_picture_url ? (
-          <img
-            src={review.user.line_picture_url}
-            alt={review.user?.line_display_name ?? ""}
-            className="h-8 w-8 rounded-full object-cover"
-          />
-        ) : (
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold"
-            style={{ backgroundColor: "rgba(27,37,40,0.08)", color: "rgba(27,37,40,0.4)" }}
-          >
-            {(review.user?.line_display_name ?? "?").charAt(0)}
-          </div>
-        )}
+        <UserAvatar
+          displayName={displayName}
+          pictureUrl={review.user?.line_picture_url}
+          useLineAvatar={review.user?.use_line_avatar}
+          size={32}
+        />
         <div className="flex-1">
           <p className="text-sm font-medium" style={{ color: "#1b2528" }}>
-            {review.user?.line_display_name ?? "匿名"}
+            {displayName}
           </p>
           <div className="flex items-center gap-2">
             {renderStars(review.rating ?? 0, 12)}

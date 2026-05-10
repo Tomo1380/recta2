@@ -86,6 +86,7 @@ class ContentController extends Controller
     {
         $validated = $request->validate([
             'question' => 'required|string',
+            'answer' => 'nullable|string',
             'tag' => 'string|max:100',
             'count' => 'integer',
             'visible' => 'boolean',
@@ -101,6 +102,7 @@ class ContentController extends Controller
     {
         $validated = $request->validate([
             'question' => 'string',
+            'answer' => 'nullable|string',
             'tag' => 'string|max:100',
             'count' => 'integer',
             'visible' => 'boolean',

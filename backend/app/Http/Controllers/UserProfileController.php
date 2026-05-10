@@ -26,6 +26,7 @@ class UserProfileController extends Controller
             'preferred_category' => 'nullable|string|max:50',
             'experience' => 'nullable|string|max:50',
             'bio' => 'nullable|string|max:500',
+            'use_line_avatar' => 'nullable|boolean',
         ]);
 
         $request->user()->update($validated);

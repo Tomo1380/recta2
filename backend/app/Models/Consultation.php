@@ -8,6 +8,7 @@ class Consultation extends Model
 {
     protected $fillable = [
         'question',
+        'answer',
         'tag',
         'count',
         'visible',

@@ -30,10 +30,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { useUserAuth } from "~/lib/user-auth";
+import UserAvatar from "~/components/user/shared/UserAvatar";
 import { userApi } from "~/lib/api";
 import type { User, Review } from "~/lib/types";
 
@@ -85,6 +85,7 @@ export default function MyPage() {
   const [preferredCategory, setPreferredCategory] = useState("");
   const [experience, setExperience] = useState("");
   const [bio, setBio] = useState("");
+  const [useLineAvatar, setUseLineAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -109,6 +110,7 @@ export default function MyPage() {
       setPreferredCategory(user.preferred_category ?? "");
       setExperience(user.experience ?? "");
       setBio(user.bio ?? "");
+      setUseLineAvatar(!!user.use_line_avatar);
     }
   }, [user]);
 
@@ -142,6 +144,7 @@ export default function MyPage() {
         preferred_category: preferredCategory || null,
         experience: experience || null,
         bio: bio || null,
+        use_line_avatar: useLineAvatar,
       });
       setSaveMessage("保存しました");
       setTimeout(() => setSaveMessage(""), 3000);
@@ -202,15 +205,13 @@ export default function MyPage() {
             トップへ戻る
           </Link>
           <div className="flex items-center gap-4">
-            <Avatar className="size-16 border-2 border-white/20">
-              <AvatarImage
-                src={user.line_picture_url ?? undefined}
-                alt={user.line_display_name ?? "User"}
-              />
-              <AvatarFallback className="text-lg">
-                {(user.nickname ?? user.line_display_name ?? "U").charAt(0)}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              displayName={user.nickname ?? user.line_display_name}
+              pictureUrl={user.line_picture_url}
+              useLineAvatar={user.use_line_avatar}
+              size={64}
+              className="border-2 border-white/20"
+            />
             <div>
               <h1 className="text-xl font-bold text-white">
                 {user.nickname ?? user.line_display_name ?? "ユーザー"}
@@ -318,6 +319,28 @@ export default function MyPage() {
                 placeholder="簡単な自己紹介を書いてください"
                 rows={3}
               />
+            </div>
+
+            {/* LINE avatar opt-in. デフォルトはオフ（口コミなどに出るアイコンは
+                名前のイニシャルから生成される）。LINE のプロフィール画像を
+                公開のアイコンとして使いたい人だけ ON にする想定。 */}
+            <div className="space-y-2 rounded-lg border border-muted bg-muted/30 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useLineAvatar}
+                  onChange={(e) => setUseLineAvatar(e.target.checked)}
+                  className="mt-1 size-4 rounded border-gray-300 accent-emerald-600"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium" style={{ color: "#1b2528" }}>
+                    LINEのプロフィール画像をアイコンとして使う
+                  </span>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    オフのままなら、口コミなどでは名前のイニシャル（例:「砂山」なら「砂」）が表示されます。
+                  </p>
+                </div>
+              </label>
             </div>
 
             <div className="flex items-center gap-3">

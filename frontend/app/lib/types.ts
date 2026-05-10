@@ -19,6 +19,7 @@ export interface User {
   line_user_id: string | null;
   line_display_name: string | null;
   line_picture_url: string | null;
+  use_line_avatar: boolean;
   nickname: string | null;
   age: number | null;
   preferred_area: string | null;

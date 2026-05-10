@@ -4,6 +4,7 @@ import AiChatPanel from "~/components/user/AiChatPanel";
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
+import { useUserAuth } from "~/lib/user-auth";
 
 // ─── Constants ─────────────────────────────────────
 const GOLD = "#D4AF37";
@@ -33,6 +34,7 @@ interface Area {
   name: string;
   slug: string;
   tier?: string;
+  store_count?: number;
 }
 
 interface Category {
@@ -40,25 +42,58 @@ interface Category {
   name: string;
   slug: string;
   color: string;
+  store_count?: number;
+}
+
+interface RecentReviewUser {
+  line_display_name?: string | null;
+  line_picture_url?: string | null;
+  use_line_avatar?: boolean;
+  nickname?: string | null;
+}
+
+interface RecentReview {
+  id: number;
+  rating: number;
+  body: string;
+  tweet_id?: string | null;
+  tweet_author_screen_name?: string | null;
+  created_at: string;
+  store: { id: number; name: string; area: string; category: string } | null;
+  user: RecentReviewUser | null;
 }
 
 interface HomeData {
   banner?: { hero_tagline?: string; hero_subtitle?: string };
   pickup_shops?: PickupShop[];
-  consultations?: { id: number; question: string; tag: string; count: number }[];
+  consultations?: { id: number; question: string; tag?: string; answer?: string; count?: number }[];
   areas?: Area[];
   categories?: Category[];
+  recent_reviews?: RecentReview[];
+}
+
+// ─── Helpers ───────────────────────────────────────
+
+function formatRelative(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diffMs = Date.now() - t;
+  const sec = Math.max(0, Math.floor(diffMs / 1000));
+  if (sec < 60) return "たった今";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分前`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}時間前`;
+  const day = Math.floor(hour / 24);
+  if (day < 7) return `${day}日前`;
+  const week = Math.floor(day / 7);
+  if (week < 5) return `${week}週間前`;
+  const month = Math.floor(day / 30);
+  if (month < 12) return `${month}ヶ月前`;
+  return `${Math.floor(day / 365)}年前`;
 }
 
 // ─── Static Data ────────────────────────────────────
-
-const REVIEWS = [
-  { id: 1, store: "渋谷シーサイド", genre: "キャバクラ", area: "渋谷", user: "ゆきな", date: "3日前", rating: 5, text: "体験入店で伺いましたが、スタッフさんがとても丁寧に対応してくれました。お客様の層も良くて、初めてでも安心して働けそうだなと感じました！送迎もあるのが嬉しいポイントです。" },
-  { id: 2, store: "青山ラウンジ", genre: "ラウンジ", area: "北青山", user: "あいり", date: "5日前", rating: 4, text: "落ち着いた雰囲気で、会話メインのお仕事なので自分に合っていました。ノルマもなく、週2からOKなので昼職との両立もできています。ドレスの貸し出しがあるのも助かります。" },
-  { id: 3, store: "恵比寿ヴァレラ", genre: "クラブ", area: "恵比寿", user: "りの", date: "1週間前", rating: 5, text: "時給が高めで、頑張った分だけしっかり稼げる環境です。先輩スタッフも優しくて、わからないことはすぐ教えてくれます。内装もおしゃれでテンション上がります！" },
-  { id: 4, store: "カフェモード", genre: "ラウンジ", area: "名古屋", user: "まりか", date: "2週間前", rating: 4, text: "カフェのような明るい雰囲気で、ナイトワーク初心者の私でもすごくリラックスして働けました。お酒が飲めなくても全然大丈夫でした。女の子同士の仲も良い印象です。" },
-  { id: 5, store: "渋谷シーサイド", genre: "キャバクラ", area: "渋谷", user: "ほのか", date: "2週間前", rating: 5, text: "日払い対応で助かりました。面接もカジュアルな雰囲気で、プレッシャーなく話せました。シフトの融通もきくので、学業との両立ができています。" },
-];
 
 const TRENDING_POOL = [
   { q: "未経験だけどラウンジで働ける？", count: "1.2k", tag: "未経験", a: "はい、大丈夫です！ラウンジは未経験からスタートする方がとても多い業種です。お店側も丁寧に研修してくれるところが多いので、安心してチャレンジできますよ。" },
@@ -86,15 +121,6 @@ const CATEGORY_IMAGES: Record<string, string> = {
   "コンカフェ": "https://images.unsplash.com/photo-1612452556802-f9e9ab097eaf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400",
 };
 
-const AREA_COUNTS: Record<string, number> = {
-  "渋谷": 186, "新宿": 234, "六本木": 152, "銀座": 98,
-  "池袋": 143, "恵比寿": 87, "麻布十番": 64, "表参道": 41,
-};
-
-const CATEGORY_COUNTS: Record<string, number> = {
-  "キャバクラ": 420, "ラウンジ": 380, "クラブ": 210,
-  "ガールズバー": 165, "コンカフェ": 95,
-};
 
 // ─── Helper Components ─────────────────────────────
 
@@ -175,7 +201,14 @@ function EdgeTopFooter() {
 
 // ─── Trending Topics ───────────────────────────────
 
-function shuffleAndPick(pool: typeof TRENDING_POOL, count: number, exclude?: typeof TRENDING_POOL): typeof TRENDING_POOL {
+interface TrendingItem {
+  q: string;
+  a: string;
+  tag?: string;
+  count?: string;
+}
+
+function shuffleAndPick<T>(pool: T[], count: number, exclude?: T[]): T[] {
   const available = exclude ? pool.filter(p => !exclude.includes(p)) : [...pool];
   for (let i = available.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -184,9 +217,10 @@ function shuffleAndPick(pool: typeof TRENDING_POOL, count: number, exclude?: typ
   return available.slice(0, count);
 }
 
-function TrendingTopics() {
+function TrendingTopics({ pool }: { pool: TrendingItem[] }) {
   const DISPLAY_COUNT = 4;
-  const [items, setItems] = useState(() => shuffleAndPick(TRENDING_POOL, DISPLAY_COUNT));
+  const safePool = pool.length > 0 ? pool : TRENDING_POOL;
+  const [items, setItems] = useState(() => shuffleAndPick(safePool, DISPLAY_COUNT));
   const [visibleCount, setVisibleCount] = useState(0);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -211,10 +245,10 @@ function TrendingTopics() {
     setProgress(0);
     setOpenIdx(null);
     setTimeout(() => {
-      setItems(prev => shuffleAndPick(TRENDING_POOL, DISPLAY_COUNT, prev));
+      setItems(prev => shuffleAndPick(safePool, DISPLAY_COUNT, prev));
       setIsRegenerating(false);
     }, manual ? 500 : 400);
-  }, []);
+  }, [safePool]);
 
   useEffect(() => {
     if (isRegenerating) return;
@@ -358,6 +392,9 @@ function getImageUrl(image: string | { url: string } | undefined): string | unde
 export default function TopPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<HomeData | null>(null);
+  // Real LINE auth state from the user-auth context. Local toggle below is
+  // only used for the "preview" affordance on the locked overlay.
+  const { isAuthenticated } = useUserAuth();
   const [lineLoggedIn, setLineLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -389,6 +426,8 @@ export default function TopPage() {
   const pickupShops = data.pickup_shops ?? [];
   const areas = data.areas ?? [];
   const categories = data.categories ?? [];
+  const recentReviews = data.recent_reviews ?? [];
+  const consultations = data.consultations ?? [];
 
   return (
     <div style={{ fontFamily: "'Outfit','Noto Sans JP',sans-serif" }} className="min-h-screen bg-[#f5f5f5] flex justify-center">
@@ -546,28 +585,45 @@ export default function TopPage() {
             <div className="flex items-center gap-2">
               <div className="w-1 h-5 rounded-full" style={{ background: `linear-gradient(180deg,${GOLD},#c8960c)` }} />
               <h2 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "17px", letterSpacing: "-0.02em", color: DARK, margin: 0 }}>新着クチコミ</h2>
-              <span className="px-2 py-0.5 rounded" style={{ background: "rgba(200,96,128,.1)", fontFamily: J, fontWeight: 600, fontSize: "9px", color: "rgba(200,96,128,.8)" }}>{REVIEWS.length}件</span>
+              <span className="px-2 py-0.5 rounded" style={{ background: "rgba(200,96,128,.1)", fontFamily: J, fontWeight: 600, fontSize: "9px", color: "rgba(200,96,128,.8)" }}>{recentReviews.length}件</span>
             </div>
-            <Link to="/stores" style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: GOLD, textDecoration: "none" }}>すべて見る →</Link>
           </div>
+          {recentReviews.length === 0 ? (
+            <div className="px-5 py-8 text-center" style={{ fontFamily: J, fontSize: "12px", color: "rgba(27,37,40,.45)" }}>
+              まだ口コミは投稿されていません。
+            </div>
+          ) : (
           <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
-            {REVIEWS.map((review, idx) => {
-              const requireLogin = !lineLoggedIn && idx >= 3;
+            {recentReviews.map((review, idx) => {
+              const requireLogin = !isAuthenticated && !lineLoggedIn && idx >= 3;
+              const userName = review.user?.nickname || review.user?.line_display_name || "匿名";
+              const initial = (userName.charAt(0) || "?");
+              const dateText = review.created_at ? formatRelative(review.created_at) : "";
               return (
-              <div key={review.id} className="shrink-0 rounded-2xl overflow-hidden" style={{ width: "270px", background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 20px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)" }}>
+              <Link
+                key={review.id}
+                to={requireLogin ? "/login" : `/stores/${review.store?.id}#reviews`}
+                onClick={() => {
+                  if (requireLogin) {
+                    sessionStorage.setItem("recta:login-return-to", "/");
+                  }
+                }}
+                className="shrink-0 rounded-2xl overflow-hidden block active:scale-[0.99] transition-transform"
+                style={{ width: "270px", background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 20px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)", textDecoration: "none", color: "inherit" }}
+              >
                 <div className="flex items-center px-4 pt-3.5 pb-2.5 gap-3">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.1),rgba(200,96,128,.04))", border: "1px solid rgba(200,96,128,.15)" }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 21V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14M3 21h10M13 21V3a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v18M13 21h8" stroke="rgba(200,96,128,.55)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
                   <div className="flex-1">
-                    <p style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: DARK, margin: 0 }}>{review.store}</p>
+                    <p style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: DARK, margin: 0 }}>{review.store?.name ?? ""}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.4)" }}>{review.area}</span>
+                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.4)" }}>{review.store?.area ?? ""}</span>
                       <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.2)" }}>·</span>
-                      <span className="px-1.5 py-0 rounded" style={{ fontFamily: J, fontWeight: 500, fontSize: "9px", color: "rgba(200,96,128,.7)", background: "rgba(200,96,128,.07)" }}>{review.genre}</span>
+                      <span className="px-1.5 py-0 rounded" style={{ fontFamily: J, fontWeight: 500, fontSize: "9px", color: "rgba(200,96,128,.7)", background: "rgba(200,96,128,.07)" }}>{review.store?.category ?? ""}</span>
                     </div>
                   </div>
-                  <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9px", color: "rgba(27,37,40,.25)" }}>{review.date}</span>
+                  <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9px", color: "rgba(27,37,40,.25)" }}>{dateText}</span>
                 </div>
                 <div style={{ height: "1px", background: "linear-gradient(90deg,transparent,rgba(27,37,40,.06) 16px,rgba(27,37,40,.06) calc(100% - 16px),transparent)" }} />
                 <div className="relative" style={{ padding: "12px 16px 14px", minHeight: "115px" }}>
@@ -580,12 +636,12 @@ export default function TopPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.12),rgba(200,96,128,.06))", border: "1px solid rgba(200,96,128,.15)" }}>
-                          <span style={{ fontFamily: J, fontWeight: 600, fontSize: "8px", color: "rgba(200,96,128,.7)" }}>{review.user[0]}</span>
+                          <span style={{ fontFamily: J, fontWeight: 600, fontSize: "8px", color: "rgba(200,96,128,.7)" }}>{initial}</span>
                         </div>
-                        <span style={{ fontFamily: J, fontWeight: 500, fontSize: "10.5px", color: "rgba(27,37,40,.5)" }}>{review.user}</span>
+                        <span style={{ fontFamily: J, fontWeight: 500, fontSize: "10.5px", color: "rgba(27,37,40,.5)" }}>{userName}</span>
                       </div>
                     </div>
-                    <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: DARK, margin: 0, lineHeight: 1.75, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{review.text}</p>
+                    <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: DARK, margin: 0, lineHeight: 1.75, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{review.body}</p>
                   </div>
                   {requireLogin && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" style={{ background: "rgba(255,255,255,.08)" }}>
@@ -605,10 +661,11 @@ export default function TopPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </Link>
               );
             })}
           </div>
+          )}
         </div>
 
         {/* ══ DARK BAND — AREA + CATEGORY ══ */}
@@ -627,7 +684,7 @@ export default function TopPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
                 {areas.map((area, i) => {
-                  const count = AREA_COUNTS[area.name] ?? Math.floor(Math.random() * 200 + 20);
+                  const count = area.store_count ?? 0;
                   return (
                     <Link key={area.id} to={`/stores?area=${encodeURIComponent(area.slug)}`} className="rounded-xl flex items-center gap-2.5 px-3 active:scale-[0.98] transition-transform" style={{ background: "rgba(255,255,255,.06)", border: i < 3 ? "1px solid rgba(212,175,55,.2)" : "1px solid rgba(255,255,255,.08)", height: "50px", textDecoration: "none" }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
@@ -661,7 +718,7 @@ export default function TopPage() {
               </div>
               <div className="flex gap-3 overflow-x-auto pl-5 pr-3 pb-1" style={{ scrollbarWidth: "none" as const }}>
                 {categories.map((cat) => {
-                  const count = CATEGORY_COUNTS[cat.name] ?? 100;
+                  const count = cat.store_count ?? 0;
                   const img = CATEGORY_IMAGES[cat.name];
                   return (
                     <Link key={cat.id} to={`/stores?category=${encodeURIComponent(cat.slug)}`} className="shrink-0 relative rounded-2xl overflow-hidden active:scale-[0.97] transition-transform" style={{ width: "130px", height: "160px", border: "1px solid rgba(255,255,255,.1)", textDecoration: "none" }}>
@@ -688,7 +745,16 @@ export default function TopPage() {
         <RecentlyViewedStores variant="flush" />
 
         {/* ══ TRENDING TOPICS ══ */}
-        <TrendingTopics />
+        <TrendingTopics
+          pool={consultations
+            .filter((c) => !!c.answer)
+            .map((c) => ({
+              q: c.question,
+              a: c.answer ?? "",
+              tag: c.tag?.replace(/^#/, ""),
+              count: c.count != null ? `${c.count}` : undefined,
+            }))}
+        />
 
         {/* ══ FOOTER ══ */}
         <div style={{ marginTop: "28px", position: "relative" }}>

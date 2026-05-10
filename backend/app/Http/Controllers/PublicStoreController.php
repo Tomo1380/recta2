@@ -7,6 +7,7 @@ use App\Models\Area;
 use App\Models\Category;
 use App\Models\PickupShop;
 use App\Models\Consultation;
+use App\Models\Review;
 use App\Models\SiteSetting;
 use App\Support\StoreApiTransformer;
 use Illuminate\Http\JsonResponse;
@@ -100,7 +101,7 @@ class PublicStoreController extends Controller
         // Load published reviews with user info
         $store->load(['reviews' => function ($q) {
             $q->where('status', 'published')
-              ->with('user:id,line_display_name,line_picture_url')
+              ->with('user:id,line_display_name,line_picture_url,use_line_avatar,nickname')
               ->orderByDesc('created_at')
               ->limit(10);
         }]);
@@ -199,17 +200,71 @@ class PublicStoreController extends Controller
         // Consultations
         $consultations = Consultation::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'question', 'tag', 'count']);
+            ->get(['id', 'question', 'answer', 'tag', 'count']);
+
+        // Live store counts per area / category (only published rows).
+        // Returned as { name => count } so the frontend can drop the
+        // hardcoded fallback dictionary entirely.
+        $publishedStores = Store::where('publish_status', 'published');
+        $areaCounts = (clone $publishedStores)
+            ->select('area', \DB::raw('count(*) as c'))
+            ->groupBy('area')
+            ->pluck('c', 'area');
+        $categoryCounts = (clone $publishedStores)
+            ->select('category', \DB::raw('count(*) as c'))
+            ->groupBy('category')
+            ->pluck('c', 'category');
 
         // Areas for quick navigation
         $areas = Area::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'tier']);
+            ->get(['id', 'name', 'slug', 'tier'])
+            ->map(function ($a) use ($areaCounts) {
+                $a->store_count = (int) ($areaCounts[$a->name] ?? 0);
+                return $a;
+            });
 
         // Categories
         $categories = Category::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'color']);
+            ->get(['id', 'name', 'slug', 'color'])
+            ->map(function ($c) use ($categoryCounts) {
+                $c->store_count = (int) ($categoryCounts[$c->name] ?? 0);
+                return $c;
+            });
+
+        // Recent reviews — replaces the hardcoded REVIEWS dictionary
+        // on the top page. Only published reviews from published stores.
+        $recentReviews = Review::with([
+                'user:id,line_display_name,line_picture_url,use_line_avatar,nickname',
+                'store:id,name,area,category',
+            ])
+            ->where('reviews.status', 'published')
+            ->whereHas('store', fn ($q) => $q->where('publish_status', 'published'))
+            ->orderByDesc('created_at')
+            ->limit(8)
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'rating' => $r->rating,
+                'body' => $r->body,
+                'tweet_id' => $r->tweet_id,
+                'tweet_author_screen_name' => $r->tweet_author_screen_name,
+                'created_at' => $r->created_at,
+                'store' => $r->store ? [
+                    'id' => $r->store->id,
+                    'name' => $r->store->name,
+                    'area' => $r->store->area,
+                    'category' => $r->store->category,
+                ] : null,
+                'user' => $r->user ? [
+                    'line_display_name' => $r->user->line_display_name,
+                    'line_picture_url' => $r->user->line_picture_url,
+                    'use_line_avatar' => (bool) $r->user->use_line_avatar,
+                    'nickname' => $r->user->nickname,
+                ] : null,
+            ])
+            ->values();
 
         return response()->json([
             'banner' => $banner,
@@ -217,6 +272,7 @@ class PublicStoreController extends Controller
             'consultations' => $consultations,
             'areas' => $areas,
             'categories' => $categories,
+            'recent_reviews' => $recentReviews,
         ]);
     }
 }

@@ -17,6 +17,7 @@ class User extends Authenticatable
         'line_user_id',
         'line_display_name',
         'line_picture_url',
+        'use_line_avatar',
         'line_access_token',
         'line_refresh_token',
         'line_token_expires_at',
@@ -39,6 +40,7 @@ class User extends Authenticatable
     protected $casts = [
         'last_login_at' => 'datetime',
         'line_token_expires_at' => 'datetime',
+        'use_line_avatar' => 'boolean',
     ];
 
     protected $appends = ['is_line_friend'];

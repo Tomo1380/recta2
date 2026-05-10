@@ -1,0 +1,2 @@
+Trigger: 2026-05-10 — reseed consultations (now with answer column) and pickup_shops idempotently
+Remove this file in the next commit after deploy.
