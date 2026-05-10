@@ -337,7 +337,7 @@ export default function MyPage() {
                     LINEのプロフィール画像をアイコンとして使う
                   </span>
                   <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                    オフのままなら、口コミなどでは名前のイニシャル（例:「砂山」なら「砂」）が表示されます。
+                    オフのままなら、口コミなどでは名前のイニシャル（例:「佐藤」なら「佐」）が表示されます。
                   </p>
                 </div>
               </label>

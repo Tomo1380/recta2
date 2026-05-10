@@ -37,7 +37,7 @@ function pickColor(seed: string): string {
 }
 
 function firstGrapheme(input: string): string {
-  // Use Intl.Segmenter when available so e.g. "砂山" renders as "砂",
+  // Use Intl.Segmenter when available so e.g. "佐藤" renders as "佐",
   // emojis as a single grapheme, and combining-mark sequences stay together.
   if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
     try {
