@@ -370,21 +370,24 @@ function buildAreaIndex(stores) {
 }
 
 // 条件キー -> 該当する feature_tags の配列。揃っていない場合は文字列マッチで救う。
+// タグ文字列は実 DB の feature_tags に合わせている（StoreSeeder で実際に
+// 投入されている文字列を使う）。ここがズレるとマッチ0件 → 推論時に
+// エリアのみで補完されるので、なるべく緩く広めに取る。
 const CONDITION_TAG_MAP = {
-  beginner: ['未経験歓迎', '未経験OK', '初心者OK'],
-  high_wage: ['高時給'],
-  trial: ['体入できる', '体入OK'],
-  taxi: ['送りあり', '送迎あり', 'タクチケ支給'],
+  beginner: ['未経験歓迎', '未経験OK', '初心者OK', '学生歓迎'],
+  high_wage: ['高時給', 'ボトルバック高め'],
+  trial: ['体入できる', '体入OK', '体入全額日払い'],
+  taxi: ['送りあり', '送迎あり', 'タクチケ支給', '交通費支給'],
   early_close: ['終電上がりOK', '終電上がり可'],
-  weekly1: ['週1OK'],
+  weekly1: ['週1OK', '短期OK', 'Wワーク歓迎', '完全自由シフト'],
   norma_low: ['ノルマなし', '同伴ノルマなし'],
-  age30: ['30代歓迎', 'アラフォーOK'],
-  daily_pay: ['日払いOK', '全額日払い'],
-  guarantee: ['保証あり', '時給保証あり'],
-  weekday: ['平日のみOK', '土日休み可'],
-  calm: ['落ち着いた雰囲気', '客層が落ち着いた系'],
-  waiwai: ['わいわい系'],
-  free_dress: ['私服OK', 'ドレス支給'],
+  age30: ['30代歓迎', 'アラフォーOK', '落ち着いた雰囲気'],
+  daily_pay: ['日払いあり', '日払いOK', '全額日払い', '体入全額日払い'],
+  guarantee: ['保証あり', '時給保証あり', '高時給'],
+  weekday: ['平日のみOK', '土日休み可', '完全自由シフト', 'Wワーク歓迎'],
+  calm: ['落ち着いた雰囲気', '客層が落ち着いた系', 'アットホーム', '少人数制'],
+  waiwai: ['わいわい系', '大型店', '髪色自由'],
+  free_dress: ['私服OK', 'ドレス支給', '衣装貸出', 'ドレス無料', '制服あり', '髪色自由'],
 };
 
 function pickStoresForAreaCondition(areaName, condKey, stores, n = 3) {
@@ -1109,16 +1112,23 @@ function expandIndustry() {
   return out;
 }
 
-// 店舗紹介系として [STORE:ID] マーカー付き回答を出す condition のホワイトリスト
+// 店舗紹介系として [STORE:ID] マーカー付き回答を出す condition のホワイトリスト。
+// 全 condition を対象にすることで「○○エリアで○○な店」の質問が
+// 確実にカードを返せるようになる（推論時に実DB照合で存在しないIDは silent drop）。
 const STORE_RECOMMENDATION_CONDITIONS = new Set([
   'beginner',
   'high_wage',
   'trial',
-  'daily_pay',
+  'taxi',
+  'early_close',
   'weekly1',
   'norma_low',
   'age30',
+  'daily_pay',
+  'guarantee',
+  'weekday',
   'calm',
+  'waiwai',
   'free_dress',
 ]);
 
