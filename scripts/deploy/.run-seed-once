@@ -1,2 +1,0 @@
-Trigger: 2026-05-10 — seed FineTuningQa (1000 rows) to production after migration
-Remove this file in the next commit after the deploy succeeds.
