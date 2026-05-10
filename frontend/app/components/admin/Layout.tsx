@@ -5,7 +5,6 @@ import {
   Building2,
   MessageSquare,
   Bot,
-  Database,
   KeyRound,
   LogOut,
   ChevronRight,
@@ -27,7 +26,6 @@ const menuItems = [
   { path: "/admin/shops", label: "店舗管理", icon: Building2 },
   { path: "/admin/reviews", label: "口コミ管理", icon: MessageSquare },
   { path: "/admin/ai-chat", label: "AIチャット設定", icon: Bot },
-  { path: "/admin/fine-tuning-qa", label: "Fine-tuning", icon: Database },
   { path: "/admin/articles", label: "コラム管理", icon: FileText },
   { path: "/admin/content", label: "コンテンツ管理", icon: LayoutGrid },
   { path: "/admin/area-category", label: "エリア・カテゴリ", icon: MapPin },
@@ -40,8 +38,6 @@ const breadcrumbMap: Record<string, string> = {
   "/admin/shops": "店舗管理",
   "/admin/reviews": "口コミ管理",
   "/admin/ai-chat": "AIチャット設定",
-  "/admin/fine-tuning-qa": "Fine-tuning",
-  "/admin/fine-tuning-qa/new": "新規作成",
   "/admin/articles": "コラム管理",
   "/admin/articles/new": "新規作成",
   "/admin/content": "コンテンツ管理",
@@ -75,11 +71,6 @@ function getBreadcrumbs(pathname: string) {
       // skip
     } else if (segments[i] === "edit" && segments[i - 2] === "articles") {
       crumbs.push({ label: "記事編集", path: currentPath });
-    } else if (segments[i - 1] === "fine-tuning-qa" && segments[i] !== "edit" && segments[i] !== "new") {
-      // /admin/fine-tuning-qa/:id - intermediate, hide; /edit step adds the label
-      // skip
-    } else if (segments[i] === "edit" && segments[i - 2] === "fine-tuning-qa") {
-      crumbs.push({ label: "Q&A編集", path: currentPath });
     }
   }
 

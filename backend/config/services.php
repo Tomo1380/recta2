@@ -56,4 +56,9 @@ return [
         'access_token' => env('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'),
     ],
 
+    'line' => [
+        // LINE公式アカウントBot基本ID (@xxx形式) — Official Managerへのジャンプ用
+        'official_account_id' => env('LINE_OFFICIAL_ACCOUNT_ID'),
+    ],
+
 ];

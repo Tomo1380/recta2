@@ -115,6 +115,7 @@ Route::prefix('admin')->group(function () {
         Route::put('categories/{category}', [AreaCategoryController::class, 'updateCategory']);
         Route::delete('categories/{category}', [AreaCategoryController::class, 'destroyCategory']);
         Route::post('categories/reorder', [AreaCategoryController::class, 'reorderCategories']);
+        Route::post('categories/{category}/image', [AreaCategoryController::class, 'uploadCategoryImage']);
 
         // Content management
         Route::get('pickup-shops', [ContentController::class, 'pickupShops']);

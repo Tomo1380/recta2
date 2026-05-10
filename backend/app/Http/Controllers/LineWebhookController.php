@@ -99,9 +99,13 @@ class LineWebhookController extends Controller
             'video' => '[動画]',
             'audio' => '[音声]',
             'sticker' => '[スタンプ]',
+            'file' => '[ファイル]',
             'location' => '[位置情報]',
             default => "[{$messageType}]",
         };
+
+        // Build content_meta with type-specific reference data
+        $contentMeta = $this->buildContentMeta($messageType, $message);
 
         // Ensure friend record exists
         $friend = LineFriend::firstOrCreate(
@@ -122,6 +126,7 @@ class LineWebhookController extends Controller
             'direction' => 'inbound',
             'message_type' => $messageType,
             'content' => $content,
+            'content_meta' => $contentMeta,
             'line_message_id' => $message['id'] ?? null,
         ]);
 
@@ -129,6 +134,38 @@ class LineWebhookController extends Controller
             'line_user_id' => $lineUserId,
             'type' => $messageType,
         ]);
+    }
+
+    /**
+     * Build per-type metadata payload for line_messages.content_meta.
+     * 画像・動画・音声・ファイル本体は LINE Messaging API 経由でしか取れず、
+     * かつ容量が大きいので message_id を保存して後で取得できるようにしておく。
+     */
+    private function buildContentMeta(string $type, array $message): ?array
+    {
+        return match ($type) {
+            'sticker' => array_filter([
+                'package_id' => $message['packageId'] ?? null,
+                'sticker_id' => $message['stickerId'] ?? null,
+                'sticker_resource_type' => $message['stickerResourceType'] ?? null,
+                'keywords' => $message['keywords'] ?? null,
+                'text' => $message['text'] ?? null,
+            ], fn ($v) => $v !== null),
+            'image', 'video', 'audio', 'file' => array_filter([
+                'message_id' => $message['id'] ?? null,
+                'content_provider' => $message['contentProvider'] ?? null,
+                'file_name' => $message['fileName'] ?? null,
+                'file_size' => $message['fileSize'] ?? null,
+                'duration' => $message['duration'] ?? null,
+            ], fn ($v) => $v !== null),
+            'location' => array_filter([
+                'title' => $message['title'] ?? null,
+                'address' => $message['address'] ?? null,
+                'latitude' => $message['latitude'] ?? null,
+                'longitude' => $message['longitude'] ?? null,
+            ], fn ($v) => $v !== null),
+            default => null,
+        };
     }
 
     /**

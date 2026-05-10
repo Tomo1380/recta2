@@ -27,7 +27,6 @@ class AreaCategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:areas',
-            'tier' => 'in:gold,standard',
             'visible' => 'boolean',
             'sort_order' => 'integer',
         ]);
@@ -42,7 +41,6 @@ class AreaCategoryController extends Controller
         $validated = $request->validate([
             'name' => 'string|max:255',
             'slug' => 'string|max:255|unique:areas,slug,' . $area->id,
-            'tier' => 'in:gold,standard',
             'visible' => 'boolean',
             'sort_order' => 'integer',
         ]);
@@ -75,7 +73,7 @@ class AreaCategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:categories',
-            'color' => 'string|max:7',
+            'image_url' => 'nullable|string|max:500',
             'visible' => 'boolean',
             'sort_order' => 'integer',
         ]);
@@ -90,12 +88,29 @@ class AreaCategoryController extends Controller
         $validated = $request->validate([
             'name' => 'string|max:255',
             'slug' => 'string|max:255|unique:categories,slug,' . $category->id,
-            'color' => 'string|max:7',
+            'image_url' => 'nullable|string|max:500',
             'visible' => 'boolean',
             'sort_order' => 'integer',
         ]);
 
         $category->update($validated);
+
+        return response()->json($category);
+    }
+
+    /**
+     * Upload an image for a category. Stored on the public disk.
+     */
+    public function uploadCategoryImage(Request $request, Category $category): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|image|max:5120',
+        ]);
+
+        $path = $request->file('image')->store('categories', 'public');
+        $url = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+
+        $category->update(['image_url' => $url]);
 
         return response()->json($category);
     }

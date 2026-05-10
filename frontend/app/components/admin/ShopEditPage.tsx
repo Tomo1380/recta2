@@ -620,7 +620,7 @@ export function ShopEditPage() {
   const [dressCodeDescription, setDressCodeDescription] = useState("");
   const [dressCodeOk, setDressCodeOk] = useState<{ note: string; image_url: string }[]>([]);
   const [dressCodeNg, setDressCodeNg] = useState<{ note: string; image_url: string }[]>([]);
-  const [setFeeItems, setSetFeeItems] = useState<
+  const [setFeeList, setSetFeeList] = useState<
     { label: string; amount: string; note: string }[]
   >([]);
   const [setFeeNotes, setSetFeeNotes] = useState("");
@@ -786,7 +786,7 @@ export function ShopEditPage() {
     }
 
     const sf = (store as any).set_fee || {};
-    setSetFeeItems(
+    setSetFeeList(
       (sf.items ?? []).map((it: any) => ({
         label: it?.label ?? "",
         amount: it?.amount != null ? String(it.amount) : "",
@@ -940,9 +940,9 @@ export function ShopEditPage() {
             })),
         }
       : null,
-    set_fee: (setFeeItems.some((it) => it.label.trim() || it.amount.trim()) || setFeeNotes.trim())
+    set_fee: (setFeeList.some((it) => it.label.trim() || it.amount.trim()) || setFeeNotes.trim())
       ? {
-          items: setFeeItems
+          items: setFeeList
             .filter((it) => it.label.trim() || it.amount.trim())
             .map((it) => {
               const num = Number(it.amount.replace(/[^\d.-]/g, ""));
@@ -964,7 +964,7 @@ export function ShopEditPage() {
         ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
       })),
     publish_status: publishStatus,
-  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeItems, setFeeNotes, rectaEpisodes, publishStatus]);
+  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1846,7 +1846,7 @@ export function ShopEditPage() {
             hint="ボトル代・席料・チャージなど、項目ごとに金額を登録してください"
           >
             <div className="space-y-2">
-              {setFeeItems.map((item, i) => (
+              {setFeeList.map((item, i) => (
                 <div key={i} className="flex gap-2 items-start group">
                   <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
                     {i + 1}
@@ -1854,9 +1854,9 @@ export function ShopEditPage() {
                   <input
                     value={item.label}
                     onChange={(e) => {
-                      const next = [...setFeeItems];
+                      const next = [...setFeeList];
                       next[i] = { ...next[i], label: e.target.value };
-                      setSetFeeItems(next);
+                      setSetFeeList(next);
                     }}
                     placeholder="項目名（例: 90分セット）"
                     className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -1864,9 +1864,9 @@ export function ShopEditPage() {
                   <input
                     value={item.amount}
                     onChange={(e) => {
-                      const next = [...setFeeItems];
+                      const next = [...setFeeList];
                       next[i] = { ...next[i], amount: e.target.value };
-                      setSetFeeItems(next);
+                      setSetFeeList(next);
                     }}
                     placeholder="金額（円）"
                     className="w-32 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -1874,15 +1874,15 @@ export function ShopEditPage() {
                   <input
                     value={item.note}
                     onChange={(e) => {
-                      const next = [...setFeeItems];
+                      const next = [...setFeeList];
                       next[i] = { ...next[i], note: e.target.value };
-                      setSetFeeItems(next);
+                      setSetFeeList(next);
                     }}
                     placeholder="備考（任意）"
                     className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   />
                   <button
-                    onClick={() => setSetFeeItems(setFeeItems.filter((_, idx) => idx !== i))}
+                    onClick={() => setSetFeeList(setFeeList.filter((_, idx) => idx !== i))}
                     className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
                   >
                     <X className="w-4 h-4" />
@@ -1891,7 +1891,7 @@ export function ShopEditPage() {
               ))}
               <button
                 onClick={() =>
-                  setSetFeeItems([...setFeeItems, { label: "", amount: "", note: "" }])
+                  setSetFeeList([...setFeeList, { label: "", amount: "", note: "" }])
                 }
                 className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
               >
@@ -2437,9 +2437,9 @@ export function ShopEditPage() {
                     });
                     return Object.keys(out).length > 0 ? out : null;
                   })(),
-                  set_fee: (setFeeItems.some((it) => it.label || it.amount) || setFeeNotes)
+                  set_fee: (setFeeList.some((it) => it.label || it.amount) || setFeeNotes)
                     ? {
-                        items: setFeeItems
+                        items: setFeeList
                           .filter((it) => it.label || it.amount)
                           .map((it) => {
                             const num = Number(it.amount.replace(/[^\d.-]/g, ""));

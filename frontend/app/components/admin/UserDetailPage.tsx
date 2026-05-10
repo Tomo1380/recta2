@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import {
   ArrowLeft,
   Star,
@@ -9,9 +9,15 @@ import {
   ExternalLink,
   StickyNote,
   Check,
+  Image as ImageIcon,
+  Video,
+  Mic,
+  FileText,
+  MapPin,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { api } from "~/lib/api";
+import { useAuth } from "~/lib/auth";
 import type { User as UserType, UserShowResponse, LineMessage } from "~/lib/types";
 
 function formatDate(dateStr: string | null): string {
@@ -40,6 +46,25 @@ function reviewStatusLabel(status: string): string {
   return "削除";
 }
 
+/**
+ * Sticker 画像URL。LINE公開CDN（認証不要）。
+ * sticker_resource_type が animation/popup/sound 系でも static PNG が同URLで取れる。
+ */
+function stickerImageUrl(stickerId: string | number): string {
+  return `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`;
+}
+
+/**
+ * LINE Official Manager の 1:1 チャット画面URL。
+ * 例: https://manager.line.biz/account/@043uxuen/chat/Uxxxxxxxxxxxxx
+ * basicId が空の時は null を返してボタンを disable する。
+ */
+function lineOfficialManagerUrl(basicId: string | null | undefined, lineUserId: string | null): string | null {
+  if (!basicId || !lineUserId) return null;
+  // @プレフィックスは付けても付けなくても manager.line.biz は受け付ける（@xxx形式）
+  return `https://manager.line.biz/account/${basicId}/chat/${lineUserId}`;
+}
+
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return "—";
   const now = new Date();
@@ -56,9 +81,108 @@ function timeAgo(dateStr: string | null): string {
   return `${diffMonth}ヶ月前`;
 }
 
+/**
+ * LINEメッセージの種別別レンダラ。
+ * sticker は LINE 公開CDNの画像を表示、image/video/audio/file は messageId を含むラベル + 公式マネージャ起動リンク、
+ * location は住所と Google Maps リンクを表示する。
+ */
+function renderMessageBody(msg: LineMessage, officialManagerUrl: string | null) {
+  const meta = msg.content_meta ?? null;
+
+  if (msg.message_type === "sticker") {
+    const stickerId = meta?.sticker_id;
+    if (stickerId !== undefined && stickerId !== null) {
+      return (
+        <img
+          src={stickerImageUrl(stickerId)}
+          alt={meta?.text || "[スタンプ]"}
+          className="w-[120px] h-[120px] object-contain"
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      );
+    }
+    return <p className="whitespace-pre-wrap opacity-80">[スタンプ]</p>;
+  }
+
+  if (msg.message_type === "image" || msg.message_type === "video" || msg.message_type === "audio" || msg.message_type === "file") {
+    const Icon =
+      msg.message_type === "image" ? ImageIcon
+      : msg.message_type === "video" ? Video
+      : msg.message_type === "audio" ? Mic
+      : FileText;
+    const label =
+      msg.message_type === "image" ? "画像"
+      : msg.message_type === "video" ? "動画"
+      : msg.message_type === "audio" ? "音声"
+      : "ファイル";
+    const messageId = meta?.message_id || msg.line_message_id || null;
+    const fileName = meta?.file_name;
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5 opacity-90">
+          <Icon className="w-3.5 h-3.5" />
+          <span>[{label}]</span>
+          {fileName && <span className="text-[11px] opacity-70 truncate max-w-[180px]">{fileName}</span>}
+        </div>
+        {messageId && (
+          <p className="text-[10px] font-mono opacity-60 truncate" title={messageId}>
+            ID: {messageId}
+          </p>
+        )}
+        {officialManagerUrl && (
+          <a
+            href={officialManagerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] underline opacity-80 hover:opacity-100"
+          >
+            LINE公式マネージャで開く
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  if (msg.message_type === "location") {
+    const lat = meta?.latitude;
+    const lng = meta?.longitude;
+    const mapUrl = lat !== undefined && lng !== undefined
+      ? `https://www.google.com/maps?q=${lat},${lng}`
+      : null;
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5" />
+          <span className="text-[12px]">{meta?.title || "[位置情報]"}</span>
+        </div>
+        {meta?.address && <p className="text-[12px] opacity-80">{meta.address}</p>}
+        {mapUrl && (
+          <a
+            href={mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] underline opacity-80 hover:opacity-100"
+          >
+            Google Mapsで開く
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  // text / fallback
+  return <p className="whitespace-pre-wrap">{msg.content}</p>;
+}
+
 export function UserDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user: adminUser } = useAuth();
   const [user, setUser] = useState<UserType | null>(null);
   const [lineMessages, setLineMessages] = useState<LineMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,6 +266,7 @@ export function UserDetailPage() {
         direction: "outbound",
         message_type: "text",
         content: messageText.trim(),
+        content_meta: null,
         line_message_id: null,
         read_at: null,
         created_at: new Date().toISOString(),
@@ -185,6 +310,8 @@ export function UserDetailPage() {
   const reviews = user.reviews ?? [];
   const lineFriend = user.line_friend;
   const isLineFriend = user.is_line_friend;
+  const officialBasicId = adminUser?.line_official_account_id || null;
+  const officialManagerUrl = lineOfficialManagerUrl(officialBasicId, user.line_user_id);
 
   return (
     <div className="space-y-6">
@@ -193,12 +320,38 @@ export function UserDetailPage() {
         <button onClick={() => navigate("/admin/users")} className="p-1.5 rounded-lg hover:bg-muted transition">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div>
+        <div className="flex-1">
           <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}>
             ユーザー詳細
           </h2>
           <p className="text-[13px] text-muted-foreground">ID: {id}</p>
         </div>
+        {/* LINE Official Manager jump link */}
+        {officialManagerUrl ? (
+          <a
+            href={officialManagerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-[12px] hover:bg-emerald-700 transition"
+            title="LINE Official Managerでこのユーザーとのトークを開く"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            LINE公式マネージャで開く
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-200 text-stone-500 text-[12px] cursor-not-allowed"
+            title={
+              !user.line_user_id
+                ? "このユーザーにはLINE IDが紐付けられていません"
+                : "環境変数 LINE_OFFICIAL_ACCOUNT_ID が未設定です"
+            }
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            LINE公式マネージャで開く
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -312,40 +465,59 @@ export function UserDetailPage() {
             />
           </div>
 
-          {/* Reviews (collapsed on left) */}
+          {/* Reviews */}
           {reviews.length > 0 && (
             <div className="bg-card border border-border rounded-xl p-5">
               <h3 className="text-sm mb-3 flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-muted-foreground" />
                 口コミ ({reviews.length})
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {reviews.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-[13px] py-1.5 border-b border-border last:border-0">
-                    <div className="min-w-0">
-                      <p className="truncate text-foreground">{r.store?.name || "—"}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, j) => (
-                            <Star
-                              key={j}
-                              className={`w-2.5 h-2.5 ${
-                                j < r.rating ? "fill-amber-400 text-amber-400" : "text-stone-200"
-                              }`}
-                            />
-                          ))}
+                  <div
+                    key={r.id}
+                    className="text-[13px] pb-3 border-b border-border last:border-0 last:pb-0"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="min-w-0 flex-1">
+                        {r.store?.id ? (
+                          <Link
+                            to={`/admin/shops/${r.store.id}/edit`}
+                            className="text-foreground hover:text-indigo-600 hover:underline truncate block"
+                          >
+                            {r.store.name}
+                          </Link>
+                        ) : (
+                          <p className="truncate text-foreground">{r.store?.name || "—"}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-0.5">
+                            {Array.from({ length: 5 }).map((_, j) => (
+                              <Star
+                                key={j}
+                                className={`w-2.5 h-2.5 ${
+                                  j < r.rating ? "fill-amber-400 text-amber-400" : "text-stone-200"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground">{formatDate(r.created_at)}</span>
                         </div>
-                        <span className="text-[11px] text-muted-foreground">{formatDate(r.created_at)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            r.status === "published" ? "bg-emerald-500" : "bg-stone-300"
+                          }`}
+                        />
+                        <span className="text-[11px] text-muted-foreground">{reviewStatusLabel(r.status)}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          r.status === "published" ? "bg-emerald-500" : "bg-stone-300"
-                        }`}
-                      />
-                      <span className="text-[11px] text-muted-foreground">{reviewStatusLabel(r.status)}</span>
-                    </div>
+                    {r.body && (
+                      <p className="text-[12px] text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                        {r.body}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -377,27 +549,40 @@ export function UserDetailPage() {
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: "480px" }}>
               {lineMessages.length > 0 ? (
                 <>
-                  {[...lineMessages].reverse().map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                    >
+                  {[...lineMessages].reverse().map((msg) => {
+                    const isSticker = msg.message_type === "sticker";
+                    return (
                       <div
-                        className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-[13px] ${
-                          msg.direction === "outbound"
-                            ? "bg-indigo-600 text-white rounded-br-md"
-                            : "bg-muted/60 border border-border text-foreground rounded-bl-md"
-                        }`}
+                        key={msg.id}
+                        className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                        <p className={`text-[10px] mt-1 ${
-                          msg.direction === "outbound" ? "text-indigo-200" : "text-muted-foreground"
-                        }`}>
-                          {formatDateTime(msg.created_at)}
-                        </p>
+                        <div
+                          className={
+                            isSticker
+                              ? "max-w-[75%] flex flex-col items-end"
+                              : `max-w-[75%] rounded-2xl px-3.5 py-2.5 text-[13px] ${
+                                  msg.direction === "outbound"
+                                    ? "bg-indigo-600 text-white rounded-br-md"
+                                    : "bg-muted/60 border border-border text-foreground rounded-bl-md"
+                                }`
+                          }
+                        >
+                          {renderMessageBody(msg, officialManagerUrl)}
+                          <p
+                            className={`text-[10px] mt-1 ${
+                              isSticker
+                                ? "text-muted-foreground"
+                                : msg.direction === "outbound"
+                                ? "text-indigo-200"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {formatDateTime(msg.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </>
               ) : (

@@ -34,11 +34,33 @@ function extractStoreIds(answer: string): number[] {
   return ids;
 }
 
-export function FineTuningQaEditPage() {
+export interface FineTuningQaEditPageProps {
+  /**
+   * Embedded mode: instead of using URL params and navigating to other admin
+   * routes, accept the QA id (or null for new) as a prop and call back to the
+   * host when the user wants to leave the editor (back / saved).
+   */
+  embedded?: boolean;
+  embeddedQaId?: number | null;
+  onBack?: () => void;
+  /** Called after save/archive succeeds; host should refetch list & exit edit. */
+  onSaved?: () => void;
+}
+
+export function FineTuningQaEditPage({
+  embedded = false,
+  embeddedQaId,
+  onBack,
+  onSaved,
+}: FineTuningQaEditPageProps = {}) {
   const params = useParams();
-  const qaId = params.id ? Number(params.id) : null;
-  const isNew = qaId === null;
   const navigate = useNavigate();
+  const qaId = embedded
+    ? (embeddedQaId ?? null)
+    : params.id
+      ? Number(params.id)
+      : null;
+  const isNew = qaId === null;
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(!isNew);
@@ -200,13 +222,23 @@ export function FineTuningQaEditPage() {
           `/admin/fine-tuning/qa`,
           payload,
         );
-        navigate(`/admin/fine-tuning-qa/${created.id}/edit`, { replace: true });
+        if (embedded) {
+          if (onSaved) onSaved();
+        } else {
+          navigate(`/admin/fine-tuning-qa/${created.id}/edit`, {
+            replace: true,
+          });
+        }
       } else {
         await api.put<FineTuningQa>(
           `/admin/fine-tuning/qa/${qaId}`,
           payload,
         );
-        navigate("/admin/fine-tuning-qa");
+        if (embedded) {
+          if (onSaved) onSaved();
+        } else {
+          navigate("/admin/fine-tuning-qa");
+        }
       }
     } catch (e) {
       const msg =
@@ -225,7 +257,11 @@ export function FineTuningQaEditPage() {
     setArchiving(true);
     try {
       await api.delete(`/admin/fine-tuning/qa/${qaId}`);
-      navigate("/admin/fine-tuning-qa");
+      if (embedded) {
+        if (onSaved) onSaved();
+      } else {
+        navigate("/admin/fine-tuning-qa");
+      }
     } catch (e) {
       console.error("Archive failed", e);
       setError("アーカイブに失敗しました");
@@ -246,7 +282,13 @@ export function FineTuningQaEditPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <button
-          onClick={() => navigate("/admin/fine-tuning-qa")}
+          onClick={() => {
+            if (embedded && onBack) {
+              onBack();
+            } else {
+              navigate("/admin/fine-tuning-qa");
+            }
+          }}
           className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition"
         >
           <ArrowLeft className="w-4 h-4" />

@@ -110,7 +110,7 @@ interface RecentHire {
 
 interface PopularFeatures {
   features: string[];
-  hint: string;
+  hint?: string;
 }
 
 interface QAItem {
@@ -145,7 +145,7 @@ interface Review {
 
 // New JSONB shapes (DB redesign 2026-05)
 export interface DressExample {
-  image_url: string;
+  image_url?: string;
   note?: string;
 }
 

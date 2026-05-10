@@ -17,6 +17,8 @@ export interface AdminUser {
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
+  /** LINE公式アカウントBot基本ID（@xxx形式）。Official Managerリンク生成に使用。 */
+  line_official_account_id?: string | null;
 }
 
 interface AuthContextValue {

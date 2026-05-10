@@ -60,10 +60,16 @@ class PublicStoreController extends Controller
         $sort = $request->input('sort', 'newest');
         switch ($sort) {
             case 'hourly_desc':
-                $query->orderBy('wage->regular->max', 'desc');
+                $driver = $query->getConnection()->getDriverName();
+                $query->orderByRaw($driver === 'pgsql'
+                    ? "nullif(wage->'regular'->>'max','')::int desc nulls last"
+                    : "CAST(json_extract(wage, '$.regular.max') AS INTEGER) desc");
                 break;
             case 'hourly_asc':
-                $query->orderBy('wage->regular->min', 'asc');
+                $driver = $query->getConnection()->getDriverName();
+                $query->orderByRaw($driver === 'pgsql'
+                    ? "nullif(wage->'regular'->>'min','')::int asc nulls last"
+                    : "CAST(json_extract(wage, '$.regular.min') AS INTEGER) asc");
                 break;
             case 'popular':
                 $query->withCount(['reviews' => fn($q) => $q->where('status', 'published')])
@@ -142,7 +148,7 @@ class PublicStoreController extends Controller
     {
         $areas = Area::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'tier']);
+            ->get(['id', 'name', 'slug']);
 
         return response()->json($areas);
     }
@@ -154,7 +160,7 @@ class PublicStoreController extends Controller
     {
         $categories = Category::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'color']);
+            ->get(['id', 'name', 'slug', 'image_url']);
 
         return response()->json($categories);
     }
@@ -218,7 +224,7 @@ class PublicStoreController extends Controller
         // Areas for quick navigation
         $areas = Area::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'tier'])
+            ->get(['id', 'name', 'slug'])
             ->map(function ($a) use ($areaCounts) {
                 $a->store_count = (int) ($areaCounts[$a->name] ?? 0);
                 return $a;
@@ -227,7 +233,7 @@ class PublicStoreController extends Controller
         // Categories
         $categories = Category::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'color'])
+            ->get(['id', 'name', 'slug', 'image_url'])
             ->map(function ($c) use ($categoryCounts) {
                 $c->store_count = (int) ($categoryCounts[$c->name] ?? 0);
                 return $c;

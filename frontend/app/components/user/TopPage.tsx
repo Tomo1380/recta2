@@ -41,7 +41,7 @@ interface Category {
   id: number;
   name: string;
   slug: string;
-  color: string;
+  image_url?: string | null;
   store_count?: number;
 }
 
@@ -719,13 +719,16 @@ export default function TopPage() {
               <div className="flex gap-3 overflow-x-auto pl-5 pr-3 pb-1" style={{ scrollbarWidth: "none" as const }}>
                 {categories.map((cat) => {
                   const count = cat.store_count ?? 0;
-                  const img = CATEGORY_IMAGES[cat.name];
+                  // Prefer the admin-uploaded image_url; fall back to the
+                  // legacy hardcoded dictionary while migration data is sparse,
+                  // then a flat dark gradient if nothing exists.
+                  const img = cat.image_url || CATEGORY_IMAGES[cat.name];
                   return (
                     <Link key={cat.id} to={`/stores?category=${encodeURIComponent(cat.slug)}`} className="shrink-0 relative rounded-2xl overflow-hidden active:scale-[0.97] transition-transform" style={{ width: "130px", height: "160px", border: "1px solid rgba(255,255,255,.1)", textDecoration: "none" }}>
                       {img ? (
                         <img src={img} alt={cat.name} className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
-                        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${cat.color}40, ${cat.color}20)` }} />
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 100%)` }} />
                       )}
                       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.6) 100%)" }} />
                       <div className="absolute bottom-0 left-0 right-0 p-3">

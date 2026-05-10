@@ -150,36 +150,84 @@ export interface AdminUser {
   updated_at: string;
 }
 
+export interface DashboardKpiWithDelta {
+  value: number;
+  delta_30d?: number;
+  delta_vs_prev?: number;
+  delta_vs_yesterday?: number;
+  avg_tokens?: number;
+}
+
+export interface DashboardChatTrendPoint {
+  date: string;
+  agent: number;
+  finetuned: number;
+  total: number;
+}
+
+export interface DashboardSimpleTrendPoint {
+  date: string;
+  count: number;
+}
+
+export interface DashboardDistributionPoint {
+  name: string;
+  count: number;
+}
+
+export interface DashboardRecentReview {
+  id: number;
+  rating: number;
+  body: string;
+  status: "published" | "unpublished" | "deleted";
+  created_at: string | null;
+  user_name: string;
+  store_id: number | null;
+  store_name: string | null;
+}
+
+export interface DashboardRecentMessage {
+  id: number;
+  user_id: number | null;
+  name: string;
+  avatar: string;
+  message: string;
+  created_at: string | null;
+  unread: boolean;
+}
+
+export interface DashboardRecentChat {
+  id: number;
+  mode: string | null;
+  page_type: string | null;
+  user_message: string;
+  total_tokens: number;
+  created_at: string | null;
+  user_name: string;
+}
+
 export interface DashboardData {
-  stats: {
-    user_count: number;
-    store_count: number;
-    review_count: number;
-    today_chat_count: number;
+  generated_at: string;
+  kpis: {
+    published_stores: DashboardKpiWithDelta;
+    active_users_30d: DashboardKpiWithDelta;
+    line_friends: DashboardKpiWithDelta;
+    reviews_today: DashboardKpiWithDelta;
+    chat_today: DashboardKpiWithDelta;
   };
-  user_trend: { month: string; count: number }[];
-  chat_trend: { date: string; count: number }[];
-  line_stats: {
-    friends: number;
-    friends_change: string;
-    today_added: number;
+  chat_trend: DashboardChatTrendPoint[];
+  line_friend_trend: DashboardSimpleTrendPoint[];
+  stores_by_area: DashboardDistributionPoint[];
+  stores_by_category: DashboardDistributionPoint[];
+  recent_reviews: DashboardRecentReview[];
+  recent_messages: DashboardRecentMessage[];
+  recent_chats: DashboardRecentChat[];
+  secondary: {
     unread_messages: number;
+    pending_reviews: number;
+    published_articles: number;
+    fine_tuning_qa_active: number;
   };
-  recent_messages: {
-    id: number;
-    user_id: number | null;
-    name: string;
-    avatar: string;
-    message: string;
-    time: string;
-    unread: boolean;
-  }[];
-  activity_logs: {
-    time: string;
-    user: string;
-    action: string;
-    type: string;
-  }[];
 }
 
 export interface LineFriend {
@@ -197,6 +245,26 @@ export interface LineFriend {
   user?: User;
 }
 
+export interface LineMessageMeta {
+  // sticker
+  package_id?: string | number;
+  sticker_id?: string | number;
+  sticker_resource_type?: string;
+  keywords?: string[];
+  text?: string;
+  // image / video / audio / file
+  message_id?: string;
+  content_provider?: { type?: string; originalContentUrl?: string; previewImageUrl?: string };
+  file_name?: string;
+  file_size?: number;
+  duration?: number;
+  // location
+  title?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface LineMessage {
   id: number;
   line_user_id: string;
@@ -204,6 +272,7 @@ export interface LineMessage {
   direction: "inbound" | "outbound";
   message_type: string;
   content: string;
+  content_meta?: LineMessageMeta | null;
   line_message_id: string | null;
   read_at: string | null;
   created_at: string;
@@ -215,7 +284,6 @@ export interface Area {
   id: number;
   name: string;
   slug: string;
-  tier: "gold" | "standard";
   visible: boolean;
   sort_order: number;
   shop_count: number;
@@ -225,7 +293,7 @@ export interface Category {
   id: number;
   name: string;
   slug: string;
-  color: string;
+  image_url: string | null;
   visible: boolean;
   sort_order: number;
   shop_count: number;

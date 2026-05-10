@@ -9,7 +9,6 @@ class Area extends Model
     protected $fillable = [
         'name',
         'slug',
-        'tier',
         'visible',
         'sort_order',
     ];

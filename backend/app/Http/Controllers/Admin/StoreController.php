@@ -131,7 +131,7 @@ class StoreController extends Controller
     {
         $request->validate($this->storeValidationRules());
 
-        $data = $this->normalizeIncomingPayload($request->only($this->fillableFields() + $this->legacyCompatibilityFields()));
+        $data = $this->normalizeIncomingPayload($request->only(array_merge($this->fillableFields(), $this->legacyCompatibilityFields())));
         $store = Store::create($data);
 
         return response()->json(StoreApiTransformer::toAdminArray($store), 201);
@@ -144,7 +144,7 @@ class StoreController extends Controller
         $request->validate($rules + $this->legacyCompatibilityValidationRules());
 
         $data = $this->normalizeIncomingPayload(
-            $request->only($this->fillableFields() + $this->legacyCompatibilityFields())
+            $request->only(array_merge($this->fillableFields(), $this->legacyCompatibilityFields()))
         );
 
         // Merge wage/schedule/etc. with any existing JSONB so partial updates don't wipe siblings

@@ -13,12 +13,14 @@ class LineMessage extends Model
         'direction',
         'message_type',
         'content',
+        'content_meta',
         'line_message_id',
         'read_at',
     ];
 
     protected $casts = [
         'read_at' => 'datetime',
+        'content_meta' => 'array',
     ];
 
     public function user(): BelongsTo

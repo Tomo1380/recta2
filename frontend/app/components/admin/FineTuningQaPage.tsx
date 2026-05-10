@@ -51,7 +51,23 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
-export function FineTuningQaPage() {
+export interface FineTuningQaPageProps {
+  /**
+   * Embedded mode: render without the page-level header/title and use callbacks
+   * instead of navigating to /admin/fine-tuning-qa/* routes. The host (e.g. the
+   * AI Chat Settings page tab) is responsible for showing/hiding an inline
+   * editor.
+   */
+  embedded?: boolean;
+  onEdit?: (id: number) => void;
+  onNew?: () => void;
+}
+
+export function FineTuningQaPage({
+  embedded = false,
+  onEdit,
+  onNew,
+}: FineTuningQaPageProps = {}) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] =
@@ -153,22 +169,46 @@ export function FineTuningQaPage() {
   const pageNumbers: number[] = [];
   for (let i = 1; i <= lastPage; i++) pageNumbers.push(i);
 
+  const handleNewClick = () => {
+    if (embedded && onNew) {
+      onNew();
+    } else {
+      navigate("/admin/fine-tuning-qa/new");
+    }
+  };
+
+  const handleRowClick = (id: number) => {
+    if (embedded && onEdit) {
+      onEdit(id);
+    } else {
+      navigate(`/admin/fine-tuning-qa/${id}/edit`);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 700,
-            }}
-          >
-            Fine-tuning Q&amp;A
-          </h2>
-          <p className="text-[13px] text-muted-foreground mt-0.5">
-            ファインチューニング学習データの編集。修正後はJSONLエクスポートしてOpenAIに再アップロード
-          </p>
-        </div>
+        {embedded ? (
+          <div>
+            <p className="text-[13px] text-muted-foreground">
+              ファインチューニング学習データの編集。修正後はJSONLエクスポートしてOpenAIに再アップロード
+            </p>
+          </div>
+        ) : (
+          <div>
+            <h2
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontWeight: 700,
+              }}
+            >
+              Fine-tuning Q&amp;A
+            </h2>
+            <p className="text-[13px] text-muted-foreground mt-0.5">
+              ファインチューニング学習データの編集。修正後はJSONLエクスポートしてOpenAIに再アップロード
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -184,7 +224,7 @@ export function FineTuningQaPage() {
             JSONLエクスポート
           </button>
           <button
-            onClick={() => navigate("/admin/fine-tuning-qa/new")}
+            onClick={handleNewClick}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition-all"
           >
             <Plus className="w-4 h-4" />
@@ -284,9 +324,7 @@ export function FineTuningQaPage() {
                   <tr
                     key={it.id}
                     className="border-b border-border last:border-0 hover:bg-muted/20 transition cursor-pointer"
-                    onClick={() =>
-                      navigate(`/admin/fine-tuning-qa/${it.id}/edit`)
-                    }
+                    onClick={() => handleRowClick(it.id)}
                   >
                     <td className="py-2.5 px-4 text-muted-foreground">
                       #{it.id}

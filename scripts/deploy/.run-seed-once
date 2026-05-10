@@ -1,0 +1,2 @@
+Trigger: 2026-05-10 — apply migrations (content_meta, simplify_areas_categories) + reseed area/category and ensure idempotent state
+Remove this file in the next commit after deploy.

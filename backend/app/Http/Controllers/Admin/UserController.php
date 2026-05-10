@@ -58,7 +58,11 @@ class UserController extends Controller
     public function show(User $user): JsonResponse
     {
         $user->load([
-            'reviews' => fn ($q) => $q->with('store:id,name')->latest()->limit(20),
+            'reviews' => fn ($q) => $q
+                ->select(['id', 'user_id', 'store_id', 'rating', 'body', 'status', 'created_at', 'updated_at'])
+                ->with('store:id,name')
+                ->latest()
+                ->limit(20),
             'lineFriend',
         ])->loadCount('reviews');
 
