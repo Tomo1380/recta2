@@ -41,10 +41,15 @@ class FineTuningQaSeeder extends Seeder
 
         $source = 'seed-1000';
 
-        // Build a set of existing questions for this source so we don't dup.
+        // Map of existing question => { id, answer } for this source.
+        // Used to skip duplicates and to upgrade old (marker-less) answers
+        // when the regenerated JSONL contains [STORE:ID] markers.
         $existing = FineTuningQa::where('source', $source)
-            ->pluck('question')
-            ->flip();
+            ->select('id', 'question', 'answer')
+            ->get()
+            ->keyBy('question')
+            ->map(fn ($row) => ['id' => $row->id, 'answer' => $row->answer])
+            ->all();
 
         $fp = fopen($path, 'r');
         if (!$fp) {
@@ -87,10 +92,25 @@ class FineTuningQaSeeder extends Seeder
             }
 
             if (isset($existing[$question])) {
+                // Question already exists. Update only when the new answer
+                // contains a [STORE:ID] marker that the existing one lacks —
+                // this lets us re-run the seeder to upgrade the answer text
+                // (e.g. when generate.mjs regenerates with marker support)
+                // without disturbing rows that were hand-edited via the
+                // admin UI.
+                $existingId = $existing[$question]['id'];
+                $oldAnswer = $existing[$question]['answer'] ?? '';
+                $hasNewMarker = str_contains($answer, '[STORE:');
+                $hasOldMarker = str_contains((string) $oldAnswer, '[STORE:');
+                if ($hasNewMarker && !$hasOldMarker) {
+                    DB::table('fine_tuning_qa')
+                        ->where('id', $existingId)
+                        ->update(['answer' => $answer, 'updated_at' => $now]);
+                }
                 $skipped++;
                 continue;
             }
-            $existing[$question] = true;
+            $existing[$question] = ['id' => 0, 'answer' => $answer]; // dummy
 
             $batch[] = [
                 'category' => null,

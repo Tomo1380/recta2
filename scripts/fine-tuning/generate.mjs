@@ -31,7 +31,8 @@ const SYSTEM_PROMPT = [
   '六本木・銀座・新宿・歌舞伎町・池袋・赤坂・渋谷・北新地・中洲などの主要エリアの求人事情に詳しく、業界用語（場内指名・本指名・同伴・アフター・バック・ノルマ・ヘルプ・黒服・売り掛け・水揚げ・卓・LO・ラスソン 等）を正確に使い分けます。',
   '回答は 150〜300 字程度、丁寧だがフレンドリーな口調。質問返しはせず、相手の状況を肯定したうえで具体的な目安や考え方を示します。',
   '違法行為・性的サービス・未成年（18 歳未満）の就労に関する質問には応じません。',
-  '特定の店舗を断定的に薦めず、条件に合う候補が複数あることを示すに留めます。',
+  '回答中で店舗を紹介する場合は、必ず [STORE:ID] マーカー（例: [STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000〜10,000円）を店名の直前に付けてください。マーカーを使わずに店名だけを書くことは禁止です。',
+  '一般論・業界知識・条件解説に答える時は、特定の店舗を断定的に薦めず、条件にマッチする実店舗があるときのみ [STORE:ID] マーカー付きで紹介します。',
 ].join('\n');
 
 // ---------------------------------------------------------------------------
@@ -315,8 +316,119 @@ const industryTemplates = [
 ];
 
 // ---------------------------------------------------------------------------
-// カテゴリ 2: エリア × 条件 Q&A（400 件）
+// 実 DB の店舗データ取得（Fine-tuning 用 [STORE:ID] マーカー埋め込みに使用）
 // ---------------------------------------------------------------------------
+//
+// 環境変数 RECTA_API_BASE (デフォルト http://localhost:3333) の
+// /api/stores?per_page=200&publish_status=published を叩いて
+// 実店舗を取得する。失敗時は null を返し、テンプレ展開にフォールバック。
+
+const RECTA_API_BASE = process.env.RECTA_API_BASE || 'http://localhost:3333';
+
+async function fetchStoresFromApi() {
+  const url = `${RECTA_API_BASE}/api/stores?per_page=200&publish_status=published`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[stores] fetch failed: HTTP ${res.status}`);
+      return null;
+    }
+    const json = await res.json();
+    const data = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+    if (!data.length) {
+      console.warn('[stores] empty store list returned');
+      return null;
+    }
+    return data
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        area: s.area || '',
+        nearest_station: s.nearest_station || '',
+        category: s.category || '',
+        feature_tags: Array.isArray(s.feature_tags) ? s.feature_tags : [],
+        hourly_min: s.hourly_min ?? s.wage?.regular?.min ?? null,
+        hourly_max: s.hourly_max ?? s.wage?.regular?.max ?? null,
+      }))
+      .filter((s) => s.id && s.name);
+  } catch (err) {
+    console.warn(`[stores] fetch error: ${err.message}`);
+    return null;
+  }
+}
+
+// area名 -> 該当店舗(配列)のインデックスを作る
+function buildAreaIndex(stores) {
+  const idx = {};
+  for (const s of stores) {
+    const key = s.area;
+    if (!key) continue;
+    if (!idx[key]) idx[key] = [];
+    idx[key].push(s);
+  }
+  return idx;
+}
+
+// 条件キー -> 該当する feature_tags の配列。揃っていない場合は文字列マッチで救う。
+const CONDITION_TAG_MAP = {
+  beginner: ['未経験歓迎', '未経験OK', '初心者OK'],
+  high_wage: ['高時給'],
+  trial: ['体入できる', '体入OK'],
+  taxi: ['送りあり', '送迎あり', 'タクチケ支給'],
+  early_close: ['終電上がりOK', '終電上がり可'],
+  weekly1: ['週1OK'],
+  norma_low: ['ノルマなし', '同伴ノルマなし'],
+  age30: ['30代歓迎', 'アラフォーOK'],
+  daily_pay: ['日払いOK', '全額日払い'],
+  guarantee: ['保証あり', '時給保証あり'],
+  weekday: ['平日のみOK', '土日休み可'],
+  calm: ['落ち着いた雰囲気', '客層が落ち着いた系'],
+  waiwai: ['わいわい系'],
+  free_dress: ['私服OK', 'ドレス支給'],
+};
+
+function pickStoresForAreaCondition(areaName, condKey, stores, n = 3) {
+  if (!stores) return [];
+  const tags = CONDITION_TAG_MAP[condKey] || [];
+  const matches = stores.filter((s) => {
+    if (s.area !== areaName) return false;
+    if (!tags.length) return true; // 条件未紐付けはエリアのみで採用
+    return tags.some((t) => s.feature_tags?.includes(t));
+  });
+  // タグマッチが少なければエリアのみのマッチで補完
+  if (matches.length < n) {
+    const areaOnly = stores.filter((s) => s.area === areaName && !matches.includes(s));
+    matches.push(...areaOnly);
+  }
+  return matches.slice(0, n);
+}
+
+function formatStoreLine(store) {
+  const parts = [`[STORE:${store.id}]`];
+  parts.push(store.name);
+  const meta = [];
+  if (store.area) meta.push(store.area);
+  if (store.nearest_station) meta.push(store.nearest_station);
+  let line = `${parts.join(' ')}`;
+  if (meta.length) line += `（${meta.join('/')}）`;
+  if (store.hourly_min && store.hourly_max) {
+    line += `時給${Number(store.hourly_min).toLocaleString()}〜${Number(store.hourly_max).toLocaleString()}円`;
+  } else if (store.hourly_min) {
+    line += `時給${Number(store.hourly_min).toLocaleString()}円〜`;
+  }
+  return line;
+}
+
+// 条件解説 + 実店舗カード入りの回答を作る（推論時に [STORE:ID] が展開される）
+function buildAreaConditionAnswerWithStores(areaName, condKey, stores) {
+  const baseAnswer = buildAreaConditionAnswer(areaName, condKey);
+  const picks = pickStoresForAreaCondition(areaName, condKey, stores, 3);
+  if (picks.length === 0) return baseAnswer; // フォールバック
+  const lines = picks.map((s) => '・' + formatStoreLine(s)).join('\n');
+  // 「具体的な候補は…」末尾を、実店舗の紹介に置き換える
+  const trimmed = baseAnswer.replace(/具体的な候補は[^。]*。?\s*$/u, '').trim();
+  return `${trimmed}\n\n候補をいくつか挙げます：\n${lines}\n\n気になる店があれば店舗詳細から条件・口コミを確認してみてください。`;
+}
 
 const AREAS = [
   { key: '六本木', tier: 'high', wage: { min: 5000, max: 12000 }, vibe: '外資系・経営者層・ハイクラス' },
@@ -997,7 +1109,20 @@ function expandIndustry() {
   return out;
 }
 
-function expandArea() {
+// 店舗紹介系として [STORE:ID] マーカー付き回答を出す condition のホワイトリスト
+const STORE_RECOMMENDATION_CONDITIONS = new Set([
+  'beginner',
+  'high_wage',
+  'trial',
+  'daily_pay',
+  'weekly1',
+  'norma_low',
+  'age30',
+  'calm',
+  'free_dress',
+]);
+
+function expandArea(stores) {
   const out = [];
   // タネ
   for (const seed of areaSeeds) out.push(makeMessage(seed.q, seed.a));
@@ -1006,11 +1131,16 @@ function expandArea() {
   for (const area of AREAS) {
     for (const condKey of condKeys) {
       const phrase = CONDITIONS[condKey].phrase;
-      // パターン A: 〜の店ある？
-      out.push(makeMessage(`${area.key}で${phrase}の店ある？`, buildAreaConditionAnswer(area.key, condKey)));
-      // パターン A 別語尾
-      out.push(makeMessage(`${area.key}で${phrase}の店、教えて`, buildAreaConditionAnswer(area.key, condKey)));
-      // パターン B
+      // 店舗紹介に向く condition だけ実店舗 [STORE:ID] 付きにする
+      const useStoreCards = stores && STORE_RECOMMENDATION_CONDITIONS.has(condKey);
+      const storeAnswer = useStoreCards
+        ? buildAreaConditionAnswerWithStores(area.key, condKey, stores)
+        : buildAreaConditionAnswer(area.key, condKey);
+      // パターン A: 〜の店ある？  ← 店舗カード入り（条件マッチ時）
+      out.push(makeMessage(`${area.key}で${phrase}の店ある？`, storeAnswer));
+      // パターン A 別語尾  ← 店舗カード入り（条件マッチ時）
+      out.push(makeMessage(`${area.key}で${phrase}の店、教えて`, storeAnswer));
+      // パターン B  ← 解説のみ（学習に解説バリエが残るよう確保）
       out.push(makeMessage(`${area.key}って${phrase}の店ありますか？`, buildAreaConditionAnswer(area.key, condKey)));
     }
   }
@@ -1062,15 +1192,36 @@ function dedupAndCap(items, cap) {
   return out;
 }
 
-function main() {
+async function main() {
+  // 実 DB から店舗を取得（失敗時は null → テンプレのみで生成）
+  const stores = await fetchStoresFromApi();
+  if (stores) {
+    console.log(`[stores] fetched ${stores.length} published stores from ${RECTA_API_BASE}`);
+    const areaCounts = {};
+    for (const s of stores) areaCounts[s.area] = (areaCounts[s.area] || 0) + 1;
+    console.log(`[stores] by area: ${JSON.stringify(areaCounts)}`);
+  } else {
+    console.log('[stores] fallback to template-only generation (no [STORE:ID] markers)');
+  }
+
   const industry = dedupAndCap(expandIndustry(), 300);
-  const area = dedupAndCap(expandArea(), 400);
+  const area = dedupAndCap(expandArea(stores), 400);
   const feature = dedupAndCap(expandFeature(), 300);
 
   // 不足分があればテンプレを追加で再展開（ここでは出し切る）
   console.log(`[counts] industry=${industry.length} area=${area.length} feature=${feature.length}`);
 
   const all = [...industry, ...area, ...feature];
+
+  // [STORE:ID] マーカー混入数を観測用にログる
+  const markerCount = all.reduce((acc, x) => {
+    const a = x.messages[2]?.content ?? '';
+    const m = a.match(/\[STORE:\d+\]/g);
+    return acc + (m ? m.length : 0);
+  }, 0);
+  const markerEntries = all.filter((x) => /\[STORE:\d+\]/.test(x.messages[2]?.content ?? '')).length;
+  console.log(`[markers] ${markerEntries} entries contain [STORE:ID] (${markerCount} markers total)`);
+
   const lines = all.map((x) => JSON.stringify(x)).join('\n') + '\n';
   fs.writeFileSync(OUT_PATH, lines, 'utf8');
 
@@ -1083,4 +1234,7 @@ function main() {
   console.log(`[total]  ${all.length} entries, ~${Math.round(totalChars / 1000)}k chars (≈${Math.round(totalChars / 1000)}k tokens rough estimate)`);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

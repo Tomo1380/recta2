@@ -8,12 +8,16 @@ const tabs = [
   { label: "LINEで相談", icon: MessageCircle, action: "line" as const },
 ];
 
-export default function BottomTabBar() {
+export default function BottomTabBar({ inline = false }: { inline?: boolean }) {
   const location = useLocation();
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white"
+      className={
+        inline
+          ? "bg-white"
+          : "fixed bottom-0 left-0 right-0 z-50 bg-white"
+      }
       style={{ borderTop: "1px solid rgba(27,37,40,0.08)" }}
     >
       <div className="mx-auto flex max-w-md items-center justify-around py-2">

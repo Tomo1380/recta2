@@ -1167,9 +1167,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       </div>
 
       {/* ============================================================ */}
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar (skipped in preview — admin preview shell renders its own) */}
       {/* ============================================================ */}
-      <BottomTabBar />
+      {!previewData && <BottomTabBar />}
     </div>
   );
 }

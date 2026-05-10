@@ -16,14 +16,14 @@ LINE_MESSAGING_CHANNEL_ACCESS_TOKEN=（取得済み・.envに反映済み）
 
 ### LINE Loginチャネル (2009379837)
 - [ ] **コールバックURL** に `http://localhost:3333/api/auth/line/callback` を追加（DEV）
-- [ ] 本番リリース時：`https://recta2.example.com/api/auth/line/callback` を追加
+- [ ] 本番リリース時：`https://recta.isayama-dev.com/api/auth/line/callback` を追加
 - [ ] スコープ: `profile`, `openid` を有効化
 - [ ] 「Web App」の OAuth 2.1 を有効化
 
 ### LINE Messaging APIチャネル (2009380275)
 - [ ] **Webhook URL** に以下を登録：
   - DEV: `https://<トンネルURL>/api/webhook/line`（ngrok等で外部公開する必要あり）
-  - 本番: `https://recta2.example.com/api/webhook/line`
+  - 本番: `https://recta.isayama-dev.com/api/webhook/line`
 - [ ] 「Webhookの利用」を ON
 - [ ] 「応答メッセージ」「あいさつメッセージ」は OFF（自前で制御するため）
 - [ ] 「Webhook再送」は ON 推奨
@@ -52,3 +52,13 @@ LINE_MESSAGING_CHANNEL_ACCESS_TOKEN=（取得済み・.envに反映済み）
 - [ ] LINE Developers コンソールで本番URLを各チャネルに登録
 - [ ] Webhook 署名検証が動作していること確認
 - [ ] ngrok URL を Webhook から外す
+
+## トラブルシュート履歴
+
+### 2026-05-10: 友だち判定が常に「未追加」だった件
+- **症状**: ログイン済みかつ友だち追加済みのユーザーでも管理画面で「未友だち」表示。送ったメッセージも管理画面に出ない。
+- **原因**: LINE Developers コンソールのWebhook URLが旧Render環境（`https://recta2-api.onrender.com/api/line/webhook`）のまま。
+  - 現実装のwebhookパスは `/api/webhook/line` （Laravel api.php prefix `/api` + ルート `/webhook/line`）
+  - 旧URLのパス（`/api/line/webhook`）とも不一致
+- **修正**: Webhook URLを `https://recta.isayama-dev.com/api/webhook/line` に変更し、検証ボタンでSuccess確認。Webhookの利用=ON、応答メッセージ=OFF。
+- **再発防止**: チャネル設定変更時はこのチェックリストの「LINE Messaging APIチャネル」セクションを更新する。

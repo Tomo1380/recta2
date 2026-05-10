@@ -40,6 +40,7 @@ import {
 import { ShopPhonePreview } from "./ShopPhonePreview";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
+import BottomTabBar from "~/components/user/shared/BottomTabBar";
 
 // --- Step Definitions ---
 interface StepConfig {
@@ -2083,6 +2084,10 @@ export function ShopEditPage() {
                 },
               } satisfies StoreDetailResponse}
             />
+                </div>
+                {/* Bottom tab bar — pinned inside the iPhone shell, not the viewport */}
+                <div className="shrink-0">
+                  <BottomTabBar inline />
                 </div>
                 {/* Home indicator */}
                 <div className="h-6 flex items-center justify-center shrink-0">

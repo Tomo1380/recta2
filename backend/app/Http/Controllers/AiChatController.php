@@ -1374,13 +1374,36 @@ class AiChatController extends Controller
         // Try [STORE:ID] markers first
         preg_match_all('/\[STORE:(\d+)\]/', $text, $matches);
         if (!empty($matches[1])) {
-            $ids = array_unique($matches[1]);
-            return Store::whereIn('id', $ids)
+            $ids = array_values(array_unique(array_map('intval', $matches[1])));
+
+            // Validate against the live DB: only keep IDs that exist AND are published.
+            // Hallucinated / archived / draft IDs are silently dropped (debug-logged).
+            $validIds = Store::whereIn('id', $ids)
                 ->where('publish_status', 'published')
-                ->get()
-                ->map(fn($s) => $this->storeToCard($s))
-                ->values()
-                ->toArray();
+                ->pluck('id')
+                ->all();
+
+            $dropped = array_values(array_diff($ids, $validIds));
+            if (!empty($dropped)) {
+                \Log::debug('[ai-chat] dropped non-existent or unpublished STORE ids', [
+                    'dropped' => $dropped,
+                    'kept' => $validIds,
+                ]);
+            }
+
+            if (empty($validIds)) {
+                return [];
+            }
+
+            // Preserve marker order from the model's response.
+            $byId = Store::whereIn('id', $validIds)->get()->keyBy('id');
+            $ordered = [];
+            foreach ($ids as $id) {
+                if ($byId->has($id)) {
+                    $ordered[] = $this->storeToCard($byId->get($id));
+                }
+            }
+            return $ordered;
         }
 
         // Fallback: match store names in text (for FT mode where markers may be missing)
