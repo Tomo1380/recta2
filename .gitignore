@@ -72,3 +72,4 @@ training_data*.jsonl
 chat-test.cjs
 top-screenshot.cjs
 top-screenshot.png
+recta-*.png
