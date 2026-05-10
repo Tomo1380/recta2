@@ -9,15 +9,15 @@ logs
 npm-debug.log*
 
 # Dependencies
-node_modules
-frontend/node_modules
-backend/vendor
+node_modules/
+frontend/node_modules/
+backend/vendor/
 
 # Build output
-dist
+/dist/
 dist-ssr
-frontend/build
-frontend/.react-router
+frontend/build/
+frontend/.react-router/
 
 # Laravel
 backend/storage/*.key
@@ -44,9 +44,10 @@ redis-store
 # OS
 Thumbs.db
 
-# Test scripts
+# Ad-hoc dev/test scripts (Playwright MCP replaces these)
 *-test.cjs
 *-screenshot.cjs
+*-screenshot.png
 
 # MCP
 .mcp.json

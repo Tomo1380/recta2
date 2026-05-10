@@ -400,21 +400,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const [loading, setLoading] = useState(!previewData);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoMode, setVideoMode] = useState<"hero" | "mini">("hero");
-  const [videoDismissed, setVideoDismissed] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => {
-      setVideoMode(window.scrollY > 180 ? "mini" : "hero");
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    if (videoMode === "hero") setVideoDismissed(false);
-  }, [videoMode]);
+  const [videoMode, setVideoMode] = useState<"hero" | "mini" | "closed">("hero");
 
   // Keep preview data in sync when form changes
   useEffect(() => {
@@ -539,7 +525,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       {/* ============================================================ */}
       {/* 1. Sticky Hero Video */}
       {/* ============================================================ */}
-      {store.video_url && !(videoMode === "mini" && videoDismissed) && (
+      {store.video_url && videoMode !== "closed" && (
         <div
           className={
             videoMode === "hero"
@@ -562,18 +548,28 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           >
             <source src={store.video_url} type="video/mp4" />
           </video>
-          {videoMode === "hero" ? (
+          {videoMode === "hero" && (
             <div
-              className="absolute inset-0"
+              className="pointer-events-none absolute inset-0"
               style={{
                 background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.4) 100%)",
               }}
             />
+          )}
+          {videoMode === "hero" ? (
+            <button
+              type="button"
+              aria-label="動画を最小化"
+              onClick={() => setVideoMode("mini")}
+              className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white text-base leading-none hover:bg-black/80"
+            >
+              −
+            </button>
           ) : (
             <button
               type="button"
               aria-label="動画を閉じる"
-              onClick={() => setVideoDismissed(true)}
+              onClick={() => setVideoMode("closed")}
               className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white text-xs hover:bg-black/80"
             >
               ×
@@ -588,9 +584,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       <div
         className="relative z-10"
         style={{
-          marginTop: store.video_url ? `${heroHeight - 20}px` : "0",
-          borderTopLeftRadius: store.video_url ? "20px" : "0",
-          borderTopRightRadius: store.video_url ? "20px" : "0",
+          marginTop: store.video_url && videoMode === "hero" ? `${heroHeight - 20}px` : "0",
+          borderTopLeftRadius: store.video_url && videoMode === "hero" ? "20px" : "0",
+          borderTopRightRadius: store.video_url && videoMode === "hero" ? "20px" : "0",
           backgroundColor: "#fafeff",
         }}
       >
