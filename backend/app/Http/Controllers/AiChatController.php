@@ -6,6 +6,7 @@ use App\Models\AiChatLimit;
 use App\Models\AiChatLog;
 use App\Models\AiChatSetting;
 use App\Models\Area;
+use App\Models\Article;
 use App\Models\Category;
 use App\Models\IndustryKnowledge;
 use App\Models\Store;
@@ -153,19 +154,19 @@ class AiChatController extends Controller
             $query->where('category', 'ilike', "%{$args['category']}%");
         }
         if (!empty($args['min_hourly'])) {
-            $query->where('hourly_min', '>=', (int)$args['min_hourly']);
+            $query->where('wage->regular->min', '>=', (int)$args['min_hourly']);
         }
         if (!empty($args['max_hourly'])) {
-            $query->where('hourly_min', '<=', (int)$args['max_hourly']);
+            $query->where('wage->regular->min', '<=', (int)$args['max_hourly']);
         }
         if (!empty($args['nearest_station'])) {
             $query->where('nearest_station', 'ilike', "%{$args['nearest_station']}%");
         }
         if (!empty($args['same_day_trial'])) {
-            $query->where('same_day_trial', true);
+            $query->where('guarantee->same_day_trial', true);
         }
         if (!empty($args['has_guarantee'])) {
-            $query->whereNotNull('guarantee_period')->where('guarantee_period', '!=', '');
+            $query->whereNotNull('guarantee->period')->where('guarantee->period', '!=', '');
         }
         if (!empty($args['keyword'])) {
             $keywords = preg_split('/[\s　,、]+/u', trim($args['keyword']));
@@ -197,8 +198,8 @@ class AiChatController extends Controller
 
         $sort = $args['sort'] ?? 'newest';
         match ($sort) {
-            'hourly_desc' => $query->orderByDesc('hourly_max'),
-            'hourly_asc' => $query->orderBy('hourly_min'),
+            'hourly_desc' => $query->orderBy('wage->regular->max', 'desc'),
+            'hourly_asc' => $query->orderBy('wage->regular->min', 'asc'),
             'popular' => $query->withCount(['reviews' => fn($q) => $q->where('status', 'published')])->orderByDesc('reviews_count'),
             default => $query->orderByDesc('created_at'),
         };
@@ -208,32 +209,42 @@ class AiChatController extends Controller
 
         return [
             'count' => $stores->count(),
-            'stores' => $stores->map(fn($s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-                'area' => $s->area,
-                'category' => $s->category,
-                'nearest_station' => $s->nearest_station,
-                'hourly_min' => $s->hourly_min,
-                'hourly_max' => $s->hourly_max,
-                'daily_estimate' => $s->daily_estimate,
-                'same_day_trial' => $s->same_day_trial,
-                'trial_hourly' => $s->trial_hourly,
-                'guarantee_period' => $s->guarantee_period,
-                'feature_tags' => $s->feature_tags ?? [],
-                'business_hours' => $s->business_hours,
-                'opening_time' => $s->opening_time,
-                'closing_time' => $s->closing_time,
-                'shift_info' => $s->shift_info,
-                'payroll_system_type' => $s->payroll_system_type,
-                'transfer_km' => $s->transfer_km,
-                'dress_code' => $s->dress_code,
-                'description' => $s->description,
-                'features_text' => $s->features_text,
-                'images' => $s->images ?? [],
-                'average_rating' => round($s->averageRating(), 1),
-                'reviews_count' => $s->reviewCount(),
-            ])->values()->toArray(),
+            'stores' => $stores->map(function ($s) {
+                $schedule  = is_array($s->schedule) ? $s->schedule : [];
+                $wage      = is_array($s->wage) ? $s->wage : [];
+                $guarantee = is_array($s->guarantee) ? $s->guarantee : [];
+                $regular   = $wage['regular'] ?? [];
+                $trial     = $wage['trial'] ?? [];
+                $payroll   = $wage['payroll'] ?? [];
+                $dressCode = is_array($s->dress_code) ? $s->dress_code : [];
+
+                return [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'area' => $s->area,
+                    'category' => $s->category,
+                    'nearest_station' => $s->nearest_station,
+                    'hourly_min' => $regular['min'] ?? null,
+                    'hourly_max' => $regular['max'] ?? null,
+                    'daily_estimate' => $wage['daily_estimate'] ?? null,
+                    'same_day_trial' => (bool) ($guarantee['same_day_trial'] ?? false),
+                    'trial_hourly' => $trial['hourly'] ?? null,
+                    'guarantee_period' => $guarantee['period'] ?? null,
+                    'feature_tags' => $s->feature_tags ?? [],
+                    'business_hours' => $schedule['hours_text'] ?? null,
+                    'opening_time' => $schedule['open'] ?? null,
+                    'closing_time' => $schedule['close'] ?? null,
+                    'shift_info' => $schedule['shift_info'] ?? null,
+                    'payroll_system_type' => $payroll['type'] ?? null,
+                    'transfer_km' => $s->transfer_km,
+                    'dress_code' => $dressCode['description'] ?? null,
+                    'description' => $s->description,
+                    'features_text' => $s->features_text,
+                    'images' => $s->images ?? [],
+                    'average_rating' => round($s->averageRating(), 1),
+                    'reviews_count' => $s->reviewCount(),
+                ];
+            })->values()->toArray(),
         ];
     }
 
@@ -244,6 +255,17 @@ class AiChatController extends Controller
             return ['error' => '店舗が見つかりませんでした。'];
         }
 
+        $schedule    = is_array($store->schedule)     ? $store->schedule     : [];
+        $wage        = is_array($store->wage)         ? $store->wage         : [];
+        $compensation= is_array($store->compensation) ? $store->compensation : [];
+        $guarantee   = is_array($store->guarantee)    ? $store->guarantee    : [];
+        $interview   = is_array($store->interview)    ? $store->interview    : [];
+        $castProfile = is_array($store->cast_profile) ? $store->cast_profile : [];
+        $dressCode   = is_array($store->dress_code)   ? $store->dress_code   : [];
+        $regular     = $wage['regular']  ?? [];
+        $trial       = $wage['trial']    ?? [];
+        $payroll     = $wage['payroll']  ?? [];
+
         return [
             'id' => $store->id,
             'name' => $store->name,
@@ -251,38 +273,42 @@ class AiChatController extends Controller
             'address' => $store->address,
             'nearest_station' => $store->nearest_station,
             'category' => $store->category,
-            'business_hours' => $store->business_hours,
-            'holidays' => $store->holidays,
-            'hourly_min' => $store->hourly_min,
-            'hourly_max' => $store->hourly_max,
-            'daily_estimate' => $store->daily_estimate,
-            'back_items' => $store->back_items,
-            'fee_items' => $store->fee_items,
-            'salary_notes' => $store->salary_notes,
-            'guarantee_period' => $store->guarantee_period,
-            'guarantee_details' => $store->guarantee_details,
-            'norma_info' => $store->norma_info,
-            'trial_avg_hourly' => $store->trial_avg_hourly,
-            'trial_hourly' => $store->trial_hourly,
-            'same_day_trial' => $store->same_day_trial,
-            'interview_hours' => $store->interview_hours,
-            'interview_info' => $store->interview_info,
+            'business_hours' => $schedule['hours_text'] ?? null,
+            'holidays' => $schedule['holidays'] ?? null,
+            'hourly_min' => $regular['min'] ?? null,
+            'hourly_max' => $regular['max'] ?? null,
+            'daily_estimate' => $wage['daily_estimate'] ?? null,
+            'back_items' => $compensation['back'] ?? null,
+            'fee_items' => $compensation['fees'] ?? null,
+            'salary_notes' => $compensation['notes'] ?? null,
+            'guarantee_period' => $guarantee['period'] ?? null,
+            'guarantee_details' => $guarantee['details'] ?? null,
+            'norma_info' => $guarantee['norma'] ?? null,
+            'trial_avg_hourly' => $trial['avg_hourly'] ?? null,
+            'trial_hourly' => $trial['hourly'] ?? null,
+            'same_day_trial' => (bool) ($guarantee['same_day_trial'] ?? false),
+            'interview_hours' => (isset($interview['start']) || isset($interview['end']))
+                ? (($interview['start'] ?? '') . '〜' . ($interview['end'] ?? ''))
+                : null,
+            'interview_info' => $interview ?: null,
             'required_documents' => $store->required_documents,
             'schedule' => $store->schedule,
             'recent_hires_summary' => $store->recent_hires_summary,
             'popular_features' => $store->popular_features,
             'analysis' => $store->analysis,
-            'recruitment_standards' => $store->recruitment_standards,
+            'recruitment_standards' => $interview['recruitment_standards'] ?? null,
             'rank' => $store->rank,
-            'gal_point' => $store->gal_point,
-            'loose_point' => $store->loose_point,
-            'age_point' => $store->age_point,
-            'waiwai_point' => $store->waiwai_point,
-            'cute_point' => $store->cute_point,
-            'unit_wage_type' => $store->unit_wage_type,
-            'payroll_system_type' => $store->payroll_system_type,
-            'payroll_system_description' => $store->payroll_system_description,
-            'dress_code' => $store->dress_code,
+            'gal_point' => $castProfile['gal'] ?? null,
+            'loose_point' => $castProfile['loose'] ?? null,
+            'age_point' => $castProfile['age'] ?? null,
+            'waiwai_point' => $castProfile['waiwai'] ?? null,
+            'cute_point' => $castProfile['cute'] ?? null,
+            'unit_wage_type' => isset($regular['unit'])
+                ? ($regular['unit'] === 'day' ? '日給' : '時給')
+                : null,
+            'payroll_system_type' => $payroll['type'] ?? null,
+            'payroll_system_description' => $payroll['description'] ?? null,
+            'dress_code' => $dressCode['description'] ?? null,
             'champagne_description' => $store->champagne_description,
             'transfer_description' => $store->transfer_description,
             'transfer_km' => $store->transfer_km,
@@ -318,10 +344,36 @@ class AiChatController extends Controller
         }
 
         $allArticles = Cache::remember('industry_knowledges', 600, function () {
-            return IndustryKnowledge::where('is_active', true)
+            $knowledge = IndustryKnowledge::where('is_active', true)
                 ->orderBy('sort_order')
                 ->get(['title', 'category', 'keywords', 'content'])
+                ->map(fn ($k) => [
+                    'title' => $k->title,
+                    'category' => $k->category,
+                    'keywords' => $k->keywords ?? [],
+                    'content' => $k->content,
+                    'source' => 'knowledge',
+                ])
                 ->toArray();
+
+            // Articles are also part of the AI knowledge base. Use title + excerpt + plain
+            // body text. tags act as additional keyword hints for matching.
+            $articles = Article::published()
+                ->get(['title', 'category', 'tags', 'excerpt', 'body_html', 'slug'])
+                ->map(function ($a) {
+                    $plain = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $a->body_html)));
+                    return [
+                        'title' => $a->title,
+                        'category' => $a->category ?: 'コラム',
+                        'keywords' => $a->tags ?? [],
+                        'content' => trim(($a->excerpt ? $a->excerpt . "\n\n" : '') . $plain),
+                        'source' => 'article',
+                        'slug' => $a->slug,
+                    ];
+                })
+                ->toArray();
+
+            return array_merge($knowledge, $articles);
         });
 
         $matched = [];
@@ -1076,15 +1128,29 @@ class AiChatController extends Controller
             $lines = [$header];
 
             foreach ($stores as $s) {
+                $schedule    = is_array($s->schedule)     ? $s->schedule     : [];
+                $wage        = is_array($s->wage)         ? $s->wage         : [];
+                $guarantee   = is_array($s->guarantee)    ? $s->guarantee    : [];
+                $castProfile = is_array($s->cast_profile) ? $s->cast_profile : [];
+                $dressCodeArr= is_array($s->dress_code)   ? $s->dress_code   : [];
+                $regular     = $wage['regular'] ?? [];
+                $trialArr    = $wage['trial']   ?? [];
+                $payrollArr  = $wage['payroll'] ?? [];
+
                 $tags = implode(',', $s->feature_tags ?? []);
-                $payroll = $s->payroll_system_type ?? '';
-                $trial = $s->same_day_trial ? "当日OK({$s->trial_hourly})" : ($s->trial_hourly ? "体入{$s->trial_hourly}" : '');
-                $guarantee = $s->guarantee_period ? "{$s->guarantee_period}" : '';
-                $norma = mb_substr(str_replace('|', '/', $s->norma_info ?? ''), 0, 30);
+                $payroll = $payrollArr['type'] ?? '';
+                $trialHourly = $trialArr['hourly'] ?? '';
+                $sameDay = (bool) ($guarantee['same_day_trial'] ?? false);
+                $trial = $sameDay ? "当日OK({$trialHourly})" : ($trialHourly ? "体入{$trialHourly}" : '');
+                $guaranteeStr = $guarantee['period'] ?? '';
+                $norma = mb_substr(str_replace('|', '/', $guarantee['norma'] ?? ''), 0, 30);
                 $rank = $s->rank ?? '';
-                $waiwai = $s->waiwai_point ?? '';
-                $loose = $s->loose_point ?? '';
-                $dressCode = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->dress_code ?? ''), 0, 30);
+                $waiwai = $castProfile['waiwai'] ?? '';
+                $loose  = $castProfile['loose']  ?? '';
+                $dressCodeStr = mb_substr(
+                    str_replace(['|', "\n"], ['/', ' '], $dressCodeArr['description'] ?? ''),
+                    0, 30
+                );
                 $transfer = $s->transfer_km ? "送り{$s->transfer_km}" : ($s->transfer_description ? '送りあり' : '');
                 $desc = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->description ?? ''), 0, 80);
 
@@ -1094,18 +1160,18 @@ class AiChatController extends Controller
                     $s->area,
                     $s->nearest_station ?? '',
                     $s->category ?? '',
-                    $s->hourly_min ?? '',
-                    $s->hourly_max ?? '',
-                    $s->opening_time ?? '',
-                    $s->closing_time ?? '',
+                    $regular['min'] ?? '',
+                    $regular['max'] ?? '',
+                    $schedule['open']  ?? '',
+                    $schedule['close'] ?? '',
                     $payroll,
                     $trial,
-                    $guarantee,
+                    $guaranteeStr,
                     $norma,
                     $rank,
                     $waiwai,
                     $loose,
-                    $dressCode,
+                    $dressCodeStr,
                     $transfer,
                     $tags,
                     $desc,
@@ -1125,8 +1191,26 @@ class AiChatController extends Controller
         if ($pageType === 'detail' && $storeId) {
             $store = Store::find($storeId);
             if ($store) {
+                $schedule    = is_array($store->schedule)     ? $store->schedule     : [];
+                $wage        = is_array($store->wage)         ? $store->wage         : [];
+                $compensation= is_array($store->compensation) ? $store->compensation : [];
+                $guarantee   = is_array($store->guarantee)    ? $store->guarantee    : [];
+                $regular     = $wage['regular'] ?? [];
+                $trial       = $wage['trial']   ?? [];
+
+                $hourlyMin = $regular['min'] ?? '';
+                $hourlyMax = $regular['max'] ?? '';
+                $businessHours = $schedule['hours_text'] ?? '';
+                $holidays = $schedule['holidays'] ?? '';
+                $dailyEstimate = $wage['daily_estimate'] ?? null;
+                $norma = $guarantee['norma'] ?? null;
+                $guaranteePeriod = $guarantee['period'] ?? null;
+                $guaranteeDetails = $guarantee['details'] ?? '';
+                $sameDayTrial = (bool) ($guarantee['same_day_trial'] ?? false);
+                $trialHourly = $trial['hourly'] ?? '';
+
                 $tags = implode(', ', $store->feature_tags ?? []);
-                $backs = collect($store->back_items ?? [])
+                $backs = collect($compensation['back'] ?? [])
                     ->map(fn($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))
                     ->filter(fn($b) => $b !== ':')
                     ->implode(', ');
@@ -1135,15 +1219,15 @@ class AiChatController extends Controller
                     "店名: {$store->name}\n" .
                     "エリア: {$store->area}（{$store->nearest_station}）\n" .
                     "カテゴリ: {$store->category}\n" .
-                    "時給: {$store->hourly_min}〜{$store->hourly_max}円\n" .
-                    "営業時間: {$store->business_hours}\n" .
-                    "定休日: {$store->holidays}\n";
+                    "時給: {$hourlyMin}〜{$hourlyMax}円\n" .
+                    "営業時間: {$businessHours}\n" .
+                    "定休日: {$holidays}\n";
 
-                if ($store->daily_estimate) $context .= "日給目安: {$store->daily_estimate}\n";
+                if ($dailyEstimate) $context .= "日給目安: {$dailyEstimate}\n";
                 if ($backs) $context .= "バック: {$backs}\n";
-                if ($store->norma_info) $context .= "ノルマ: {$store->norma_info}\n";
-                if ($store->guarantee_period) $context .= "保証: {$store->guarantee_period} {$store->guarantee_details}\n";
-                if ($store->same_day_trial) $context .= "当日体入: OK（体入時給: {$store->trial_hourly}）\n";
+                if ($norma) $context .= "ノルマ: {$norma}\n";
+                if ($guaranteePeriod) $context .= "保証: {$guaranteePeriod} {$guaranteeDetails}\n";
+                if ($sameDayTrial) $context .= "当日体入: OK（体入時給: {$trialHourly}）\n";
                 if ($tags) $context .= "特徴: {$tags}\n";
                 $context .= "説明: {$store->description}\n";
                 if ($store->features_text) $context .= "詳細特徴: {$store->features_text}\n";
@@ -1315,14 +1399,17 @@ class AiChatController extends Controller
 
     private function storeToCard(Store $s): array
     {
+        $wage    = is_array($s->wage) ? $s->wage : [];
+        $regular = $wage['regular'] ?? [];
+
         return [
             'id' => $s->id,
             'name' => $s->name,
             'area' => $s->area,
             'category' => $s->category,
             'nearest_station' => $s->nearest_station,
-            'hourly_min' => $s->hourly_min,
-            'hourly_max' => $s->hourly_max,
+            'hourly_min' => $regular['min'] ?? null,
+            'hourly_max' => $regular['max'] ?? null,
             'description' => $s->description,
             'feature_tags' => $s->feature_tags,
             'images' => $s->images,
@@ -1351,7 +1438,7 @@ class AiChatController extends Controller
             $query->whereJsonContains('feature_tags', '日払いOK');
         }
         if (str_contains($message, '時給') || str_contains($message, '高時給') || str_contains($message, 'バック') || str_contains($message, '給料')) {
-            $query->orderByDesc('hourly_max');
+            $query->orderBy('wage->regular->max', 'desc');
         }
 
         // Area keywords
@@ -1380,28 +1467,38 @@ class AiChatController extends Controller
             $stores = Store::where('publish_status', 'published')->limit(3)->get();
         }
 
-        $storeCards = $stores->map(fn($s) => [
-            'id' => $s->id,
-            'name' => $s->name,
-            'area' => $s->area,
-            'category' => $s->category,
-            'nearest_station' => $s->nearest_station,
-            'hourly_min' => $s->hourly_min,
-            'hourly_max' => $s->hourly_max,
-            'feature_tags' => $s->feature_tags,
-            'description' => mb_substr($s->description ?? '', 0, 100),
-            'images' => $s->images,
-            'average_rating' => round($s->averageRating(), 1),
-        ])->values()->toArray();
+        $storeCards = $stores->map(function ($s) {
+            $wage    = is_array($s->wage) ? $s->wage : [];
+            $regular = $wage['regular'] ?? [];
+            return [
+                'id' => $s->id,
+                'name' => $s->name,
+                'area' => $s->area,
+                'category' => $s->category,
+                'nearest_station' => $s->nearest_station,
+                'hourly_min' => $regular['min'] ?? null,
+                'hourly_max' => $regular['max'] ?? null,
+                'feature_tags' => $s->feature_tags,
+                'description' => mb_substr($s->description ?? '', 0, 100),
+                'images' => $s->images,
+                'average_rating' => round($s->averageRating(), 1),
+            ];
+        })->values()->toArray();
 
         $lineCta = "\n\nもっと詳しく知りたい方は、LINEで担当者に直接相談できます！";
 
         // Build response with actual store names and details
         $storeList = $stores->map(function ($s) {
-            $line = "・{$s->name}（{$s->area}/{$s->nearest_station}）時給" . number_format($s->hourly_min) . "〜" . number_format($s->hourly_max) . "円";
+            $wage      = is_array($s->wage) ? $s->wage : [];
+            $regular   = $wage['regular'] ?? [];
+            $guarantee = is_array($s->guarantee) ? $s->guarantee : [];
+            $hourlyMin = (int) ($regular['min'] ?? 0);
+            $hourlyMax = (int) ($regular['max'] ?? 0);
+
+            $line = "・{$s->name}（{$s->area}/{$s->nearest_station}）時給" . number_format($hourlyMin) . "〜" . number_format($hourlyMax) . "円";
             $features = [];
-            if ($s->same_day_trial) $features[] = '当日体入OK';
-            if ($s->guarantee_period) $features[] = '保証あり';
+            if (!empty($guarantee['same_day_trial'])) $features[] = '当日体入OK';
+            if (!empty($guarantee['period'])) $features[] = '保証あり';
             $tags = $s->feature_tags ?? [];
             if (in_array('未経験歓迎', $tags)) $features[] = '未経験歓迎';
             if (in_array('ノルマなし', $tags)) $features[] = 'ノルマなし';

@@ -271,56 +271,122 @@ class StoreSeeder extends Seeder
         $appeal = self::APPEALS[array_rand(self::APPEALS)];
         $description = "{$area['name']}の{$adj}{$category['name']}。{$appeal}";
 
+        // ---------- Schedule JSONB ----------
+        $schedule = [
+            'open' => $hoursStart,
+            'close' => $hoursEnd,
+            'holidays' => $holidays,
+            'shift_info' => '週' . rand(1, 3) . '日〜OK。シフト自由制。',
+            'hours_text' => "{$hoursStart}〜{$hoursEnd}",
+        ];
+
+        // ---------- Wage JSONB ----------
+        $unitWageType = ['時給', '時給', '時給', '日給'][array_rand(['時給', '時給', '時給', '日給'])];
+        $payrollType = ['全額日払い', '日払い可', '月2回', '月末締め翌月払い'][array_rand(['全額日払い', '日払い可', '月2回', '月末締め翌月払い'])];
+        $payrollDescription = $this->chance(0.5)
+            ? ['体入時も全額日払い。', '日払い・週払い選択可。', '月末締め翌月15日払い。前払い相談可。'][array_rand([0, 1, 2])]
+            : null;
+
+        $wage = [
+            'regular' => [
+                'min' => $hourlyMin,
+                'max' => $hourlyMax,
+                'unit' => $unitWageType === '日給' ? 'day' : 'hour',
+            ],
+            'payroll' => [
+                'type' => $payrollType,
+                'description' => $payrollDescription,
+            ],
+            'daily_estimate' => number_format($hourlyMin * 5) . '円〜' . number_format($hourlyMax * 6) . '円',
+        ];
+
+        if ($this->chance(0.7)) {
+            $wage['trial'] = [
+                'hourly' => number_format($hourlyMin) . '円',
+                'avg_hourly' => number_format($hourlyMin + 500) . '円',
+                'days' => rand(1, 3),
+            ];
+        }
+
         $store = [
             'name' => $name,
             'area' => $area['name'],
             'address' => $area['address_prefix'] . rand(1, 9) . '-' . rand(1, 30) . '-' . rand(1, 15),
             'nearest_station' => $station,
             'category' => $category['name'],
-            'business_hours' => "{$hoursStart}〜{$hoursEnd}",
-            'opening_time' => $hoursStart,
-            'closing_time' => $hoursEnd,
-            'holidays' => $holidays,
-            'shift_info' => '週' . rand(1, 3) . '日〜OK。シフト自由制。',
             'phone' => '03-' . rand(1000, 9999) . '-' . rand(1000, 9999),
-            'hourly_min' => $hourlyMin,
-            'hourly_max' => $hourlyMax,
-            'daily_estimate' => number_format($hourlyMin * 5) . '円〜' . number_format($hourlyMax * 6) . '円',
+            'schedule' => $schedule,
+            'wage' => $wage,
             'feature_tags' => $tags,
             'description' => $description,
             'features_text' => "{$station}徒歩" . rand(1, 8) . "分。{$appeal}",
             'publish_status' => 'published',
         ];
 
-        // Optional fields (70% chance each)
+        // ---------- Compensation JSONB ----------
+        $compensation = [];
         if ($this->chance(0.7)) {
-            $store['back_items'] = $this->randomBackItems();
+            $compensation['back'] = $this->randomBackItems();
         }
         if ($this->chance(0.6)) {
-            $store['fee_items'] = $this->randomFeeItems();
+            $compensation['fees'] = $this->randomFeeItems();
         }
         if ($this->chance(0.6)) {
-            $store['salary_notes'] = $this->randomSalaryNotes();
+            $compensation['notes'] = $this->randomSalaryNotes();
+        }
+        if (!empty($compensation)) {
+            $store['compensation'] = $compensation;
+        }
+
+        // ---------- Guarantee JSONB ----------
+        $guarantee = [];
+        if ($this->chance(0.5)) {
+            $guarantee['period'] = ['1ヶ月', '2ヶ月', '最大3ヶ月'][array_rand(['1ヶ月', '2ヶ月', '最大3ヶ月'])];
+            $guarantee['details'] = "未経験者は時給" . number_format($hourlyMin + 1000) . "円保証。";
         }
         if ($this->chance(0.5)) {
-            $store['guarantee_period'] = ['1ヶ月', '2ヶ月', '最大3ヶ月'][array_rand(['1ヶ月', '2ヶ月', '最大3ヶ月'])];
-            $store['guarantee_details'] = "未経験者は時給" . number_format($hourlyMin + 1000) . "円保証。";
+            $guarantee['norma'] = ['ノルマなし', 'ノルマなし。ただし月8日以上の出勤推奨。', '月間売上目標あり（未達でもペナルティなし）'][array_rand(['ノルマなし', 'ノルマなし。ただし月8日以上の出勤推奨。', '月間売上目標あり（未達でもペナルティなし）'])];
         }
-        if ($this->chance(0.5)) {
-            $store['norma_info'] = ['ノルマなし', 'ノルマなし。ただし月8日以上の出勤推奨。', '月間売上目標あり（未達でもペナルティなし）'][array_rand(['ノルマなし', 'ノルマなし。ただし月8日以上の出勤推奨。', '月間売上目標あり（未達でもペナルティなし）'])];
+        if (isset($wage['trial'])) {
+            $guarantee['same_day_trial'] = $this->chance(0.4);
         }
+        if (!empty($guarantee)) {
+            $store['guarantee'] = $guarantee;
+        }
+
+        // ---------- Interview JSONB ----------
+        $interview = [];
         if ($this->chance(0.7)) {
-            $store['trial_avg_hourly'] = number_format($hourlyMin + 500) . '円';
-            $store['trial_hourly'] = number_format($hourlyMin) . '円';
             $interviewRanges = [
                 ['13:00', '18:00'], ['14:00', '19:00'], ['15:00', '20:00'], ['12:00', '17:00'],
             ];
             $interviewRange = $interviewRanges[array_rand($interviewRanges)];
-            $store['interview_hours'] = "{$interviewRange[0]}〜{$interviewRange[1]}";
-            $store['interview_start'] = $interviewRange[0];
-            $store['interview_end'] = $interviewRange[1];
-            $store['same_day_trial'] = $this->chance(0.4);
+            $interview['start'] = $interviewRange[0];
+            $interview['end'] = $interviewRange[1];
         }
+        if ($this->chance(0.4)) {
+            $interview['recruitment_standards'] = ['18歳以上（高校生不可）。明るい方歓迎。', '未経験者歓迎。容姿よりコミュ力重視。', '経験者優遇。20〜30代活躍中。'][array_rand(['18歳以上（高校生不可）。明るい方歓迎。', '未経験者歓迎。容姿よりコミュ力重視。', '経験者優遇。20〜30代活躍中。'])];
+        }
+        if (!empty($interview)) {
+            $store['interview'] = $interview;
+        }
+
+        // ---------- Cast Profile JSONB ----------
+        $store['cast_profile'] = [
+            'gal' => rand(0, 100),
+            'loose' => rand(0, 100),
+            'age' => rand(0, 100),
+            'waiwai' => rand(0, 100),
+            'cute' => rand(0, 100),
+        ];
+
+        // ---------- Dress Code JSONB ----------
+        if ($this->chance(0.5)) {
+            $dressCodeDesc = ['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'][array_rand(['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'])];
+            $store['dress_code'] = ['description' => $dressCodeDesc];
+        }
+
+        // ---------- Optional fields ----------
         if ($this->chance(0.4)) {
             $store['analysis'] = $this->randomAnalysis($category['name']);
         }
@@ -337,22 +403,7 @@ class StoreSeeder extends Seeder
 
         // New columns
         $store['rank'] = ['S', 'A', 'A', 'B', 'B', 'B', 'C'][array_rand(['S', 'A', 'A', 'B', 'B', 'B', 'C'])];
-        $store['gal_point'] = rand(0, 100);
-        $store['loose_point'] = rand(0, 100);
-        $store['age_point'] = rand(0, 100);
-        $store['waiwai_point'] = rand(0, 100);
-        $store['cute_point'] = rand(0, 100);
-        $store['unit_wage_type'] = ['時給', '時給', '時給', '日給'][array_rand(['時給', '時給', '時給', '日給'])];
-        $store['payroll_system_type'] = ['全額日払い', '日払い可', '月2回', '月末締め翌月払い'][array_rand(['全額日払い', '日払い可', '月2回', '月末締め翌月払い'])];
-        if ($this->chance(0.5)) {
-            $store['payroll_system_description'] = ['体入時も全額日払い。', '日払い・週払い選択可。', '月末締め翌月15日払い。前払い相談可。'][array_rand(['体入時も全額日払い。', '日払い・週払い選択可。', '月末締め翌月15日払い。前払い相談可。'])];
-        }
-        if ($this->chance(0.4)) {
-            $store['recruitment_standards'] = ['18歳以上（高校生不可）。明るい方歓迎。', '未経験者歓迎。容姿よりコミュ力重視。', '経験者優遇。20〜30代活躍中。'][array_rand(['18歳以上（高校生不可）。明るい方歓迎。', '未経験者歓迎。容姿よりコミュ力重視。', '経験者優遇。20〜30代活躍中。'])];
-        }
-        if ($this->chance(0.5)) {
-            $store['dress_code'] = ['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'][array_rand(['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'])];
-        }
+
         if ($this->chance(0.4)) {
             $store['champagne_description'] = ['モエ・エ・シャンドン、ヴーヴクリコなど各種あり。', 'ボトルバック10%〜。高級シャンパン多数取り揃え。', 'シャンパンタワー対応可。各種銘柄あり。'][array_rand(['モエ・エ・シャンドン、ヴーヴクリコなど各種あり。', 'ボトルバック10%〜。高級シャンパン多数取り揃え。', 'シャンパンタワー対応可。各種銘柄あり。'])];
         }
@@ -361,13 +412,6 @@ class StoreSeeder extends Seeder
             $store['transfer_km'] = rand(10, 30) . 'km';
         }
 
-        if ($this->chance(0.25)) {
-            $store['schedule'] = [
-                'hours' => $store['business_hours'],
-                'holidays' => $store['holidays'],
-                'shift_info' => '週' . rand(1, 3) . '日〜OK。シフト自由制。',
-            ];
-        }
         if ($this->chance(0.2)) {
             $store['recent_hires'] = [
                 [
@@ -378,6 +422,9 @@ class StoreSeeder extends Seeder
             ];
             $store['recent_hires_summary'] = '直近1ヶ月で' . $store['recent_hires'][0]['count'] . '名採用';
         }
+
+        // experience_guaranteed flag
+        $store['experience_guaranteed'] = $this->chance(0.15);
 
         return $store;
     }
@@ -557,34 +604,58 @@ class StoreSeeder extends Seeder
                 'address' => '東京都港区六本木3-15-20',
                 'nearest_station' => '六本木駅',
                 'category' => 'キャバクラ',
-                'business_hours' => '20:00〜LAST',
-                'opening_time' => '20:00',
-                'closing_time' => 'LAST',
-                'holidays' => '日曜日',
-                'shift_info' => '週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。',
                 'phone' => '03-1234-5678',
-                'hourly_min' => 4000,
-                'hourly_max' => 8000,
-                'daily_estimate' => '30,000円〜60,000円',
-                'back_items' => [
-                    ['label' => '指名バック', 'amount' => '1,500円'],
-                    ['label' => 'ドリンクバック', 'amount' => '500円'],
-                    ['label' => '同伴バック', 'amount' => '3,000円'],
+                'rank' => 'A',
+                'schedule' => [
+                    'open' => '20:00',
+                    'close' => 'LAST',
+                    'holidays' => '日曜日',
+                    'shift_info' => '週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。',
+                    'hours_text' => '20:00〜LAST（1:00頃）',
                 ],
-                'fee_items' => [
-                    ['label' => '雑費', 'amount' => '1,000円/日'],
-                    ['label' => 'ヘアメイク', 'amount' => '500円（任意）'],
+                'wage' => [
+                    'regular' => ['min' => 4000, 'max' => 8000, 'unit' => 'hour'],
+                    'trial' => ['hourly' => '4,500円', 'avg_hourly' => '5,000円', 'days' => 3],
+                    'payroll' => [
+                        'type' => '全額日払い',
+                        'description' => '体験入店時も全額日払いOK。月末締め翌月払いも選択可。',
+                    ],
+                    'daily_estimate' => '30,000円〜60,000円',
                 ],
-                'salary_notes' => '体験入店時も全額日払いOK。指名本数に応じて時給UP制度あり。',
-                'guarantee_period' => '最大3ヶ月',
-                'guarantee_details' => '未経験者は時給5,000円保証。3ヶ月目以降は実績ベースに移行。',
-                'norma_info' => 'ノルマなし。ただし月8日以上の出勤推奨。',
-                'trial_avg_hourly' => '5,000円',
-                'trial_hourly' => '4,500円',
-                'interview_hours' => '14:00〜19:00',
-                'interview_start' => '14:00',
-                'interview_end' => '19:00',
-                'same_day_trial' => true,
+                'compensation' => [
+                    'back' => [
+                        ['label' => '指名バック', 'amount' => '1,500円'],
+                        ['label' => 'ドリンクバック', 'amount' => '500円'],
+                        ['label' => '同伴バック', 'amount' => '3,000円'],
+                    ],
+                    'fees' => [
+                        ['label' => '雑費', 'amount' => '1,000円/日'],
+                        ['label' => 'ヘアメイク', 'amount' => '500円（任意）'],
+                    ],
+                    'notes' => '体験入店時も全額日払いOK。指名本数に応じて時給UP制度あり。',
+                ],
+                'guarantee' => [
+                    'period' => '最大3ヶ月',
+                    'details' => '未経験者は時給5,000円保証。3ヶ月目以降は実績ベースに移行。',
+                    'norma' => 'ノルマなし。ただし月8日以上の出勤推奨。',
+                    'same_day_trial' => true,
+                ],
+                'cast_profile' => [
+                    'gal' => 20, 'loose' => 40, 'age' => 30, 'waiwai' => 60, 'cute' => 70,
+                ],
+                'interview' => [
+                    'start' => '14:00',
+                    'end' => '19:00',
+                    'dress_advice' => '清潔感のある私服でOK。ワンピースやキレイめカジュアルがおすすめ。',
+                    'tips' => ['笑顔を意識してください', 'お酒が飲めなくても大丈夫です', '希望の勤務日数を伝えてください'],
+                    'criteria' => '18歳以上（高校生不可）。明るくコミュニケーションが取れる方。',
+                    'recruitment_standards' => '18歳以上（高校生不可）。容姿よりもコミュニケーション力を重視。未経験者歓迎。',
+                    'dialog' => [
+                        ['speaker' => 'staff', 'text' => 'はじめまして！今日はお越しいただきありがとうございます。まず、ナイトワークは初めてですか？'],
+                        ['speaker' => 'user', 'text' => 'はい、全くの未経験です。少し不安で…'],
+                        ['speaker' => 'staff', 'text' => '大丈夫ですよ！うちは未経験からスタートした子がほとんどです。最初は先輩がマンツーマンでサポートしますので安心してくださいね。'],
+                    ],
+                ],
                 'feature_tags' => ['未経験歓迎', '終電上がりOK', '日払いあり', 'ノルマなし', '送りあり', '体入全額日払い'],
                 'description' => '六本木の老舗キャバクラ。アットホームな雰囲気で未経験者も安心して働けます。スタッフのサポート体制が充実しており、接客マナーから会話術まで丁寧に指導します。',
                 'features_text' => '六本木駅徒歩3分の好立地。20代〜30代の落ち着いた客層が中心。終電上がりOKで学生さんやWワークの方にも人気のお店です。',
@@ -603,24 +674,9 @@ class StoreSeeder extends Seeder
                     'customer_age' => [['label' => '20代', 'ratio' => 15], ['label' => '30代', 'ratio' => 35], ['label' => '40代', 'ratio' => 35], ['label' => '50代〜', 'ratio' => 15]],
                     'drinking_style' => 55,
                 ],
-                'interview_info' => [
-                    'dress_advice' => '清潔感のある私服でOK。ワンピースやキレイめカジュアルがおすすめ。',
-                    'tips' => ['笑顔を意識してください', 'お酒が飲めなくても大丈夫です', '希望の勤務日数を伝えてください'],
-                    'dress_code' => 'ドレス貸出あり（無料）。自前ドレスも可。',
-                    'criteria' => '18歳以上（高校生不可）。明るくコミュニケーションが取れる方。',
-                    'dialog' => [
-                        ['speaker' => 'staff', 'text' => 'はじめまして！今日はお越しいただきありがとうございます。まず、ナイトワークは初めてですか？'],
-                        ['speaker' => 'user', 'text' => 'はい、全くの未経験です。少し不安で…'],
-                        ['speaker' => 'staff', 'text' => '大丈夫ですよ！うちは未経験からスタートした子がほとんどです。最初は先輩がマンツーマンでサポートしますので安心してくださいね。'],
-                    ],
-                ],
                 'required_documents' => [
                     'documents' => ['身分証明書（運転免許証 or マイナンバーカード）', '住民票（3ヶ月以内）'],
                     'notes' => '身分証は面接時に確認します。住民票は採用決定後でOKです。',
-                ],
-                'schedule' => [
-                    'hours' => '20:00〜LAST（1:00頃）', 'holidays' => '日曜定休',
-                    'shift_info' => '週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能です。',
                 ],
                 'recent_hires' => [
                     ['month' => '2026年1月', 'count' => 8, 'examples' => ['22歳 未経験 → 時給5,000円スタート', '25歳 経験1年 → 時給6,500円スタート']],
@@ -628,17 +684,9 @@ class StoreSeeder extends Seeder
                 ],
                 'recent_hires_summary' => '直近2ヶ月で20名採用',
                 'popular_features' => ['features' => ['未経験歓迎', 'ノルマなし', '終電上がり'], 'hint' => '六本木エリアではノルマなしのお店が人気です'],
-                'recruitment_standards' => '18歳以上（高校生不可）。容姿よりもコミュニケーション力を重視。未経験者歓迎。',
-                'rank' => 'A',
-                'gal_point' => 20,
-                'loose_point' => 40,
-                'age_point' => 30,
-                'waiwai_point' => 60,
-                'cute_point' => 70,
-                'unit_wage_type' => '時給',
-                'payroll_system_type' => '全額日払い',
-                'payroll_system_description' => '体験入店時も全額日払いOK。月末締め翌月払いも選択可。',
-                'dress_code' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
+                'dress_code' => [
+                    'description' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
+                ],
                 'champagne_description' => 'モエ・エ・シャンドン、ドンペリニヨン、クリュッグなど各種取り揃え。ボトルバック10%〜。',
                 'transfer_description' => '都内近郊は無料送りあり。終電後も安心。',
                 'transfer_km' => '20km',
@@ -652,6 +700,7 @@ class StoreSeeder extends Seeder
                     'comment' => 'うちはとにかくアットホームが自慢。スタッフ全員で新人さんをサポートします！不安なことがあれば何でも聞いてくださいね。',
                     'supports' => ['面接同行', 'ドレス選びサポート', '接客マナー研修', 'メンタルケア'],
                 ],
+                'experience_guaranteed' => true,
                 'publish_status' => 'published',
             ],
             [
@@ -660,31 +709,39 @@ class StoreSeeder extends Seeder
                 'address' => '東京都中央区銀座7-8-10',
                 'nearest_station' => '銀座駅',
                 'category' => 'ラウンジ',
-                'business_hours' => '19:00〜1:00',
-                'opening_time' => '19:00',
-                'closing_time' => '1:00',
-                'holidays' => '日曜・祝日',
-                'shift_info' => '週2日〜OK。シフト応相談。',
                 'phone' => '03-9876-5432',
-                'hourly_min' => 5000,
-                'hourly_max' => 12000,
-                'daily_estimate' => '40,000円〜80,000円',
-                'back_items' => [
-                    ['label' => '指名バック', 'amount' => '2,000円'],
-                    ['label' => 'ボトルバック', 'amount' => '10%'],
-                    ['label' => '同伴バック', 'amount' => '5,000円'],
+                'schedule' => [
+                    'open' => '19:00',
+                    'close' => '1:00',
+                    'holidays' => '日曜・祝日',
+                    'shift_info' => '週2日〜OK。シフト応相談。',
+                    'hours_text' => '19:00〜1:00',
                 ],
-                'fee_items' => [['label' => '雑費', 'amount' => '1,500円/日']],
-                'salary_notes' => '経験者優遇。売上に応じたインセンティブ制度あり。',
-                'guarantee_period' => '1ヶ月',
-                'guarantee_details' => '経験者は面談にて応相談。',
-                'norma_info' => '月間売上目標あり（未達でもペナルティなし）',
-                'trial_avg_hourly' => '6,000円',
-                'trial_hourly' => '5,500円',
-                'interview_hours' => '13:00〜18:00',
-                'interview_start' => '13:00',
-                'interview_end' => '18:00',
-                'same_day_trial' => false,
+                'wage' => [
+                    'regular' => ['min' => 5000, 'max' => 12000, 'unit' => 'hour'],
+                    'trial' => ['hourly' => '5,500円', 'avg_hourly' => '6,000円', 'days' => 1],
+                    'payroll' => ['type' => '月末締め翌月払い', 'description' => null],
+                    'daily_estimate' => '40,000円〜80,000円',
+                ],
+                'compensation' => [
+                    'back' => [
+                        ['label' => '指名バック', 'amount' => '2,000円'],
+                        ['label' => 'ボトルバック', 'amount' => '10%'],
+                        ['label' => '同伴バック', 'amount' => '5,000円'],
+                    ],
+                    'fees' => [['label' => '雑費', 'amount' => '1,500円/日']],
+                    'notes' => '経験者優遇。売上に応じたインセンティブ制度あり。',
+                ],
+                'guarantee' => [
+                    'period' => '1ヶ月',
+                    'details' => '経験者は面談にて応相談。',
+                    'norma' => '月間売上目標あり（未達でもペナルティなし）',
+                    'same_day_trial' => false,
+                ],
+                'interview' => [
+                    'start' => '13:00',
+                    'end' => '18:00',
+                ],
                 'feature_tags' => ['経験者優遇', '高時給', '落ち着いた雰囲気', 'ボトルバック高め'],
                 'description' => '銀座の高級ラウンジ。落ち着いた大人の空間で、品のある接客を心がけています。経営者や医師など、ハイクラスなお客様が中心です。',
                 'features_text' => '銀座駅徒歩2分。完全会員制ラウンジ。20席のアットホームな空間で、お客様一人ひとりとじっくり向き合える環境です。',
@@ -712,27 +769,35 @@ class StoreSeeder extends Seeder
                 'address' => '東京都渋谷区道玄坂2-10-5',
                 'nearest_station' => '渋谷駅',
                 'category' => 'ガールズバー',
-                'business_hours' => '18:00〜5:00',
-                'opening_time' => '18:00',
-                'closing_time' => '5:00',
-                'holidays' => '不定休',
-                'shift_info' => '週1日〜OK。完全自由シフト。',
                 'phone' => '03-5555-1234',
-                'hourly_min' => 2500,
-                'hourly_max' => 4000,
-                'daily_estimate' => '15,000円〜25,000円',
-                'back_items' => [
-                    ['label' => 'ドリンクバック', 'amount' => '300円'],
-                    ['label' => 'フードバック', 'amount' => '200円'],
+                'schedule' => [
+                    'open' => '18:00',
+                    'close' => '5:00',
+                    'holidays' => '不定休',
+                    'shift_info' => '週1日〜OK。完全自由シフト。',
+                    'hours_text' => '18:00〜5:00',
                 ],
-                'fee_items' => [],
-                'salary_notes' => '全額日払い。交通費支給（上限1,000円）。',
-                'trial_avg_hourly' => '3,000円',
-                'trial_hourly' => '2,800円',
-                'interview_hours' => '15:00〜20:00',
-                'interview_start' => '15:00',
-                'interview_end' => '20:00',
-                'same_day_trial' => true,
+                'wage' => [
+                    'regular' => ['min' => 2500, 'max' => 4000, 'unit' => 'hour'],
+                    'trial' => ['hourly' => '2,800円', 'avg_hourly' => '3,000円', 'days' => 1],
+                    'payroll' => ['type' => '全額日払い', 'description' => null],
+                    'daily_estimate' => '15,000円〜25,000円',
+                ],
+                'compensation' => [
+                    'back' => [
+                        ['label' => 'ドリンクバック', 'amount' => '300円'],
+                        ['label' => 'フードバック', 'amount' => '200円'],
+                    ],
+                    'fees' => [],
+                    'notes' => '全額日払い。交通費支給（上限1,000円）。',
+                ],
+                'guarantee' => [
+                    'same_day_trial' => true,
+                ],
+                'interview' => [
+                    'start' => '15:00',
+                    'end' => '20:00',
+                ],
                 'feature_tags' => ['未経験歓迎', '髪色自由', 'ネイルOK', 'ピアスOK', 'カウンター越し', '全額日払い'],
                 'description' => '渋谷の人気ガールズバー。カウンター越しの接客なので初めてでも安心！20代のスタッフが活躍中。友達同士の応募も大歓迎！',
                 'features_text' => '渋谷駅徒歩5分。服装・髪色自由でありのままの自分で働けます。Wワーク・学生さん大歓迎。',
@@ -751,14 +816,17 @@ class StoreSeeder extends Seeder
                 'address' => '東京都新宿区歌舞伎町1-20-1',
                 'nearest_station' => '新宿駅',
                 'category' => 'キャバクラ',
-                'business_hours' => '20:00〜LAST',
-                'opening_time' => '20:00',
-                'closing_time' => 'LAST',
-                'holidays' => '日曜日',
-                'shift_info' => '週2日〜OK。出勤日数相談可。',
-                'hourly_min' => 5000,
-                'hourly_max' => 10000,
-                'daily_estimate' => '40,000円〜70,000円',
+                'schedule' => [
+                    'open' => '20:00',
+                    'close' => 'LAST',
+                    'holidays' => '日曜日',
+                    'shift_info' => '週2日〜OK。出勤日数相談可。',
+                    'hours_text' => '20:00〜LAST',
+                ],
+                'wage' => [
+                    'regular' => ['min' => 5000, 'max' => 10000, 'unit' => 'hour'],
+                    'daily_estimate' => '40,000円〜70,000円',
+                ],
                 'feature_tags' => ['高時給', '大型店', '経験者優遇', '寮完備'],
                 'description' => '新宿最大級の大型キャバクラ。100席以上の広々とした空間で、毎日多くのお客様にご来店いただいています。',
                 'publish_status' => 'published',
@@ -769,13 +837,16 @@ class StoreSeeder extends Seeder
                 'address' => '東京都渋谷区恵比寿南1-5-8',
                 'nearest_station' => '恵比寿駅',
                 'category' => 'ラウンジ',
-                'business_hours' => '19:00〜1:00',
-                'opening_time' => '19:00',
-                'closing_time' => '1:00',
-                'holidays' => '日曜・月曜',
-                'shift_info' => '週1日〜OK。シフト自由制。',
-                'hourly_min' => 4000,
-                'hourly_max' => 7000,
+                'schedule' => [
+                    'open' => '19:00',
+                    'close' => '1:00',
+                    'holidays' => '日曜・月曜',
+                    'shift_info' => '週1日〜OK。シフト自由制。',
+                    'hours_text' => '19:00〜1:00',
+                ],
+                'wage' => [
+                    'regular' => ['min' => 4000, 'max' => 7000, 'unit' => 'hour'],
+                ],
                 'feature_tags' => ['未経験歓迎', '終電上がりOK', '少人数制', 'アットホーム'],
                 'description' => '恵比寿の隠れ家ラウンジ。少人数制で一人ひとりに目が行き届く環境。未経験者でも丁寧に指導します。',
                 'publish_status' => 'published',

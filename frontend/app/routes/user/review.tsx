@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { Star, ArrowLeft, Loader2 } from "lucide-react";
+import { Star, ArrowLeft, Loader2, Twitter } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
 import {
@@ -32,15 +33,38 @@ export default function ReviewPage() {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [body, setBody] = useState("");
+  const [tweetUrl, setTweetUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+
+  const tweetIdMatch = tweetUrl.match(/https?:\/\/(?:x|twitter|mobile\.twitter)\.com\/([^/]+)\/status\/(\d+)/);
+  const tweetId = tweetIdMatch?.[2];
+  const tweetAuthor = tweetIdMatch?.[1];
+
+  useEffect(() => {
+    if (!tweetId) return;
+    if (typeof window === "undefined") return;
+    const win = window as unknown as { twttr?: { widgets?: { load: (el?: HTMLElement) => void } } };
+    if (win.twttr?.widgets) {
+      win.twttr.widgets.load();
+      return;
+    }
+    if (document.getElementById("twitter-wjs")) return;
+    const s = document.createElement("script");
+    s.id = "twitter-wjs";
+    s.src = "https://platform.twitter.com/widgets.js";
+    s.async = true;
+    document.body.appendChild(s);
+  }, [tweetId]);
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (hydrated && !authLoading && !isAuthenticated) {
       navigate(`/login`);
     }
-  }, [authLoading, isAuthenticated, navigate]);
+  }, [hydrated, authLoading, isAuthenticated, navigate]);
 
   // Fetch store info
   useEffect(() => {
@@ -67,12 +91,17 @@ export default function ReviewPage() {
       setError(`口コミは${MIN_BODY_LENGTH}文字以上で入力してください`);
       return;
     }
+    if (tweetUrl && !tweetIdMatch) {
+      setError("X(旧Twitter)のツイートURLを正しく貼り付けてください");
+      return;
+    }
 
     setSubmitting(true);
     try {
       await userApi.post(`/stores/${storeId}/reviews`, {
         rating,
         body,
+        tweet_url: tweetUrl || undefined,
       });
       navigate(`/stores/${storeId}`);
     } catch (err) {
@@ -185,6 +214,37 @@ export default function ReviewPage() {
                   {body.length}文字
                 </span>
               </div>
+            </div>
+
+            {/* X tweet quote (optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="tweet-url" className="flex items-center gap-1.5">
+                <Twitter className="size-3.5" />
+                Xのツイートを引用
+                <span className="text-xs font-normal text-muted-foreground">（任意）</span>
+              </Label>
+              <Input
+                id="tweet-url"
+                type="url"
+                value={tweetUrl}
+                onChange={(e) => setTweetUrl(e.target.value)}
+                placeholder="https://x.com/username/status/1234567890..."
+              />
+              {tweetId ? (
+                <div className="rounded-lg border bg-white p-3">
+                  <blockquote className="twitter-tweet" data-conversation="none">
+                    <a href={`https://x.com/${tweetAuthor}/status/${tweetId}`}>
+                      ツイートを読み込み中...
+                    </a>
+                  </blockquote>
+                </div>
+              ) : tweetUrl ? (
+                <p className="text-xs text-destructive">URLの形式が正しくありません</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Xのツイート個別ページのURLを貼り付けると、口コミに引用埋め込みできます。
+                </p>
+              )}
             </div>
 
             {/* Error */}

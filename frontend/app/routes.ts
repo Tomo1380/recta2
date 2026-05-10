@@ -10,6 +10,9 @@ export default [
     route("auth/callback", "routes/user/auth-callback.tsx"),
     route("mypage", "routes/user/mypage.tsx"),
     route("stores/:id/review", "routes/user/review.tsx"),
+    route("relocate-support", "routes/user/relocate-support.tsx"),
+    route("columns", "routes/user/columns.tsx"),
+    route("columns/:slug", "routes/user/column-detail.tsx"),
   ]),
 
   // 管理画面
@@ -26,6 +29,9 @@ export default [
     route("admin/admin-users", "routes/admin/admin-users.tsx"),
     route("admin/area-category", "routes/admin/area-category.tsx"),
     route("admin/content", "routes/admin/content.tsx"),
+    route("admin/articles", "routes/admin/articles.tsx"),
+    route("admin/articles/new", "routes/admin/article-new.tsx"),
+    route("admin/articles/:id/edit", "routes/admin/article-edit.tsx"),
     route("admin/users/broadcast", "routes/admin/line-broadcast.tsx"),
     route("admin/users/:userId/messages", "routes/admin/line-messages.tsx"),
   ]),

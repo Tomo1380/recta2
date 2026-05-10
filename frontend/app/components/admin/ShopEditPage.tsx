@@ -514,7 +514,10 @@ function FloatingPreview({
 export function ShopEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isNew = id === "new";
+  // The /admin/shops/new route renders this component without an :id param,
+  // so id will be undefined. Treat both "new" string and missing param as
+  // "new shop" mode.
+  const isNew = id === "new" || id === undefined;
   const [currentStep, setCurrentStep] = useState(0);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
@@ -739,12 +742,21 @@ export function ShopEditPage() {
     setStoreImages((store.images || []).map((img: any) => typeof img === 'string' ? img : img.url));
   }, []);
 
+  const [notFound, setNotFound] = useState(false);
   useEffect(() => {
     if (isNew || !id) return;
     setLoading(true);
+    setNotFound(false);
     api.get<Store>(`/admin/stores/${id}`)
       .then(populateFromStore)
-      .catch(() => setSaveError("店舗データの取得に失敗しました"))
+      .catch((err) => {
+        const status = (err as { status?: number })?.status;
+        if (status === 404) {
+          setNotFound(true);
+        } else {
+          setSaveError("店舗データの取得に失敗しました");
+        }
+      })
       .finally(() => setLoading(false));
   }, [id, isNew, populateFromStore]);
 
@@ -978,6 +990,8 @@ export function ShopEditPage() {
                 "ラウンジ",
                 "クラブ",
                 "ガールズバー",
+                "コンカフェ",
+                "スナック",
               ]}
             />
           </Field>
@@ -1818,6 +1832,24 @@ export function ShopEditPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 text-center">
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 border border-amber-200 mb-4">
+          <Building2 className="w-7 h-7 text-amber-600" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-1.5">店舗が見つかりませんでした</h2>
+        <p className="text-sm text-gray-500 mb-6">指定されたID（{id}）の店舗は存在しないか、削除された可能性があります。</p>
+        <button
+          onClick={() => navigate("/admin/shops")}
+          className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          店舗一覧に戻る
+        </button>
       </div>
     );
   }

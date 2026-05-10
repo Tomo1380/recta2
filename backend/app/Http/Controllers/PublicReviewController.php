@@ -16,9 +16,22 @@ class PublicReviewController extends Controller
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'body' => 'required|string|min:10',
+            'tweet_url' => 'nullable|string|max:500',
         ]);
 
-        // 同じユーザーが同じ店舗に既にレビュー済みかチェック
+        $tweetId = null;
+        $tweetAuthor = null;
+        if (! empty($validated['tweet_url'])) {
+            if (preg_match('#https?://(?:x|twitter|mobile\.twitter)\.com/([^/]+)/status/(\d+)#', $validated['tweet_url'], $m)) {
+                $tweetAuthor = $m[1];
+                $tweetId = $m[2];
+            } else {
+                return response()->json([
+                    'message' => 'Xのツイート URL を正しく貼り付けてください',
+                ], 422);
+            }
+        }
+
         $exists = Review::where('user_id', $request->user()->id)
             ->where('store_id', $store->id)
             ->where('status', '!=', 'deleted')
@@ -35,6 +48,8 @@ class PublicReviewController extends Controller
             'store_id' => $store->id,
             'rating' => $validated['rating'],
             'body' => $validated['body'],
+            'tweet_id' => $tweetId,
+            'tweet_author_screen_name' => $tweetAuthor,
             'status' => 'published',
         ]);
 

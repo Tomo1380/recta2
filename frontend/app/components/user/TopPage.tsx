@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
+import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 
 // ─── Constants ─────────────────────────────────────
 const GOLD = "#D4AF37";
@@ -505,6 +506,40 @@ export default function TopPage() {
           </div>
         </div>
 
+        {/* ══ 上京サポート BANNER ══ */}
+        <div className="mt-6 px-5">
+          <Link
+            to="/relocate-support"
+            className="block rounded-2xl overflow-hidden active:scale-[0.99] transition-transform"
+            style={{
+              background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 60%, rgba(200,96,128,.4) 100%)`,
+              border: `1px solid rgba(212,175,55,.3)`,
+              boxShadow: "0 8px 24px rgba(0,0,0,.18)",
+              textDecoration: "none",
+              position: "relative",
+            }}
+          >
+            <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "44%", background: `radial-gradient(circle at 70% 50%, rgba(212,175,55,.18), transparent 60%)`, pointerEvents: "none" }} />
+            <div className="flex items-center gap-3 p-4 relative">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(212,175,55,.15)", border: "1px solid rgba(212,175,55,.35)" }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 21V11l9-7 9 7v10" stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M9 21v-6h6v6" stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "9.5px", letterSpacing: "0.14em", color: GOLD, textTransform: "uppercase" }}>Relocate Support</span>
+                  <span className="px-1.5 py-0 rounded" style={{ background: "rgba(255,255,255,.1)", fontFamily: J, fontWeight: 600, fontSize: "8.5px", color: "rgba(255,255,255,.85)" }}>家紹介あり</span>
+                </div>
+                <p style={{ fontFamily: J, fontWeight: 700, fontSize: "14.5px", color: "white", margin: 0, lineHeight: 1.4 }}>地方から東京で働きたい方へ</p>
+                <p style={{ fontFamily: J, fontWeight: 400, fontSize: "11px", color: "rgba(255,255,255,.7)", margin: "2px 0 0", lineHeight: 1.5 }}>体験確約・オンライン面接・住居サポートまで一気通貫</p>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0"><path d="M9 18l6-6-6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+          </Link>
+        </div>
+
         {/* ══ REVIEWS ══ */}
         <div className="mt-6 px-5 pb-4">
           <div className="flex items-center justify-between mb-3">
@@ -516,7 +551,9 @@ export default function TopPage() {
             <Link to="/stores" style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: GOLD, textDecoration: "none" }}>すべて見る →</Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
-            {REVIEWS.map(review => (
+            {REVIEWS.map((review, idx) => {
+              const requireLogin = !lineLoggedIn && idx >= 3;
+              return (
               <div key={review.id} className="shrink-0 rounded-2xl overflow-hidden" style={{ width: "270px", background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 20px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)" }}>
                 <div className="flex items-center px-4 pt-3.5 pb-2.5 gap-3">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.1),rgba(200,96,128,.04))", border: "1px solid rgba(200,96,128,.15)" }}>
@@ -534,7 +571,7 @@ export default function TopPage() {
                 </div>
                 <div style={{ height: "1px", background: "linear-gradient(90deg,transparent,rgba(27,37,40,.06) 16px,rgba(27,37,40,.06) calc(100% - 16px),transparent)" }} />
                 <div className="relative" style={{ padding: "12px 16px 14px", minHeight: "115px" }}>
-                  <div style={{ filter: lineLoggedIn ? "none" : "blur(7px)", transition: "filter .4s ease", userSelect: lineLoggedIn ? "auto" : "none" }}>
+                  <div style={{ filter: requireLogin ? "blur(7px)" : "none", transition: "filter .4s ease", userSelect: requireLogin ? "none" : "auto" }}>
                     <div className="flex items-center gap-3 mb-2.5">
                       <div className="flex items-center gap-0.5">
                         {[1,2,3,4,5].map(s => (
@@ -550,7 +587,7 @@ export default function TopPage() {
                     </div>
                     <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: DARK, margin: 0, lineHeight: 1.75, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{review.text}</p>
                   </div>
-                  {!lineLoggedIn && (
+                  {requireLogin && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" style={{ background: "rgba(255,255,255,.08)" }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="mb-1">
                         <rect x="3" y="11" width="18" height="11" rx="2" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" />
@@ -569,7 +606,8 @@ export default function TopPage() {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -586,7 +624,6 @@ export default function TopPage() {
                   <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: "10px", letterSpacing: "0.1em", color: "rgba(212,175,55,.5)", textTransform: "uppercase" as const }}>Area</span>
                   <span style={{ fontFamily: J, fontWeight: 500, fontSize: "14px", color: "rgba(255,255,255,.9)" }}>エリアから探す</span>
                 </div>
-                <Link to="/stores" style={{ fontFamily: J, fontWeight: 400, fontSize: "11px", color: GOLD, textDecoration: "none" }}>もっと見る →</Link>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
                 {areas.map((area, i) => {
@@ -604,6 +641,14 @@ export default function TopPage() {
                   );
                 })}
               </div>
+              <Link
+                to="/stores"
+                className="mt-3 flex items-center justify-center gap-1.5 rounded-xl active:scale-[0.98] transition-transform"
+                style={{ height: "44px", background: "rgba(212,175,55,.1)", border: "1px solid rgba(212,175,55,.25)", textDecoration: "none" }}
+              >
+                <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: GOLD, letterSpacing: "0.02em" }}>他のエリアも見る</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </Link>
             </div>
 
             <div style={{ height: "1px", background: "rgba(255,255,255,.06)", margin: "24px 20px" }} />
@@ -638,6 +683,9 @@ export default function TopPage() {
           </div>
           <EdgeBottom />
         </div>
+
+        {/* ══ RECENTLY VIEWED (あなたが見た記事) ══ */}
+        <RecentlyViewedStores variant="flush" />
 
         {/* ══ TRENDING TOPICS ══ */}
         <TrendingTopics />

@@ -262,6 +262,44 @@ export interface BannerSettings {
   hero_ai_label: string;
 }
 
+// コラム記事 (CMS)
+export interface Article {
+  id: number;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  body: Record<string, unknown> | null;   // TipTap JSON
+  body_html: string | null;
+  thumbnail_url: string | null;
+  category: string | null;
+  tags: string[] | null;
+  status: "draft" | "published";
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArticleSummary {
+  id: number;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  thumbnail_url: string | null;
+  category: string | null;
+  tags?: string[] | null;
+  published_at: string | null;
+}
+
+export interface PublicArticleIndexResponse {
+  articles: Paginated<ArticleSummary>;
+  categories: string[];
+}
+
+export interface PublicArticleShowResponse {
+  article: Article;
+  related: ArticleSummary[];
+}
+
 export interface AiChatStats {
   daily_stats: { date: string; count: number; total_tokens: number }[];
   top_users: { name: string; count: number }[];

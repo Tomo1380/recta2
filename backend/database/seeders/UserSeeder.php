@@ -14,7 +14,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'U1234567890abcdef1234567890abcdef',
                 'line_display_name' => 'みく',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample1.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'admin_notes' => '六本木希望。未経験。22歳。',
                 'last_login_at' => now()->subHours(2),
@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'U2345678901abcdef2345678901abcdef',
                 'line_display_name' => 'あやか',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample2.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'admin_notes' => '銀座ラウンジ経験2年。高時給希望。',
                 'last_login_at' => now()->subDays(1),
@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'U3456789012abcdef3456789012abcdef',
                 'line_display_name' => 'れいな🌸',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample3.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'last_login_at' => now()->subDays(3),
             ],
@@ -45,7 +45,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'U5678901234abcdef5678901234abcdef',
                 'line_display_name' => 'まりな',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample5.jpg',
+                'line_picture_url' => null,
                 'status' => 'suspended',
                 'admin_notes' => '連絡取れず。アカウント停止。',
                 'last_login_at' => now()->subMonths(1),
@@ -55,7 +55,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'U6789012345abcdef6789012345abcdef',
                 'line_display_name' => 'さき💫',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample6.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'admin_notes' => '友だち追加後にブロック。',
                 'last_login_at' => now(),
@@ -73,7 +73,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'U8901234567abcdef8901234567abcdef',
                 'line_display_name' => 'なな',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample8.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'last_login_at' => now()->subDays(2),
             ],
@@ -83,7 +83,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'Uf1234567890abcdef1234567890abcde',
                 'line_display_name' => 'かなこ',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample_f1.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'admin_notes' => '友だち追加のみ。サイト未ログイン。',
                 'last_login_at' => null,
@@ -98,7 +98,7 @@ class UserSeeder extends Seeder
             [
                 'line_user_id' => 'Uf3456789012abcdef3456789012abcde',
                 'line_display_name' => 'りさ',
-                'line_picture_url' => 'https://profile.line-scdn.net/sample_f3.jpg',
+                'line_picture_url' => null,
                 'status' => 'active',
                 'admin_notes' => '渋谷のガールズバー探し中とメッセージあり。',
                 'last_login_at' => null,

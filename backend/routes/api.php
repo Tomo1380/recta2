@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AiChatSettingController;
+use App\Http\Controllers\Admin\ArticleController;
 use App\Http\Controllers\Admin\AreaCategoryController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\ContentController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Admin\LineFriendController;
 use App\Http\Controllers\Admin\ReviewController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\PublicArticleController;
 use App\Http\Controllers\PublicStoreController;
 use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\LineAuthController;
@@ -26,11 +28,15 @@ Route::get('/', fn () => response()->json(['status' => 'ok']));
 // ========== 公開API ==========
 Route::get('/home', [PublicStoreController::class, 'home']);
 Route::get('/stores', [PublicStoreController::class, 'index']);
-Route::get('/stores/{store}', [PublicStoreController::class, 'show']);
+Route::get('/stores/{store}', [PublicStoreController::class, 'show'])->whereNumber('store');
 Route::get('/areas', [PublicStoreController::class, 'areas']);
 Route::get('/categories', [PublicStoreController::class, 'categories']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
 Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');
+
+// ========== コラム記事（公開） ==========
+Route::get('/columns', [PublicArticleController::class, 'index']);
+Route::get('/columns/{slug}', [PublicArticleController::class, 'show']);
 
 // ========== LINE認証 ==========
 Route::get('/auth/line', [LineAuthController::class, 'redirect']);
@@ -48,7 +54,7 @@ Route::middleware('auth:sanctum')->prefix('user')->group(function () {
 });
 
 // ========== 口コミ投稿・削除（エンドユーザー） ==========
-Route::middleware('auth:sanctum')->post('/stores/{store}/reviews', [PublicReviewController::class, 'store']);
+Route::middleware('auth:sanctum')->post('/stores/{store}/reviews', [PublicReviewController::class, 'store'])->whereNumber('store');
 Route::middleware('auth:sanctum')->delete('/user/reviews/{review}', [PublicReviewController::class, 'destroy']);
 
 // ========== 管理画面 ==========
@@ -134,6 +140,10 @@ Route::prefix('admin')->group(function () {
         Route::put('/ai-chat/fine-tuning/data', [FineTuningController::class, 'updateTrainingPair']);
         Route::delete('/ai-chat/fine-tuning/data/{index}', [FineTuningController::class, 'deleteTrainingPair']);
         Route::post('/ai-chat/fine-tuning/data', [FineTuningController::class, 'addTrainingPair']);
+
+        // コラム記事管理
+        Route::apiResource('articles', ArticleController::class);
+        Route::post('articles/{article}/thumbnail', [ArticleController::class, 'uploadThumbnail']);
 
         // 業界ナレッジ管理
         Route::get('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'index']);

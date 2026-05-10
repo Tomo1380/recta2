@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Link } from "react-router";
 
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Slider } from "~/components/ui/slider";
 import {
   Accordion,
   AccordionContent,
@@ -11,23 +13,28 @@ import {
 import {
   MapPin,
   Star,
-  Clock,
   Phone,
   ExternalLink,
-  ChevronRight,
   FileText,
-  Users,
   MessageSquare,
   Building,
   Award,
   Navigation,
   Sparkles,
-
+  Map as MapIcon,
+  Wine,
+  Heart,
+  Shirt,
+  Calculator,
+  Wallet,
+  Instagram,
 } from "lucide-react";
 
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
+import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import AiChatPanel from "~/components/user/AiChatPanel";
+import { pushViewedStore } from "~/lib/viewed-stores";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -126,8 +133,81 @@ interface Review {
   id: number;
   rating: number;
   body: string;
+  tweet_id?: string | null;
+  tweet_author_screen_name?: string | null;
   created_at: string;
   user: ReviewUser;
+}
+
+// New JSONB shapes (DB redesign 2026-05)
+export interface DressExample {
+  image_url: string;
+  note?: string;
+}
+
+export interface DressCodeObject {
+  description?: string;
+  ok_examples?: DressExample[];
+  ng_examples?: DressExample[];
+}
+
+export interface ChampagnePriceItem {
+  amount?: number | string;
+  image_url?: string;
+  note?: string;
+}
+
+export interface ChampagnePrices {
+  tequila?: ChampagnePriceItem;
+  belle_epoque?: ChampagnePriceItem;
+  armand?: ChampagnePriceItem;
+  lavay?: ChampagnePriceItem;
+}
+
+export interface RectaEpisode {
+  name: string;
+  photo_url?: string;
+  comment?: string;
+  instagram_url?: string;
+}
+
+export interface TransferZone {
+  radius_km?: number | string;
+  fee?: number | string;
+  color?: string;
+  label?: string;
+}
+
+export interface SetFeeItem {
+  label: string;
+  amount: number | string;
+  note?: string;
+}
+
+export interface SetFee {
+  items?: SetFeeItem[];
+  notes?: string;
+}
+
+export interface SalarySimulator {
+  default_hourly?: number;
+  default_sales?: number;
+  default_nominations?: number;
+  back_rate?: number;
+  nomination_unit?: number;
+  hours_per_day?: number;
+  days_per_month?: number;
+  formulas?: Record<string, unknown>;
+}
+
+export interface RelatedStoreLite {
+  id: number;
+  name: string;
+  area?: string;
+  category?: string;
+  image_url?: string;
+  hourly_min?: number;
+  hourly_max?: number;
 }
 
 export interface StoreDetailStore {
@@ -165,7 +245,7 @@ export interface StoreDetailStore {
   feature_tags: string[];
   description: string;
   features_text: string;
-  dress_code: string | null;
+  dress_code: string | DressCodeObject | null;
   images: StoreImage[] | null;
   video_url: string;
   analysis: Analysis | null;
@@ -190,6 +270,22 @@ export interface StoreDetailStore {
   reviews_count: number;
   average_rating: number;
   reviews: Review[];
+
+  // ── New JSONB fields (post DB redesign) ─────────────────────────────────
+  /** Object form of dress_code (preferred over the legacy string above) */
+  dress_code_detail?: DressCodeObject | null;
+  champagne_prices?: ChampagnePrices | null;
+  recta_episodes?: RectaEpisode[] | null;
+  related_store_ids?: number[] | null;
+  /** Optional pre-resolved related stores (preferred over related_store_ids) */
+  related_stores?: RelatedStoreLite[] | null;
+  /** Optional list of "high recruitment-standard" sibling stores */
+  high_standard_stores?: RelatedStoreLite[] | null;
+  transfer_map_image_url?: string | null;
+  transfer_zones?: TransferZone[] | null;
+  experience_guaranteed?: boolean | null;
+  set_fee?: SetFee | null;
+  salary_simulator?: SalarySimulator | null;
 }
 
 export interface StoreDetailResponse {
@@ -318,14 +414,15 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
     fetch(`/api/stores/${id}`)
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (res.status === 404) throw new Error("NOT_FOUND");
+        if (!res.ok) throw new Error("FAILED");
         return res.json();
       })
       .then((json: StoreDetailResponse) => {
         if (!cancelled) setData(json);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message ?? "読み込みに失敗しました");
+        if (!cancelled) setError(err.message === "NOT_FOUND" ? "NOT_FOUND" : "FAILED");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -336,22 +433,63 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
     };
   }, [id, previewData]);
 
+  // Persist this store to "recently viewed" history (skip preview mode)
+  useEffect(() => {
+    if (previewData) return;
+    if (!data?.store) return;
+    const s = data.store;
+    const firstImage = (s.images ?? [])
+      .slice()
+      .sort((a, b) => a.order - b.order)[0]?.url;
+    pushViewedStore({
+      id: s.id,
+      name: s.name,
+      area: s.area,
+      category: s.category,
+      image_url: firstImage,
+      hourly_min: s.hourly_min,
+      hourly_max: s.hourly_max,
+    });
+  }, [data?.store, previewData]);
 
   if (loading) return <LoadingSkeleton />;
 
   if (error || !data) {
+    const isNotFound = error === "NOT_FOUND";
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-4">
-        <p className="text-lg font-medium" style={{ color: "rgba(200,96,128,1)" }}>
-          {error ?? "データが見つかりませんでした"}
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="rounded-full border px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-80"
-          style={{ borderColor: "#D4AF37", color: "#D4AF37" }}
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-5 px-6 text-center">
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-full"
+          style={{ background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.35)" }}
         >
-          再読み込み
-        </button>
+          <Building size={28} style={{ color: "#D4AF37" }} />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-base font-bold" style={{ color: "#1b2528" }}>
+            {isNotFound ? "店舗が見つかりませんでした" : "店舗を読み込めませんでした"}
+          </p>
+          <p className="text-xs" style={{ color: "rgba(27,37,40,0.55)" }}>
+            {isNotFound
+              ? "URLが間違っているか、掲載が終了した可能性があります。"
+              : "通信エラーが発生しました。少し時間をおいて再度お試しください。"}
+          </p>
+        </div>
+        <div className="flex gap-2.5">
+          <Link
+            to="/stores"
+            className="rounded-full border px-5 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+            style={{ borderColor: "rgba(27,37,40,0.15)", color: "#1b2528", textDecoration: "none" }}
+          >
+            店舗一覧へ
+          </Link>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-full border px-5 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+            style={{ borderColor: "#D4AF37", color: "#D4AF37" }}
+          >
+            再読み込み
+          </button>
+        </div>
       </div>
     );
   }
@@ -749,31 +887,50 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 11. Transfer / Dress code / Champagne */}
+          {/* 11a. Transfer Map (送りマップ) — image + zone fee table */}
           {/* ============================================================ */}
-          {(store.transfer_description || store.dress_code || store.champagne_description) && (
-            <SectionCard
-              icon={<Navigation size={20} style={{ color: "#D4AF37" }} />}
-              title="その他の情報"
-            >
-              <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-                {store.transfer_description && (
-                  <InfoRow
-                    label="送り"
-                    value={store.transfer_km
-                      ? `${store.transfer_description}（${store.transfer_km}以内）`
-                      : store.transfer_description}
-                  />
-                )}
-                {store.dress_code && (
-                  <InfoRow label="ドレスコード" value={store.dress_code} />
-                )}
-                {store.champagne_description && (
-                  <InfoRow label="シャンパン" value={store.champagne_description} />
-                )}
-              </div>
-            </SectionCard>
-          )}
+          <TransferMapSection
+            mapImageUrl={store.transfer_map_image_url}
+            zones={store.transfer_zones}
+            fallbackDescription={store.transfer_description}
+            fallbackKm={store.transfer_km}
+          />
+
+          {/* ============================================================ */}
+          {/* 11b. Champagne prices (4 fixed templates) */}
+          {/* ============================================================ */}
+          <ChampagnePricesSection
+            prices={store.champagne_prices}
+            fallback={store.champagne_description}
+          />
+
+          {/* ============================================================ */}
+          {/* 11c. Recta-keiyū episodes (レクタ経由入店女性エピソード) */}
+          {/* ============================================================ */}
+          <RectaEpisodesSection episodes={store.recta_episodes} />
+
+          {/* ============================================================ */}
+          {/* 11d. Dress code OK / NG examples */}
+          {/* ============================================================ */}
+          <DressCodeSection
+            detail={store.dress_code_detail ?? (typeof store.dress_code === "object" ? (store.dress_code as DressCodeObject | null) : undefined)}
+            fallback={typeof store.dress_code === "string" ? store.dress_code : null}
+          />
+
+          {/* ============================================================ */}
+          {/* 11e. Salary simulator (interactive) */}
+          {/* ============================================================ */}
+          <SalarySimulatorSection
+            simulator={store.salary_simulator}
+            backItems={store.back_items}
+            hourlyMin={store.hourly_min}
+            hourlyMax={store.hourly_max}
+          />
+
+          {/* ============================================================ */}
+          {/* 11f. Set fee (セット料金) */}
+          {/* ============================================================ */}
+          <SetFeeSection setFee={store.set_fee} />
 
           {/* ============================================================ */}
           {/* 12. Q&A */}
@@ -799,93 +956,35 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 12. Reviews - with blur overlay */}
+          {/* 12a. Related stores (系列店) — moved here for SEO internal links */}
+          {/* ============================================================ */}
+          <RelatedStoresSection
+            title="系列店舗"
+            icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+            stores={store.related_stores}
+            ids={store.related_store_ids}
+            currentId={store.id}
+          />
+
+          {/* ============================================================ */}
+          {/* 12b. High recruitment-standard stores */}
+          {/* ============================================================ */}
+          <RelatedStoresSection
+            title="採用基準が高い店舗"
+            icon={<Award size={20} style={{ color: "#D4AF37" }} />}
+            stores={store.high_standard_stores}
+            currentId={store.id}
+          />
+
+          {/* ============================================================ */}
+          {/* 12c. Reviews — first 3 visible, 4th+ blurred behind LINE login */}
           {/* ============================================================ */}
           {(store.reviews ?? []).length > 0 && (
-            <div
-              className="relative overflow-hidden rounded-[16px] bg-white"
-              style={{
-                boxShadow: "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
-                border: "1px solid rgba(27,37,40,0.06)",
-              }}
-            >
-              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-                <SectionHeading icon={<Star size={20} style={{ color: "#D4AF37" }} />}>
-                  リアルな声・口コミ ({store.reviews_count ?? 0}件)
-                </SectionHeading>
-                <a
-                  href={`/stores/${store.id}/review`}
-                  className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
-                  style={{
-                    background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
-                  }}
-                >
-                  口コミを書く
-                </a>
-              </div>
-              <div className="relative px-5 pb-5">
-                {/* Review content - blurred */}
-                <div className="space-y-4" style={{ filter: "blur(6px)", userSelect: "none" }}>
-                  {(store.reviews ?? []).map((review) => (
-                    <div key={review.id} className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        {review.user?.line_picture_url ? (
-                          <img
-                            src={review.user.line_picture_url}
-                            alt={review.user?.line_display_name ?? ""}
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div
-                            className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold"
-                            style={{ backgroundColor: "rgba(27,37,40,0.08)", color: "rgba(27,37,40,0.4)" }}
-                          >
-                            {(review.user?.line_display_name ?? "?").charAt(0)}
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>
-                            {review.user?.line_display_name ?? "匿名"}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {renderStars(review.rating ?? 0, 12)}
-                            <span className="text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
-                              {review.created_at ? new Date(review.created_at).toLocaleDateString("ja-JP") : ""}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-sm leading-relaxed pl-11" style={{ color: "rgba(27,37,40,0.7)" }}>
-                        {review.body}
-                      </p>
-                      <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Blur overlay with login prompt */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
-                  <p
-                    className="font-heading mb-4 text-center text-base font-bold"
-                    style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif", color: "#1b2528" }}
-                  >
-                    クチコミを見るにはログインが必要です
-                  </p>
-                  <button
-                    className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: "#06C755" }}
-                    onClick={() => {
-                      window.location.href = "/login";
-                    }}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                    </svg>
-                    LINEでログイン
-                  </button>
-                </div>
-              </div>
-            </div>
+            <ReviewsSection
+              storeId={store.id}
+              reviews={store.reviews ?? []}
+              reviewsCount={store.reviews_count ?? 0}
+            />
           )}
 
           {/* ============================================================ */}
@@ -1005,6 +1104,11 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               )}
             </div>
           </SectionCard>
+
+          {/* ============================================================ */}
+          {/* 16. Recently viewed stores (あなたが見た記事) */}
+          {/* ============================================================ */}
+          <RecentlyViewedStores excludeId={store.id} variant="card" />
 
         </div>
 
@@ -1210,5 +1314,834 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
         )}
       </div>
     </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// New sections (added 2026-05 — DEV FB)
+// ---------------------------------------------------------------------------
+
+const GOLD_HEX = "#D4AF37";
+
+function toAmountNumber(value: number | string | undefined): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const cleaned = String(value).replace(/[^\d.-]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatAmount(value: number | string | undefined): string {
+  const n = toAmountNumber(value);
+  if (n === null) {
+    return typeof value === "string" ? value : "—";
+  }
+  return `¥${n.toLocaleString()}`;
+}
+
+// ── Transfer map section ───────────────────────────────────────────────────
+function TransferMapSection({
+  mapImageUrl,
+  zones,
+  fallbackDescription,
+  fallbackKm,
+}: {
+  mapImageUrl?: string | null;
+  zones?: TransferZone[] | null;
+  fallbackDescription?: string | null;
+  fallbackKm?: string | null;
+}) {
+  const hasMap = !!mapImageUrl;
+  const zoneList = zones ?? [];
+  const hasZones = zoneList.length > 0;
+  const hasFallback = !!(fallbackDescription || fallbackKm);
+
+  if (!hasMap && !hasZones && !hasFallback) return null;
+
+  return (
+    <SectionCard
+      icon={<MapIcon size={20} style={{ color: GOLD_HEX }} />}
+      title="送り（送迎範囲）"
+    >
+      {hasMap && (
+        <div className="overflow-hidden rounded-[12px] mb-3">
+          <img
+            src={mapImageUrl!}
+            alt="送り範囲マップ"
+            className="w-full h-auto object-cover"
+          />
+        </div>
+      )}
+
+      {hasZones && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
+            距離別の料金
+          </p>
+          <div className="overflow-hidden rounded-[10px]" style={{ border: "1px solid rgba(27,37,40,0.08)" }}>
+            {zoneList.map((zone, i) => {
+              const radius = zone.radius_km;
+              const radiusLabel =
+                radius !== undefined && radius !== null && radius !== ""
+                  ? typeof radius === "number"
+                    ? `〜${radius}km`
+                    : String(radius)
+                  : zone.label ?? `ゾーン${i + 1}`;
+              const fee = formatAmount(zone.fee);
+              return (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-3 py-2.5 text-sm"
+                  style={{
+                    borderTop: i === 0 ? "none" : "1px solid rgba(27,37,40,0.06)",
+                    backgroundColor: i % 2 === 0 ? "rgba(212,175,55,0.03)" : "transparent",
+                  }}
+                >
+                  <span
+                    className="inline-block h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: zone.color || GOLD_HEX }}
+                  />
+                  <span className="flex-1 font-medium" style={{ color: "#1b2528" }}>
+                    {zone.label ?? radiusLabel}
+                  </span>
+                  <span style={{ color: GOLD_HEX, fontWeight: 600 }}>{fee}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!hasMap && !hasZones && hasFallback && (
+        <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+          {fallbackKm
+            ? `${fallbackDescription ?? "送りあり"}（${fallbackKm}以内）`
+            : fallbackDescription}
+        </p>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Champagne prices section ──────────────────────────────────────────────
+const CHAMPAGNE_TEMPLATES: { key: keyof ChampagnePrices; label: string }[] = [
+  { key: "tequila", label: "テキーラ" },
+  { key: "belle_epoque", label: "ベル・エポック" },
+  { key: "armand", label: "アルマンド" },
+  { key: "lavay", label: "ラベイ" },
+];
+
+function ChampagnePricesSection({
+  prices,
+  fallback,
+}: {
+  prices?: ChampagnePrices | null;
+  fallback?: string | null;
+}) {
+  const hasAny =
+    prices &&
+    CHAMPAGNE_TEMPLATES.some((t) => {
+      const item = prices[t.key];
+      return item && (item.amount !== undefined || item.image_url);
+    });
+
+  if (!hasAny && !fallback) return null;
+
+  return (
+    <SectionCard
+      icon={<Wine size={20} style={{ color: GOLD_HEX }} />}
+      title="シャンパン金額"
+    >
+      {hasAny ? (
+        <div className="grid grid-cols-2 gap-3">
+          {CHAMPAGNE_TEMPLATES.map(({ key, label }) => {
+            const item = prices?.[key];
+            if (!item) return null;
+            return (
+              <div
+                key={key}
+                className="overflow-hidden rounded-[12px]"
+                style={{
+                  border: "1px solid rgba(212,175,55,0.25)",
+                  backgroundColor: "rgba(212,175,55,0.04)",
+                }}
+              >
+                <div className="aspect-[4/5] w-full overflow-hidden bg-[#1b2528]">
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={label}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Wine size={36} style={{ color: GOLD_HEX, opacity: 0.6 }} />
+                    </div>
+                  )}
+                </div>
+                <div className="px-3 py-2.5">
+                  <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
+                    {label}
+                  </p>
+                  <p className="text-base font-bold" style={{ color: GOLD_HEX }}>
+                    {formatAmount(item.amount)}
+                  </p>
+                  {item.note && (
+                    <p className="text-[11px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                      {item.note}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+          {fallback}
+        </p>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Recta-keiyū episodes section ──────────────────────────────────────────
+function RectaEpisodesSection({ episodes }: { episodes?: RectaEpisode[] | null }) {
+  const list = (episodes ?? []).filter((e) => e && e.name);
+  if (list.length === 0) return null;
+
+  return (
+    <SectionCard
+      icon={<Heart size={20} style={{ color: GOLD_HEX }} />}
+      title="レクタ経由で入店した女性"
+    >
+      <div className="space-y-4">
+        {list.map((ep, i) => (
+          <div key={i} className="flex gap-3">
+            <div className="shrink-0">
+              {ep.photo_url ? (
+                <img
+                  src={ep.photo_url}
+                  alt={ep.name}
+                  className="h-16 w-16 rounded-full object-cover"
+                  style={{ border: "2px solid rgba(212,175,55,0.3)" }}
+                />
+              ) : (
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold"
+                  style={{
+                    backgroundColor: "rgba(212,175,55,0.12)",
+                    color: GOLD_HEX,
+                  }}
+                >
+                  {ep.name.charAt(0)}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
+                  {ep.name}
+                </p>
+                {ep.instagram_url && (
+                  <a
+                    href={ep.instagram_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs hover:underline"
+                    style={{ color: GOLD_HEX }}
+                  >
+                    <Instagram size={12} />
+                    Instagram
+                  </a>
+                )}
+              </div>
+              {ep.comment && (
+                <p
+                  className="mt-1 text-sm leading-relaxed"
+                  style={{ color: "rgba(27,37,40,0.7)" }}
+                >
+                  {ep.comment}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Dress code OK / NG examples ───────────────────────────────────────────
+function DressCodeSection({
+  detail,
+  fallback,
+}: {
+  detail?: DressCodeObject | null;
+  fallback?: string | null;
+}) {
+  const ok = detail?.ok_examples ?? [];
+  const ng = detail?.ng_examples ?? [];
+  const description = detail?.description;
+
+  if (ok.length === 0 && ng.length === 0 && !description && !fallback) return null;
+
+  return (
+    <SectionCard
+      icon={<Shirt size={20} style={{ color: GOLD_HEX }} />}
+      title="ドレスコード"
+    >
+      {(description || fallback) && (
+        <p
+          className="mb-4 text-sm leading-relaxed"
+          style={{ color: "rgba(27,37,40,0.7)" }}
+        >
+          {description || fallback}
+        </p>
+      )}
+
+      {ok.length > 0 && (
+        <div className="mb-4 space-y-2">
+          <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
+            OKな例
+          </p>
+          <DressGallery items={ok} variant="ok" />
+        </div>
+      )}
+
+      {ng.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
+            NGな例
+          </p>
+          <DressGallery items={ng} variant="ng" />
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function DressGallery({
+  items,
+  variant,
+}: {
+  items: DressExample[];
+  variant: "ok" | "ng";
+}) {
+  const badgeBg = variant === "ok" ? "rgba(34,197,94,0.95)" : "rgba(220,38,38,0.95)";
+  const badgeText = variant === "ok" ? "OK" : "NG";
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className="overflow-hidden rounded-[10px]"
+          style={{ border: "1px solid rgba(27,37,40,0.08)" }}
+        >
+          <div className="relative aspect-[3/4] w-full bg-[rgba(27,37,40,0.04)]">
+            {item.image_url ? (
+              <img
+                src={item.image_url}
+                alt={`${badgeText}例 ${i + 1}`}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Shirt size={28} style={{ color: "rgba(27,37,40,0.3)" }} />
+              </div>
+            )}
+            <span
+              className="absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+              style={{ backgroundColor: badgeBg }}
+            >
+              {badgeText}
+            </span>
+          </div>
+          {item.note && (
+            <p
+              className="px-2 py-1.5 text-[11px] leading-snug"
+              style={{ color: "rgba(27,37,40,0.6)" }}
+            >
+              {item.note}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Salary simulator ──────────────────────────────────────────────────────
+function SalarySimulatorSection({
+  simulator,
+  backItems,
+  hourlyMin,
+  hourlyMax,
+}: {
+  simulator?: SalarySimulator | null;
+  backItems?: BackItem[];
+  hourlyMin?: number;
+  hourlyMax?: number;
+}) {
+  // Defaults: prefer simulator → fall back to store hourly_min/back/etc.
+  const baseHourly =
+    simulator?.default_hourly ??
+    (Math.max(hourlyMin ?? 0, 0) || 3000);
+  const baseSales = simulator?.default_sales ?? 200_000;
+  const baseNominations = simulator?.default_nominations ?? 0;
+
+  // back_rate: prefer explicit, otherwise infer from store back_items if any
+  // are expressed as percentage values (≤ 100), otherwise a sensible 30%.
+  const inferredBackRate = (() => {
+    if (typeof simulator?.back_rate === "number") return simulator.back_rate;
+    const sample = (backItems ?? []).find(
+      (b) => typeof b.amount === "number" && b.amount > 0 && b.amount <= 100,
+    );
+    if (sample) return sample.amount / 100;
+    return 0.3;
+  })();
+  const nominationUnit = simulator?.nomination_unit ?? 1500;
+  const hoursPerDay = simulator?.hours_per_day ?? 5;
+  const daysPerMonth = simulator?.days_per_month ?? 22;
+
+  const hourlyMaxBound = Math.max(
+    hourlyMax ?? baseHourly * 2,
+    baseHourly + 1000,
+  );
+
+  const [hourly, setHourly] = useState<number>(baseHourly);
+  const [sales, setSales] = useState<number>(baseSales);
+  const [nominations, setNominations] = useState<number>(baseNominations);
+
+  // If the input store changes, re-sync defaults (rare but tidy).
+  useEffect(() => {
+    setHourly(baseHourly);
+    setSales(baseSales);
+    setNominations(baseNominations);
+  }, [baseHourly, baseSales, baseNominations]);
+
+  const monthly = useMemo(() => {
+    const wage = hourly * hoursPerDay * daysPerMonth;
+    const back = sales * inferredBackRate;
+    const nom = nominations * nominationUnit;
+    return Math.round(wage + back + nom);
+  }, [hourly, sales, nominations, inferredBackRate, hoursPerDay, daysPerMonth, nominationUnit]);
+
+  // Render the section only if we have a simulator config OR a usable hourly base.
+  const enabled = !!simulator || (hourlyMin && hourlyMin > 0);
+  if (!enabled) return null;
+
+  return (
+    <SectionCard
+      icon={<Calculator size={20} style={{ color: GOLD_HEX }} />}
+      title="給料シミュレーター"
+    >
+      <div className="space-y-5">
+        <div
+          className="rounded-[12px] px-4 py-3"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(212,175,55,0.04) 100%)",
+            border: "1px solid rgba(212,175,55,0.25)",
+          }}
+        >
+          <p className="text-xs font-medium" style={{ color: "rgba(27,37,40,0.55)" }}>
+            想定月収
+          </p>
+          <p
+            className="font-heading text-2xl font-bold"
+            style={{ color: GOLD_HEX, fontFamily: "'Outfit','Noto Sans JP',sans-serif" }}
+          >
+            ¥{monthly.toLocaleString()}
+          </p>
+          <p className="text-[11px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+            {hoursPerDay}時間 × {daysPerMonth}日 + バック{Math.round(inferredBackRate * 100)}%
+            {nominationUnit > 0 ? ` + 指名 ¥${nominationUnit.toLocaleString()}/本` : ""}
+          </p>
+        </div>
+
+        <SimSlider
+          label="時給"
+          value={hourly}
+          min={1500}
+          max={Math.max(hourlyMaxBound, 10000)}
+          step={100}
+          format={(v) => `¥${v.toLocaleString()}`}
+          onChange={setHourly}
+        />
+        <SimSlider
+          label="月の売上"
+          value={sales}
+          min={0}
+          max={2_000_000}
+          step={10_000}
+          format={(v) => `¥${v.toLocaleString()}`}
+          onChange={setSales}
+        />
+        <SimSlider
+          label="指名本数 / 月"
+          value={nominations}
+          min={0}
+          max={50}
+          step={1}
+          format={(v) => `${v}本`}
+          onChange={setNominations}
+        />
+
+        <p className="text-[11px]" style={{ color: "rgba(27,37,40,0.45)" }}>
+          ※ 概算です。実際の給与は店舗ごとの規定により異なります。
+        </p>
+      </div>
+    </SectionCard>
+  );
+}
+
+function SimSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-medium" style={{ color: "#1b2528" }}>
+          {label}
+        </span>
+        <span className="text-sm font-bold" style={{ color: GOLD_HEX }}>
+          {format(value)}
+        </span>
+      </div>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={(v) => onChange(v[0] ?? value)}
+      />
+      <div className="flex justify-between text-[10px]" style={{ color: "rgba(27,37,40,0.4)" }}>
+        <span>{format(min)}</span>
+        <span>{format(max)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Set fee (セット料金) ─────────────────────────────────────────────────
+function SetFeeSection({ setFee }: { setFee?: SetFee | null }) {
+  const items = setFee?.items ?? [];
+  const notes = setFee?.notes;
+  if (items.length === 0 && !notes) return null;
+
+  return (
+    <SectionCard
+      icon={<Wallet size={20} style={{ color: GOLD_HEX }} />}
+      title="セット料金"
+    >
+      {items.length > 0 && (
+        <div className="overflow-hidden rounded-[10px]" style={{ border: "1px solid rgba(27,37,40,0.08)" }}>
+          {items.map((item, i) => (
+            <div
+              key={i}
+              className="px-3 py-2.5"
+              style={{
+                borderTop: i === 0 ? "none" : "1px solid rgba(27,37,40,0.06)",
+              }}
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium" style={{ color: "#1b2528" }}>
+                  {item.label}
+                </span>
+                <span className="text-sm font-bold" style={{ color: GOLD_HEX }}>
+                  {formatAmount(item.amount)}
+                </span>
+              </div>
+              {item.note && (
+                <p className="mt-0.5 text-[11px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                  {item.note}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {notes && (
+        <p
+          className="mt-3 rounded-[10px] px-3 py-2 text-xs"
+          style={{
+            backgroundColor: "rgba(212,175,55,0.08)",
+            color: "rgba(27,37,40,0.7)",
+          }}
+        >
+          {notes}
+        </p>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Related stores section ───────────────────────────────────────────────
+function RelatedStoresSection({
+  title,
+  icon,
+  stores,
+  ids,
+  currentId,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  stores?: RelatedStoreLite[] | null;
+  ids?: number[] | null;
+  currentId: number;
+}) {
+  const [resolved, setResolved] = useState<RelatedStoreLite[]>([]);
+
+  // Prefer pre-resolved `stores` from API. If only ids are given, fetch in parallel.
+  useEffect(() => {
+    if (stores && stores.length > 0) {
+      setResolved(stores.filter((s) => s.id !== currentId));
+      return;
+    }
+    if (!ids || ids.length === 0) {
+      setResolved([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      ids
+        .filter((id) => id !== currentId)
+        .slice(0, 6)
+        .map((id) =>
+          fetch(`/api/stores/${id}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+        ),
+    ).then((results) => {
+      if (cancelled) return;
+      const items: RelatedStoreLite[] = [];
+      for (const r of results) {
+        const s = r?.store;
+        if (!s) continue;
+        const firstImage = (s.images ?? [])
+          .slice()
+          .sort((a: StoreImage, b: StoreImage) => a.order - b.order)[0]?.url;
+        items.push({
+          id: s.id,
+          name: s.name,
+          area: s.area,
+          category: s.category,
+          image_url: firstImage,
+          hourly_min: s.hourly_min,
+          hourly_max: s.hourly_max,
+        });
+      }
+      setResolved(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [stores, ids, currentId]);
+
+  if (resolved.length === 0) return null;
+
+  return (
+    <SectionCard icon={icon} title={title}>
+      <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {resolved.map((s) => (
+          <Link
+            key={s.id}
+            to={`/stores/${s.id}`}
+            className="shrink-0 rounded-xl overflow-hidden"
+            style={{
+              width: "170px",
+              background: "#fcfeff",
+              border: "1px solid rgba(27,37,40,0.06)",
+              textDecoration: "none",
+            }}
+          >
+            <div className="relative w-full" style={{ height: "100px" }}>
+              {s.image_url ? (
+                <img
+                  src={s.image_url}
+                  alt={s.name}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #1b2528, #2a3a3f)" }}
+                >
+                  <span style={{ fontSize: "20px", fontWeight: 700, color: GOLD_HEX }}>
+                    {s.name.charAt(0)}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="px-2.5 py-2">
+              <p
+                className="truncate text-xs font-bold"
+                style={{ color: "#1b2528" }}
+              >
+                {s.name}
+              </p>
+              {s.area && (
+                <p className="truncate text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                  {s.area}
+                  {s.category ? ` / ${s.category}` : ""}
+                </p>
+              )}
+              {(s.hourly_min || s.hourly_max) && (
+                <p
+                  className="mt-0.5 text-[10px]"
+                  style={{ color: GOLD_HEX, fontWeight: 600 }}
+                >
+                  時給 ¥{(s.hourly_min ?? 0).toLocaleString()}〜¥{(s.hourly_max ?? 0).toLocaleString()}
+                </p>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Reviews section (3 visible + blur for 4+) ─────────────────────────────
+function ReviewsSection({
+  storeId,
+  reviews,
+  reviewsCount,
+}: {
+  storeId: number;
+  reviews: Review[];
+  reviewsCount: number;
+}) {
+  const visible = reviews.slice(0, 3);
+  const hidden = reviews.slice(3);
+  const hasHidden = hidden.length > 0 || reviewsCount > visible.length;
+
+  return (
+    <div
+      className="overflow-hidden rounded-[16px] bg-white"
+      style={{
+        boxShadow: "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(27,37,40,0.06)",
+      }}
+    >
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+        <SectionHeading icon={<Star size={20} style={{ color: GOLD_HEX }} />}>
+          リアルな声・口コミ ({reviewsCount}件)
+        </SectionHeading>
+        <a
+          href={`/stores/${storeId}/review`}
+          className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+          style={{
+            background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
+          }}
+        >
+          口コミを書く
+        </a>
+      </div>
+
+      {/* Visible reviews (first 3) */}
+      <div className="space-y-4 px-5">
+        {visible.map((review) => (
+          <ReviewItem key={review.id} review={review} />
+        ))}
+      </div>
+
+      {/* Blurred locked reviews + login CTA */}
+      {hasHidden && (
+        <div className="relative mt-4 px-5 pb-5">
+          <div className="space-y-4" style={{ filter: "blur(6px)", userSelect: "none", pointerEvents: "none" }}>
+            {(hidden.length > 0 ? hidden : visible).slice(0, 3).map((review) => (
+              <ReviewItem key={`locked-${review.id}`} review={review} />
+            ))}
+          </div>
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center"
+            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.85) 50%)" }}
+          >
+            <p
+              className="font-heading mb-3 text-center text-base font-bold"
+              style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif", color: "#1b2528" }}
+            >
+              4件目以降はログインが必要です
+            </p>
+            <button
+              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "#06C755" }}
+              onClick={() => {
+                window.location.href = "/login";
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+              </svg>
+              LINEでログイン
+            </button>
+          </div>
+        </div>
+      )}
+      {!hasHidden && <div className="pb-5" />}
+    </div>
+  );
+}
+
+function ReviewItem({ review }: { review: Review }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        {review.user?.line_picture_url ? (
+          <img
+            src={review.user.line_picture_url}
+            alt={review.user?.line_display_name ?? ""}
+            className="h-8 w-8 rounded-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold"
+            style={{ backgroundColor: "rgba(27,37,40,0.08)", color: "rgba(27,37,40,0.4)" }}
+          >
+            {(review.user?.line_display_name ?? "?").charAt(0)}
+          </div>
+        )}
+        <div className="flex-1">
+          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>
+            {review.user?.line_display_name ?? "匿名"}
+          </p>
+          <div className="flex items-center gap-2">
+            {renderStars(review.rating ?? 0, 12)}
+            <span className="text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
+              {review.created_at ? new Date(review.created_at).toLocaleDateString("ja-JP") : ""}
+            </span>
+          </div>
+        </div>
+      </div>
+      <p className="text-sm leading-relaxed pl-11" style={{ color: "rgba(27,37,40,0.7)" }}>
+        {review.body}
+      </p>
+      {review.tweet_id && review.tweet_author_screen_name && (
+        <div className="pl-11">
+          <blockquote className="twitter-tweet" data-conversation="none">
+            <a href={`https://x.com/${review.tweet_author_screen_name}/status/${review.tweet_id}`}>
+              ツイートを表示
+            </a>
+          </blockquote>
+        </div>
+      )}
+      <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+    </div>
   );
 }

@@ -15,6 +15,8 @@ class Review extends Model
         'store_id',
         'rating',
         'body',
+        'tweet_id',
+        'tweet_author_screen_name',
         'status',
     ];
 

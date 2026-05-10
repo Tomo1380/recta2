@@ -23,14 +23,23 @@ class PublicApiTest extends TestCase
         static $counter = 0;
         $counter++;
 
-        return Store::create(array_merge([
+        // Allow tests to keep using the legacy flat fields (hourly_min, hourly_max)
+        // by folding them into the new JSONB structure here.
+        $hourlyMin = $overrides['hourly_min'] ?? 3000;
+        $hourlyMax = $overrides['hourly_max'] ?? 8000;
+        unset($overrides['hourly_min'], $overrides['hourly_max']);
+
+        $defaults = [
             'name' => "Store {$counter}",
             'area' => '新宿',
             'category' => 'キャバクラ',
             'publish_status' => 'published',
-            'hourly_min' => 3000,
-            'hourly_max' => 8000,
-        ], $overrides));
+            'wage' => [
+                'regular' => ['min' => (int) $hourlyMin, 'max' => (int) $hourlyMax, 'unit' => 'hour'],
+            ],
+        ];
+
+        return Store::create(array_merge($defaults, $overrides));
     }
 
     // ========== Home ==========

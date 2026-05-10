@@ -22,6 +22,7 @@ import { Search, Filter } from "lucide-react";
 import StoreCard from "~/components/user/shared/StoreCard";
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
+import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import AiChatPanel from "~/components/user/AiChatPanel";
 
 // ---------------------------------------------------------------------------
@@ -231,7 +232,7 @@ export default function StoreListPage() {
   // Filter state derived from URL
   const currentArea = searchParams.get("area") || "";
   const currentCategory = searchParams.get("category") || "";
-  const currentSort = searchParams.get("sort") || "newest";
+  const currentSort = searchParams.get("sort") || "experience_guaranteed";
   const currentQuery = searchParams.get("q") || "";
   const currentPage = Number(searchParams.get("page") || "1");
 
@@ -454,6 +455,7 @@ export default function StoreListPage() {
               <SelectValue placeholder="並び替え" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="experience_guaranteed">体験確約</SelectItem>
               <SelectItem value="newest">新着順</SelectItem>
               <SelectItem value="hourly_desc">時給が高い順</SelectItem>
               <SelectItem value="hourly_asc">時給が低い順</SelectItem>
@@ -535,6 +537,11 @@ export default function StoreListPage() {
             )}
           </>
         )}
+      </div>
+
+      {/* Recently viewed (あなたが見た記事) */}
+      <div className="mx-auto max-w-3xl pb-4">
+        <RecentlyViewedStores variant="flush" />
       </div>
 
       {/* Footer */}

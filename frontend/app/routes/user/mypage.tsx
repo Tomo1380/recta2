@@ -73,6 +73,12 @@ export default function MyPage() {
   const { user, isAuthenticated, loading: authLoading, logout } = useUserAuth();
   const navigate = useNavigate();
 
+  // SSR + auth-from-localStorage causes hook-mismatch crashes when the client
+  // re-renders. Render nothing until hydrated so SSR HTML and the first
+  // client render agree.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+
   const [nickname, setNickname] = useState("");
   const [age, setAge] = useState("");
   const [preferredArea, setPreferredArea] = useState("");
@@ -87,10 +93,10 @@ export default function MyPage() {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (hydrated && !authLoading && !isAuthenticated) {
       navigate("/login");
     }
-  }, [authLoading, isAuthenticated, navigate]);
+  }, [hydrated, authLoading, isAuthenticated, navigate]);
 
   // Populate form when user data loads
   useEffect(() => {
@@ -158,7 +164,7 @@ export default function MyPage() {
     navigate("/");
   };
 
-  if (authLoading || !user) {
+  if (!hydrated || authLoading || !user) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"

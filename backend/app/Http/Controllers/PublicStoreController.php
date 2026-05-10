@@ -8,8 +8,10 @@ use App\Models\Category;
 use App\Models\PickupShop;
 use App\Models\Consultation;
 use App\Models\SiteSetting;
+use App\Support\StoreApiTransformer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PublicStoreController extends Controller
 {
@@ -49,16 +51,18 @@ class PublicStoreController extends Controller
         }
 
         if ($minWage = $request->input('min_hourly')) {
-            $query->where('hourly_min', '>=', (int)$minWage);
+            // wage->regular->min stored as int in JSONB.
+            // Use Laravel's portable JSON path syntax (works on PG and SQLite).
+            $query->where('wage->regular->min', '>=', (int) $minWage);
         }
 
         $sort = $request->input('sort', 'newest');
         switch ($sort) {
             case 'hourly_desc':
-                $query->orderByDesc('hourly_max');
+                $query->orderBy('wage->regular->max', 'desc');
                 break;
             case 'hourly_asc':
-                $query->orderBy('hourly_min');
+                $query->orderBy('wage->regular->min', 'asc');
                 break;
             case 'popular':
                 $query->withCount(['reviews' => fn($q) => $q->where('status', 'published')])
@@ -71,10 +75,12 @@ class PublicStoreController extends Controller
         $stores = $query->withCount(['reviews' => fn($q) => $q->where('status', 'published')])
                         ->paginate($request->input('per_page', 20));
 
-        // Add average_rating to each store
+        // Transform: flatten JSONB into legacy fields for frontend compat + add average_rating
         $stores->getCollection()->transform(function ($store) {
-            $store->average_rating = round($store->averageRating(), 1);
-            return $store;
+            $arr = StoreApiTransformer::toPublicArray($store);
+            $arr['average_rating'] = round($store->averageRating(), 1);
+            $arr['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
+            return $arr;
         });
 
         return response()->json($stores);
@@ -90,7 +96,6 @@ class PublicStoreController extends Controller
         }
 
         $store->loadCount(['reviews' => fn($q) => $q->where('status', 'published')]);
-        $store->average_rating = round($store->averageRating(), 1);
 
         // Load published reviews with user info
         $store->load(['reviews' => function ($q) {
@@ -99,6 +104,11 @@ class PublicStoreController extends Controller
               ->orderByDesc('created_at')
               ->limit(10);
         }]);
+
+        $storePayload = StoreApiTransformer::toPublicArray($store);
+        $storePayload['average_rating'] = round($store->averageRating(), 1);
+        $storePayload['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
+        $storePayload['reviews'] = $store->reviews; // already loaded
 
         // Related stores (same area, same category)
         $related = Store::where('publish_status', 'published')
@@ -111,14 +121,16 @@ class PublicStoreController extends Controller
             ->limit(6)
             ->get();
 
-        $related->transform(function ($s) {
-            $s->average_rating = round($s->averageRating(), 1);
-            return $s;
-        });
+        $relatedPayload = $related->map(function ($s) {
+            $arr = StoreApiTransformer::toPublicArray($s);
+            $arr['average_rating'] = round($s->averageRating(), 1);
+            $arr['reviews_count'] = $s->reviews_count ?? $s->reviewCount();
+            return $arr;
+        })->values();
 
         return response()->json([
-            'store' => $store,
-            'related' => $related,
+            'store' => $storePayload,
+            'related' => $relatedPayload,
         ]);
     }
 
@@ -167,13 +179,14 @@ class PublicStoreController extends Controller
             ->filter(fn($p) => $p->store && $p->store->publish_status === 'published')
             ->map(function ($pickup) {
                 $store = $pickup->store;
+                $compat = StoreApiTransformer::toPublicArray($store);
                 return [
                     'id' => $store->id,
                     'name' => $store->name,
                     'area' => $store->area,
                     'category' => $store->category,
-                    'hourly_min' => $store->hourly_min,
-                    'hourly_max' => $store->hourly_max,
+                    'hourly_min' => $compat['hourly_min'] ?? null,
+                    'hourly_max' => $compat['hourly_max'] ?? null,
                     'feature_tags' => $store->feature_tags,
                     'images' => $store->images,
                     'is_pr' => $pickup->is_pr,

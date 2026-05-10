@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   MapPin,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "~/lib/auth";
@@ -25,6 +26,7 @@ const menuItems = [
   { path: "/admin/shops", label: "店舗管理", icon: Building2 },
   { path: "/admin/reviews", label: "口コミ管理", icon: MessageSquare },
   { path: "/admin/ai-chat", label: "AIチャット設定", icon: Bot },
+  { path: "/admin/articles", label: "コラム管理", icon: FileText },
   { path: "/admin/content", label: "コンテンツ管理", icon: LayoutGrid },
   { path: "/admin/area-category", label: "エリア・カテゴリ", icon: MapPin },
   { path: "/admin/admin-users", label: "管理ユーザー", icon: KeyRound },
@@ -36,6 +38,8 @@ const breadcrumbMap: Record<string, string> = {
   "/admin/shops": "店舗管理",
   "/admin/reviews": "口コミ管理",
   "/admin/ai-chat": "AIチャット設定",
+  "/admin/articles": "コラム管理",
+  "/admin/articles/new": "新規作成",
   "/admin/content": "コンテンツ管理",
   "/admin/area-category": "エリア・カテゴリ",
   "/admin/admin-users": "管理ユーザー",
@@ -62,6 +66,11 @@ function getBreadcrumbs(pathname: string) {
       crumbs.push({ label: "店舗作成", path: currentPath });
     } else if (segments[i - 1] === "shops") {
       crumbs.push({ label: "店舗編集", path: currentPath });
+    } else if (segments[i - 1] === "articles" && segments[i] !== "edit") {
+      // /admin/articles/:id - intermediate, hide; /edit step adds the label
+      // skip
+    } else if (segments[i] === "edit" && segments[i - 2] === "articles") {
+      crumbs.push({ label: "記事編集", path: currentPath });
     }
   }
 
@@ -75,18 +84,27 @@ export default function AdminLayout() {
   const breadcrumbs = getBreadcrumbs(location.pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Admin panel is client-only (auth state lives in localStorage). Render a
+  // stable placeholder during SSR so the server HTML matches the first
+  // client render — this avoids the hydration mismatch where the server
+  // emits the empty <script> stub and the client renders the real <div>.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
   // Auth guard - redirect to login if not authenticated
   useEffect(() => {
-    if (!loading && !user) {
+    if (hydrated && !loading && !user) {
       navigate("/admin/login", { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, hydrated]);
 
-  if (loading) {
+  if (!hydrated || loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
@@ -94,7 +112,13 @@ export default function AdminLayout() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background">

@@ -442,11 +442,19 @@ class FineTuningController extends Controller
             $lines = [$header];
 
             foreach ($stores as $s) {
+                $wage         = is_array($s->wage)      ? $s->wage      : [];
+                $guaranteeArr = is_array($s->guarantee) ? $s->guarantee : [];
+                $regular      = $wage['regular'] ?? [];
+                $trialArr     = $wage['trial']   ?? [];
+                $payrollArr   = $wage['payroll'] ?? [];
+
                 $tags = implode(',', $s->feature_tags ?? []);
-                $payroll = $s->payroll_system_type ?? '';
-                $trial = $s->same_day_trial ? "当日OK({$s->trial_hourly})" : ($s->trial_hourly ? "体入{$s->trial_hourly}" : '');
-                $guarantee = $s->guarantee_period ? "{$s->guarantee_period}" : '';
-                $norma = $s->norma_info ?? '';
+                $payroll = $payrollArr['type'] ?? '';
+                $trialHourly = $trialArr['hourly'] ?? '';
+                $sameDay = (bool) ($guaranteeArr['same_day_trial'] ?? false);
+                $trial = $sameDay ? "当日OK({$trialHourly})" : ($trialHourly ? "体入{$trialHourly}" : '');
+                $guarantee = $guaranteeArr['period'] ?? '';
+                $norma = $guaranteeArr['norma'] ?? '';
                 $rank = $s->rank ?? '';
                 $desc = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->description ?? ''), 0, 80);
                 $feat = mb_substr(str_replace(['|', "\n"], ['/', ' '], $s->features_text ?? ''), 0, 60);
@@ -457,8 +465,8 @@ class FineTuningController extends Controller
                     $s->area,
                     $s->nearest_station ?? '',
                     $s->category ?? '',
-                    $s->hourly_min ?? '',
-                    $s->hourly_max ?? '',
+                    $regular['min'] ?? '',
+                    $regular['max'] ?? '',
                     $payroll,
                     $trial,
                     $guarantee,
