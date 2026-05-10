@@ -598,22 +598,35 @@ export function ShopEditPage() {
   ]);
   const [hiringTotal, setHiringTotal] = useState("直近5ヶ月で52名採用");
   const [popularFeatures, setPopularFeatures] = useState<string[]>([]);
-  const [otherHint, setOtherHint] = useState("");
   // New schema fields
-  const [recruitmentStandards, setRecruitmentStandards] = useState("");
-  const [rank, setRank] = useState("");
-  const [galPoint, setGalPoint] = useState(50);
-  const [loosePoint, setLoosePoint] = useState(50);
-  const [agePoint, setAgePoint] = useState(50);
-  const [waiwaiPoint, setWaiwaiPoint] = useState(50);
-  const [cutePoint, setCutePoint] = useState(50);
   const [transferDescription, setTransferDescription] = useState("");
   const [transferKm, setTransferKm] = useState("");
-  const [unitWageType, setUnitWageType] = useState("");
-  const [dressCodeField, setDressCodeField] = useState("");
   const [payrollSystemType, setPayrollSystemType] = useState("");
   const [payrollSystemDescription, setPayrollSystemDescription] = useState("");
   const [champagneDescription, setChampagneDescription] = useState("");
+
+  // FB-driven detail-page features (Part B)
+  const [champagnePrices, setChampagnePrices] = useState<{
+    tequila: { amount: string; note: string };
+    belle_epoque: { amount: string; note: string };
+    armand: { amount: string; note: string };
+    lavay: { amount: string; note: string };
+  }>({
+    tequila: { amount: "", note: "" },
+    belle_epoque: { amount: "", note: "" },
+    armand: { amount: "", note: "" },
+    lavay: { amount: "", note: "" },
+  });
+  const [dressCodeDescription, setDressCodeDescription] = useState("");
+  const [dressCodeOk, setDressCodeOk] = useState<{ note: string; image_url: string }[]>([]);
+  const [dressCodeNg, setDressCodeNg] = useState<{ note: string; image_url: string }[]>([]);
+  const [setFeeItems, setSetFeeItems] = useState<
+    { label: string; amount: string; note: string }[]
+  >([]);
+  const [setFeeNotes, setSetFeeNotes] = useState("");
+  const [rectaEpisodes, setRectaEpisodes] = useState<
+    { name: string; comment: string; instagram_url: string; photo_url: string }[]
+  >([]);
   const [qaItems, setQaItems] = useState<{ label: string; value: string }[]>([]);
   const [staffName, setStaffName] = useState("");
   const [staffRole, setStaffRole] = useState("");
@@ -723,20 +736,73 @@ export function ShopEditPage() {
     }
 
     // New schema fields
-    setRecruitmentStandards((store as any).recruitment_standards || "");
-    setRank((store as any).rank || "");
-    setGalPoint((store as any).gal_point ?? 50);
-    setLoosePoint((store as any).loose_point ?? 50);
-    setAgePoint((store as any).age_point ?? 50);
-    setWaiwaiPoint((store as any).waiwai_point ?? 50);
-    setCutePoint((store as any).cute_point ?? 50);
     setTransferDescription((store as any).transfer_description || "");
     setTransferKm((store as any).transfer_km || "");
-    setUnitWageType((store as any).unit_wage_type || "");
-    setDressCodeField((store as any).dress_code || "");
     setPayrollSystemType((store as any).payroll_system_type || "");
     setPayrollSystemDescription((store as any).payroll_system_description || "");
     setChampagneDescription((store as any).champagne_description || "");
+
+    // FB-driven detail features (Part B)
+    const cp = (store as any).champagne_prices || {};
+    setChampagnePrices({
+      tequila: {
+        amount: cp.tequila?.amount != null ? String(cp.tequila.amount) : "",
+        note: cp.tequila?.note ?? "",
+      },
+      belle_epoque: {
+        amount: cp.belle_epoque?.amount != null ? String(cp.belle_epoque.amount) : "",
+        note: cp.belle_epoque?.note ?? "",
+      },
+      armand: {
+        amount: cp.armand?.amount != null ? String(cp.armand.amount) : "",
+        note: cp.armand?.note ?? "",
+      },
+      lavay: {
+        amount: cp.lavay?.amount != null ? String(cp.lavay.amount) : "",
+        note: cp.lavay?.note ?? "",
+      },
+    });
+
+    const dressDetail = (store as any).dress_code_detail
+      ?? (typeof (store as any).dress_code === "object" ? (store as any).dress_code : null);
+    if (dressDetail && typeof dressDetail === "object") {
+      setDressCodeDescription(dressDetail.description ?? "");
+      setDressCodeOk(
+        (dressDetail.ok_examples ?? []).map((e: any) => ({
+          note: e?.note ?? "",
+          image_url: e?.image_url ?? "",
+        })),
+      );
+      setDressCodeNg(
+        (dressDetail.ng_examples ?? []).map((e: any) => ({
+          note: e?.note ?? "",
+          image_url: e?.image_url ?? "",
+        })),
+      );
+    } else {
+      setDressCodeDescription("");
+      setDressCodeOk([]);
+      setDressCodeNg([]);
+    }
+
+    const sf = (store as any).set_fee || {};
+    setSetFeeItems(
+      (sf.items ?? []).map((it: any) => ({
+        label: it?.label ?? "",
+        amount: it?.amount != null ? String(it.amount) : "",
+        note: it?.note ?? "",
+      })),
+    );
+    setSetFeeNotes(sf.notes ?? "");
+
+    setRectaEpisodes(
+      ((store as any).recta_episodes ?? []).map((ep: any) => ({
+        name: ep?.name ?? "",
+        comment: ep?.comment ?? "",
+        instagram_url: ep?.instagram_url ?? "",
+        photo_url: ep?.photo_url ?? "",
+      })),
+    );
 
     // Publish status & images
     setPublishStatus(store.publish_status || "draft");
@@ -836,22 +902,69 @@ export function ShopEditPage() {
       comment: staffComment,
       supports: supportItems.filter(Boolean),
     },
-    recruitment_standards: recruitmentStandards,
-    rank: rank || null,
-    gal_point: galPoint,
-    loose_point: loosePoint,
-    age_point: agePoint,
-    waiwai_point: waiwaiPoint,
-    cute_point: cutePoint,
     transfer_description: transferDescription,
     transfer_km: transferKm,
-    unit_wage_type: unitWageType || null,
-    dress_code: dressCodeField,
     payroll_system_type: payrollSystemType || null,
     payroll_system_description: payrollSystemDescription,
     champagne_description: champagneDescription,
+    // Part B: FB-driven detail-page features
+    champagne_prices: (() => {
+      const out: Record<string, { amount: number; note?: string }> = {};
+      (Object.keys(champagnePrices) as Array<keyof typeof champagnePrices>).forEach((k) => {
+        const item = champagnePrices[k];
+        const trimmedAmount = item.amount.trim();
+        if (!trimmedAmount && !item.note.trim()) return;
+        const num = Number(trimmedAmount.replace(/[^\d.-]/g, ""));
+        if (!Number.isFinite(num) && !item.note.trim()) return;
+        out[k as string] = {
+          amount: Number.isFinite(num) ? num : 0,
+          ...(item.note.trim() ? { note: item.note.trim() } : {}),
+        };
+      });
+      return Object.keys(out).length > 0 ? out : null;
+    })(),
+    dress_code: (dressCodeDescription.trim() || dressCodeOk.length > 0 || dressCodeNg.length > 0)
+      ? {
+          description: dressCodeDescription.trim() || undefined,
+          ok_examples: dressCodeOk
+            .filter((e) => e.note.trim() || e.image_url.trim())
+            .map((e) => ({
+              note: e.note.trim() || undefined,
+              image_url: e.image_url.trim() || undefined,
+            })),
+          ng_examples: dressCodeNg
+            .filter((e) => e.note.trim() || e.image_url.trim())
+            .map((e) => ({
+              note: e.note.trim() || undefined,
+              image_url: e.image_url.trim() || undefined,
+            })),
+        }
+      : null,
+    set_fee: (setFeeItems.some((it) => it.label.trim() || it.amount.trim()) || setFeeNotes.trim())
+      ? {
+          items: setFeeItems
+            .filter((it) => it.label.trim() || it.amount.trim())
+            .map((it) => {
+              const num = Number(it.amount.replace(/[^\d.-]/g, ""));
+              return {
+                label: it.label.trim(),
+                amount: Number.isFinite(num) ? num : it.amount.trim(),
+                ...(it.note.trim() ? { note: it.note.trim() } : {}),
+              };
+            }),
+          ...(setFeeNotes.trim() ? { notes: setFeeNotes.trim() } : {}),
+        }
+      : null,
+    recta_episodes: rectaEpisodes
+      .filter((ep) => ep.name.trim())
+      .map((ep) => ({
+        name: ep.name.trim(),
+        ...(ep.comment.trim() ? { comment: ep.comment.trim() } : {}),
+        ...(ep.instagram_url.trim() ? { instagram_url: ep.instagram_url.trim() } : {}),
+        ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
+      })),
     publish_status: publishStatus,
-  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, recruitmentStandards, rank, galPoint, loosePoint, agePoint, waiwaiPoint, cutePoint, transferDescription, transferKm, unitWageType, dressCodeField, payrollSystemType, payrollSystemDescription, champagneDescription, publishStatus]);
+  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeItems, setFeeNotes, rectaEpisodes, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1138,24 +1251,14 @@ export function ShopEditPage() {
               placeholder="その他、給与に関する補足情報があれば入力してください"
             />
           </Field>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="単価種別">
-              <SelectInput
-                value={unitWageType}
-                onChange={(e: any) => setUnitWageType(e.target.value)}
-                options={["時給", "日給", "月給"]}
-                placeholder="選択してください"
-              />
-            </Field>
-            <Field label="給与支払い方法">
-              <SelectInput
-                value={payrollSystemType}
-                onChange={(e: any) => setPayrollSystemType(e.target.value)}
-                options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
-                placeholder="選択してください"
-              />
-            </Field>
-          </div>
+          <Field label="給与支払い方法">
+            <SelectInput
+              value={payrollSystemType}
+              onChange={(e: any) => setPayrollSystemType(e.target.value)}
+              options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
+              placeholder="選択してください"
+            />
+          </Field>
           <Field label="給与支払い補足">
             <TextArea
               value={payrollSystemDescription}
@@ -1391,68 +1494,6 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="採用基準・ランク" icon={UserCheck}>
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="店舗ランク">
-              <SelectInput
-                value={rank}
-                onChange={(e: any) => setRank(e.target.value)}
-                options={["S", "A", "B", "C"]}
-                placeholder="選択してください"
-              />
-            </Field>
-          </div>
-          <Field label="採用基準（詳細）" hint="求める人物像や採用ラインなどを記載してください">
-            <TextArea
-              value={recruitmentStandards}
-              onChange={(e: any) => setRecruitmentStandards(e.target.value)}
-              rows={4}
-              placeholder="例: 容姿端麗な方、接客経験者優遇、18〜28歳程度"
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="キャストポイント分析" icon={BarChart3}>
-        <div className="space-y-6">
-          <SliderField
-            label="ギャルポイント"
-            value={galPoint}
-            onChange={(e: any) => setGalPoint(Number(e.target.value))}
-            leftLabel="清楚系"
-            rightLabel="ギャル系"
-          />
-          <SliderField
-            label="ゆるさポイント"
-            value={loosePoint}
-            onChange={(e: any) => setLoosePoint(Number(e.target.value))}
-            leftLabel="しっかり"
-            rightLabel="ゆるめ"
-          />
-          <SliderField
-            label="年齢ポイント"
-            value={agePoint}
-            onChange={(e: any) => setAgePoint(Number(e.target.value))}
-            leftLabel="若め"
-            rightLabel="大人め"
-          />
-          <SliderField
-            label="ワイワイポイント"
-            value={waiwaiPoint}
-            onChange={(e: any) => setWaiwaiPoint(Number(e.target.value))}
-            leftLabel="落ち着き"
-            rightLabel="ワイワイ"
-          />
-          <SliderField
-            label="かわいいポイント"
-            value={cutePoint}
-            onChange={(e: any) => setCutePoint(Number(e.target.value))}
-            leftLabel="クール"
-            rightLabel="かわいい"
-          />
-        </div>
-      </SectionCard>
     </div>
   );
 
@@ -1619,15 +1660,107 @@ export function ShopEditPage() {
 
   const renderStep5 = () => (
     <div className="space-y-6">
-      <SectionCard title="ドレスコード" icon={Star}>
-        <Field label="ドレスコード" hint="お店で働く際の服装ルールを記載してください">
-          <TextArea
-            value={dressCodeField}
-            onChange={(e: any) => setDressCodeField(e.target.value)}
-            rows={3}
-            placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 私服OK"
-          />
-        </Field>
+      <SectionCard title="ドレスコード（OK / NG）" icon={Star}>
+        <div className="space-y-5">
+          <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
+            <TextArea
+              value={dressCodeDescription}
+              onChange={(e: any) => setDressCodeDescription(e.target.value)}
+              rows={3}
+              placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
+            />
+          </Field>
+          <Field label="OKな例" hint="OKな服装の説明文（任意で画像URL）を登録できます">
+            <div className="space-y-2">
+              {dressCodeOk.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start group">
+                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={item.note}
+                      onChange={(e) => {
+                        const next = [...dressCodeOk];
+                        next[i] = { ...next[i], note: e.target.value };
+                        setDressCodeOk(next);
+                      }}
+                      placeholder="例: 明るめのカラードレス"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                    <input
+                      value={item.image_url}
+                      onChange={(e) => {
+                        const next = [...dressCodeOk];
+                        next[i] = { ...next[i], image_url: e.target.value };
+                        setDressCodeOk(next);
+                      }}
+                      placeholder="画像URL（任意）"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setDressCodeOk(dressCodeOk.filter((_, idx) => idx !== i))}
+                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setDressCodeOk([...dressCodeOk, { note: "", image_url: "" }])}
+                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+              >
+                <Plus className="w-3.5 h-3.5" /> OK例を追加
+              </button>
+            </div>
+          </Field>
+          <Field label="NGな例" hint="NGな服装の説明文（任意で画像URL）を登録できます">
+            <div className="space-y-2">
+              {dressCodeNg.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start group">
+                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={item.note}
+                      onChange={(e) => {
+                        const next = [...dressCodeNg];
+                        next[i] = { ...next[i], note: e.target.value };
+                        setDressCodeNg(next);
+                      }}
+                      placeholder="例: 黒ドレス・ビジュー付き"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                    <input
+                      value={item.image_url}
+                      onChange={(e) => {
+                        const next = [...dressCodeNg];
+                        next[i] = { ...next[i], image_url: e.target.value };
+                        setDressCodeNg(next);
+                      }}
+                      placeholder="画像URL（任意）"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setDressCodeNg(dressCodeNg.filter((_, idx) => idx !== i))}
+                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setDressCodeNg([...dressCodeNg, { note: "", image_url: "" }])}
+                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+              >
+                <Plus className="w-3.5 h-3.5" /> NG例を追加
+              </button>
+            </div>
+          </Field>
+        </div>
       </SectionCard>
 
       <SectionCard title="人気の特徴" icon={Star}>
@@ -1639,28 +1772,224 @@ export function ShopEditPage() {
               placeholder="特徴を入力"
             />
           </Field>
-          <Field label="他店ヒント">
-            <TextInput
-              value={otherHint}
-              onChange={(e: any) => setOtherHint(e.target.value)}
-              placeholder="他店との比較ポイントを入力"
+        </div>
+      </SectionCard>
+
+      <SectionCard title="シャンパン情報" icon={Wine}>
+        <div className="space-y-5">
+          <Field
+            label="シャンパン説明"
+            hint="シャンパンメニューや注文ルールなどを記載してください"
+          >
+            <TextArea
+              value={champagneDescription}
+              onChange={(e: any) => setChampagneDescription(e.target.value)}
+              rows={4}
+              placeholder="例: ドンペリ 50,000円〜 / モエシャン 30,000円〜 など"
             />
           </Field>
         </div>
       </SectionCard>
 
-      <SectionCard title="シャンパン情報" icon={Wine}>
-        <Field
-          label="シャンパン説明"
-          hint="シャンパンメニューや注文ルールなどを記載してください"
-        >
-          <TextArea
-            value={champagneDescription}
-            onChange={(e: any) => setChampagneDescription(e.target.value)}
-            rows={4}
-            placeholder="例: ドンペリ 50,000円〜 / モエシャン 30,000円〜 など"
-          />
-        </Field>
+      <SectionCard title="シャンパン金額（4銘柄）" icon={Wine}>
+        <p className="text-xs text-muted-foreground mb-4">
+          新地・六本木の高級店向け。空欄でも構いません。
+        </p>
+        <div className="space-y-3">
+          {([
+            { key: "tequila", label: "テキーラ" },
+            { key: "belle_epoque", label: "ベル・エポック" },
+            { key: "armand", label: "アルマンド" },
+            { key: "lavay", label: "ラベイ" },
+          ] as const).map(({ key, label }) => (
+            <div
+              key={key}
+              className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center border border-border rounded-xl p-3 bg-muted/10"
+            >
+              <div className="text-sm font-medium text-foreground md:col-span-1">
+                {label}
+              </div>
+              <div className="md:col-span-1">
+                <TextInput
+                  type="number"
+                  value={champagnePrices[key].amount}
+                  onChange={(e: any) =>
+                    setChampagnePrices({
+                      ...champagnePrices,
+                      [key]: { ...champagnePrices[key], amount: e.target.value },
+                    })
+                  }
+                  placeholder="金額（円）"
+                />
+              </div>
+              <div className="md:col-span-1">
+                <TextInput
+                  value={champagnePrices[key].note}
+                  onChange={(e: any) =>
+                    setChampagnePrices({
+                      ...champagnePrices,
+                      [key]: { ...champagnePrices[key], note: e.target.value },
+                    })
+                  }
+                  placeholder="備考（任意）"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="セット料金" icon={DollarSign}>
+        <div className="space-y-5">
+          <Field
+            label="セット料金項目"
+            hint="ボトル代・席料・チャージなど、項目ごとに金額を登録してください"
+          >
+            <div className="space-y-2">
+              {setFeeItems.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start group">
+                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
+                    {i + 1}
+                  </div>
+                  <input
+                    value={item.label}
+                    onChange={(e) => {
+                      const next = [...setFeeItems];
+                      next[i] = { ...next[i], label: e.target.value };
+                      setSetFeeItems(next);
+                    }}
+                    placeholder="項目名（例: 90分セット）"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                  <input
+                    value={item.amount}
+                    onChange={(e) => {
+                      const next = [...setFeeItems];
+                      next[i] = { ...next[i], amount: e.target.value };
+                      setSetFeeItems(next);
+                    }}
+                    placeholder="金額（円）"
+                    className="w-32 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                  <input
+                    value={item.note}
+                    onChange={(e) => {
+                      const next = [...setFeeItems];
+                      next[i] = { ...next[i], note: e.target.value };
+                      setSetFeeItems(next);
+                    }}
+                    placeholder="備考（任意）"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                  <button
+                    onClick={() => setSetFeeItems(setFeeItems.filter((_, idx) => idx !== i))}
+                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() =>
+                  setSetFeeItems([...setFeeItems, { label: "", amount: "", note: "" }])
+                }
+                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+              >
+                <Plus className="w-3.5 h-3.5" /> セット項目を追加
+              </button>
+            </div>
+          </Field>
+          <Field label="セット料金 補足">
+            <TextArea
+              value={setFeeNotes}
+              onChange={(e: any) => setSetFeeNotes(e.target.value)}
+              rows={2}
+              placeholder="例: 延長30分ごと+1,500円、税込表記"
+            />
+          </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="レクタ経由入店女性エピソード" icon={Sparkles}>
+        <p className="text-xs text-muted-foreground mb-4">
+          レクタ経由で入店した在籍キャストのエピソードを登録できます（顔出しOK時のみ）。
+        </p>
+        <div className="space-y-4">
+          {rectaEpisodes.map((ep, i) => (
+            <div
+              key={i}
+              className="border border-border rounded-xl p-4 space-y-3 bg-muted/10"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">エピソード {i + 1}</span>
+                <button
+                  onClick={() => setRectaEpisodes(rectaEpisodes.filter((_, idx) => idx !== i))}
+                  className="text-muted-foreground hover:text-destructive transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="名前">
+                  <TextInput
+                    value={ep.name}
+                    onChange={(e: any) => {
+                      const next = [...rectaEpisodes];
+                      next[i] = { ...next[i], name: e.target.value };
+                      setRectaEpisodes(next);
+                    }}
+                    placeholder="例: みき"
+                  />
+                </Field>
+                <Field label="Instagram URL（任意）">
+                  <TextInput
+                    value={ep.instagram_url}
+                    onChange={(e: any) => {
+                      const next = [...rectaEpisodes];
+                      next[i] = { ...next[i], instagram_url: e.target.value };
+                      setRectaEpisodes(next);
+                    }}
+                    placeholder="https://instagram.com/..."
+                  />
+                </Field>
+              </div>
+              <Field label="写真URL（任意）">
+                <TextInput
+                  value={ep.photo_url}
+                  onChange={(e: any) => {
+                    const next = [...rectaEpisodes];
+                    next[i] = { ...next[i], photo_url: e.target.value };
+                    setRectaEpisodes(next);
+                  }}
+                  placeholder="https://..."
+                />
+              </Field>
+              <Field label="エピソード">
+                <TextArea
+                  value={ep.comment}
+                  onChange={(e: any) => {
+                    const next = [...rectaEpisodes];
+                    next[i] = { ...next[i], comment: e.target.value };
+                    setRectaEpisodes(next);
+                  }}
+                  rows={3}
+                  placeholder="例: 上京して2ヶ月で月収100万達成！"
+                />
+              </Field>
+            </div>
+          ))}
+          <button
+            onClick={() =>
+              setRectaEpisodes([
+                ...rectaEpisodes,
+                { name: "", comment: "", instagram_url: "", photo_url: "" },
+              ])
+            }
+            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+          >
+            <Plus className="w-3.5 h-3.5" /> エピソードを追加
+          </button>
+        </div>
       </SectionCard>
 
       <SectionCard title="送り・交通サポート" icon={Car}>
@@ -2051,7 +2380,7 @@ export function ShopEditPage() {
                     : null,
                   recent_hires_summary: hiringTotal,
                   popular_features: popularFeatures.length > 0
-                    ? { features: popularFeatures, hint: otherHint }
+                    ? { features: popularFeatures }
                     : null,
                   qa: qaItems.length > 0
                     ? qaItems.map((q) => ({ question: q.label, answer: q.value }))
@@ -2064,20 +2393,73 @@ export function ShopEditPage() {
                         supports: supportItems,
                       }
                     : null,
-                  recruitment_standards: recruitmentStandards || null,
-                  rank: rank || null,
-                  gal_point: galPoint,
-                  loose_point: loosePoint,
-                  age_point: agePoint,
-                  waiwai_point: waiwaiPoint,
-                  cute_point: cutePoint,
+                  recruitment_standards: null,
+                  rank: null,
+                  gal_point: 50,
+                  loose_point: 50,
+                  age_point: 50,
+                  waiwai_point: 50,
+                  cute_point: 50,
                   transfer_description: transferDescription || null,
                   transfer_km: transferKm || null,
-                  unit_wage_type: unitWageType || null,
-                  dress_code: dressCodeField || null,
+                  unit_wage_type: null,
+                  dress_code: dressCodeDescription || dressCodeOk.length > 0 || dressCodeNg.length > 0
+                    ? {
+                        description: dressCodeDescription || undefined,
+                        ok_examples: dressCodeOk
+                          .filter((e) => e.note || e.image_url)
+                          .map((e) => ({
+                            note: e.note || undefined,
+                            image_url: e.image_url || "",
+                          })),
+                        ng_examples: dressCodeNg
+                          .filter((e) => e.note || e.image_url)
+                          .map((e) => ({
+                            note: e.note || undefined,
+                            image_url: e.image_url || "",
+                          })),
+                      }
+                    : null,
                   payroll_system_type: payrollSystemType || null,
                   payroll_system_description: payrollSystemDescription || null,
                   champagne_description: champagneDescription || null,
+                  champagne_prices: (() => {
+                    const out: Record<string, { amount: number; note?: string }> = {};
+                    (Object.keys(champagnePrices) as Array<keyof typeof champagnePrices>).forEach((k) => {
+                      const item = champagnePrices[k];
+                      const trimmedAmount = item.amount.trim();
+                      if (!trimmedAmount && !item.note.trim()) return;
+                      const num = Number(trimmedAmount.replace(/[^\d.-]/g, ""));
+                      out[k as string] = {
+                        amount: Number.isFinite(num) ? num : 0,
+                        ...(item.note.trim() ? { note: item.note.trim() } : {}),
+                      };
+                    });
+                    return Object.keys(out).length > 0 ? out : null;
+                  })(),
+                  set_fee: (setFeeItems.some((it) => it.label || it.amount) || setFeeNotes)
+                    ? {
+                        items: setFeeItems
+                          .filter((it) => it.label || it.amount)
+                          .map((it) => {
+                            const num = Number(it.amount.replace(/[^\d.-]/g, ""));
+                            return {
+                              label: it.label,
+                              amount: Number.isFinite(num) ? num : it.amount,
+                              ...(it.note ? { note: it.note } : {}),
+                            };
+                          }),
+                        ...(setFeeNotes ? { notes: setFeeNotes } : {}),
+                      }
+                    : null,
+                  recta_episodes: rectaEpisodes
+                    .filter((ep) => ep.name)
+                    .map((ep) => ({
+                      name: ep.name,
+                      ...(ep.comment ? { comment: ep.comment } : {}),
+                      ...(ep.instagram_url ? { instagram_url: ep.instagram_url } : {}),
+                      ...(ep.photo_url ? { photo_url: ep.photo_url } : {}),
+                    })),
                   reviews_count: 0,
                   average_rating: 0,
                   reviews: [],

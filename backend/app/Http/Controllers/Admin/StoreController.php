@@ -68,7 +68,6 @@ class StoreController extends Controller
             'nearest_station' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:255',
             'website_url' => 'nullable|string|max:2048',
-            'rank' => 'nullable|string|max:10',
             'video_url' => 'nullable|string|max:2048',
             'description' => 'nullable|string',
             'features_text' => 'nullable|string',
@@ -112,7 +111,7 @@ class StoreController extends Controller
     {
         return [
             'name', 'area', 'address', 'nearest_station', 'category',
-            'phone', 'website_url', 'rank',
+            'phone', 'website_url',
             'schedule',
             'wage', 'compensation', 'guarantee', 'cast_profile', 'interview',
             'feature_tags', 'description', 'features_text',
@@ -265,10 +264,9 @@ class StoreController extends Controller
             'back_items', 'fee_items', 'salary_notes',
             'guarantee_period', 'guarantee_details', 'norma_info', 'same_day_trial',
             'trial_avg_hourly', 'trial_hourly',
-            'unit_wage_type', 'payroll_system_type', 'payroll_system_description',
+            'payroll_system_type', 'payroll_system_description',
             'interview_hours', 'interview_start', 'interview_end',
-            'interview_info', 'recruitment_standards',
-            'gal_point', 'loose_point', 'age_point', 'waiwai_point', 'cute_point',
+            'interview_info',
         ];
     }
 
@@ -296,19 +294,12 @@ class StoreController extends Controller
             'same_day_trial' => 'nullable|boolean',
             'trial_avg_hourly' => 'nullable|string|max:255',
             'trial_hourly' => 'nullable|string|max:255',
-            'unit_wage_type' => 'nullable|string|max:50',
             'payroll_system_type' => 'nullable|string|max:100',
             'payroll_system_description' => 'nullable|string',
             'interview_hours' => 'nullable|string|max:255',
             'interview_start' => 'nullable|string|max:10',
             'interview_end' => 'nullable|string|max:10',
             'interview_info' => 'nullable|array',
-            'recruitment_standards' => 'nullable|string',
-            'gal_point' => 'nullable|integer|min:0|max:100',
-            'loose_point' => 'nullable|integer|min:0|max:100',
-            'age_point' => 'nullable|integer|min:0|max:100',
-            'waiwai_point' => 'nullable|integer|min:0|max:100',
-            'cute_point' => 'nullable|integer|min:0|max:100',
         ];
     }
 
@@ -344,9 +335,6 @@ class StoreController extends Controller
         $regular = $wage['regular'] ?? [];
         if (array_key_exists('hourly_min', $legacy)) $regular['min'] = $legacy['hourly_min'];
         if (array_key_exists('hourly_max', $legacy)) $regular['max'] = $legacy['hourly_max'];
-        if (array_key_exists('unit_wage_type', $legacy)) {
-            $regular['unit'] = $legacy['unit_wage_type'] === '日給' ? 'day' : 'hour';
-        }
         if (!empty($regular)) $wage['regular'] = $regular;
 
         $trial = $wage['trial'] ?? [];
@@ -387,32 +375,11 @@ class StoreController extends Controller
         $interview = $data['interview'] ?? [];
         if (array_key_exists('interview_start', $legacy)) $interview['start'] = $legacy['interview_start'];
         if (array_key_exists('interview_end', $legacy))   $interview['end'] = $legacy['interview_end'];
-        if (array_key_exists('recruitment_standards', $legacy)) $interview['recruitment_standards'] = $legacy['recruitment_standards'];
         if (array_key_exists('interview_info', $legacy) && is_array($legacy['interview_info'])) {
             $interview = array_replace($interview, $legacy['interview_info']);
         }
         if (!empty($interview)) {
             $data['interview'] = $interview;
-        }
-
-        // cast_profile
-        $castProfile = $data['cast_profile'] ?? [];
-        foreach ([
-            'gal_point' => 'gal',
-            'loose_point' => 'loose',
-            'age_point' => 'age',
-            'waiwai_point' => 'waiwai',
-            'cute_point' => 'cute',
-        ] as $legacyKey => $newKey) {
-            if (array_key_exists($legacyKey, $legacy)) $castProfile[$newKey] = (int)$legacy[$legacyKey];
-        }
-        if (!empty($castProfile)) {
-            $data['cast_profile'] = $castProfile;
-        }
-
-        // dress_code: if a legacy string was sent under "dress_code", wrap as { description }
-        if (isset($data['dress_code']) && is_string($data['dress_code'])) {
-            $data['dress_code'] = ['description' => $data['dress_code']];
         }
 
         return $data;

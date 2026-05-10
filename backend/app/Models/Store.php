@@ -12,7 +12,7 @@ class Store extends Model
 
     protected $fillable = [
         'name', 'area', 'address', 'nearest_station', 'category',
-        'phone', 'website_url', 'rank',
+        'phone', 'website_url',
         'schedule',
         'wage', 'compensation', 'guarantee', 'cast_profile', 'interview',
         'feature_tags', 'description', 'features_text',

@@ -1,2 +1,0 @@
-Trigger: 2026-05-10 — extend [STORE:ID] coverage 90→140 entries (all 14 conditions now produce marker answers)
-Remove this file in the next commit after deploy.
