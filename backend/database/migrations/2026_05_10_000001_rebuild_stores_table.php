@@ -9,6 +9,18 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // The stores schema is being rebuilt destructively. Any rows that
+        // referenced the old stores ids (reviews / pickup_shops) cannot be
+        // preserved meaningfully because the new schema re-numbers from 1.
+        // Truncate dependents first so the FK we re-create at the end of
+        // this migration can be added without a 23503 foreign key violation.
+        if (Schema::hasTable('reviews')) {
+            DB::table('reviews')->delete();
+        }
+        if (Schema::hasTable('pickup_shops')) {
+            DB::table('pickup_shops')->delete();
+        }
+
         if (DB::getDriverName() === 'pgsql') {
             DB::statement('DROP TABLE IF EXISTS stores CASCADE');
         } else {
