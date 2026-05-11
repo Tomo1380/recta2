@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             ContentSeeder::class,
             LineFriendSeeder::class,
             FineTuningQaSeeder::class,
+            IndustryKnowledgeSeeder::class,
         ]);
     }
 }
