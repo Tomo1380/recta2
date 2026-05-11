@@ -602,36 +602,7 @@ export default function StoreListPage() {
   return (
     <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#f5f5f5" }}>
       {/* ----------------------------------------------------------- */}
-      {/* Top header                                                  */}
-      {/* ----------------------------------------------------------- */}
-      <header
-        className="sticky top-0 z-30 bg-white"
-        style={{ borderBottom: "1px solid rgba(27,37,40,0.06)" }}
-      >
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-          <Link
-            to="/"
-            className="shrink-0 text-[19px] font-bold leading-none tracking-tight"
-            style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
-          >
-            Recta<span style={{ color: "#D4AF37" }}>.</span>
-          </Link>
-          <Link
-            to="/login"
-            className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
-            style={{ border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-            ログイン
-          </Link>
-        </div>
-      </header>
-
-      {/* ----------------------------------------------------------- */}
-      {/* Editorial poster hero — "STORES / お店一覧"                 */}
+      {/* Editorial poster hero — "STORES / お店一覧" (with login)    */}
       {/* ----------------------------------------------------------- */}
       <section
         className="relative overflow-hidden"
@@ -639,6 +610,22 @@ export default function StoreListPage() {
           background: "linear-gradient(135deg, #1b2528 0%, #243034 60%, #1b2528 100%)",
         }}
       >
+        {/* Floating login pill — top-right */}
+        <Link
+          to="/login"
+          className="absolute right-4 top-4 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-white"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.35)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.18)",
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          ログイン
+        </Link>
         {/* Gold glow */}
         <div
           aria-hidden
