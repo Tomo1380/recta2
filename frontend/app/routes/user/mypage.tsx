@@ -4,7 +4,6 @@ import { Star, Trash2, Save, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -12,13 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,39 +27,11 @@ import { Badge } from "~/components/ui/badge";
 import { useUserAuth } from "~/lib/user-auth";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import { userApi } from "~/lib/api";
-import type { User, Review } from "~/lib/types";
+import type { Review } from "~/lib/types";
 
 export function meta() {
   return [{ title: "マイページ - Recta" }];
 }
-
-const AREA_OPTIONS = [
-  "渋谷",
-  "新宿",
-  "六本木",
-  "銀座",
-  "池袋",
-  "恵比寿",
-  "麻布十番",
-  "表参道",
-  "その他",
-];
-
-const CATEGORY_OPTIONS = [
-  "キャバクラ",
-  "ラウンジ",
-  "クラブ",
-  "ガールズバー",
-  "コンカフェ",
-];
-
-const EXPERIENCE_OPTIONS = [
-  { value: "none", label: "未経験" },
-  { value: "beginner", label: "半年未満" },
-  { value: "intermediate", label: "半年〜1年" },
-  { value: "experienced", label: "1年〜3年" },
-  { value: "veteran", label: "3年以上" },
-];
 
 export default function MyPage() {
   const { user, isAuthenticated, loading: authLoading, logout } = useUserAuth();
@@ -80,12 +44,6 @@ export default function MyPage() {
   useEffect(() => { setHydrated(true); }, []);
 
   const [nickname, setNickname] = useState("");
-  const [age, setAge] = useState("");
-  const [preferredArea, setPreferredArea] = useState("");
-  const [preferredCategory, setPreferredCategory] = useState("");
-  const [experience, setExperience] = useState("");
-  const [bio, setBio] = useState("");
-  const [useLineAvatar, setUseLineAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -105,12 +63,6 @@ export default function MyPage() {
   useEffect(() => {
     if (user) {
       setNickname(user.nickname ?? "");
-      setAge(user.age?.toString() ?? "");
-      setPreferredArea(user.preferred_area ?? "");
-      setPreferredCategory(user.preferred_category ?? "");
-      setExperience(user.experience ?? "");
-      setBio(user.bio ?? "");
-      setUseLineAvatar(!!user.use_line_avatar);
     }
   }, [user]);
 
@@ -139,12 +91,6 @@ export default function MyPage() {
     try {
       await userApi.put("/user/profile", {
         nickname: nickname || null,
-        age: age ? Number(age) : null,
-        preferred_area: preferredArea || null,
-        preferred_category: preferredCategory || null,
-        experience: experience || null,
-        bio: bio || null,
-        use_line_avatar: useLineAvatar,
       });
       setSaveMessage("保存しました");
       setTimeout(() => setSaveMessage(""), 3000);
@@ -242,105 +188,11 @@ export default function MyPage() {
                 id="nickname"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                placeholder="表示名を入力"
+                placeholder="例: ゆきな"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="age">年齢</Label>
-              <Input
-                id="age"
-                type="number"
-                min={18}
-                max={99}
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                placeholder="年齢を入力"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>希望エリア</Label>
-              <Select value={preferredArea} onValueChange={setPreferredArea}>
-                <SelectTrigger>
-                  <SelectValue placeholder="エリアを選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AREA_OPTIONS.map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {a}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>希望業種</Label>
-              <Select
-                value={preferredCategory}
-                onValueChange={setPreferredCategory}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="業種を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORY_OPTIONS.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>経験</Label>
-              <Select value={experience} onValueChange={setExperience}>
-                <SelectTrigger>
-                  <SelectValue placeholder="経験を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPERIENCE_OPTIONS.map((e) => (
-                    <SelectItem key={e.value} value={e.value}>
-                      {e.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio">自己紹介</Label>
-              <Textarea
-                id="bio"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="簡単な自己紹介を書いてください"
-                rows={3}
-              />
-            </div>
-
-            {/* LINE avatar opt-in. デフォルトはオフ（口コミなどに出るアイコンは
-                名前のイニシャルから生成される）。LINE のプロフィール画像を
-                公開のアイコンとして使いたい人だけ ON にする想定。 */}
-            <div className="space-y-2 rounded-lg border border-muted bg-muted/30 p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useLineAvatar}
-                  onChange={(e) => setUseLineAvatar(e.target.checked)}
-                  className="mt-1 size-4 rounded border-gray-300 accent-emerald-600"
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-medium" style={{ color: "#1b2528" }}>
-                    LINEのプロフィール画像をアイコンとして使う
-                  </span>
-                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                    オフのままなら、口コミなどでは名前のイニシャル（例:「佐藤」なら「佐」）が表示されます。
-                  </p>
-                </div>
-              </label>
+              <p className="text-xs text-muted-foreground">
+                口コミや投稿はこのニックネームの頭文字（例:「ゆきな」なら「ゆ」）のアイコンで表示されます。LINEのプロフィール画像は公開されません。
+              </p>
             </div>
 
             <div className="flex items-center gap-3">

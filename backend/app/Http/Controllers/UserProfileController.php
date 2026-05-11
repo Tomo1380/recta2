@@ -19,14 +19,13 @@ class UserProfileController extends Controller
      */
     public function update(Request $request)
     {
+        // Public profile is intentionally minimal — only the nickname is
+        // user-editable. Other demographic / preference fields are kept in
+        // the schema for analytics but aren't exposed through the user UI
+        // because we don't want to surface anything that could de-anonymise
+        // reviewers.
         $validated = $request->validate([
             'nickname' => 'nullable|string|max:50',
-            'age' => 'nullable|integer|min:18|max:99',
-            'preferred_area' => 'nullable|string|max:50',
-            'preferred_category' => 'nullable|string|max:50',
-            'experience' => 'nullable|string|max:50',
-            'bio' => 'nullable|string|max:500',
-            'use_line_avatar' => 'nullable|boolean',
         ]);
 
         $request->user()->update($validated);

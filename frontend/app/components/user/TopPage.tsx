@@ -596,7 +596,8 @@ export default function TopPage() {
           <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
             {recentReviews.map((review, idx) => {
               const requireLogin = !isAuthenticated && !lineLoggedIn && idx >= 3;
-              const userName = review.user?.nickname || review.user?.line_display_name || "匿名";
+              // 口コミ表示は本人のニックネームのみ。LINE 実名はプライバシー保護のため使わない。
+              const userName = review.user?.nickname || "匿名";
               const initial = (userName.charAt(0) || "?");
               const dateText = review.created_at ? formatRelative(review.created_at) : "";
               return (

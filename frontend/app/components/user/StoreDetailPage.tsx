@@ -2151,14 +2151,15 @@ function ReviewsSection({
 }
 
 function ReviewItem({ review }: { review: Review }) {
-  const displayName = review.user?.nickname || review.user?.line_display_name || "匿名";
+  // 口コミは本人のニックネームのみを公開。LINEの実名や画像はプライバシー保護のため使わない。
+  const displayName = review.user?.nickname || "匿名";
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
+        {/* 口コミは常にニックネームのイニシャルアバターで表示する。
+            LINE のプロフィール画像は本人がプライバシー上嫌がるため公開しない。 */}
         <UserAvatar
           displayName={displayName}
-          pictureUrl={review.user?.line_picture_url}
-          useLineAvatar={review.user?.use_line_avatar}
           size={32}
         />
         <div className="flex-1">
