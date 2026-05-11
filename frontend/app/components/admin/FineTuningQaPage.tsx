@@ -103,6 +103,16 @@ export function FineTuningQaPage({
   const [retrainStarting, setRetrainStarting] = useState(false);
   const [retrainError, setRetrainError] = useState<string | null>(null);
   const [retrainEpochs, setRetrainEpochs] = useState<1 | 2 | 3>(1);
+  // OpenAI fine-tunable base models. Pricing/capability differs — see notes.
+  // gpt-5 family is filter-listed at OpenAI but FT availability varies per
+  // model; left out of the UI until confirmed callable.
+  const BASE_MODELS = [
+    { id: "gpt-4.1-mini-2025-04-14", label: "gpt-4.1-mini (推奨・新しい・学習$0.80/M)" },
+    { id: "gpt-4.1-nano-2025-04-14", label: "gpt-4.1-nano (超軽量・推論安い)" },
+    { id: "gpt-4o-mini-2024-07-18", label: "gpt-4o-mini (現行・既存モデルと互換)" },
+    { id: "gpt-4.1-2025-04-14", label: "gpt-4.1 (高性能・高価)" },
+  ] as const;
+  const [retrainBaseModel, setRetrainBaseModel] = useState<string>(BASE_MODELS[0].id);
   const [activeJob, setActiveJob] = useState<JobInfo | null>(null);
   const [currentModel, setCurrentModel] = useState<string | null>(null);
   const [openAIConfigured, setOpenAIConfigured] = useState(true);
@@ -242,7 +252,10 @@ export function FineTuningQaPage({
         status?: string;
         model?: string;
         message?: string;
-      }>("/admin/ai-chat/fine-tuning/start", { epochs: retrainEpochs });
+      }>("/admin/ai-chat/fine-tuning/start", {
+        epochs: retrainEpochs,
+        base_model: retrainBaseModel,
+      });
       if (!res.success || !res.job_id) {
         throw new Error(res.message || "ジョブの開始に失敗しました");
       }
@@ -613,9 +626,20 @@ export function FineTuningQaPage({
                   約 ¥{estimatedCostJpy.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ベースモデル</span>
-                <span className="font-mono">gpt-4o-mini-2024-07-18</span>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-muted-foreground shrink-0 pt-1">ベースモデル</span>
+                <select
+                  value={retrainBaseModel}
+                  onChange={(e) => setRetrainBaseModel(e.target.value)}
+                  disabled={retrainStarting}
+                  className="text-[12px] font-mono border border-border rounded px-2 py-1 bg-white max-w-[280px]"
+                >
+                  {BASE_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">エポック数</span>
