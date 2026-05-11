@@ -298,6 +298,12 @@ export function AIChatSettingsPage() {
   const [ftModelInput, setFtModelInput] = useState("");
   const [ftModelSaving, setFtModelSaving] = useState(false);
   const [ftStatusFetched, setFtStatusFetched] = useState(false);
+  const [ftLastJob, setFtLastJob] = useState<{
+    id: string | null;
+    model: string | null;
+    finished_at: number | null;
+    created_at: number | null;
+  } | null>(null);
 
   const currentPrompt = promptConfigs[promptSubTab];
   const currentButtons = suggestButtons[suggestSubTab];
@@ -409,10 +415,17 @@ export function AIChatSettingsPage() {
         openai_configured: boolean;
         current_model: string | null;
         store_count: number;
+        last_trained_job?: {
+          id: string | null;
+          model: string | null;
+          finished_at: number | null;
+          created_at: number | null;
+        } | null;
       }>("/admin/ai-chat/fine-tuning/status");
       setFtCurrentModel(data.current_model);
       setFtOpenAIConfigured(!!data.openai_configured);
       setFtStoreCount(data.store_count ?? 0);
+      setFtLastJob(data.last_trained_job ?? null);
     } catch {
       // silent
     }
@@ -619,7 +632,7 @@ export function AIChatSettingsPage() {
   const monthlyTokens = stats?.monthly_tokens ?? 0;
 
   // モデル別単価（USD per 1M tokens, 2026-05 基準）。
-  //   Agent モード:    Gemini 2.5 Flash-Lite    in $0.10 / out $0.40
+  //   Agent モード:    Gemini 3.1 Flash-Lite    in $0.10 / out $0.40
   //   Fine-tuned モード: GPT-4.1 Mini fine-tuned  in $0.80 / out $3.20
   // USD→JPY は 1ドル=150円で換算。
   const PRICE = {
@@ -932,6 +945,39 @@ export function AIChatSettingsPage() {
                   <AlertCircle className="w-3 h-3" />
                   OPENAI_API_KEY が未設定です
                 </p>
+              )}
+
+              {ftLastJob?.finished_at && (
+                <div className="mt-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">最終学習日時</span>
+                    <span className="font-mono">
+                      {new Date(ftLastJob.finished_at * 1000).toLocaleString("ja-JP")}
+                    </span>
+                  </div>
+                  {ftLastJob.model && (
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">学習で生成されたモデル</span>
+                      <span className="font-mono break-all text-right">
+                        {ftLastJob.model}
+                      </span>
+                    </div>
+                  )}
+                  {ftLastJob.model &&
+                    ftCurrentModel &&
+                    ftLastJob.model !== ftCurrentModel && (
+                      <p className="text-amber-700 flex items-center gap-1 pt-1">
+                        <AlertCircle className="w-3 h-3" />
+                        最新の学習結果が本番に適用されていません（本番は古いモデル）
+                      </p>
+                    )}
+                  {ftLastJob.model && ftCurrentModel === ftLastJob.model && (
+                    <p className="text-emerald-600 flex items-center gap-1 pt-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      この学習結果が本番に適用済み
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1556,7 +1602,7 @@ export function AIChatSettingsPage() {
                     単価 (per 1M tokens)
                   </p>
                   <p>
-                    Agent (Gemini 2.5 Flash-Lite): 入力 $0.10 / 出力 $0.40
+                    Agent (Gemini 3.1 Flash-Lite): 入力 $0.10 / 出力 $0.40
                   </p>
                   <p>
                     Fine-tuned (GPT-4.1 Mini fine-tuned): 入力 $0.80 / 出力

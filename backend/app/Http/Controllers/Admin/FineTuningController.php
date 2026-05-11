@@ -40,6 +40,35 @@ class FineTuningController extends Controller
         $qaActiveCount = FineTuningQa::where('status', FineTuningQa::STATUS_ACTIVE)->count();
         $qaTotalCount = FineTuningQa::count();
 
+        // Look up the most recent succeeded job on OpenAI to report
+        // last_trained_at and the model it produced. Falls back to null
+        // if the API key is missing or the call fails.
+        $lastSucceededJob = null;
+        if (!empty($openaiKey)) {
+            try {
+                $resp = Http::withHeaders([
+                    'Authorization' => "Bearer {$openaiKey}",
+                ])->timeout(10)->get('https://api.openai.com/v1/fine_tuning/jobs', [
+                    'limit' => 10,
+                ]);
+                if ($resp->successful()) {
+                    foreach (($resp->json('data') ?? []) as $job) {
+                        if (($job['status'] ?? null) === 'succeeded') {
+                            $lastSucceededJob = [
+                                'id' => $job['id'] ?? null,
+                                'model' => $job['fine_tuned_model'] ?? null,
+                                'finished_at' => $job['finished_at'] ?? null,
+                                'created_at' => $job['created_at'] ?? null,
+                            ];
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // network / api failure — leave $lastSucceededJob as null
+            }
+        }
+
         return response()->json([
             'openai_configured' => !empty($openaiKey),
             'current_model' => $currentModel,
@@ -49,6 +78,7 @@ class FineTuningController extends Controller
             'store_count' => Store::where('publish_status', 'published')->count(),
             'qa_active_count' => $qaActiveCount,
             'qa_total_count' => $qaTotalCount,
+            'last_trained_job' => $lastSucceededJob,
         ]);
     }
 
