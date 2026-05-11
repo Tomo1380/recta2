@@ -34,6 +34,7 @@ import {
   ChevronRight,
   X as XIcon,
   Minus,
+  Maximize2,
 } from "lucide-react";
 
 import Footer from "~/components/user/shared/Footer";
@@ -1513,6 +1514,23 @@ const StoreVideoSection = forwardRef<
             style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.4) 100%)" }}
           />
         )}
+        {/* Mini: restore button (top-left) */}
+        {mode === "mini" && (
+          <button
+            type="button"
+            aria-label="動画を拡大"
+            onClick={() => setMode("stuck")}
+            className="absolute left-1 top-1 z-10 inline-flex items-center justify-center rounded-full text-white"
+            style={{
+              width: "20px",
+              height: "20px",
+              backgroundColor: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            <Maximize2 className="size-3" />
+          </button>
+        )}
         <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
           {mode === "stuck" && (
             <button
@@ -1544,7 +1562,9 @@ const StoreVideoSection = forwardRef<
     );
   }
 
-  // Inline poster card with play button
+  // Inline poster card with play button. For YouTube we use the auto-thumbnail
+  // as a plain <img>; for mp4 we render the video itself with preload=metadata
+  // so the first frame shows as the poster (no download of the whole stream).
   return (
     <button
       type="button"
@@ -1558,11 +1578,27 @@ const StoreVideoSection = forwardRef<
       }}
       aria-label="動画を再生"
     >
-      {effectivePoster && (
+      {isYouTube && effectivePoster ? (
         <img
           src={effectivePoster}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100"
+          className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
+        />
+      ) : (
+        // mp4: render the video element muted with preload=metadata so the
+        // first frame is shown as the poster.
+        <video
+          src={videoUrl}
+          muted
+          playsInline
+          preload="metadata"
+          // Seeking to a tiny offset forces Safari/Chrome to paint a frame
+          // even when preload=metadata wouldn't on its own.
+          // eslint-disable-next-line react/no-unknown-property
+          onLoadedMetadata={(e) => {
+            try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {}
+          }}
+          className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
         />
       )}
       <div
