@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
+  AlertCircle,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -8,6 +10,8 @@ import {
   Loader2,
   Plus,
   Search,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { api, ApiError } from "~/lib/api";
 import type { Paginated } from "~/lib/types";
@@ -73,6 +77,7 @@ export function FineTuningQaPage({
   const [statusFilter, setStatusFilter] =
     useState<(typeof STATUS_OPTIONS)[number]>("全て");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [sort, setSort] = useState<"id_asc" | "id_desc" | "updated_desc" | "question_asc">("id_asc");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<FineTuningQa[]>([]);
@@ -86,6 +91,201 @@ export function FineTuningQaPage({
   const [categories, setCategories] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
 
+  // --- Re-training flow state ---
+  type JobInfo = {
+    id: string;
+    status: string;
+    fine_tuned_model: string | null;
+    base_model?: string;
+    created_at?: number;
+  };
+  const [retrainModalOpen, setRetrainModalOpen] = useState(false);
+  const [retrainStarting, setRetrainStarting] = useState(false);
+  const [retrainError, setRetrainError] = useState<string | null>(null);
+  const [activeJob, setActiveJob] = useState<JobInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<string | null>(null);
+  const [openAIConfigured, setOpenAIConfigured] = useState(true);
+  const [applyingModel, setApplyingModel] = useState(false);
+  const [applyToast, setApplyToast] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
+
+  // Persist last-known job id so re-opening the tab shows ongoing job status.
+  const JOB_STORAGE_KEY = "recta:ft:last_job_id";
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const fetchJobStatus = useCallback(async (jobId: string) => {
+    try {
+      const res = await api.get<{
+        success: boolean;
+        job?: {
+          id: string;
+          status: string;
+          fine_tuned_model: string | null;
+          model?: string;
+          created_at?: number;
+        };
+      }>(`/admin/ai-chat/fine-tuning/job?job_id=${encodeURIComponent(jobId)}`);
+      if (res.job) {
+        setActiveJob({
+          id: res.job.id,
+          status: res.job.status,
+          fine_tuned_model: res.job.fine_tuned_model,
+          base_model: res.job.model,
+          created_at: res.job.created_at,
+        });
+        // If terminal, stop polling.
+        const terminal = ["succeeded", "failed", "cancelled"];
+        if (terminal.includes(res.job.status)) {
+          stopPolling();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch job status", e);
+    }
+  }, [stopPolling]);
+
+  const startPolling = useCallback(
+    (jobId: string) => {
+      stopPolling();
+      // Immediate fetch, then every 30s.
+      void fetchJobStatus(jobId);
+      pollRef.current = window.setInterval(() => {
+        void fetchJobStatus(jobId);
+      }, 30000);
+    },
+    [fetchJobStatus, stopPolling],
+  );
+
+  // Load FT status + last job on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await api.get<{
+          openai_configured: boolean;
+          current_model: string | null;
+        }>("/admin/ai-chat/fine-tuning/status");
+        if (cancelled) return;
+        setCurrentModel(status.current_model);
+        setOpenAIConfigured(!!status.openai_configured);
+      } catch {
+        /* silent */
+      }
+
+      const lastJobId =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(JOB_STORAGE_KEY)
+          : null;
+      if (lastJobId) {
+        startPolling(lastJobId);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleStartRetrain = async () => {
+    if (retrainStarting) return;
+    setRetrainStarting(true);
+    setRetrainError(null);
+    try {
+      const res = await api.post<{
+        success: boolean;
+        job_id?: string;
+        status?: string;
+        model?: string;
+        message?: string;
+      }>("/admin/ai-chat/fine-tuning/start", {});
+      if (!res.success || !res.job_id) {
+        throw new Error(res.message || "ジョブの開始に失敗しました");
+      }
+      const job: JobInfo = {
+        id: res.job_id,
+        status: res.status || "queued",
+        fine_tuned_model: null,
+        base_model: res.model,
+      };
+      setActiveJob(job);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(JOB_STORAGE_KEY, res.job_id);
+      }
+      setRetrainModalOpen(false);
+      startPolling(res.job_id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "ジョブの開始に失敗しました";
+      setRetrainError(msg);
+    } finally {
+      setRetrainStarting(false);
+    }
+  };
+
+  const handleApplyModel = async () => {
+    if (!activeJob?.fine_tuned_model || applyingModel) return;
+    setApplyingModel(true);
+    try {
+      await api.put<{ success: boolean }>(
+        "/admin/ai-chat/fine-tuning/model",
+        { model_id: activeJob.fine_tuned_model },
+      );
+      setCurrentModel(activeJob.fine_tuned_model);
+      setApplyToast("本番モデルに適用しました");
+      window.setTimeout(() => setApplyToast(null), 2500);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "モデル適用に失敗しました";
+      setRetrainError(msg);
+    } finally {
+      setApplyingModel(false);
+    }
+  };
+
+  const handleDismissJob = () => {
+    stopPolling();
+    setActiveJob(null);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(JOB_STORAGE_KEY);
+    }
+  };
+
+  // Estimate cost: ~$8 per 1M tokens for fine-tuning gpt-4o-mini training.
+  // Each pair ~ 500-1000 tokens × N epochs(3). Show a rough estimate.
+  const estimatedCostJpy = (() => {
+    const activeCount = statusCounts.active;
+    if (!activeCount) return 0;
+    const tokensPerPair = 800; // ChatML system+user+assistant rough avg
+    const epochs = 3;
+    const totalTokens = activeCount * tokensPerPair * epochs;
+    const usd = (totalTokens / 1_000_000) * 8;
+    return Math.round(usd * 150);
+  })();
+
+  const jobStatusLabel = (s: string): { label: string; color: string } => {
+    switch (s) {
+      case "validating_files":
+        return { label: "ファイル検証中", color: "text-amber-700 bg-amber-50" };
+      case "queued":
+        return { label: "キュー待ち", color: "text-amber-700 bg-amber-50" };
+      case "running":
+        return { label: "学習中", color: "text-indigo-700 bg-indigo-50" };
+      case "succeeded":
+        return { label: "完了", color: "text-emerald-700 bg-emerald-50" };
+      case "failed":
+        return { label: "失敗", color: "text-red-700 bg-red-50" };
+      case "cancelled":
+        return { label: "キャンセル", color: "text-stone-700 bg-stone-100" };
+      default:
+        return { label: s, color: "text-stone-700 bg-stone-100" };
+    }
+  };
+
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
@@ -95,6 +295,7 @@ export function FineTuningQaPage({
       if (search) params.set("q", search);
       if (statusFilter !== "全て") params.set("status", statusFilter);
       if (categoryFilter) params.set("category", categoryFilter);
+      params.set("sort", sort);
 
       const res = await api.get<IndexResponse>(
         `/admin/fine-tuning/qa?${params.toString()}`,
@@ -109,7 +310,7 @@ export function FineTuningQaPage({
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, categoryFilter]);
+  }, [page, search, statusFilter, categoryFilter, sort]);
 
   useEffect(() => {
     fetchItems();
@@ -117,7 +318,7 @@ export function FineTuningQaPage({
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, categoryFilter]);
+  }, [search, statusFilter, categoryFilter, sort]);
 
   async function handleExport() {
     if (exporting) return;
@@ -209,7 +410,7 @@ export function FineTuningQaPage({
             </p>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleExport}
@@ -224,6 +425,30 @@ export function FineTuningQaPage({
             JSONLエクスポート
           </button>
           <button
+            type="button"
+            onClick={() => {
+              setRetrainError(null);
+              setRetrainModalOpen(true);
+            }}
+            disabled={
+              !openAIConfigured ||
+              statusCounts.active === 0 ||
+              (activeJob !== null &&
+                !["succeeded", "failed", "cancelled"].includes(activeJob.status))
+            }
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 text-white rounded-lg text-[13px] hover:bg-amber-600 transition-all disabled:opacity-50"
+            title={
+              !openAIConfigured
+                ? "OPENAI_API_KEY が設定されていません"
+                : statusCounts.active === 0
+                  ? "active な Q&A がありません"
+                  : "OpenAI で fine-tuning ジョブを起動"
+            }
+          >
+            <Sparkles className="w-4 h-4" />
+            OpenAI で再学習
+          </button>
+          <button
             onClick={handleNewClick}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition-all"
           >
@@ -232,6 +457,166 @@ export function FineTuningQaPage({
           </button>
         </div>
       </div>
+
+      {/* Active job banner */}
+      {activeJob && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              {["succeeded"].includes(activeJob.status) ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+              ) : ["failed", "cancelled"].includes(activeJob.status) ? (
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+              ) : (
+                <Loader2 className="w-5 h-5 text-indigo-600 animate-spin mt-0.5 shrink-0" />
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13px] font-semibold text-stone-800">
+                    Fine-tuning ジョブ
+                  </span>
+                  <span
+                    className={`text-[11px] px-2 py-0.5 rounded-md ${jobStatusLabel(activeJob.status).color}`}
+                  >
+                    {jobStatusLabel(activeJob.status).label}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 font-mono break-all">
+                  Job ID: {activeJob.id}
+                </p>
+                {activeJob.fine_tuned_model && (
+                  <p className="text-[12px] text-emerald-700 mt-1 font-mono break-all flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 shrink-0" />
+                    {activeJob.fine_tuned_model}
+                    {currentModel === activeJob.fine_tuned_model && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded ml-1">
+                        本番適用済み
+                      </span>
+                    )}
+                  </p>
+                )}
+                {!activeJob.fine_tuned_model &&
+                  !["failed", "cancelled"].includes(activeJob.status) && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      30秒ごとにステータスを更新します。タブを閉じてもジョブは継続します（所要 15〜30分）。
+                    </p>
+                  )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {activeJob.fine_tuned_model &&
+                currentModel !== activeJob.fine_tuned_model && (
+                  <button
+                    type="button"
+                    onClick={handleApplyModel}
+                    disabled={applyingModel}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-md text-[12px] hover:bg-emerald-700 transition disabled:opacity-50"
+                  >
+                    {applyingModel ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                    このモデルを本番に適用
+                  </button>
+                )}
+              <button
+                type="button"
+                onClick={handleDismissJob}
+                className="p-1.5 rounded-md text-muted-foreground hover:bg-muted"
+                title="ジョブ表示を閉じる"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          {retrainError && (
+            <p className="text-[12px] text-red-600">{retrainError}</p>
+          )}
+          {applyToast && (
+            <p className="text-[12px] text-emerald-700">{applyToast}</p>
+          )}
+        </div>
+      )}
+
+      {/* Re-training confirmation modal */}
+      {retrainModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !retrainStarting && setRetrainModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-[15px] font-semibold">
+                  OpenAI で再学習しますか？
+                </h3>
+                <p className="text-[12px] text-muted-foreground mt-1">
+                  現在 active の{" "}
+                  <strong className="text-foreground">
+                    {statusCounts.active.toLocaleString()}件
+                  </strong>{" "}
+                  の Q&amp;A で新しい fine-tuning ジョブを開始します。
+                </p>
+              </div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-[12px] space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">所要時間</span>
+                <span className="font-mono">約15〜30分</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">推定コスト</span>
+                <span className="font-mono">
+                  約 ¥{estimatedCostJpy.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ベースモデル</span>
+                <span className="font-mono">gpt-4o-mini-2024-07-18</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">エポック数</span>
+                <span className="font-mono">3</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              ※
+              ジョブ完了後に「本番に適用」ボタンを押すまで、現在の本番モデルには影響しません。
+            </p>
+            {retrainError && (
+              <p className="text-[12px] text-red-600">{retrainError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRetrainModalOpen(false)}
+                disabled={retrainStarting}
+                className="px-3 py-1.5 rounded-md text-[13px] border border-border hover:bg-muted disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleStartRetrain}
+                disabled={retrainStarting}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 text-white rounded-md text-[13px] hover:bg-amber-600 disabled:opacity-50"
+              >
+                {retrainStarting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                学習を開始
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status counts */}
       <div className="flex flex-wrap items-center gap-2 text-[12px]">
@@ -285,6 +670,17 @@ export function FineTuningQaPage({
           {STATUS_OPTIONS.map((s) => (
             <option key={s}>{s}</option>
           ))}
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as typeof sort)}
+          className="px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+          title="並び順"
+        >
+          <option value="id_asc">投入順</option>
+          <option value="id_desc">新しい順</option>
+          <option value="updated_desc">最近編集した順</option>
+          <option value="question_asc">質問の五十音順</option>
         </select>
       </div>
 

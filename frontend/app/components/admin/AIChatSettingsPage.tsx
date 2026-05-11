@@ -618,11 +618,32 @@ export function AIChatSettingsPage() {
   const monthlyTotal = stats?.monthly_total ?? 0;
   const monthlyTokens = stats?.monthly_tokens ?? 0;
 
-  const estimatedCost = Math.round((monthlyTokens / 1000) * 0.3);
+  // モデル別単価（USD per 1M tokens, 2026-05 基準）。
+  //   Agent モード:    Gemini 2.5 Flash-Lite    in $0.10 / out $0.40
+  //   Fine-tuned モード: GPT-4.1 Mini fine-tuned  in $0.80 / out $3.20
+  // USD→JPY は 1ドル=150円で換算。
+  const PRICE = {
+    agent: { input: 0.10, output: 0.40 },
+    finetuned: { input: 0.80, output: 3.20 },
+  };
+  const USD_TO_JPY = 150;
+  const costYen = (input: number, output: number, mode: "agent" | "finetuned") => {
+    const usd = (input / 1_000_000) * PRICE[mode].input + (output / 1_000_000) * PRICE[mode].output;
+    return Math.round(usd * USD_TO_JPY);
+  };
 
   const modeStats = stats?.mode_stats ?? [];
   const agentStats = modeStats.find((m) => m.mode === "agent");
   const finetunedStats = modeStats.find((m) => m.mode === "finetuned");
+
+  // モード別の月次コスト（直近の集計区間で）
+  const agentCost = agentStats
+    ? costYen(agentStats.total_input_tokens ?? 0, agentStats.total_output_tokens ?? 0, "agent")
+    : 0;
+  const finetunedCost = finetunedStats
+    ? costYen(finetunedStats.total_input_tokens ?? 0, finetunedStats.total_output_tokens ?? 0, "finetuned")
+    : 0;
+  const estimatedCost = agentCost + finetunedCost;
 
   const modeDailyMap = new Map<
     string,
@@ -807,6 +828,29 @@ export function AIChatSettingsPage() {
 
           {/* Mode info + fine-tuned model id */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            {ftStatusFetched && !ftCurrentModel && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[12px] text-amber-900 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold">
+                    Fine-tuned モデルIDが未設定です
+                  </p>
+                  <p>
+                    Fine-tuned モードはまだ利用できません（リクエストは Agent
+                    モードへフォールバックします）。下の入力欄に OpenAI
+                    のモデルIDを保存するか、{" "}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("qa")}
+                      className="underline font-medium hover:text-amber-700"
+                    >
+                      Fine-tuning Q&amp;A タブ
+                    </button>{" "}
+                    から「OpenAI で再学習」ボタンで新規ジョブを起動してください。
+                  </p>
+                </div>
+              </div>
+            )}
             <div>
               <h3 className="text-sm font-medium">チャットモード</h3>
               <p className="text-[12px] text-muted-foreground mt-0.5">
@@ -1105,6 +1149,14 @@ export function AIChatSettingsPage() {
       {/* Tab: Knowledge */}
       {activeTab === "knowledge" && (
         <div className="space-y-4">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900 flex items-start gap-2">
+            <span className="inline-flex items-center rounded-md bg-amber-200/70 px-2 py-0.5 text-[11px] font-semibold text-amber-900 shrink-0 mt-[1px]">
+              Agentモード専用
+            </span>
+            <p className="leading-relaxed">
+              ここに登録したナレッジは Agent モードでのみ <code className="rounded bg-amber-100 px-1 text-[11px]">get_industry_knowledge</code> ツール経由で参照されます。Fine-tuned モードでは使われません（Fine-tuned モードは学習データ（Fine-tuning Q&amp;A タブ）から回答します）。
+            </p>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-[15px] font-semibold">業界ナレッジ管理</h3>
@@ -1368,35 +1420,168 @@ export function AIChatSettingsPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-                    今月のチャット総数
-                  </p>
-                  <p
-                    className="text-3xl text-foreground mt-2"
-                    style={{
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {monthlyTotal.toLocaleString()}
-                  </p>
+              {/* モード別 KPI: Agent / Fine-tuned / 合計 の3列構造 */}
+              <div className="bg-card border border-border rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
+                  <h3 className="text-sm font-semibold">
+                    モード別サマリー（集計期間: 直近30日 / 月次総数は今月）
+                  </h3>
+                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    Agent vs Fine-tuned
+                  </span>
                 </div>
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-                    推定APIコスト
+
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/10">
+                      <th className="text-left py-2 px-4 text-muted-foreground text-[11px] uppercase tracking-wider w-1/4">
+                        指標
+                      </th>
+                      <th className="text-right py-2 px-4 text-amber-700 text-[11px] uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1">
+                          <Zap className="w-3 h-3" />
+                          Agent
+                        </span>
+                      </th>
+                      <th className="text-right py-2 px-4 text-indigo-700 text-[11px] uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" />
+                          Fine-tuned
+                        </span>
+                      </th>
+                      <th className="text-right py-2 px-4 text-foreground text-[11px] uppercase tracking-wider">
+                        合計
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="py-2.5 px-4 text-muted-foreground">
+                        利用数（直近30日）
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(agentStats?.count ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(finetunedStats?.count ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
+                        {(
+                          (agentStats?.count ?? 0) +
+                          (finetunedStats?.count ?? 0)
+                        ).toLocaleString()}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="py-2.5 px-4 text-muted-foreground">
+                        入力トークン
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(agentStats?.total_input_tokens ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(
+                          finetunedStats?.total_input_tokens ?? 0
+                        ).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
+                        {(
+                          (agentStats?.total_input_tokens ?? 0) +
+                          (finetunedStats?.total_input_tokens ?? 0)
+                        ).toLocaleString()}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="py-2.5 px-4 text-muted-foreground">
+                        出力トークン
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(
+                          agentStats?.total_output_tokens ?? 0
+                        ).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(
+                          finetunedStats?.total_output_tokens ?? 0
+                        ).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
+                        {(
+                          (agentStats?.total_output_tokens ?? 0) +
+                          (finetunedStats?.total_output_tokens ?? 0)
+                        ).toLocaleString()}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="py-2.5 px-4 text-muted-foreground">
+                        合計トークン
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(agentStats?.total_tokens ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono">
+                        {(finetunedStats?.total_tokens ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
+                        {(
+                          (agentStats?.total_tokens ?? 0) +
+                          (finetunedStats?.total_tokens ?? 0)
+                        ).toLocaleString()}
+                      </td>
+                    </tr>
+                    <tr className="bg-muted/20">
+                      <td className="py-2.5 px-4 text-foreground font-medium">
+                        推定APIコスト
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-amber-700">
+                        &yen;{agentCost.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono text-indigo-700">
+                        &yen;{finetunedCost.toLocaleString()}
+                      </td>
+                      <td
+                        className="py-2.5 px-4 text-right font-mono font-bold text-foreground"
+                        style={{
+                          fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        }}
+                      >
+                        &yen;{estimatedCost.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="px-5 py-3 border-t border-border bg-muted/10 text-[11px] text-muted-foreground space-y-0.5">
+                  <p className="font-medium text-foreground">
+                    単価 (per 1M tokens)
                   </p>
-                  <p
-                    className="text-3xl text-foreground mt-2"
-                    style={{
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      fontWeight: 700,
-                    }}
-                  >
-                    &yen;{estimatedCost.toLocaleString()}
+                  <p>
+                    Agent (Gemini 2.5 Flash-Lite): 入力 $0.10 / 出力 $0.40
                   </p>
+                  <p>
+                    Fine-tuned (GPT-4.1 Mini fine-tuned): 入力 $0.80 / 出力
+                    $3.20
+                  </p>
+                  <p>※ 1USD = 150 JPY 換算（概算）</p>
                 </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-5">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                  今月のチャット総数（全モード合計）
+                </p>
+                <p
+                  className="text-3xl text-foreground mt-2"
+                  style={{
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    fontWeight: 700,
+                  }}
+                >
+                  {monthlyTotal.toLocaleString()}
+                  <span className="text-[12px] text-muted-foreground font-normal ml-2">
+                    / トークン {monthlyTokens.toLocaleString()}
+                  </span>
+                </p>
               </div>
 
               <div className="bg-card border border-border rounded-xl p-5">
@@ -1518,71 +1703,20 @@ export function AIChatSettingsPage() {
 
               <div className="bg-card border border-border rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-5">
-                  <h3 className="text-sm font-semibold">モード別比較</h3>
+                  <h3 className="text-sm font-semibold">
+                    モード別の日次推移
+                  </h3>
                   <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                     Agent vs Fine-tuned
                   </span>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                  <div className="rounded-lg border border-border p-3">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Zap className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="text-[11px] text-muted-foreground">
-                        Agent 利用数
-                      </span>
-                    </div>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                    >
-                      {(agentStats?.count ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-border p-3">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Zap className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="text-[11px] text-muted-foreground">
-                        Agent 平均トークン
-                      </span>
-                    </div>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                    >
-                      {Math.round(agentStats?.avg_tokens ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-border p-3">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                      <span className="text-[11px] text-muted-foreground">
-                        Fine-tuned 利用数
-                      </span>
-                    </div>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                    >
-                      {(finetunedStats?.count ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-border p-3">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                      <span className="text-[11px] text-muted-foreground">
-                        Fine-tuned 平均トークン
-                      </span>
-                    </div>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                    >
-                      {Math.round(
-                        finetunedStats?.avg_tokens ?? 0,
-                      ).toLocaleString()}
-                    </p>
-                  </div>
+                  <span className="text-[10px] text-muted-foreground ml-auto">
+                    平均トークン: Agent{" "}
+                    {Math.round(agentStats?.avg_tokens ?? 0).toLocaleString()}{" "}
+                    / Fine-tuned{" "}
+                    {Math.round(
+                      finetunedStats?.avg_tokens ?? 0,
+                    ).toLocaleString()}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

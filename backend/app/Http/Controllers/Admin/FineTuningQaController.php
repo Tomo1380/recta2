@@ -38,8 +38,28 @@ class FineTuningQaController extends Controller
         $perPage = (int) $request->input('per_page', 50);
         $perPage = max(1, min($perPage, 200));
 
-        $items = $query->orderByDesc('updated_at')
-            ->paginate($perPage);
+        // Sort options:
+        //   id_asc       投入順（デフォルト・カテゴリブロックがまとまる）
+        //   id_desc      新しく追加した行から
+        //   updated_desc 最近編集した順
+        //   question_asc 質問の五十音順
+        $sort = (string) $request->input('sort', 'id_asc');
+        switch ($sort) {
+            case 'id_desc':
+                $query->orderByDesc('id');
+                break;
+            case 'updated_desc':
+                $query->orderByDesc('updated_at');
+                break;
+            case 'question_asc':
+                $query->orderBy('question');
+                break;
+            case 'id_asc':
+            default:
+                $query->orderBy('id');
+        }
+
+        $items = $query->paginate($perPage);
 
         // Status counts (across the whole table, not just current filters)
         $statusCounts = FineTuningQa::selectRaw('status, COUNT(*) as c')
