@@ -102,6 +102,7 @@ export function FineTuningQaPage({
   const [retrainModalOpen, setRetrainModalOpen] = useState(false);
   const [retrainStarting, setRetrainStarting] = useState(false);
   const [retrainError, setRetrainError] = useState<string | null>(null);
+  const [retrainEpochs, setRetrainEpochs] = useState<1 | 2 | 3>(1);
   const [activeJob, setActiveJob] = useState<JobInfo | null>(null);
   const [currentModel, setCurrentModel] = useState<string | null>(null);
   const [openAIConfigured, setOpenAIConfigured] = useState(true);
@@ -204,7 +205,7 @@ export function FineTuningQaPage({
         status?: string;
         model?: string;
         message?: string;
-      }>("/admin/ai-chat/fine-tuning/start", {});
+      }>("/admin/ai-chat/fine-tuning/start", { epochs: retrainEpochs });
       if (!res.success || !res.job_id) {
         throw new Error(res.message || "ジョブの開始に失敗しました");
       }
@@ -256,15 +257,13 @@ export function FineTuningQaPage({
   };
 
   // Estimate cost: $3 per 1M training tokens for gpt-4o-mini fine-tuning
-  // (OpenAI 2026 pricing; previously $8 — old quote was used here).
-  // Each ChatML pair (system + user + assistant) averages around 500 tokens
-  // in this dataset; epochs default to 3.
+  // (OpenAI 2026 pricing). Each ChatML pair (system + user + assistant)
+  // averages around 500 tokens in this dataset; user-selectable epochs.
   const estimatedCostJpy = (() => {
     const activeCount = statusCounts.active;
     if (!activeCount) return 0;
     const tokensPerPair = 500;
-    const epochs = 3;
-    const totalTokens = activeCount * tokensPerPair * epochs;
+    const totalTokens = activeCount * tokensPerPair * retrainEpochs;
     const usd = (totalTokens / 1_000_000) * 3;
     return Math.round(usd * 150);
   })();
@@ -581,10 +580,29 @@ export function FineTuningQaPage({
                 <span className="text-muted-foreground">ベースモデル</span>
                 <span className="font-mono">gpt-4o-mini-2024-07-18</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">エポック数</span>
-                <span className="font-mono">3</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRetrainEpochs(n as 1 | 2 | 3)}
+                      disabled={retrainStarting}
+                      className={`px-2.5 py-0.5 rounded-md text-[12px] font-mono border transition ${
+                        retrainEpochs === n
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-white border-border hover:bg-muted"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
               </div>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                エポック = 学習データを通すループ数。1で軽め・速い・安い、3で深く学習。Rectaは類似テンプレが多いので 1〜2 で十分なケースが多い。
+              </p>
             </div>
             <p className="text-[11px] text-muted-foreground">
               ※
