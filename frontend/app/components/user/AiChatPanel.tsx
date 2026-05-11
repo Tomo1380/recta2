@@ -910,8 +910,10 @@ export default function AiChatPanel({
         </div>
       )}
 
-      {/* ---- Quick question pills (hidden when category chips are shown) ---- */}
-      {!hasMessages && !showCategoryChips && activeSuggestButtons.length > 0 && (
+      {/* ---- Quick question pills ----
+          管理画面で編集できる suggest_buttons を表示。トップページでも
+          カテゴリチップの下に並べて、編集が画面に反映されるようにする。 */}
+      {!hasMessages && activeSuggestButtons.length > 0 && (
         <div className="px-5 pt-2 pb-4">
           <div className="flex flex-wrap gap-2">
             {activeSuggestButtons.map((q) => (
