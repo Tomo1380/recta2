@@ -406,7 +406,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const [loading, setLoading] = useState(!previewData);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoMode, setVideoMode] = useState<"inline" | "stuck" | "mini" | "closed">("inline");
+  const [videoMode, setVideoMode] = useState<"inline" | "stuck" | "mini">("inline");
 
   // Keep preview data in sync when form changes
   useEffect(() => {
@@ -1425,13 +1425,30 @@ function LuxeHero({
 
 // Store video — inline by default; once playing, sticks to top of viewport.
 // User can shrink to corner mini OR close.
+// Extracts a YouTube video ID from common URL shapes; returns null if not YouTube.
+function parseYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") return u.pathname.slice(1).split("/")[0] || null;
+    if (host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")) {
+      if (u.pathname === "/watch") return u.searchParams.get("v");
+      const m = u.pathname.match(/^\/(?:embed|shorts|v)\/([^/?]+)/);
+      if (m) return m[1];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const StoreVideoSection = forwardRef<
   HTMLVideoElement,
   {
     videoUrl: string;
     posterUrl?: string;
-    mode: "inline" | "stuck" | "mini" | "closed";
-    setMode: (m: "inline" | "stuck" | "mini" | "closed") => void;
+    mode: "inline" | "stuck" | "mini";
+    setMode: (m: "inline" | "stuck" | "mini") => void;
   }
 >(function StoreVideoSection({ videoUrl, posterUrl, mode, setMode }, ref) {
   const localRef = useRef<HTMLVideoElement | null>(null);
@@ -1441,13 +1458,17 @@ const StoreVideoSection = forwardRef<
     else if (ref) (ref as React.MutableRefObject<HTMLVideoElement | null>).current = el;
   };
 
-  if (mode === "closed") return null;
+  const ytId = parseYouTubeId(videoUrl);
+  const isYouTube = !!ytId;
+  const effectivePoster = posterUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : undefined);
 
   const handlePlay = () => {
     setMode("stuck");
-    requestAnimationFrame(() => {
-      localRef.current?.play().catch(() => {});
-    });
+    if (!isYouTube) {
+      requestAnimationFrame(() => {
+        localRef.current?.play().catch(() => {});
+      });
+    }
   };
 
   // Stuck and mini are fixed-position overlays
@@ -1465,23 +1486,34 @@ const StoreVideoSection = forwardRef<
             : { width: "140px", height: "80px", backgroundColor: "#000", border: "1px solid rgba(255,255,255,0.15)" }
         }
       >
-        <video
-          ref={setRefs}
-          autoPlay
-          loop
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        >
-          <source src={videoUrl} type="video/mp4" />
-        </video>
-        {mode === "stuck" && (
+        {isYouTube ? (
+          <iframe
+            title="店舗動画"
+            src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&playsinline=1&controls=${mode === "stuck" ? 1 : 0}&modestbranding=1&rel=0`}
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full"
+            style={{ border: 0 }}
+          />
+        ) : (
+          <video
+            ref={setRefs}
+            autoPlay
+            loop
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+          >
+            <source src={videoUrl} type="video/mp4" />
+          </video>
+        )}
+        {mode === "stuck" && !isYouTube && (
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
             style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.4) 100%)" }}
           />
         )}
-        <div className="absolute right-1.5 top-1.5 flex gap-1">
+        <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
           {mode === "stuck" && (
             <button
               type="button"
@@ -1495,8 +1527,8 @@ const StoreVideoSection = forwardRef<
           )}
           <button
             type="button"
-            aria-label="動画を閉じる"
-            onClick={() => setMode("closed")}
+            aria-label="動画を閉じてプレイヤーに戻す"
+            onClick={() => setMode("inline")}
             className="inline-flex items-center justify-center rounded-full text-white"
             style={{
               width: mode === "stuck" ? "28px" : "20px",
@@ -1526,9 +1558,9 @@ const StoreVideoSection = forwardRef<
       }}
       aria-label="動画を再生"
     >
-      {posterUrl && (
+      {effectivePoster && (
         <img
-          src={posterUrl}
+          src={effectivePoster}
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100"
         />
@@ -1549,7 +1581,7 @@ const StoreVideoSection = forwardRef<
           className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/80"
           style={{ fontFamily: "'Outfit', sans-serif" }}
         >
-          Tap to play store video
+          {isYouTube ? "Tap to play YouTube video" : "Tap to play store video"}
         </span>
       </div>
     </button>
