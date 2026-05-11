@@ -358,9 +358,9 @@ function SectionHeading({
 }) {
   return (
     <h2
-      className="font-heading flex items-center gap-2 pl-3 text-lg font-bold"
+      className="flex items-center gap-2 pl-3 text-[17px] font-bold tracking-tight"
       style={{
-        fontFamily: "'Domine', 'Noto Sans JP', sans-serif",
+        fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
         color: "#1b2528",
         borderLeft: "4px solid #D4AF37",
       }}
@@ -521,7 +521,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
 
   return (
-    <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#fafeff" }}>
+    <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#f5f5f5" }}>
       {/* ============================================================ */}
       {/* 1. Sticky Hero Video */}
       {/* ============================================================ */}
@@ -587,10 +587,117 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           marginTop: store.video_url && videoMode === "hero" ? `${heroHeight - 20}px` : "0",
           borderTopLeftRadius: store.video_url && videoMode === "hero" ? "20px" : "0",
           borderTopRightRadius: store.video_url && videoMode === "hero" ? "20px" : "0",
-          backgroundColor: "#fafeff",
+          backgroundColor: "#f5f5f5",
         }}
       >
-        <div className="mx-auto max-w-3xl space-y-5 px-4 pb-24 pt-6">
+        <div className="mx-auto max-w-3xl space-y-5 px-4 pb-24 pt-5">
+          {/* ============================================================ */}
+          {/* Editorial hero — store name, station, rating, hourly chip   */}
+          {/* ============================================================ */}
+          <section className="space-y-2">
+            <div
+              className="text-[10px] font-medium tracking-[0.14em] uppercase"
+              style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
+            >
+              {store.category} ・ {store.area}
+            </div>
+            <h1
+              className="text-[26px] font-bold leading-tight tracking-tight"
+              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+            >
+              {store.name}
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+              {(store.average_rating ?? 0) > 0 && (
+                <div className="inline-flex items-center gap-1">
+                  <Star size={13} style={{ color: "#D4AF37", fill: "#D4AF37" }} />
+                  <span
+                    className="text-[13px] font-semibold tabular-nums"
+                    style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    {(store.average_rating ?? 0).toFixed(1)}
+                  </span>
+                  {store.reviews_count !== undefined && (
+                    <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.45)" }}>
+                      ({store.reviews_count}件)
+                    </span>
+                  )}
+                </div>
+              )}
+              {store.nearest_station && (
+                <span
+                  className="text-[11px]"
+                  style={{ color: "rgba(27,37,40,0.55)" }}
+                >
+                  ⌖ {store.nearest_station}
+                </span>
+              )}
+              {store.same_day_trial && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                  style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
+                >
+                  即日体験OK
+                </span>
+              )}
+            </div>
+          </section>
+
+          {/* ============================================================ */}
+          {/* Quick stats — 4 strip                                       */}
+          {/* ============================================================ */}
+          <div
+            className="grid grid-cols-4 overflow-hidden rounded-2xl bg-white"
+            style={{
+              boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+              border: "1px solid rgba(27,37,40,0.06)",
+            }}
+          >
+            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+              <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
+                体験時給
+              </div>
+              <div
+                className="mt-0.5 text-[14px] font-bold tabular-nums"
+                style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
+              >
+                ¥{(store.trial_hourly ?? store.hourly_min ?? 0).toLocaleString()}
+              </div>
+            </div>
+            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+              <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
+                最高時給
+              </div>
+              <div
+                className="mt-0.5 text-[14px] font-bold tabular-nums"
+                style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
+              >
+                ¥{(store.hourly_max ?? 0).toLocaleString()}
+              </div>
+            </div>
+            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+              <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
+                営業
+              </div>
+              <div className="mt-0.5 text-[10.5px] font-semibold leading-tight" style={{ color: "#1b2528" }}>
+                {store.opening_time && store.closing_time
+                  ? `${store.opening_time}〜${store.closing_time}`
+                  : store.business_hours || "—"}
+              </div>
+            </div>
+            <div className="px-2 py-3 text-center">
+              <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
+                体入
+              </div>
+              <div
+                className="mt-0.5 text-[12px] font-bold"
+                style={{ color: store.same_day_trial ? "#6FB37D" : "rgba(27,37,40,0.4)" }}
+              >
+                {store.same_day_trial ? "即日OK" : "—"}
+              </div>
+            </div>
+          </div>
+
           {/* ============================================================ */}
           {/* 2. AI Chat (replaces old Shop Intro Card — chat intro summarizes store info) */}
           {/* ============================================================ */}
