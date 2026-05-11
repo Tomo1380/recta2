@@ -2148,12 +2148,10 @@ function SalarySimulatorSection({
     setNominations(baseNominations);
   }, [baseHourly, baseSales, baseNominations]);
 
-  const monthly = useMemo(() => {
-    const wage = hourly * hoursPerDay * daysPerMonth;
-    const back = sales * inferredBackRate;
-    const nom = nominations * nominationUnit;
-    return Math.round(wage + back + nom);
-  }, [hourly, sales, nominations, inferredBackRate, hoursPerDay, daysPerMonth, nominationUnit]);
+  const wage = hourly * hoursPerDay * daysPerMonth;
+  const back = sales * inferredBackRate;
+  const nom = nominations * nominationUnit;
+  const monthly = Math.round(wage + back + nom);
 
   // Render the section only if we have a simulator config OR a usable hourly base.
   const enabled = !!simulator || (hourlyMin && hourlyMin > 0);
@@ -2164,63 +2162,197 @@ function SalarySimulatorSection({
       icon={<Calculator size={20} style={{ color: GOLD_HEX }} />}
       title="給料シミュレーター"
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
+        {/* Total — luxe dark panel with gold radial glow */}
         <div
-          className="rounded-[12px] px-4 py-3"
+          className="relative overflow-hidden rounded-2xl px-5 py-5 text-center"
           style={{
-            background:
-              "linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(212,175,55,0.04) 100%)",
-            border: "1px solid rgba(212,175,55,0.25)",
+            background: "linear-gradient(135deg, #1b2528 0%, #2c3e46 100%)",
           }}
         >
-          <p className="text-xs font-medium" style={{ color: "rgba(27,37,40,0.55)" }}>
-            想定月収
-          </p>
-          <p
-            className="font-heading text-2xl font-bold"
-            style={{ color: GOLD_HEX, fontFamily: "'Outfit','Noto Sans JP',sans-serif" }}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute"
+            style={{
+              top: "-40%",
+              right: "-20%",
+              width: "60%",
+              height: "200%",
+              background: "radial-gradient(circle, rgba(212,175,55,0.28) 0%, transparent 70%)",
+            }}
+          />
+          <div
+            className="relative text-[10px] font-medium uppercase"
+            style={{ color: "rgba(212,175,55,0.75)", letterSpacing: "0.16em" }}
+          >
+            月収目安
+          </div>
+          <div
+            className="relative mt-1.5 text-[40px] font-bold leading-none tabular-nums"
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              background: "linear-gradient(135deg, #ffe066, #D4AF37)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+              letterSpacing: "-0.02em",
+            }}
           >
             ¥{monthly.toLocaleString()}
-          </p>
-          <p className="text-[11px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-            {hoursPerDay}時間 × {daysPerMonth}日 + バック{Math.round(inferredBackRate * 100)}%
+          </div>
+          <div className="relative mt-1 text-[10.5px] text-white/55">
+            {hoursPerDay}時間 × {daysPerMonth}日勤務 + バック{Math.round(inferredBackRate * 100)}%
             {nominationUnit > 0 ? ` + 指名 ¥${nominationUnit.toLocaleString()}/本` : ""}
-          </p>
+          </div>
         </div>
 
-        <SimSlider
-          label="時給"
-          value={hourly}
-          min={1500}
-          max={Math.max(hourlyMaxBound, 10000)}
-          step={100}
-          format={(v) => `¥${v.toLocaleString()}`}
-          onChange={setHourly}
-        />
-        <SimSlider
-          label="月の売上"
-          value={sales}
-          min={0}
-          max={2_000_000}
-          step={10_000}
-          format={(v) => `¥${v.toLocaleString()}`}
-          onChange={setSales}
-        />
-        <SimSlider
-          label="指名本数 / 月"
-          value={nominations}
-          min={0}
-          max={50}
-          step={1}
-          format={(v) => `${v}本`}
-          onChange={setNominations}
-        />
+        {/* Sliders — ClaudeDesign style with custom gold thumb */}
+        <div className="space-y-4 pt-1">
+          <LuxeSimSlider
+            label="時給"
+            value={hourly}
+            min={1500}
+            max={Math.max(hourlyMaxBound, 10000)}
+            step={100}
+            format={(v) => `¥${v.toLocaleString()}`}
+            onChange={setHourly}
+          />
+          <LuxeSimSlider
+            label="月の売上"
+            value={sales}
+            min={0}
+            max={2_000_000}
+            step={10_000}
+            format={(v) => `¥${v.toLocaleString()}`}
+            onChange={setSales}
+          />
+          <LuxeSimSlider
+            label="指名本数 / 月"
+            value={nominations}
+            min={0}
+            max={50}
+            step={1}
+            format={(v) => `${v}本`}
+            onChange={setNominations}
+          />
+        </div>
 
-        <p className="text-[11px]" style={{ color: "rgba(27,37,40,0.45)" }}>
-          ※ 概算です。実際の給与は店舗ごとの規定により異なります。
+        {/* Breakdown table */}
+        <div
+          className="rounded-xl px-4 py-3"
+          style={{
+            backgroundColor: "rgba(27,37,40,0.025)",
+            border: "1px solid rgba(27,37,40,0.06)",
+          }}
+        >
+          <SimBreakdownRow
+            label={`時給×時間（${hoursPerDay}h × ${daysPerMonth}日）`}
+            value={`¥${wage.toLocaleString()}`}
+          />
+          <SimBreakdownRow
+            label={`売上バック（${Math.round(inferredBackRate * 100)}%）`}
+            value={`¥${Math.round(back).toLocaleString()}`}
+          />
+          <SimBreakdownRow
+            label={`指名（${nominations}本 × ¥${nominationUnit.toLocaleString()}）`}
+            value={`¥${nom.toLocaleString()}`}
+          />
+          <div
+            className="mt-1 flex items-center justify-between border-t pt-2 text-[13px] font-semibold"
+            style={{ borderColor: "rgba(27,37,40,0.1)" }}
+          >
+            <span style={{ color: "#1b2528" }}>合計</span>
+            <span
+              className="text-[16px] tabular-nums"
+              style={{ color: GOLD_HEX, fontFamily: "'Outfit', sans-serif" }}
+            >
+              ¥{monthly.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-center" style={{ color: "rgba(27,37,40,0.4)" }}>
+          ※ 平均値ベースの参考シミュレーションです。実際は店舗担当者にご確認ください。
         </p>
       </div>
     </SectionCard>
+  );
+}
+
+function SimBreakdownRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 text-[12.5px]">
+      <span style={{ color: "rgba(27,37,40,0.7)" }}>{label}</span>
+      <span
+        className="font-semibold tabular-nums"
+        style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// Luxe slider — custom track + gold-bordered thumb, used inside the simulator.
+function LuxeSimSlider({
+  label, value, min, max, step, format, onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-[12px] font-medium" style={{ color: "rgba(27,37,40,0.7)" }}>
+          {label}
+        </span>
+        <span
+          className="text-[14px] font-bold tabular-nums"
+          style={{ color: GOLD_HEX, fontFamily: "'Outfit', sans-serif" }}
+        >
+          {format(value)}
+        </span>
+      </div>
+      <div className="relative h-5">
+        <div
+          className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full"
+          style={{ backgroundColor: "rgba(27,37,40,0.08)" }}
+        />
+        <div
+          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
+          style={{
+            left: 0,
+            width: `${pct}%`,
+            background: "linear-gradient(90deg, #D4AF37, #c8960c)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{
+            left: `${pct}%`,
+            backgroundColor: "white",
+            border: "2px solid #D4AF37",
+            boxShadow: "0 2px 8px rgba(212,175,55,0.4)",
+          }}
+        />
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="absolute inset-0 w-full cursor-pointer opacity-0"
+          aria-label={label}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -2459,6 +2591,21 @@ function ReviewsSection({
   const hidden = reviews.slice(3);
   const hasHidden = hidden.length > 0 || reviewsCount > visible.length;
 
+  // Compute summary stats from visible reviews (or fallbacks if none)
+  const ratings = reviews.map((r) => r.rating ?? 0).filter((n) => n > 0);
+  const avg = ratings.length > 0
+    ? ratings.reduce((s, n) => s + n, 0) / ratings.length
+    : 0;
+  const total = reviewsCount || ratings.length;
+
+  // Bucket distribution (use loaded reviews; for unloaded use weighted estimate centered on avg).
+  const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  ratings.forEach((r) => {
+    const bucket = Math.round(Math.max(1, Math.min(5, r)));
+    dist[bucket] = (dist[bucket] ?? 0) + 1;
+  });
+  const distMax = Math.max(...Object.values(dist), 1);
+
   return (
     <div
       id="reviews"
@@ -2468,23 +2615,88 @@ function ReviewsSection({
         border: "1px solid rgba(27,37,40,0.06)",
       }}
     >
-      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+      <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <SectionHeading icon={<Star size={20} style={{ color: GOLD_HEX }} />}>
-          リアルな声・口コミ ({reviewsCount}件)
+          リアルな声・口コミ
         </SectionHeading>
         <a
           href={`/stores/${storeId}/review`}
           className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
-          style={{
-            background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
-          }}
+          style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
         >
           口コミを書く
         </a>
       </div>
 
+      {/* Summary panel — cream gradient + gold border */}
+      {total > 0 && (
+        <div className="mx-5 mb-4">
+          <div
+            className="grid grid-cols-[110px_1fr] items-center gap-4 rounded-2xl p-4"
+            style={{
+              background: "linear-gradient(135deg, #fffdf6, #fff8e8)",
+              border: "1px solid rgba(212,175,55,0.28)",
+            }}
+          >
+            <div
+              className="border-r pr-4 text-center"
+              style={{ borderColor: "rgba(212,175,55,0.22)" }}
+            >
+              <div
+                className="text-[36px] font-bold leading-none tabular-nums"
+                style={{ color: GOLD_HEX, fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.02em" }}
+              >
+                {avg.toFixed(1)}
+              </div>
+              <div className="mt-1.5 inline-flex">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    size={11}
+                    style={{
+                      color: i < Math.round(avg) ? GOLD_HEX : "rgba(212,175,55,0.25)",
+                      fill: i < Math.round(avg) ? GOLD_HEX : "none",
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="mt-1 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                {total}件
+              </div>
+            </div>
+            <div>
+              {[5, 4, 3, 2, 1].map((s) => {
+                const pct = ratings.length > 0 ? (dist[s] / distMax) * 100 : 0;
+                return (
+                  <div
+                    key={s}
+                    className="mb-[5px] grid grid-cols-[14px_1fr] items-center gap-2 text-[10.5px]"
+                    style={{ color: "rgba(27,37,40,0.5)", fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    <span className="tabular-nums">{s}</span>
+                    <div
+                      className="h-[5px] overflow-hidden rounded-full"
+                      style={{ backgroundColor: "rgba(27,37,40,0.06)" }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background: "linear-gradient(90deg, #D4AF37, #c8960c)",
+                          transition: "width 400ms ease",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Visible reviews (first 3) */}
-      <div className="space-y-4 px-5">
+      <div className="space-y-2.5 px-5">
         {visible.map((review) => (
           <ReviewItem key={review.id} review={review} />
         ))}
@@ -2492,35 +2704,65 @@ function ReviewsSection({
 
       {/* Blurred locked reviews + login CTA */}
       {hasHidden && (
-        <div className="relative mt-4 px-5 pb-5">
-          <div className="space-y-4" style={{ filter: "blur(6px)", userSelect: "none", pointerEvents: "none" }}>
-            {(hidden.length > 0 ? hidden : visible).slice(0, 3).map((review) => (
+        <div className="relative mt-3 px-5 pb-5 pt-12">
+          {/* Fade overlay */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-5 top-0 h-20"
+            style={{
+              background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 100%)",
+            }}
+          />
+          <div
+            className="space-y-2.5"
+            style={{ filter: "blur(6px)", userSelect: "none", pointerEvents: "none" }}
+          >
+            {(hidden.length > 0 ? hidden : visible).slice(0, 2).map((review) => (
               <ReviewItem key={`locked-${review.id}`} review={review} />
             ))}
           </div>
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.85) 50%)" }}
+          {/* Gold gate card */}
+          <button
+            type="button"
+            onClick={() => { window.location.href = "/login"; }}
+            className="absolute inset-x-5 z-10 flex items-center gap-3 rounded-2xl bg-white p-4 text-left"
+            style={{
+              top: "55%",
+              transform: "translateY(-50%)",
+              border: "1px solid rgba(212,175,55,0.32)",
+              boxShadow: "0 6px 20px rgba(212,175,55,0.18)",
+            }}
           >
-            <p
-              className="font-heading mb-3 text-center text-base font-bold"
-              style={{ fontFamily: "'Domine', 'Noto Sans JP', sans-serif", color: "#1b2528" }}
-            >
-              4件目以降はログインが必要です
-            </p>
-            <button
-              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "#06C755" }}
-              onClick={() => {
-                window.location.href = "/login";
+            <span
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl"
+              style={{
+                background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.05))",
+                border: "1px solid rgba(212,175,55,0.32)",
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-              </svg>
-              LINEでログイン
-            </button>
-          </div>
+              🔒
+            </span>
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-[13px] font-semibold"
+                style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+              >
+                続きはログインで全件公開
+              </div>
+              <div className="mt-0.5 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                あと {Math.max(reviewsCount - visible.length, 1)} 件のクチコミ
+              </div>
+            </div>
+            <span
+              className="shrink-0 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-white"
+              style={{
+                backgroundColor: "#06C755",
+                boxShadow: "0 4px 14px rgba(6,199,85,0.3)",
+              }}
+            >
+              LINEで開く
+            </span>
+          </button>
         </div>
       )}
       {!hasHidden && <div className="pb-5" />}

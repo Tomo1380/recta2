@@ -610,22 +610,6 @@ export default function StoreListPage() {
           background: "linear-gradient(135deg, #1b2528 0%, #243034 60%, #1b2528 100%)",
         }}
       >
-        {/* Floating login pill — top-right */}
-        <Link
-          to="/login"
-          className="absolute right-4 top-4 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-white"
-          style={{
-            backgroundColor: "rgba(0,0,0,0.35)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.18)",
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          ログイン
-        </Link>
         {/* Gold glow */}
         <div
           aria-hidden
@@ -759,7 +743,7 @@ export default function StoreListPage() {
       {/* ----------------------------------------------------------- */}
       <div className="mx-auto max-w-3xl px-4">
         <div
-          className="mt-3 flex gap-5 overflow-x-auto border-b text-xs"
+          className="mt-3 flex gap-5 overflow-x-auto overflow-y-hidden border-b text-xs"
           style={{ borderColor: "rgba(27,37,40,0.06)" }}
         >
           {SORT_TABS.map((s) => {
