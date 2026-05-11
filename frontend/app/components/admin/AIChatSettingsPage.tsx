@@ -1151,10 +1151,10 @@ export function AIChatSettingsPage() {
         <div className="space-y-4">
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900 flex items-start gap-2">
             <span className="inline-flex items-center rounded-md bg-amber-200/70 px-2 py-0.5 text-[11px] font-semibold text-amber-900 shrink-0 mt-[1px]">
-              Agentモード専用
+              推論時参照は Agent のみ
             </span>
             <p className="leading-relaxed">
-              ここに登録したナレッジは Agent モードでのみ <code className="rounded bg-amber-100 px-1 text-[11px]">get_industry_knowledge</code> ツール経由で参照されます。Fine-tuned モードでは使われません（Fine-tuned モードは学習データ（Fine-tuning Q&amp;A タブ）から回答します）。
+              ここのナレッジは Agent モードでは推論時に <code className="rounded bg-amber-100 px-1 text-[11px]">get_industry_knowledge</code> ツール経由で動的に参照されます。Fine-tuned モードでは推論時に参照せず、<strong>同じ内容を Fine-tuning Q&amp;A の学習データに含めてモデル自身に記憶させる</strong>使い分けです。
             </p>
           </div>
           <div className="flex items-center justify-between">

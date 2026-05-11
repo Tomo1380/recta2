@@ -949,23 +949,27 @@ class AiChatController extends Controller
      */
     private function buildOpenAiSystemPrompt(AiChatSetting $setting, string $storeContext, string $userArea = '', string $pageType = 'top'): string
     {
-        $storeData = $storeContext ?: $this->buildPipeDelimitedStoreData();
+        // Fine-tuned model already has store knowledge / area×condition recommendations
+        // / industry terminology baked in from the training data, so we don't pipe
+        // the full store dump on every request (that was 12k+ tokens of duplicate
+        // context). Only the *detail* page passes a single store's data because
+        // that one row is what the user is asking about.
+        $prompt = '';
 
-        $prompt = "【掲載店舗データ】\n{$storeData}\n\n";
+        if ($pageType === 'detail' && $storeContext) {
+            $prompt .= "{$storeContext}\n\n";
+            $prompt .= "【詳細ページ】上記の店舗に関する質問に回答する。他店舗は紹介しない。\n\n";
+        }
 
         if ($userArea) {
             $prompt .= "【ユーザーの現在地】{$userArea}付近。エリア指定がない場合はこの地域周辺を優先。\n\n";
-        }
-
-        if ($pageType === 'detail' && $storeContext) {
-            $prompt .= "【詳細ページ】上記の店舗に関する質問に回答する。他店舗は紹介しない。\n\n";
         }
 
         if ($setting->system_prompt) {
             $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
         }
 
-        // Remind FT model of the one runtime-critical format requirement
+        // Remind FT model of the runtime-critical format requirements
         $prompt .= "店舗を紹介する時は必ず[STORE:ID]マーカーを付けること。LINE誘導CTAを回答の末尾に必ず付けること。";
 
         return $prompt;
