@@ -185,6 +185,43 @@ export function FineTuningQaPage({
           : null;
       if (lastJobId) {
         startPolling(lastJobId);
+      } else {
+        // No saved job_id (possibly because the /start request 502'd at the
+        // proxy while the job actually started on OpenAI's side). Recover
+        // by listing recent jobs and picking the most recent non-terminal
+        // one as the active job.
+        try {
+          const list = await api.get<{
+            success: boolean;
+            jobs?: Array<{
+              id: string;
+              status: string;
+              fine_tuned_model: string | null;
+              model?: string;
+              created_at?: number;
+            }>;
+          }>("/admin/ai-chat/fine-tuning/job");
+          if (cancelled) return;
+          const terminal = new Set(["succeeded", "failed", "cancelled"]);
+          const pending = (list.jobs ?? []).find(
+            (j) => !terminal.has(j.status),
+          );
+          if (pending) {
+            setActiveJob({
+              id: pending.id,
+              status: pending.status,
+              fine_tuned_model: pending.fine_tuned_model,
+              base_model: pending.model,
+              created_at: pending.created_at,
+            });
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem(JOB_STORAGE_KEY, pending.id);
+            }
+            startPolling(pending.id);
+          }
+        } catch {
+          /* silent */
+        }
       }
     })();
     return () => {
