@@ -255,15 +255,17 @@ export function FineTuningQaPage({
     }
   };
 
-  // Estimate cost: ~$8 per 1M tokens for fine-tuning gpt-4o-mini training.
-  // Each pair ~ 500-1000 tokens × N epochs(3). Show a rough estimate.
+  // Estimate cost: $3 per 1M training tokens for gpt-4o-mini fine-tuning
+  // (OpenAI 2026 pricing; previously $8 — old quote was used here).
+  // Each ChatML pair (system + user + assistant) averages around 500 tokens
+  // in this dataset; epochs default to 3.
   const estimatedCostJpy = (() => {
     const activeCount = statusCounts.active;
     if (!activeCount) return 0;
-    const tokensPerPair = 800; // ChatML system+user+assistant rough avg
+    const tokensPerPair = 500;
     const epochs = 3;
     const totalTokens = activeCount * tokensPerPair * epochs;
-    const usd = (totalTokens / 1_000_000) * 8;
+    const usd = (totalTokens / 1_000_000) * 3;
     return Math.round(usd * 150);
   })();
 
