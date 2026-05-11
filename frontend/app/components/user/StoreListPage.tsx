@@ -663,7 +663,7 @@ export default function StoreListPage() {
             background: "radial-gradient(ellipse at center, rgba(200,96,128,0.18) 0%, transparent 60%)",
           }}
         />
-        <div className="relative mx-auto max-w-3xl px-4 pb-5 pt-5">
+        <div className="relative mx-auto max-w-3xl px-5 pb-6 pt-6">
           <div
             className="text-[10px] font-bold uppercase"
             style={{ color: "rgba(212,175,55,0.85)", fontFamily: "'Outfit', sans-serif", letterSpacing: "0.22em" }}
@@ -705,16 +705,16 @@ export default function StoreListPage() {
       </section>
 
       {/* ----------------------------------------------------------- */}
-      {/* AI Chat — directly under hero                               */}
+      {/* AI Chat — breathing room from hero                          */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl px-4 pt-4">
         <AiChatPanel pageType="list" />
       </div>
 
       {/* ----------------------------------------------------------- */}
       {/* Action bar — single filter button + active chips counter    */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 pt-2">
+      <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 pt-5">
         <button
           onClick={() => setShowFilter(true)}
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
@@ -772,7 +772,7 @@ export default function StoreListPage() {
       {/* ----------------------------------------------------------- */}
       <div className="mx-auto max-w-3xl px-4">
         <div
-          className="mt-2 flex gap-4 overflow-x-auto border-b text-xs"
+          className="mt-3 flex gap-5 overflow-x-auto border-b text-xs"
           style={{ borderColor: "rgba(27,37,40,0.06)" }}
         >
           {SORT_TABS.map((s) => {
@@ -800,9 +800,9 @@ export default function StoreListPage() {
       {/* ----------------------------------------------------------- */}
       {/* Results                                                     */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto max-w-3xl px-3 pt-3 pb-4">
+      <div className="mx-auto max-w-3xl px-3 pt-4 pb-6">
         {loading ? (
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {Array.from({ length: 6 }).map((_, i) => (
               <EditorialCardSkeleton key={i} />
             ))}
@@ -834,7 +834,7 @@ export default function StoreListPage() {
           </div>
         ) : (
           <>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {storeList.map((store) => (
                 <EditorialStoreCard key={store.id} store={store} />
               ))}
