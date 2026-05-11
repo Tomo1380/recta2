@@ -150,10 +150,18 @@ export function FineTuningQaPage({
           base_model: res.job.model,
           created_at: res.job.created_at,
         });
-        // If terminal, stop polling.
+        // If terminal, stop polling. For cancelled/failed also drop the
+        // localStorage pin so a later reload re-discovers any newer job
+        // that's still running.
         const terminal = ["succeeded", "failed", "cancelled"];
         if (terminal.includes(res.job.status)) {
           stopPolling();
+          if (
+            (res.job.status === "cancelled" || res.job.status === "failed") &&
+            typeof window !== "undefined"
+          ) {
+            window.localStorage.removeItem(JOB_STORAGE_KEY);
+          }
         }
       }
     } catch (e) {
@@ -189,17 +197,58 @@ export function FineTuningQaPage({
         /* silent */
       }
 
+      // Decide which job (if any) to display:
+      //   1. If localStorage has a job_id, fetch its current state.
+      //   2. If that job is non-terminal, poll it.
+      //   3. If it's terminal (cancelled/failed/succeeded) OR there's no
+      //      stored id, fall back to the most-recent non-terminal job on
+      //      OpenAI's side. That way a cancelled job left in localStorage
+      //      doesn't stick around hiding a job that's still running in a
+      //      different browser/session.
       const lastJobId =
         typeof window !== "undefined"
           ? window.localStorage.getItem(JOB_STORAGE_KEY)
           : null;
+
+      const terminalSet = new Set(["succeeded", "failed", "cancelled"]);
+
+      let lastJobIsActive = false;
       if (lastJobId) {
-        startPolling(lastJobId);
-      } else {
-        // No saved job_id (possibly because the /start request 502'd at the
-        // proxy while the job actually started on OpenAI's side). Recover
-        // by listing recent jobs and picking the most recent non-terminal
-        // one as the active job.
+        try {
+          const r = await api.get<{
+            success: boolean;
+            job?: {
+              id: string;
+              status: string;
+              fine_tuned_model: string | null;
+              model?: string;
+              created_at?: number;
+            };
+          }>(`/admin/ai-chat/fine-tuning/job?job_id=${encodeURIComponent(lastJobId)}`);
+          if (cancelled) return;
+          if (r.job && !terminalSet.has(r.job.status)) {
+            lastJobIsActive = true;
+            setActiveJob({
+              id: r.job.id,
+              status: r.job.status,
+              fine_tuned_model: r.job.fine_tuned_model,
+              base_model: r.job.model,
+              created_at: r.job.created_at,
+            });
+            startPolling(r.job.id);
+          } else if (typeof window !== "undefined") {
+            // Stale localStorage entry — clear it so we don't keep showing
+            // a cancelled/succeeded job after the user moves on.
+            window.localStorage.removeItem(JOB_STORAGE_KEY);
+          }
+        } catch {
+          /* network error — fall through to list-based recovery */
+        }
+      }
+
+      if (!lastJobIsActive) {
+        // No active job pinned locally. Ask OpenAI for the most recent
+        // non-terminal job (handles 502-on-start + cross-session cases).
         try {
           const list = await api.get<{
             success: boolean;
@@ -212,9 +261,8 @@ export function FineTuningQaPage({
             }>;
           }>("/admin/ai-chat/fine-tuning/job");
           if (cancelled) return;
-          const terminal = new Set(["succeeded", "failed", "cancelled"]);
           const pending = (list.jobs ?? []).find(
-            (j) => !terminal.has(j.status),
+            (j) => !terminalSet.has(j.status),
           );
           if (pending) {
             setActiveJob({
