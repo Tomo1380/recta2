@@ -765,8 +765,12 @@ export default function AiChatPanel({
     messages.length > 0 &&
     messages[messages.length - 1]?.role === "ai";
 
-  // Whether category chips are shown (top page, no messages yet)
-  const showCategoryChips = !hasMessages && pageType === "top";
+  // Category-chips carousel (the hardcoded "状況を話す / 不安を解消 / 条件で絞る /
+  // 私を診断" 4-card display) is intentionally disabled: the admin-managed
+  // suggest_buttons are the single source of truth for top-page suggestions.
+  // Keeping the SUGGEST_ACTIONS constant in case we want it back as a marketing
+  // splash, but it no longer renders.
+  const showCategoryChips = false;
 
   return (
     <div
