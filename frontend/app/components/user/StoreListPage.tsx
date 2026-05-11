@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Star, ChevronDown, Search as SearchIcon, X } from "lucide-react";
+import { Star, ChevronDown, Search as SearchIcon, X, SlidersHorizontal } from "lucide-react";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
   Pagination,
@@ -49,19 +49,8 @@ interface PaginatedResponse {
   to: number | null;
 }
 
-interface Area {
-  id: number;
-  name: string;
-  slug: string;
-  tier: number;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  color: string;
-}
+interface Area { id: number; name: string; slug: string; tier: number; }
+interface Category { id: number; name: string; slug: string; color: string; }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,13 +63,11 @@ function buildStoreApiUrl(params: URLSearchParams): string {
   const q = params.get("q");
   const sort = params.get("sort");
   const page = params.get("page");
-
   if (area) query.set("area", area);
   if (category) query.set("category", category);
   if (q) query.set("q", q);
   if (sort) query.set("sort", sort);
   query.set("page", page || "1");
-
   return `/api/stores?${query.toString()}`;
 }
 
@@ -91,7 +78,7 @@ function getImageUrl(image: string | { url: string } | undefined): string | unde
 }
 
 // ---------------------------------------------------------------------------
-// Editorial list-card — horizontal, light surface, gold accent
+// Editorial list card — 1-column compact, full-height gold accent on the left
 // ---------------------------------------------------------------------------
 
 function EditorialStoreCard({ store }: { store: Store }) {
@@ -100,32 +87,31 @@ function EditorialStoreCard({ store }: { store: Store }) {
   const fullStars = Math.floor(rating);
   const hasHalf = rating - fullStars >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
-  const taiken = store.same_day_trial;
 
   return (
     <Link
       to={`/stores/${store.id}`}
-      className="group relative block overflow-hidden rounded-2xl bg-white transition-shadow hover:shadow-lg"
+      className="group relative flex overflow-hidden rounded-xl bg-white transition-shadow active:scale-[0.99]"
       style={{
-        boxShadow: "0 4px 14px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04)",
         border: "1px solid rgba(27,37,40,0.06)",
       }}
     >
-      {/* Left gold accent line */}
+      {/* Full-height gold accent bar */}
       <span
         aria-hidden
-        className="absolute inset-y-4 left-0 w-[3px] rounded-r-full"
+        className="w-[3px] shrink-0"
         style={{ background: "linear-gradient(180deg, #D4AF37 0%, #c8960c 100%)" }}
       />
 
-      <div className="flex gap-3 p-3 pl-4">
+      <div className="flex flex-1 gap-3 p-2.5">
         {/* Poster */}
-        <div className="relative size-[120px] shrink-0 overflow-hidden rounded-xl">
+        <div className="relative size-[96px] shrink-0 overflow-hidden rounded-lg">
           {imageUrl ? (
             <img
               src={imageUrl}
               alt={store.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="h-full w-full object-cover"
             />
           ) : (
             <div
@@ -143,16 +129,16 @@ function EditorialStoreCard({ store }: { store: Store }) {
           {/* Category pill */}
           {store.category && (
             <span
-              className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-semibold text-white"
+              className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-semibold text-white"
               style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
             >
               {store.category}
             </span>
           )}
           {/* 体験確約 ribbon */}
-          {taiken && (
+          {store.same_day_trial && (
             <span
-              className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white"
+              className="absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
               体験確約
@@ -164,7 +150,7 @@ function EditorialStoreCard({ store }: { store: Store }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-start justify-between gap-2">
             <h3
-              className="truncate text-[14.5px] font-bold leading-tight"
+              className="truncate text-[14px] font-bold leading-tight"
               style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
             >
               {store.name}
@@ -183,30 +169,26 @@ function EditorialStoreCard({ store }: { store: Store }) {
           </div>
 
           {store.area && (
-            <p className="mt-0.5 text-[11px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+            <p className="mt-0.5 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
               ⌖ {store.area}
             </p>
           )}
 
-          {/* Hourly — editorial label */}
+          {/* Hourly */}
           {(store.hourly_min || store.hourly_max) && (
-            <div className="mt-1.5 flex items-baseline gap-1.5">
-              <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                時給
-              </span>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>時給</span>
               <span
-                className="text-[15px] font-bold tabular-nums leading-none"
+                className="text-[14px] font-bold tabular-nums leading-none"
                 style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
               >
                 ¥{(store.hourly_min ?? 0).toLocaleString()}
               </span>
               {store.hourly_max && store.hourly_max !== store.hourly_min && (
                 <>
-                  <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.4)" }}>
-                    〜
-                  </span>
+                  <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.35)" }}>〜</span>
                   <span
-                    className="text-[13px] font-semibold tabular-nums leading-none"
+                    className="text-[12px] font-semibold tabular-nums leading-none"
                     style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
                   >
                     ¥{store.hourly_max.toLocaleString()}
@@ -216,86 +198,67 @@ function EditorialStoreCard({ store }: { store: Store }) {
             </div>
           )}
 
-          {/* Rating count + feature tags */}
-          <div className="mt-auto flex flex-wrap items-center gap-1 pt-2">
+          {/* Reviews count + tags */}
+          <div className="mt-auto flex flex-wrap items-center gap-1 pt-1.5">
             {rating > 0 && (
               <>
                 <div className="flex items-center">
                   {Array.from({ length: fullStars }).map((_, i) => (
-                    <Star
-                      key={`f-${i}`}
-                      className="size-[10px]"
-                      style={{ color: "#D4AF37", fill: "#D4AF37" }}
-                    />
+                    <Star key={`f-${i}`} className="size-[9px]" style={{ color: "#D4AF37", fill: "#D4AF37" }} />
                   ))}
                   {hasHalf && (
-                    <Star
-                      className="size-[10px]"
-                      style={{ color: "#D4AF37", fill: "#D4AF37", opacity: 0.5 }}
-                    />
+                    <Star className="size-[9px]" style={{ color: "#D4AF37", fill: "#D4AF37", opacity: 0.5 }} />
                   )}
                   {Array.from({ length: emptyStars }).map((_, i) => (
-                    <Star
-                      key={`e-${i}`}
-                      className="size-[10px]"
-                      style={{ color: "rgba(212,175,55,0.3)", fill: "none" }}
-                    />
+                    <Star key={`e-${i}`} className="size-[9px]" style={{ color: "rgba(212,175,55,0.3)", fill: "none" }} />
                   ))}
                 </div>
                 {store.reviews_count !== undefined && (
-                  <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.4)" }}>
+                  <span className="text-[9px]" style={{ color: "rgba(27,37,40,0.4)" }}>
                     ({store.reviews_count}件)
                   </span>
                 )}
               </>
             )}
+            {store.feature_tags?.slice(0, 2).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-1.5 py-px text-[9px] font-medium"
+                style={{
+                  backgroundColor: "rgba(212,175,55,0.08)",
+                  border: "1px solid rgba(212,175,55,0.18)",
+                  color: "rgba(168,130,20,0.95)",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
           </div>
-
-          {store.feature_tags && store.feature_tags.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {store.feature_tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-                  style={{
-                    backgroundColor: "rgba(212,175,55,0.08)",
-                    border: "1px solid rgba(212,175,55,0.18)",
-                    color: "rgba(168,130,20,0.95)",
-                  }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </Link>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Skeleton
-// ---------------------------------------------------------------------------
-
 function EditorialCardSkeleton() {
   return (
     <div
-      className="relative overflow-hidden rounded-2xl bg-white"
+      className="relative flex overflow-hidden rounded-xl bg-white"
       style={{
-        boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.05)",
         border: "1px solid rgba(27,37,40,0.06)",
       }}
     >
-      <div className="flex gap-3 p-3 pl-4">
-        <Skeleton className="size-[120px] shrink-0 rounded-xl" />
+      <span className="w-[3px] shrink-0 bg-gradient-to-b from-[#D4AF37] to-[#c8960c]" />
+      <div className="flex flex-1 gap-3 p-2.5">
+        <Skeleton className="size-[96px] shrink-0 rounded-lg" />
         <div className="flex-1 space-y-2 py-1">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-3 w-1/3" />
-          <Skeleton className="h-4 w-1/2" />
-          <div className="flex gap-1 pt-1">
-            <Skeleton className="h-3 w-10 rounded-full" />
-            <Skeleton className="h-3 w-10 rounded-full" />
+          <Skeleton className="h-3.5 w-3/4" />
+          <Skeleton className="h-2.5 w-1/3" />
+          <Skeleton className="h-3.5 w-1/2" />
+          <div className="flex gap-1 pt-0.5">
+            <Skeleton className="h-2.5 w-10 rounded-full" />
+            <Skeleton className="h-2.5 w-10 rounded-full" />
           </div>
         </div>
       </div>
@@ -304,65 +267,44 @@ function EditorialCardSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// Pagination — editorial styling
+// Pagination
 // ---------------------------------------------------------------------------
 
 function StorePagination({
-  currentPage,
-  lastPage,
-  onPageChange,
+  currentPage, lastPage, onPageChange,
 }: {
-  currentPage: number;
-  lastPage: number;
-  onPageChange: (page: number) => void;
+  currentPage: number; lastPage: number; onPageChange: (page: number) => void;
 }) {
   if (lastPage <= 1) return null;
-
   const pages: (number | "ellipsis")[] = [];
   const delta = 2;
   for (let i = 1; i <= lastPage; i++) {
-    if (
-      i === 1 ||
-      i === lastPage ||
-      (i >= currentPage - delta && i <= currentPage + delta)
-    ) {
+    if (i === 1 || i === lastPage || (i >= currentPage - delta && i <= currentPage + delta)) {
       pages.push(i);
     } else if (pages[pages.length - 1] !== "ellipsis") {
       pages.push("ellipsis");
     }
   }
-
   return (
-    <Pagination className="mt-8">
+    <Pagination className="mt-6">
       <PaginationContent>
         <PaginationItem>
           <PaginationPrevious
             href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              if (currentPage > 1) onPageChange(currentPage - 1);
-            }}
-            className={
-              currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
-            }
+            onClick={(e) => { e.preventDefault(); if (currentPage > 1) onPageChange(currentPage - 1); }}
+            className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
             style={{ color: "rgba(27,37,40,0.6)" }}
           />
         </PaginationItem>
-
         {pages.map((page, idx) =>
           page === "ellipsis" ? (
-            <PaginationItem key={`ellipsis-${idx}`}>
-              <PaginationEllipsis />
-            </PaginationItem>
+            <PaginationItem key={`ellipsis-${idx}`}><PaginationEllipsis /></PaginationItem>
           ) : (
             <PaginationItem key={page}>
               <PaginationLink
                 href="#"
                 isActive={page === currentPage}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPageChange(page);
-                }}
+                onClick={(e) => { e.preventDefault(); onPageChange(page); }}
                 className="cursor-pointer"
                 style={
                   page === currentPage
@@ -375,19 +317,11 @@ function StorePagination({
             </PaginationItem>
           )
         )}
-
         <PaginationItem>
           <PaginationNext
             href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              if (currentPage < lastPage) onPageChange(currentPage + 1);
-            }}
-            className={
-              currentPage >= lastPage
-                ? "pointer-events-none opacity-50"
-                : "cursor-pointer"
-            }
+            onClick={(e) => { e.preventDefault(); if (currentPage < lastPage) onPageChange(currentPage + 1); }}
+            className={currentPage >= lastPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
             style={{ color: "rgba(27,37,40,0.6)" }}
           />
         </PaginationItem>
@@ -397,19 +331,12 @@ function StorePagination({
 }
 
 // ---------------------------------------------------------------------------
-// Filter bottom sheet
+// Filter bottom sheet — slides up, body-scroll-locked, footer doesn't overlap
 // ---------------------------------------------------------------------------
 
 function FilterSheet({
-  open,
-  onClose,
-  areas,
-  categories,
-  currentArea,
-  currentCategory,
-  onAreaChange,
-  onCategoryChange,
-  onClear,
+  open, onClose, areas, categories, currentArea, currentCategory,
+  onAreaChange, onCategoryChange, onClear,
 }: {
   open: boolean;
   onClose: () => void;
@@ -421,136 +348,125 @@ function FilterSheet({
   onCategoryChange: (slug: string) => void;
   onClear: () => void;
 }) {
-  if (!open) return null;
+  // Mount management for transition
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      // Trigger transition on next frame
+      requestAnimationFrame(() => setVisible(true));
+      document.body.style.overflow = "hidden";
+    } else {
+      setVisible(false);
+      document.body.style.overflow = "";
+      const t = setTimeout(() => setMounted(false), 280);
+      return () => clearTimeout(t);
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  if (!mounted) return null;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      style={{
+        backgroundColor: visible ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0)",
+        transition: "background-color 250ms ease",
+      }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-t-3xl bg-white p-5"
-        style={{ maxHeight: "85vh", overflowY: "auto" }}
+        className="w-full max-w-3xl rounded-t-3xl bg-white shadow-2xl"
+        style={{
+          maxHeight: "82vh",
+          transform: visible ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)",
+          display: "flex",
+          flexDirection: "column",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
-        <div className="mb-4 flex items-center justify-between">
-          <h3
-            className="text-lg font-bold"
-            style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
-          >
-            条件を絞り込む
-          </h3>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 hover:bg-gray-100"
-            aria-label="閉じる"
-          >
-            <X className="size-5" style={{ color: "#1b2528" }} />
-          </button>
-        </div>
-
-        <div className="mb-5">
-          <div
-            className="mb-2 text-xs font-semibold"
-            style={{ color: "rgba(27,37,40,0.55)", letterSpacing: "0.05em" }}
-          >
-            エリア
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded-full px-3 py-1.5 text-xs"
-              style={
-                !currentArea
-                  ? {
-                      backgroundColor: "rgba(212,175,55,0.1)",
-                      border: "1px solid #D4AF37",
-                      color: "#D4AF37",
-                    }
-                  : { border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }
-              }
-              onClick={() => onAreaChange("")}
+        <div className="shrink-0 px-5 pt-3 pb-1">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" />
+          <div className="flex items-center justify-between">
+            <h3
+              className="text-base font-bold"
+              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
             >
-              すべて
-            </button>
-            {areas.map((a) => (
-              <button
-                key={a.id}
-                className="rounded-full px-3 py-1.5 text-xs"
-                style={
-                  currentArea === a.slug
-                    ? {
-                        backgroundColor: "rgba(212,175,55,0.1)",
-                        border: "1px solid #D4AF37",
-                        color: "#D4AF37",
-                      }
-                    : { border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }
-                }
-                onClick={() => onAreaChange(a.slug)}
-              >
-                {a.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-5">
-          <div
-            className="mb-2 text-xs font-semibold"
-            style={{ color: "rgba(27,37,40,0.55)", letterSpacing: "0.05em" }}
-          >
-            カテゴリ
-          </div>
-          <div className="flex flex-wrap gap-2">
+              条件を絞り込む
+            </h3>
             <button
-              className="rounded-full px-3 py-1.5 text-xs"
-              style={
-                !currentCategory
-                  ? {
-                      backgroundColor: "rgba(212,175,55,0.1)",
-                      border: "1px solid #D4AF37",
-                      color: "#D4AF37",
-                    }
-                  : { border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }
-              }
-              onClick={() => onCategoryChange("")}
+              onClick={onClose}
+              className="rounded-full p-1.5 hover:bg-gray-100"
+              aria-label="閉じる"
             >
-              すべて
+              <X className="size-4" style={{ color: "#1b2528" }} />
             </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                className="rounded-full px-3 py-1.5 text-xs"
-                style={
-                  currentCategory === c.slug
-                    ? {
-                        backgroundColor: "rgba(212,175,55,0.1)",
-                        border: "1px solid #D4AF37",
-                        color: "#D4AF37",
-                      }
-                    : { border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }
-                }
-                onClick={() => onCategoryChange(c.slug)}
-              >
-                {c.name}
-              </button>
-            ))}
           </div>
         </div>
 
-        <div className="sticky bottom-0 -mx-5 -mb-5 flex gap-3 border-t bg-white px-5 py-4">
+        {/* Body — scrollable, with padding-bottom equal to footer height */}
+        <div className="flex-1 overflow-y-auto px-5 pb-6" style={{ paddingBottom: "92px" }}>
+          <div className="mt-3">
+            <div
+              className="mb-2 text-[11px] font-semibold uppercase"
+              style={{ color: "rgba(27,37,40,0.55)", letterSpacing: "0.08em" }}
+            >
+              エリア
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <SheetChip active={!currentArea} onClick={() => onAreaChange("")}>すべて</SheetChip>
+              {areas.map((a) => (
+                <SheetChip
+                  key={a.id}
+                  active={currentArea === a.slug}
+                  onClick={() => onAreaChange(a.slug)}
+                >
+                  {a.name}
+                </SheetChip>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div
+              className="mb-2 text-[11px] font-semibold uppercase"
+              style={{ color: "rgba(27,37,40,0.55)", letterSpacing: "0.08em" }}
+            >
+              カテゴリ
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <SheetChip active={!currentCategory} onClick={() => onCategoryChange("")}>すべて</SheetChip>
+              {categories.map((c) => (
+                <SheetChip
+                  key={c.id}
+                  active={currentCategory === c.slug}
+                  onClick={() => onCategoryChange(c.slug)}
+                >
+                  {c.name}
+                </SheetChip>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer — absolute over the body so chips can scroll under */}
+        <div
+          className="absolute inset-x-0 bottom-0 flex gap-2 border-t bg-white px-5 py-3"
+          style={{ borderColor: "rgba(27,37,40,0.08)" }}
+        >
           <button
-            className="flex-1 rounded-full py-3 text-sm font-medium"
-            style={{
-              border: "1px solid rgba(27,37,40,0.12)",
-              color: "#1b2528",
-            }}
+            className="flex-1 rounded-full py-2.5 text-sm font-medium"
+            style={{ border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }}
             onClick={onClear}
           >
             クリア
           </button>
           <button
-            className="flex-1 rounded-full py-3 text-sm font-semibold text-white"
+            className="flex-1 rounded-full py-2.5 text-sm font-semibold text-white"
             style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             onClick={onClose}
           >
@@ -559,6 +475,29 @@ function FilterSheet({
         </div>
       </div>
     </div>
+  );
+}
+
+function SheetChip({
+  active, children, onClick,
+}: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full px-3 py-1.5 text-xs"
+      style={
+        active
+          ? {
+              backgroundColor: "rgba(212,175,55,0.1)",
+              border: "1px solid #D4AF37",
+              color: "#D4AF37",
+              fontWeight: 600,
+            }
+          : { border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }
+      }
+    >
+      {children}
+    </button>
   );
 }
 
@@ -606,16 +545,12 @@ export default function StoreListPage() {
         }
       })
       .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-
     fetch(buildStoreApiUrl(searchParams))
       .then((res) => res.json())
       .then((data: PaginatedResponse) => {
@@ -625,29 +560,18 @@ export default function StoreListPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setStores(null);
-          setLoading(false);
-        }
+        if (!cancelled) { setStores(null); setLoading(false); }
       });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   const updateParam = useCallback(
     (key: string, value: string, resetPage = true) => {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
-        if (value) {
-          next.set(key, value);
-        } else {
-          next.delete(key);
-        }
-        if (resetPage && key !== "page") {
-          next.set("page", "1");
-        }
+        if (value) next.set(key, value);
+        else next.delete(key);
+        if (resetPage && key !== "page") next.set("page", "1");
         return next;
       });
     },
@@ -670,44 +594,36 @@ export default function StoreListPage() {
   const total = stores?.total ?? 0;
   const storeList = stores?.data ?? [];
   const isEmpty = !loading && storeList.length === 0;
-  const isFiltered = currentArea || currentCategory || currentQuery;
 
   const areaName = areas.find((a) => a.slug === currentArea)?.name;
   const categoryName = categories.find((c) => c.slug === currentCategory)?.name;
+  const activeChipsCount = (currentArea ? 1 : 0) + (currentCategory ? 1 : 0);
 
   return (
     <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#f5f5f5" }}>
       {/* ----------------------------------------------------------- */}
-      {/* Header — single row, Recta. brand + login                   */}
+      {/* Top header                                                  */}
       {/* ----------------------------------------------------------- */}
       <header
-        className="sticky top-0 z-30 border-b bg-white"
-        style={{ borderColor: "rgba(27,37,40,0.06)" }}
+        className="sticky top-0 z-30 bg-white"
+        style={{ borderBottom: "1px solid rgba(27,37,40,0.06)" }}
       >
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <Link
             to="/"
-            className="text-xl font-bold tracking-tight"
+            className="shrink-0 text-[19px] font-bold leading-none tracking-tight"
             style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
           >
             Recta<span style={{ color: "#D4AF37" }}>.</span>
           </Link>
           <Link
             to="/login"
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs"
-            style={{
-              border: "1px solid rgba(27,37,40,0.12)",
-              color: "#1b2528",
-            }}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
+            style={{ border: "1px solid rgba(27,37,40,0.12)", color: "#1b2528" }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.7" />
-              <path
-                d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-              />
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
             ログイン
           </Link>
@@ -715,68 +631,148 @@ export default function StoreListPage() {
       </header>
 
       {/* ----------------------------------------------------------- */}
-      {/* AI Chat — directly under header                             */}
+      {/* Editorial poster hero — "STORES / お店一覧"                 */}
+      {/* ----------------------------------------------------------- */}
+      <section
+        className="relative overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #1b2528 0%, #243034 60%, #1b2528 100%)",
+        }}
+      >
+        {/* Gold glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            top: "-30%",
+            right: "-10%",
+            width: "60%",
+            height: "160%",
+            background: "radial-gradient(ellipse at center, rgba(212,175,55,0.22) 0%, transparent 60%)",
+          }}
+        />
+        {/* Pink accent */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            bottom: "-40%",
+            left: "-10%",
+            width: "55%",
+            height: "120%",
+            background: "radial-gradient(ellipse at center, rgba(200,96,128,0.18) 0%, transparent 60%)",
+          }}
+        />
+        <div className="relative mx-auto max-w-3xl px-4 pb-5 pt-5">
+          <div
+            className="text-[10px] font-bold uppercase"
+            style={{ color: "rgba(212,175,55,0.85)", fontFamily: "'Outfit', sans-serif", letterSpacing: "0.22em" }}
+          >
+            STORES
+          </div>
+          <div className="mt-1 flex items-end justify-between gap-4">
+            <h1
+              className="text-[26px] font-bold leading-none text-white"
+              style={{ fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+            >
+              お店一覧
+            </h1>
+            <div className="flex items-baseline gap-1">
+              <span
+                className="text-[28px] font-bold leading-none tabular-nums"
+                style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
+              >
+                {total.toLocaleString()}
+              </span>
+              <span className="text-[11px] font-medium text-white/70">件</span>
+            </div>
+          </div>
+          {/* Gold underline */}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="size-1 rounded-full" style={{ backgroundColor: "#D4AF37" }} />
+            <span
+              className="h-px flex-1"
+              style={{ background: "linear-gradient(90deg, rgba(212,175,55,0.7), rgba(212,175,55,0))" }}
+            />
+            <span
+              className="text-[10px] font-light text-white/55"
+              style={{ fontFamily: "'Outfit', sans-serif", letterSpacing: "0.14em" }}
+            >
+              AIで探す、理想の一店
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ----------------------------------------------------------- */}
+      {/* AI Chat — directly under hero                               */}
       {/* ----------------------------------------------------------- */}
       <div className="mx-auto max-w-3xl">
         <AiChatPanel pageType="list" />
       </div>
 
       {/* ----------------------------------------------------------- */}
-      {/* Filter bar — chips + sort tabs                              */}
+      {/* Action bar — single filter button + active chips counter    */}
+      {/* ----------------------------------------------------------- */}
+      <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 pt-2">
+        <button
+          onClick={() => setShowFilter(true)}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
+          style={{
+            backgroundColor: activeChipsCount > 0 ? "rgba(212,175,55,0.08)" : "white",
+            border: `1px solid ${activeChipsCount > 0 ? "#D4AF37" : "rgba(27,37,40,0.1)"}`,
+            color: activeChipsCount > 0 ? "#D4AF37" : "#1b2528",
+          }}
+        >
+          <SlidersHorizontal className="size-3.5" />
+          絞り込み
+          {activeChipsCount > 0 && (
+            <span
+              className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
+            >
+              {activeChipsCount}
+            </span>
+          )}
+        </button>
+        {/* Active chips (compact, removable) */}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+          {areaName && (
+            <button
+              onClick={() => updateParam("area", "")}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium"
+              style={{ backgroundColor: "rgba(212,175,55,0.1)", color: "#D4AF37" }}
+            >
+              {areaName} <X className="size-3" />
+            </button>
+          )}
+          {categoryName && (
+            <button
+              onClick={() => updateParam("category", "")}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium"
+              style={{ backgroundColor: "rgba(200,96,128,0.1)", color: "rgba(200,96,128,0.9)" }}
+            >
+              {categoryName} <X className="size-3" />
+            </button>
+          )}
+          {currentQuery && (
+            <button
+              onClick={() => { setSearchInput(""); updateParam("q", ""); }}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium"
+              style={{ backgroundColor: "rgba(27,37,40,0.06)", color: "rgba(27,37,40,0.7)" }}
+            >
+              「{currentQuery}」 <X className="size-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ----------------------------------------------------------- */}
+      {/* Sort tabs — gold underline                                  */}
       {/* ----------------------------------------------------------- */}
       <div className="mx-auto max-w-3xl px-4">
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          <button
-            onClick={() => setShowFilter(true)}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
-            style={
-              currentArea
-                ? {
-                    backgroundColor: "rgba(212,175,55,0.08)",
-                    border: "1px solid #D4AF37",
-                    color: "#D4AF37",
-                  }
-                : {
-                    backgroundColor: "white",
-                    border: "1px solid rgba(27,37,40,0.1)",
-                    color: "#1b2528",
-                  }
-            }
-          >
-            <span style={{ color: currentArea ? "#D4AF37" : "rgba(27,37,40,0.5)" }}>
-              エリア
-            </span>
-            {areaName && <span className="font-semibold">{areaName}</span>}
-            <ChevronDown className="size-3" />
-          </button>
-          <button
-            onClick={() => setShowFilter(true)}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
-            style={
-              currentCategory
-                ? {
-                    backgroundColor: "rgba(212,175,55,0.08)",
-                    border: "1px solid #D4AF37",
-                    color: "#D4AF37",
-                  }
-                : {
-                    backgroundColor: "white",
-                    border: "1px solid rgba(27,37,40,0.1)",
-                    color: "#1b2528",
-                  }
-            }
-          >
-            <span style={{ color: currentCategory ? "#D4AF37" : "rgba(27,37,40,0.5)" }}>
-              カテゴリ
-            </span>
-            {categoryName && <span className="font-semibold">{categoryName}</span>}
-            <ChevronDown className="size-3" />
-          </button>
-        </div>
-
-        {/* Sort tabs — gold underline */}
         <div
-          className="mt-3 flex gap-5 overflow-x-auto border-b text-xs"
+          className="mt-2 flex gap-4 overflow-x-auto border-b text-xs"
           style={{ borderColor: "rgba(27,37,40,0.06)" }}
         >
           {SORT_TABS.map((s) => {
@@ -785,18 +781,14 @@ export default function StoreListPage() {
               <button
                 key={s.id}
                 onClick={() => updateParam("sort", s.id)}
-                className="relative whitespace-nowrap pb-2.5 pt-1 font-medium"
-                style={{
-                  color: active ? "#D4AF37" : "rgba(27,37,40,0.5)",
-                }}
+                className="relative whitespace-nowrap pb-2 pt-1 font-medium"
+                style={{ color: active ? "#D4AF37" : "rgba(27,37,40,0.5)" }}
               >
                 {s.label}
                 {active && (
                   <span
                     className="absolute inset-x-0 -bottom-px h-0.5"
-                    style={{
-                      background: "linear-gradient(90deg, #D4AF37, #c8960c)",
-                    }}
+                    style={{ background: "linear-gradient(90deg, #D4AF37, #c8960c)" }}
                   />
                 )}
               </button>
@@ -806,52 +798,17 @@ export default function StoreListPage() {
       </div>
 
       {/* ----------------------------------------------------------- */}
-      {/* Count                                                       */}
-      {/* ----------------------------------------------------------- */}
-      <div className="mx-auto flex max-w-3xl items-baseline gap-1 px-4 pt-4">
-        {searchInput && (
-          <button
-            onClick={() => {
-              setSearchInput("");
-              updateParam("q", "");
-            }}
-            className="mr-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
-            style={{
-              backgroundColor: "rgba(212,175,55,0.08)",
-              color: "#D4AF37",
-            }}
-          >
-            「{searchInput}」 <X className="size-3" />
-          </button>
-        )}
-        <span
-          className="text-2xl font-bold tabular-nums"
-          style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
-        >
-          {total.toLocaleString()}
-        </span>
-        <span className="text-xs font-medium" style={{ color: "#1b2528" }}>
-          件
-        </span>
-        {isFiltered && (
-          <span className="ml-1 text-[11px]" style={{ color: "rgba(27,37,40,0.4)" }}>
-            のお店
-          </span>
-        )}
-      </div>
-
-      {/* ----------------------------------------------------------- */}
       {/* Results                                                     */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto max-w-3xl px-4 py-4">
+      <div className="mx-auto max-w-3xl px-3 pt-3 pb-4">
         {loading ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <EditorialCardSkeleton key={i} />
             ))}
           </div>
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-col items-center justify-center py-14 text-center">
             <div
               className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
               style={{ backgroundColor: "rgba(212,175,55,0.1)" }}
@@ -860,10 +817,7 @@ export default function StoreListPage() {
             </div>
             <p
               className="mb-2 text-base font-bold"
-              style={{
-                color: "#1b2528",
-                fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
-              }}
+              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
             >
               条件に合うお店が見つかりませんでした
             </p>
@@ -880,12 +834,11 @@ export default function StoreListPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
               {storeList.map((store) => (
                 <EditorialStoreCard key={store.id} store={store} />
               ))}
             </div>
-
             {stores && (
               <StorePagination
                 currentPage={stores.current_page}
@@ -902,13 +855,9 @@ export default function StoreListPage() {
         <RecentlyViewedStores variant="flush" />
       </div>
 
-      {/* Footer */}
       <Footer />
-
-      {/* Bottom Tab Bar */}
       <BottomTabBar />
 
-      {/* Filter sheet */}
       <FilterSheet
         open={showFilter}
         onClose={() => setShowFilter(false)}

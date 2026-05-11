@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, forwardRef } from "react";
 import { Link } from "react-router";
 
 import { Separator } from "~/components/ui/separator";
@@ -28,6 +28,12 @@ import {
   Calculator,
   Wallet,
   Instagram,
+  Play,
+  Pause,
+  ChevronLeft,
+  ChevronRight,
+  X as XIcon,
+  Minus,
 } from "lucide-react";
 
 import Footer from "~/components/user/shared/Footer";
@@ -400,7 +406,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const [loading, setLoading] = useState(!previewData);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoMode, setVideoMode] = useState<"hero" | "mini" | "closed">("hero");
+  const [videoMode, setVideoMode] = useState<"inline" | "stuck" | "mini" | "closed">("inline");
 
   // Keep preview data in sync when form changes
   useEffect(() => {
@@ -516,133 +522,26 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   }
 
   const { store } = data;
-  const heroHeight = 220;
-
-
+  const sortedImages = (store.images ?? []).slice().sort((a, b) => a.order - b.order);
 
   return (
     <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#f5f5f5" }}>
       {/* ============================================================ */}
-      {/* 1. Sticky Hero Video */}
+      {/* Luxe hero — image slider w/ editorial overlay                */}
       {/* ============================================================ */}
-      {store.video_url && videoMode !== "closed" && (
-        <div
-          className={
-            videoMode === "hero"
-              ? "fixed top-0 left-0 right-0 z-20 w-full overflow-hidden"
-              : "fixed bottom-20 right-3 z-30 overflow-hidden rounded-lg shadow-2xl ring-1 ring-black/20"
-          }
-          style={
-            videoMode === "hero"
-              ? { height: `${heroHeight}px` }
-              : { width: "140px", height: "80px" }
-          }
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="absolute inset-0 h-full w-full object-cover"
-          >
-            <source src={store.video_url} type="video/mp4" />
-          </video>
-          {videoMode === "hero" && (
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.4) 100%)",
-              }}
-            />
-          )}
-          {videoMode === "hero" ? (
-            <button
-              type="button"
-              aria-label="動画を最小化"
-              onClick={() => setVideoMode("mini")}
-              className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white text-base leading-none hover:bg-black/80"
-            >
-              −
-            </button>
-          ) : (
-            <button
-              type="button"
-              aria-label="動画を閉じる"
-              onClick={() => setVideoMode("closed")}
-              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white text-xs hover:bg-black/80"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      )}
+      <LuxeHero
+        images={sortedImages.map((img) => img.url)}
+        category={store.category}
+        area={store.area}
+        name={store.name}
+        nearestStation={store.nearest_station}
+        averageRating={store.average_rating}
+        reviewsCount={store.reviews_count}
+        sameDayTrial={store.same_day_trial}
+      />
 
-      {/* ============================================================ */}
-      {/* Main content - overlaps video on scroll */}
-      {/* ============================================================ */}
-      <div
-        className="relative z-10"
-        style={{
-          marginTop: store.video_url && videoMode === "hero" ? `${heroHeight - 20}px` : "0",
-          borderTopLeftRadius: store.video_url && videoMode === "hero" ? "20px" : "0",
-          borderTopRightRadius: store.video_url && videoMode === "hero" ? "20px" : "0",
-          backgroundColor: "#f5f5f5",
-        }}
-      >
-        <div className="mx-auto max-w-3xl space-y-5 px-4 pb-24 pt-5">
-          {/* ============================================================ */}
-          {/* Editorial hero — store name, station, rating, hourly chip   */}
-          {/* ============================================================ */}
-          <section className="space-y-2">
-            <div
-              className="text-[10px] font-medium tracking-[0.14em] uppercase"
-              style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
-            >
-              {store.category} ・ {store.area}
-            </div>
-            <h1
-              className="text-[26px] font-bold leading-tight tracking-tight"
-              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
-            >
-              {store.name}
-            </h1>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-              {(store.average_rating ?? 0) > 0 && (
-                <div className="inline-flex items-center gap-1">
-                  <Star size={13} style={{ color: "#D4AF37", fill: "#D4AF37" }} />
-                  <span
-                    className="text-[13px] font-semibold tabular-nums"
-                    style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
-                  >
-                    {(store.average_rating ?? 0).toFixed(1)}
-                  </span>
-                  {store.reviews_count !== undefined && (
-                    <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.45)" }}>
-                      ({store.reviews_count}件)
-                    </span>
-                  )}
-                </div>
-              )}
-              {store.nearest_station && (
-                <span
-                  className="text-[11px]"
-                  style={{ color: "rgba(27,37,40,0.55)" }}
-                >
-                  ⌖ {store.nearest_station}
-                </span>
-              )}
-              {store.same_day_trial && (
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-                  style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
-                >
-                  即日体験OK
-                </span>
-              )}
-            </div>
-          </section>
-
+      <div className="relative z-10" style={{ backgroundColor: "#f5f5f5" }}>
+        <div className="mx-auto max-w-3xl space-y-4 px-4 pb-24 pt-4">
           {/* ============================================================ */}
           {/* Quick stats — 4 strip                                       */}
           {/* ============================================================ */}
@@ -719,6 +618,19 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               trial_hourly: store.trial_hourly,
             }}
           />
+
+          {/* ============================================================ */}
+          {/* 3. Store video — play-to-stick (inline → mini)              */}
+          {/* ============================================================ */}
+          {store.video_url && (
+            <StoreVideoSection
+              videoUrl={store.video_url}
+              posterUrl={sortedImages[0]?.url}
+              ref={videoRef}
+              mode={videoMode}
+              setMode={setVideoMode}
+            />
+          )}
 
           {/* ============================================================ */}
           {/* 4. Experience Entry (体験入店情報) */}
@@ -1284,6 +1196,365 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+// Luxe hero — auto-carousel image slider + editorial overlay
+function LuxeHero({
+  images,
+  category,
+  area,
+  name,
+  nearestStation,
+  averageRating,
+  reviewsCount,
+  sameDayTrial,
+}: {
+  images: string[];
+  category?: string;
+  area?: string;
+  name: string;
+  nearestStation?: string;
+  averageRating?: number;
+  reviewsCount?: number;
+  sameDayTrial?: boolean;
+}) {
+  const slides = images.length > 0 ? images : [];
+  const hasSlides = slides.length > 0;
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!hasSlides || slides.length < 2 || paused) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % slides.length);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [hasSlides, slides.length, paused]);
+
+  const goPrev = () => setIndex((i) => (i - 1 + slides.length) % slides.length);
+  const goNext = () => setIndex((i) => (i + 1) % slides.length);
+
+  return (
+    <section
+      className="relative isolate w-full overflow-hidden"
+      style={{ height: "440px", background: "#1b2528" }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* Slides */}
+      {hasSlides ? (
+        slides.map((src, i) => (
+          <div
+            key={i}
+            className="absolute inset-0"
+            style={{
+              opacity: i === index ? 1 : 0,
+              transition: "opacity 800ms ease",
+            }}
+          >
+            <img
+              src={src}
+              alt=""
+              className="h-full w-full object-cover"
+              style={{ transform: i === index ? "scale(1.04)" : "scale(1)", transition: "transform 4s ease-out" }}
+            />
+          </div>
+        ))
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, #2a1d12 0%, #16110b 50%, #0d0805 100%), radial-gradient(circle at 30% 30%, rgba(212,175,55,0.35), transparent 50%)",
+          }}
+        >
+          <div className="flex h-full w-full items-center justify-center">
+            <span
+              className="text-[120px] font-bold italic"
+              style={{
+                color: "rgba(212,175,55,0.45)",
+                fontFamily: "'Outfit', serif",
+                textShadow: "0 8px 30px rgba(0,0,0,0.6)",
+              }}
+            >
+              {name.charAt(0)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Gradient fade — bottom dark for legibility */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(8,6,16,0.55) 0%, rgba(8,6,16,0.05) 35%, rgba(8,6,16,0.8) 100%)",
+        }}
+      />
+
+      {/* Floating top — back + share */}
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-3">
+        <Link
+          to="/stores"
+          className="inline-flex size-9 items-center justify-center rounded-full text-white"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.4)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.15)",
+          }}
+          aria-label="戻る"
+        >
+          <ChevronLeft className="size-5" />
+        </Link>
+        {slides.length > 1 && (
+          <div
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium text-white tabular-nums"
+            style={{
+              backgroundColor: "rgba(0,0,0,0.4)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              fontFamily: "'Outfit', sans-serif",
+            }}
+          >
+            {index + 1} / {slides.length}
+          </div>
+        )}
+      </div>
+
+      {/* Editorial overlay — bottom */}
+      <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-6">
+        <div
+          className="text-[10px] font-bold uppercase"
+          style={{
+            color: "rgba(212,175,55,0.95)",
+            fontFamily: "'Outfit', sans-serif",
+            letterSpacing: "0.18em",
+          }}
+        >
+          {category} ・ {area}
+        </div>
+        <h1
+          className="mt-1 text-[32px] font-bold leading-[1.1] text-white"
+          style={{
+            fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
+            textShadow: "0 2px 18px rgba(0,0,0,0.5)",
+          }}
+        >
+          {name}
+        </h1>
+        {/* Gold underline */}
+        <div className="mt-3 flex items-center gap-2">
+          <span className="size-1 rounded-full" style={{ backgroundColor: "#D4AF37" }} />
+          <span
+            className="h-px flex-1"
+            style={{ background: "linear-gradient(90deg, rgba(212,175,55,0.9), rgba(212,175,55,0))" }}
+            aria-hidden
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {(averageRating ?? 0) > 0 && (
+            <div className="inline-flex items-center gap-1">
+              <Star size={13} style={{ color: "#D4AF37", fill: "#D4AF37" }} />
+              <span
+                className="text-[13px] font-semibold tabular-nums text-white"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                {(averageRating ?? 0).toFixed(1)}
+              </span>
+              {reviewsCount !== undefined && (
+                <span className="text-[10.5px] text-white/60">({reviewsCount}件)</span>
+              )}
+            </div>
+          )}
+          {nearestStation && (
+            <span className="text-[11px] text-white/80">⌖ {nearestStation}</span>
+          )}
+          {sameDayTrial && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
+            >
+              即日体験OK
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Arrows (only when multiple slides) */}
+      {slides.length > 1 && (
+        <>
+          <button
+            onClick={goPrev}
+            className="absolute left-2 top-1/2 z-10 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-0 transition-opacity hover:opacity-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)" }}
+            aria-label="前の写真"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            onClick={goNext}
+            className="absolute right-2 top-1/2 z-10 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-0 transition-opacity hover:opacity-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)" }}
+            aria-label="次の写真"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </>
+      )}
+
+      {/* Indicator dots */}
+      {slides.length > 1 && (
+        <div className="absolute inset-x-0 bottom-1 z-10 flex justify-center gap-1.5">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              aria-label={`${i + 1}枚目に移動`}
+              className="h-[3px] rounded-full transition-all"
+              style={{
+                width: i === index ? "20px" : "8px",
+                backgroundColor: i === index ? "#D4AF37" : "rgba(255,255,255,0.4)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Store video — inline by default; once playing, sticks to top of viewport.
+// User can shrink to corner mini OR close.
+const StoreVideoSection = forwardRef<
+  HTMLVideoElement,
+  {
+    videoUrl: string;
+    posterUrl?: string;
+    mode: "inline" | "stuck" | "mini" | "closed";
+    setMode: (m: "inline" | "stuck" | "mini" | "closed") => void;
+  }
+>(function StoreVideoSection({ videoUrl, posterUrl, mode, setMode }, ref) {
+  const localRef = useRef<HTMLVideoElement | null>(null);
+  const setRefs = (el: HTMLVideoElement | null) => {
+    localRef.current = el;
+    if (typeof ref === "function") ref(el);
+    else if (ref) (ref as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+  };
+
+  if (mode === "closed") return null;
+
+  const handlePlay = () => {
+    setMode("stuck");
+    requestAnimationFrame(() => {
+      localRef.current?.play().catch(() => {});
+    });
+  };
+
+  // Stuck and mini are fixed-position overlays
+  if (mode === "stuck" || mode === "mini") {
+    return (
+      <div
+        className={
+          mode === "stuck"
+            ? "fixed inset-x-0 top-0 z-40 w-full overflow-hidden shadow-2xl"
+            : "fixed bottom-20 right-3 z-40 overflow-hidden rounded-xl shadow-2xl"
+        }
+        style={
+          mode === "stuck"
+            ? { height: "220px", backgroundColor: "#000" }
+            : { width: "140px", height: "80px", backgroundColor: "#000", border: "1px solid rgba(255,255,255,0.15)" }
+        }
+      >
+        <video
+          ref={setRefs}
+          autoPlay
+          loop
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source src={videoUrl} type="video/mp4" />
+        </video>
+        {mode === "stuck" && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.4) 100%)" }}
+          />
+        )}
+        <div className="absolute right-1.5 top-1.5 flex gap-1">
+          {mode === "stuck" && (
+            <button
+              type="button"
+              aria-label="動画を最小化"
+              onClick={() => setMode("mini")}
+              className="inline-flex size-7 items-center justify-center rounded-full text-white"
+              style={{ backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)" }}
+            >
+              <Minus className="size-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="動画を閉じる"
+            onClick={() => setMode("closed")}
+            className="inline-flex items-center justify-center rounded-full text-white"
+            style={{
+              width: mode === "stuck" ? "28px" : "20px",
+              height: mode === "stuck" ? "28px" : "20px",
+              backgroundColor: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Inline poster card with play button
+  return (
+    <button
+      type="button"
+      onClick={handlePlay}
+      className="group relative block w-full overflow-hidden rounded-2xl"
+      style={{
+        aspectRatio: "16 / 9",
+        backgroundColor: "#0E1316",
+        boxShadow: "0 4px 18px rgba(0,0,0,0.1)",
+        border: "1px solid rgba(27,37,40,0.06)",
+      }}
+      aria-label="動画を再生"
+    >
+      {posterUrl && (
+        <img
+          src={posterUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100"
+        />
+      )}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%)" }}
+      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+        <span
+          className="inline-flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-transform group-hover:scale-105"
+          style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
+        >
+          <Play className="ml-0.5 size-6" style={{ fill: "white" }} />
+        </span>
+        <span
+          className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/80"
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+        >
+          Tap to play store video
+        </span>
+      </div>
+    </button>
+  );
+});
 
 function SectionCard({
   icon,
