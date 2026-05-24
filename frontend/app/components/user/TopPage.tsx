@@ -190,20 +190,6 @@ function EdgeBottom() {
   );
 }
 
-function EdgeTopFooter() {
-  return (
-    <div style={{ position: "relative", height: "44px", marginBottom: "-1px" }}>
-      <div style={{ position: "absolute", top: "-6px", left: "10%", width: "80%", height: "18px", background: "radial-gradient(ellipse, rgba(212,175,55,.14) 0%, transparent 70%)", pointerEvents: "none" }} />
-      <svg viewBox="0 0 430 44" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 5px 16px rgba(27,37,40,.2))" }}>
-        <defs><linearGradient id="eF1g" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor={GOLD} stopOpacity="0.4" /><stop offset="40%" stopColor={GOLD} stopOpacity="0.2" /><stop offset="70%" stopColor={GOLD} stopOpacity="0.6" /><stop offset="100%" stopColor={GOLD} stopOpacity="0.15" /></linearGradient></defs>
-        <path d="M0,44 L430,44 L430,10 C370,4 290,20 215,12 C140,4 70,18 0,24 Z" fill={DARK} />
-        <path d="M0,24 C70,18 140,4 215,12 C290,20 370,4 430,10" fill="none" stroke="url(#eF1g)" strokeWidth="2" />
-        <path d="M0,23 C70,17 140,3 215,11 C290,19 370,3 430,9" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="0.7" />
-      </svg>
-    </div>
-  );
-}
-
 // ─── Trending Topics ───────────────────────────────
 
 interface TrendingItem {
@@ -748,40 +734,7 @@ export default function TopPage() {
         />
 
         {/* ══ FOOTER ══ */}
-        <div style={{ marginTop: "28px", position: "relative" }}>
-          <EdgeTopFooter />
-          <footer style={{ background: DARK, padding: "16px 20px 24px", position: "relative", overflow: "hidden" }}>
-            <div className="flex items-center gap-2 mb-5">
-              <h3 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "22px", letterSpacing: "0.04em", color: "white", margin: 0 }}>Recta</h3>
-              <div className="w-[4px] h-[4px] rounded-full" style={{ background: GOLD, boxShadow: "0 0 6px rgba(212,175,55,.6)" }} />
-            </div>
-            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", color: "rgba(255,255,255,.45)", lineHeight: 1.7, margin: "0 0 20px", maxWidth: "280px" }}>
-              AIがあなたにぴったりのナイトワークを提案。安心・安全な求人情報をお届けします。
-            </p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 mb-6">
-              {["利用規約", "プライバシーポリシー", "運営会社", "お問い合わせ", "よくある質問", "ヘルプセンター"].map(link => (
-                <Link key={link} to={`/${link === "利用規約" ? "terms" : link === "プライバシーポリシー" ? "privacy" : link === "運営会社" ? "company" : link === "お問い合わせ" ? "contact" : link === "よくある質問" ? "faq" : "help"}`} style={{ fontFamily: J, fontWeight: 400, fontSize: "11px", color: "rgba(255,255,255,.4)", textDecoration: "none", textAlign: "left" }}>
-                  {link}
-                </Link>
-              ))}
-            </div>
-            <div style={{ height: "1px", background: "rgba(255,255,255,.08)", marginBottom: "16px" }} />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,.4)"><path d="M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" /></svg>
-                </div>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)" }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,.4)"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-                </div>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.5"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="5" /><circle cx="17.5" cy="6.5" r="1.5" fill="rgba(255,255,255,.4)" stroke="none" /></svg>
-                </div>
-              </div>
-              <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 400, fontSize: "9px", letterSpacing: "0.06em", color: "rgba(255,255,255,.2)" }}>© 2026 Recta Inc.</span>
-            </div>
-          </footer>
-        </div>
+        <Footer />
     </>
   );
 }

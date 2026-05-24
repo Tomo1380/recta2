@@ -938,28 +938,6 @@ export default function ComparePage({ ids }: ComparePageProps) {
               />
             </div>
 
-            {/* Quick navigation */}
-            <div className="px-4 mt-4 grid grid-cols-2 gap-3">
-              {validStores.slice(0, 2).map((s) => (
-                <Link
-                  key={s.id}
-                  to={`/stores/${s.id}`}
-                  className="rounded-xl text-center py-3 active:scale-[0.98] transition-transform truncate"
-                  style={{
-                    background: "white",
-                    border: `1px solid ${GOLD}66`,
-                    color: DARK,
-                    textDecoration: "none",
-                    fontFamily: J,
-                    fontWeight: 600,
-                    fontSize: "12px",
-                    paddingInline: 10,
-                  }}
-                >
-                  {s.name}
-                </Link>
-              ))}
-            </div>
           </>
         )}
 
