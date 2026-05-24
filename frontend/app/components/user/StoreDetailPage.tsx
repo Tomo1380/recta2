@@ -45,6 +45,7 @@ import AiChatPanel from "~/components/user/AiChatPanel";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
 import CompareToggle from "~/components/user/shared/CompareToggle";
+import StoreMap from "~/components/shared/StoreMap";
 import { pushViewedStore } from "~/lib/viewed-stores";
 
 // ---------------------------------------------------------------------------
@@ -227,6 +228,8 @@ export interface StoreDetailStore {
   name: string;
   area: string;
   address: string;
+  lat: number | null;
+  lng: number | null;
   nearest_station: string;
   category: string;
   business_hours: string;
@@ -985,9 +988,11 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 11a. Transfer / 足代 — distance-based zone fee table */}
+          {/* 11a. Transfer / 足代 — distance-based zone fee map + table */}
           {/* ============================================================ */}
           <TransferMapSection
+            lat={store.lat}
+            lng={store.lng}
             zones={store.transfer_zones}
             fallbackDescription={store.transfer_description}
             fallbackKm={store.transfer_km}
@@ -1173,20 +1178,31 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 )}
               </div>
 
-              {/* Google Map embed */}
-              {store.address && (
-                <div className="overflow-hidden rounded-[12px]">
-                  <iframe
-                    title="Map"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(store.address)}&output=embed&z=16`}
-                    width="100%"
-                    height="180"
-                    style={{ border: 0 }}
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                </div>
+              {/* Map: Google Maps JS API when lat/lng exists; fall back to the
+                  legacy address iframe (free, no API key needed) so we never
+                  show an empty box. */}
+              {store.lat != null && store.lng != null ? (
+                <StoreMap
+                  lat={store.lat}
+                  lng={store.lng}
+                  height={180}
+                  fallbackAddress={store.address}
+                />
+              ) : (
+                store.address && (
+                  <div className="overflow-hidden rounded-[12px]">
+                    <iframe
+                      title="Map"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(store.address)}&output=embed&z=16`}
+                      width="100%"
+                      height="180"
+                      style={{ border: 0 }}
+                      allowFullScreen
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  </div>
+                )
               )}
             </div>
           </SectionCard>
@@ -2101,10 +2117,14 @@ function formatAmount(value: number | string | undefined): string {
 
 // ── Transfer / 足代 zone fee section ───────────────────────────────────────
 function TransferMapSection({
+  lat,
+  lng,
   zones,
   fallbackDescription,
   fallbackKm,
 }: {
+  lat: number | null;
+  lng: number | null;
   zones?: TransferZone[] | null;
   fallbackDescription?: string | null;
   fallbackKm?: string | null;
@@ -2112,6 +2132,7 @@ function TransferMapSection({
   const zoneList = zones ?? [];
   const hasZones = zoneList.length > 0;
   const hasFallback = !!(fallbackDescription || fallbackKm);
+  const canShowMap = hasZones && typeof lat === "number" && typeof lng === "number";
 
   if (!hasZones && !hasFallback) return null;
 
@@ -2120,6 +2141,16 @@ function TransferMapSection({
       icon={<MapIcon size={20} style={{ color: GOLD_HEX }} />}
       title="送り・足代"
     >
+      {canShowMap && (
+        <div className="mb-3">
+          <StoreMap
+            lat={lat}
+            lng={lng}
+            zones={zoneList.map((z) => ({ radius_km: z.radius_km, color: z.color }))}
+            height={220}
+          />
+        </div>
+      )}
       {hasZones && (
         <div className="space-y-2">
           <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
@@ -2171,11 +2202,18 @@ function TransferMapSection({
 }
 
 // ── Champagne prices section ──────────────────────────────────────────────
-const CHAMPAGNE_TEMPLATES: { key: keyof ChampagnePrices; label: string }[] = [
-  { key: "tequila", label: "テキーラ" },
-  { key: "belle_epoque", label: "ベル・エポック" },
-  { key: "armand", label: "アルマンド" },
-  { key: "lavay", label: "ラベイ" },
+// Each key maps to a default bottle photo bundled in /public/champagne/. The
+// admin can override per-store with image_url, but the defaults give every
+// participating store a consistent look without extra upload work.
+const CHAMPAGNE_TEMPLATES: {
+  key: keyof ChampagnePrices;
+  label: string;
+  defaultImage: string;
+}[] = [
+  { key: "tequila",      label: "テキーラ",     defaultImage: "/champagne/tequila.png" },
+  { key: "belle_epoque", label: "ベル・エポック", defaultImage: "/champagne/belle_epoque.png" },
+  { key: "armand",       label: "アルマンド",    defaultImage: "/champagne/armand.png" },
+  { key: "lavay",        label: "ラベイ",       defaultImage: "/champagne/la_vie.png" },
 ];
 
 function ChampagnePricesSection({
@@ -2185,57 +2223,80 @@ function ChampagnePricesSection({
   prices?: ChampagnePrices | null;
   fallback?: string | null;
 }) {
-  const hasAny =
-    prices &&
-    CHAMPAGNE_TEMPLATES.some((t) => {
-      const item = prices[t.key];
-      return item && (item.amount !== undefined || item.image_url);
-    });
+  // Only render a card if the store sets an amount for that bottle —
+  // bottles without prices are simply omitted from the grid.
+  const visible = CHAMPAGNE_TEMPLATES
+    .map((tpl) => ({ tpl, item: prices?.[tpl.key] }))
+    .filter(({ item }) => item && (item.amount !== undefined && item.amount !== null && item.amount !== ""));
 
-  if (!hasAny && !fallback) return null;
+  if (visible.length === 0 && !fallback) return null;
 
   return (
     <SectionCard
       icon={<Wine size={20} style={{ color: GOLD_HEX }} />}
       title="シャンパン金額"
     >
-      {hasAny ? (
+      {visible.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">
-          {CHAMPAGNE_TEMPLATES.map(({ key, label }) => {
-            const item = prices?.[key];
-            if (!item) return null;
+          {visible.map(({ tpl, item }) => {
+            const src = item!.image_url || tpl.defaultImage;
             return (
               <div
-                key={key}
-                className="overflow-hidden rounded-[12px]"
+                key={tpl.key}
+                className="relative overflow-hidden rounded-[14px]"
                 style={{
-                  border: "1px solid rgba(212,175,55,0.25)",
-                  backgroundColor: "rgba(212,175,55,0.04)",
+                  background: "linear-gradient(160deg, #1b2528 0%, #2c3e46 100%)",
+                  border: "1px solid rgba(212,175,55,0.35)",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
                 }}
               >
-                <div className="aspect-[4/5] w-full overflow-hidden bg-[#1b2528]">
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={label}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Wine size={36} style={{ color: GOLD_HEX, opacity: 0.6 }} />
-                    </div>
-                  )}
+                {/* Bottle image fills the card; gold ambient glow on top-right */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute"
+                  style={{
+                    top: "-20%",
+                    right: "-20%",
+                    width: "70%",
+                    height: "70%",
+                    background: "radial-gradient(circle, rgba(212,175,55,0.22), transparent 70%)",
+                  }}
+                />
+                <div className="relative aspect-[3/4] w-full">
+                  <img
+                    src={src}
+                    alt={tpl.label}
+                    className="absolute inset-0 h-full w-full object-contain p-3"
+                    onError={(e) => {
+                      // Fall back to a wine icon if neither uploaded image
+                      // nor default asset is available (e.g. before the
+                      // designer ships /public/champagne/ images).
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
                 </div>
-                <div className="px-3 py-2.5">
-                  <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
-                    {label}
+                {/* Gold "price tag" pinned to the bottom */}
+                <div
+                  className="relative px-3 py-2.5 text-center"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%)",
+                  }}
+                >
+                  <p
+                    className="text-[10px] font-medium uppercase tracking-[0.16em]"
+                    style={{ color: "rgba(212,175,55,0.85)", fontFamily: "'Outfit',sans-serif" }}
+                  >
+                    {tpl.label}
                   </p>
-                  <p className="text-base font-bold" style={{ color: GOLD_HEX }}>
-                    {formatAmount(item.amount)}
+                  <p
+                    className="text-[18px] font-bold leading-tight tabular-nums"
+                    style={{ color: "#ffe066", fontFamily: "'Outfit',sans-serif" }}
+                  >
+                    {formatAmount(item!.amount)}
                   </p>
-                  {item.note && (
-                    <p className="text-[11px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                      {item.note}
+                  {item!.note && (
+                    <p className="mt-0.5 text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+                      {item!.note}
                     </p>
                   )}
                 </div>

@@ -89,6 +89,8 @@ Route::prefix('admin')->group(function () {
         Route::post('/users/broadcast', [LineFriendController::class, 'broadcast']);
 
         // 店舗管理
+        // 住所 → 緯度経度 (Google Geocoding) — apiResource の {store} に飲まれないよう先に登録。
+        Route::post('/stores/geocode', [StoreController::class, 'geocode']);
         Route::apiResource('/stores', StoreController::class);
         Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
         Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);

@@ -694,6 +694,8 @@ class StoreSeeder extends Seeder
                 'name' => 'Club Lumière',
                 'area' => '六本木',
                 'address' => '東京都港区六本木3-15-20',
+                'lat' => 35.6618200,
+                'lng' => 139.7327500,
                 'nearest_station' => '六本木駅',
                 'category' => 'キャバクラ',
                 'phone' => '03-1234-5678',
@@ -774,6 +776,12 @@ class StoreSeeder extends Seeder
                     'description' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
                 ],
                 'champagne_description' => 'モエ・エ・シャンドン、ドンペリニヨン、クリュッグなど各種取り揃え。ボトルバック10%〜。',
+                'champagne_prices' => [
+                    'tequila'      => ['amount' => 18000, 'note' => 'ボトル価格'],
+                    'belle_epoque' => ['amount' => 80000, 'note' => 'ボトル価格'],
+                    'armand'       => ['amount' => 800000, 'note' => '指名同伴のみ'],
+                    'lavay'        => ['amount' => 250000, 'note' => 'ボトル価格'],
+                ],
                 'transfer_description' => '都内近郊は無料送りあり。終電後も安心。',
                 'transfer_km' => '20km',
                 // 高級店向け足代テーブル — 距離別に現金支給
@@ -799,6 +807,8 @@ class StoreSeeder extends Seeder
                 'name' => 'Lounge SEIREN',
                 'area' => '銀座',
                 'address' => '東京都中央区銀座7-8-10',
+                'lat' => 35.6709600,
+                'lng' => 139.7615900,
                 'nearest_station' => '銀座駅',
                 'category' => 'ラウンジ',
                 'phone' => '03-9876-5432',
@@ -852,6 +862,13 @@ class StoreSeeder extends Seeder
                     'comment' => '銀座で10年以上続く信頼のあるお店です。品のある接客を学びたい方にぴったりの環境です。',
                     'supports' => ['接客研修', 'ドレスレンタル', 'タクシー送り'],
                 ],
+                // 高級ラウンジらしくシャンパン4種を全部設定
+                'champagne_prices' => [
+                    'tequila'      => ['amount' => 22000],
+                    'belle_epoque' => ['amount' => 100000, 'note' => 'ボトル価格'],
+                    'armand'       => ['amount' => 1000000, 'note' => 'VIP・指名同伴推奨'],
+                    'lavay'        => ['amount' => 350000, 'note' => 'ボトル価格'],
+                ],
                 // 銀座の高級ラウンジ — 都内・千葉・神奈川と幅広く足代対応
                 'transfer_zones' => [
                     ['label' => '都内', 'radius_km' => 10, 'fee' => 3000, 'color' => '#D4AF37'],
@@ -866,6 +883,8 @@ class StoreSeeder extends Seeder
                 'name' => 'Girls Bar Honey',
                 'area' => '渋谷',
                 'address' => '東京都渋谷区道玄坂2-10-5',
+                'lat' => 35.6580500,
+                'lng' => 139.6985400,
                 'nearest_station' => '渋谷駅',
                 'category' => 'ガールズバー',
                 'phone' => '03-5555-1234',
@@ -912,6 +931,8 @@ class StoreSeeder extends Seeder
                 'name' => 'Club GRANDEUR',
                 'area' => '新宿',
                 'address' => '東京都新宿区歌舞伎町1-20-1',
+                'lat' => 35.6951800,
+                'lng' => 139.7032500,
                 'nearest_station' => '新宿駅',
                 'category' => 'キャバクラ',
                 'schedule' => [
@@ -933,6 +954,8 @@ class StoreSeeder extends Seeder
                 'name' => 'Lounge Crescent',
                 'area' => '恵比寿',
                 'address' => '東京都渋谷区恵比寿南1-5-8',
+                'lat' => 35.6464400,
+                'lng' => 139.7100100,
                 'nearest_station' => '恵比寿駅',
                 'category' => 'ラウンジ',
                 'schedule' => [

@@ -33,6 +33,13 @@ return [
         'tuned_model_id' => env('GEMINI_TUNED_MODEL_ID'),
     ],
 
+    'google_maps' => [
+        // IP-restricted server-side key used by GeocodingService.
+        // 公開キー (フロントエンドの Maps JS API) は VITE_GOOGLE_MAPS_API_KEY
+        // としてフロント側 .env に置く — ここには来ない。
+        'server_key' => env('GOOGLE_MAPS_SERVER_KEY'),
+    ],
+
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
     ],

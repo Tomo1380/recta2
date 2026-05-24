@@ -13,7 +13,7 @@ class Store extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'area', 'address', 'nearest_station', 'category',
+        'name', 'area', 'address', 'lat', 'lng', 'nearest_station', 'category',
         'phone', 'website_url',
         'schedule',
         'wage', 'compensation', 'guarantee', 'interview',
@@ -49,6 +49,8 @@ class Store extends Model
         'recta_episodes' => 'array',
         'related_store_ids' => 'array',
         'experience_guaranteed' => 'boolean',
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Store;
+use App\Services\GeocodingService;
 use App\Support\StoreApiTransformer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,6 +71,8 @@ class StoreController extends Controller
             'area' => $prefix . 'required|string|max:255',
             'category' => $prefix . 'required|string|max:255',
             'address' => 'nullable|string|max:255',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
             'nearest_station' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:255',
             'website_url' => 'nullable|string|max:2048',
@@ -133,7 +136,7 @@ class StoreController extends Controller
     private function fillableFields(): array
     {
         return [
-            'name', 'area', 'address', 'nearest_station', 'category',
+            'name', 'area', 'address', 'lat', 'lng', 'nearest_station', 'category',
             'phone', 'website_url',
             'schedule',
             'wage', 'compensation', 'guarantee', 'interview',
@@ -304,6 +307,29 @@ class StoreController extends Controller
         if (!empty($records)) {
             $store->staffPhotos()->createMany($records);
         }
+    }
+
+    /**
+     * Admin-only: convert an address to lat/lng via Google Geocoding.
+     * Used by the ShopEdit「住所から緯度経度を取得」button — the editor reviews
+     * the result on the map preview before committing it with the rest of the
+     * form payload.
+     */
+    public function geocode(Request $request, GeocodingService $geo): JsonResponse
+    {
+        $validated = $request->validate([
+            'address' => 'required|string|max:255',
+        ]);
+
+        $result = $geo->geocode($validated['address']);
+
+        if (!$result) {
+            return response()->json([
+                'message' => '緯度経度を取得できませんでした。住所を確認してください。',
+            ], 422);
+        }
+
+        return response()->json($result);
     }
 
     public function destroy(Store $store): JsonResponse

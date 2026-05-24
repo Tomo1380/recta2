@@ -40,6 +40,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { ShopPhonePreview } from "./ShopPhonePreview";
+import StoreMap from "~/components/shared/StoreMap";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
@@ -530,6 +531,12 @@ export function ShopEditPage() {
   const [shopName, setShopName] = useState("");
   const [area, setArea] = useState("");
   const [address, setAddress] = useState("");
+  // 緯度経度 — Google Geocoding (admin の「住所から取得」ボタンで埋める)。
+  // null = 未取得。詳細ページの送り・足代マップの表示可否判定に使う。
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
   const [station, setStation] = useState("");
   const [category, setCategory] = useState("");
   const [openingTime, setOpeningTime] = useState("");
@@ -669,6 +676,8 @@ export function ShopEditPage() {
     setShopName(store.name || "");
     setArea(store.area || "");
     setAddress(store.address || "");
+    setLat(typeof (store as any).lat === "number" ? (store as any).lat : (store as any).lat ? Number((store as any).lat) : null);
+    setLng(typeof (store as any).lng === "number" ? (store as any).lng : (store as any).lng ? Number((store as any).lng) : null);
     setStation(store.nearest_station || "");
     setCategory(store.category || "");
     setOpeningTime(store.opening_time || "");
@@ -905,6 +914,8 @@ export function ShopEditPage() {
     name: shopName,
     area,
     address,
+    lat,
+    lng,
     nearest_station: station,
     category,
     business_hours: openingTime && closingTime ? `${openingTime}〜${closingTime}` : null,
@@ -1054,7 +1065,7 @@ export function ShopEditPage() {
         ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
       })),
     publish_status: publishStatus,
-  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, transferZones, relatedStoreIds, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
+  }), [shopName, area, address, lat, lng, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, transferZones, relatedStoreIds, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1183,6 +1194,54 @@ export function ShopEditPage() {
                 placeholder="例: 東京都新宿区歌舞伎町1-1-1"
               />
             </Field>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                disabled={!address.trim() || geocodeLoading}
+                onClick={async () => {
+                  setGeocodeError(null);
+                  setGeocodeLoading(true);
+                  try {
+                    const res = await api.post<{ lat: number; lng: number; formatted_address: string }>(
+                      "/admin/stores/geocode",
+                      { address: address.trim() }
+                    );
+                    setLat(res.lat);
+                    setLng(res.lng);
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : "緯度経度の取得に失敗しました";
+                    setGeocodeError(msg);
+                  } finally {
+                    setGeocodeLoading(false);
+                  }
+                }}
+                className="text-xs rounded-md px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50"
+              >
+                {geocodeLoading ? "取得中…" : "📍 住所から緯度経度を取得"}
+              </button>
+              {lat != null && lng != null && (
+                <span className="text-xs text-muted-foreground">
+                  {lat.toFixed(5)}, {lng.toFixed(5)}
+                </span>
+              )}
+              {(lat != null || lng != null) && (
+                <button
+                  type="button"
+                  onClick={() => { setLat(null); setLng(null); }}
+                  className="text-xs text-muted-foreground hover:text-destructive"
+                >
+                  クリア
+                </button>
+              )}
+              {geocodeError && (
+                <span className="text-xs text-destructive">{geocodeError}</span>
+              )}
+            </div>
+            {lat != null && lng != null && (
+              <div className="mt-3">
+                <StoreMap lat={lat} lng={lng} height={180} />
+              </div>
+            )}
           </div>
           <Field label="業種カテゴリ" required>
             <SelectInput
@@ -2503,6 +2562,8 @@ export function ShopEditPage() {
                   name: shopName || "店舗名未設定",
                   area: area,
                   address: address,
+                  lat,
+                  lng,
                   nearest_station: station,
                   category: category,
                   business_hours: openingTime && closingTime ? `${openingTime}〜${closingTime}` : "",
