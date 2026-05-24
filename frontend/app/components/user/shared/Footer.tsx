@@ -10,8 +10,6 @@ const footerLinks = [
   { label: "プライバシーポリシー", to: "/privacy" },
   { label: "運営会社", to: "/company" },
   { label: "お問い合わせ", to: "/contact" },
-  { label: "よくある質問", to: "/faq" },
-  { label: "ヘルプセンター", to: "/help" },
 ];
 
 const GOLD = LUXE.gold;
@@ -88,7 +86,7 @@ export default function Footer({ className }: FooterProps) {
           ))}
         </div>
         <div style={{ height: 1, background: "rgba(255,255,255,.08)", marginBottom: 16 }} />
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {/* LINE */}
             <SocialIconBox>
@@ -118,18 +116,49 @@ export default function Footer({ className }: FooterProps) {
               </svg>
             </SocialIconBox>
           </div>
-          <span
-            style={{
-              fontFamily: LUXE.fontOutfit,
-              fontWeight: 400,
-              fontSize: 9,
-              letterSpacing: "0.06em",
-              color: "rgba(255,255,255,.2)",
-            }}
-          >
-            &copy; 2026 Recta Inc.
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              aria-label="18歳未満は利用できません"
+              style={{
+                fontFamily: LUXE.fontOutfit,
+                fontWeight: 700,
+                fontSize: 9,
+                letterSpacing: "0.08em",
+                color: GOLD,
+                background: "rgba(212,175,55,0.08)",
+                border: `1px solid ${GOLD}66`,
+                padding: "2px 6px",
+                borderRadius: 4,
+                lineHeight: 1.2,
+              }}
+            >
+              R18+
+            </span>
+            <span
+              style={{
+                fontFamily: LUXE.fontOutfit,
+                fontWeight: 400,
+                fontSize: 9,
+                letterSpacing: "0.06em",
+                color: "rgba(255,255,255,.2)",
+              }}
+            >
+              &copy; 2026 Recta Inc.
+            </span>
+          </div>
         </div>
+        <p
+          style={{
+            fontFamily: J,
+            fontWeight: 300,
+            fontSize: 10,
+            color: "rgba(255,255,255,.32)",
+            margin: "12px 0 0",
+            lineHeight: 1.5,
+          }}
+        >
+          本サービスは18歳以上の方のみご利用いただけます。
+        </p>
       </footer>
     </div>
   );

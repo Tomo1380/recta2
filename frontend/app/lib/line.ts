@@ -34,7 +34,8 @@ export type LineCtaSource =
   | "store-detail:chat-end"
   | "column:end"
   | "relocate:end"
-  | "chat:line-cta";
+  | "chat:line-cta"
+  | "contact-page";
 
 declare global {
   interface Window {

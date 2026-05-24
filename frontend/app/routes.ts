@@ -15,6 +15,12 @@ export default [
     route("compare/:ids", "routes/user/compare.tsx"),
     route("columns", "routes/user/columns.tsx"),
     route("columns/:slug", "routes/user/column-detail.tsx"),
+
+    // 法務・運営関連 (Footer から導線)
+    route("terms", "routes/user/legal/terms.tsx"),
+    route("privacy", "routes/user/legal/privacy.tsx"),
+    route("company", "routes/user/legal/company.tsx"),
+    route("contact", "routes/user/legal/contact.tsx"),
   ]),
 
   // 管理画面
