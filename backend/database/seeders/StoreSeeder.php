@@ -281,9 +281,10 @@ class StoreSeeder extends Seeder
             'Club Lumière' => [
                 'videos' => [
                     [
-                        'video_url' => 'https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4',
-                        'label' => '店内ツアー',
-                        'description' => 'エントランスから店内まで。落ち着いた六本木の大人空間をご案内します。',
+                        // YouTube: 店舗紹介（ゼロ側で撮影してる本物の動画）
+                        'video_url' => 'https://www.youtube.com/watch?v=J6ywSMFqnL0',
+                        'label' => '店舗紹介',
+                        'description' => '店内の雰囲気とお店の魅力をYouTubeでご紹介。実際に働いているスタッフの声もチェックできます。',
                     ],
                     [
                         'video_url' => 'https://videos.pexels.com/video-files/3209828/3209828-uhd_2560_1440_25fps.mp4',

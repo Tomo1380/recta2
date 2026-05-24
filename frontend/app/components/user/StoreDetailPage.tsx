@@ -35,6 +35,8 @@ import {
   X as XIcon,
   Minus,
   Maximize2,
+  Tv,
+  RotateCcw,
 } from "lucide-react";
 
 import Footer from "~/components/user/shared/Footer";
@@ -46,6 +48,7 @@ import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
 import CompareToggle from "~/components/user/shared/CompareToggle";
 import StoreMap from "~/components/shared/StoreMap";
+import LuxeCard from "~/components/user/shared/LuxeCard";
 import { pushViewedStore } from "~/lib/viewed-stores";
 
 // ---------------------------------------------------------------------------
@@ -524,6 +527,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
   return (
     <>
+      {/* Reserve room for the sticky video player at the top of the frame.
+          Height is reported by the active video to stickyController; while
+          nothing is stuck this is 0 and behaves exactly like before. */}
+      {stickyController.stuckHeight > 0 && (
+        <div aria-hidden style={{ height: stickyController.stuckHeight }} />
+      )}
+
       {/* ============================================================ */}
       {/* Luxe hero — image slider w/ editorial overlay                */}
       {/* ============================================================ */}
@@ -1503,11 +1513,16 @@ type StickyEntry = { id: string; mode: Exclude<StickyVideoMode, "inline"> } | nu
 export interface StickyVideoController {
   modeFor: (id: string) => StickyVideoMode;
   setMode: (id: string, next: StickyVideoMode) => void;
+  /** Height (px) currently occupied by a stuck video at the top of the frame,
+   *  so layout can push down the rest of the content. 0 when nothing is stuck. */
+  stuckHeight: number;
+  setStuckHeight: (px: number) => void;
 }
 
 function useStickyVideoController(): StickyVideoController {
   const [active, setActive] = useState<StickyEntry>(null);
-  // controller オブジェクト参照を active が変わらない限り安定させ、
+  const [stuckHeight, setStuckHeight] = useState(0);
+  // controller オブジェクト参照を active/stuckHeight が変わらない限り安定させ、
   // 各 StoreVideoSection の useCallback / useEffect で不要な発火を防ぐ。
   return useMemo<StickyVideoController>(
     () => ({
@@ -1515,9 +1530,12 @@ function useStickyVideoController(): StickyVideoController {
         active && active.id === id ? active.mode : "inline",
       setMode: (id: string, next: StickyVideoMode) => {
         setActive(next === "inline" ? null : { id, mode: next });
+        if (next !== "stuck") setStuckHeight(0);
       },
+      stuckHeight,
+      setStuckHeight,
     }),
-    [active],
+    [active, stuckHeight],
   );
 }
 
@@ -1539,11 +1557,12 @@ function StoreVideosBlock({
   controller: StickyVideoController;
 }) {
   if (videos.length === 0) return null;
+  const showNumber = videos.length > 1;
 
   return (
     <div className="space-y-4">
       {videos.map((v, idx) => (
-        <div key={`${v.video_url}-${idx}`} className="space-y-2">
+        <LuxeCard key={`${v.video_url}-${idx}`} className="overflow-hidden">
           <StoreVideoSection
             id={`video-${idx}`}
             videoUrl={v.video_url}
@@ -1551,30 +1570,62 @@ function StoreVideosBlock({
             controller={controller}
           />
           {(v.label || v.description) && (
-            <div className="px-1">
+            <div className="px-4 pt-3 pb-4">
               {v.label && (
-                <p
-                  className="text-[12.5px] font-semibold leading-tight"
-                  style={{ color: "#1b2528", fontFamily: "'Noto Sans JP',sans-serif" }}
-                >
-                  {v.label}
-                </p>
+                <div className="flex items-center gap-2 mb-2">
+                  {showNumber && (
+                    <span
+                      className="inline-flex items-center justify-center shrink-0"
+                      style={{
+                        fontFamily: "'Outfit', sans-serif",
+                        fontWeight: 700,
+                        fontSize: 11,
+                        letterSpacing: "0.08em",
+                        color: "#D4AF37",
+                        minWidth: 22,
+                      }}
+                    >
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                  )}
+                  {showNumber && (
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 20,
+                        height: 1,
+                        background: "linear-gradient(90deg, rgba(212,175,55,0.85), rgba(212,175,55,0))",
+                      }}
+                    />
+                  )}
+                  <p
+                    className="text-[13.5px] font-bold leading-tight"
+                    style={{ color: "#1b2528", fontFamily: "'Noto Sans JP',sans-serif", margin: 0 }}
+                  >
+                    {v.label}
+                  </p>
+                </div>
               )}
               {v.description && (
                 <p
-                  className="text-[12px] mt-1 leading-relaxed whitespace-pre-line"
-                  style={{ color: "rgba(27,37,40,0.65)", fontFamily: "'Noto Sans JP',sans-serif" }}
+                  className="text-[12px] leading-relaxed whitespace-pre-line"
+                  style={{ color: "rgba(27,37,40,0.62)", fontFamily: "'Noto Sans JP',sans-serif", margin: 0 }}
                 >
                   {v.description}
                 </p>
               )}
             </div>
           )}
-        </div>
+        </LuxeCard>
       ))}
     </div>
   );
 }
+
+/** Mobile column width that the user-facing layout pins to. Mirrored as a
+ *  constant here because StoreVideoSection uses fixed positioning and needs to
+ *  align with that frame instead of stretching to the viewport. */
+const FRAME_WIDTH = 430;
 
 const StoreVideoSection = forwardRef<
   HTMLVideoElement,
@@ -1613,9 +1664,31 @@ const StoreVideoSection = forwardRef<
     }
   }, [mode]);
 
+  // When this video becomes the stuck one, report its current rendered height
+  // to the controller so the layout can push the rest of the page down.
+  // Width is fixed (FRAME_WIDTH or viewport, whichever is smaller), so the
+  // 16:9 aspect ratio fully determines the height.
+  const stuckHeightPx = useMemo(() => {
+    if (mode !== "stuck") return 0;
+    if (typeof window === "undefined") return Math.round((FRAME_WIDTH * 9) / 16);
+    const w = Math.min(window.innerWidth, FRAME_WIDTH);
+    return Math.round((w * 9) / 16);
+  }, [mode]);
+  const { setStuckHeight } = controller;
+  useEffect(() => {
+    if (mode === "stuck") setStuckHeight(stuckHeightPx);
+  }, [mode, stuckHeightPx, setStuckHeight]);
+
   const ytId = parseYouTubeId(videoUrl);
   const isYouTube = !!ytId;
-  const effectivePoster = posterUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : undefined);
+  // For YouTube videos, the platform's auto thumbnail is the canonical
+  // poster — always prefer it over store-level fallbacks (which would
+  // otherwise show an unrelated venue photo behind the play button).
+  // maxresdefault (16:9 HD) first, mqdefault (16:9) fallback via <img onError>.
+  // hqdefault/sddefault are 4:3 so we avoid them — they show black bars.
+  const effectivePoster = isYouTube
+    ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`
+    : posterUrl;
 
   const handlePlay = () => {
     setMode("stuck");
@@ -1626,157 +1699,329 @@ const StoreVideoSection = forwardRef<
     }
   };
 
-  // Stuck and mini are fixed-position overlays
-  if (mode === "stuck" || mode === "mini") {
-    return (
-      <div
-        className={
-          mode === "stuck"
-            ? "fixed inset-x-0 top-0 z-40 w-full overflow-hidden shadow-2xl"
-            : "fixed bottom-20 right-3 z-40 overflow-hidden rounded-xl shadow-2xl"
-        }
-        style={
-          mode === "stuck"
-            ? { height: "220px", backgroundColor: "#000" }
-            : { width: "140px", height: "80px", backgroundColor: "#000", border: "1px solid rgba(255,255,255,0.15)" }
-        }
-      >
-        {isYouTube ? (
-          <iframe
-            title="店舗動画"
-            src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&playsinline=1&controls=${mode === "stuck" ? 1 : 0}&modestbranding=1&rel=0`}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 h-full w-full"
-            style={{ border: 0 }}
-          />
-        ) : (
-          <video
-            ref={setRefs}
-            autoPlay
-            loop
-            playsInline
-            className="absolute inset-0 h-full w-full object-cover"
-          >
-            <source src={videoUrl} type="video/mp4" />
-          </video>
-        )}
-        {mode === "stuck" && !isYouTube && (
+  // The playing media element (video or iframe) is rendered exactly once and
+  // never remounted as mode changes — only its outer container's CSS shifts
+  // between inline/stuck/mini. That's what keeps the playback position from
+  // resetting when the user minimizes or restores.
+  const hasStarted = mode !== "inline";
+
+  return (
+    <>
+      {/* ── Inline slot ─────────────────────────────────────────────────
+          Always rendered to reserve the 16:9 footprint inside the LuxeCard.
+          - mode === inline : shows the poster + play button
+          - otherwise       : shows the PlayingPlaceholder ("再生中 / ここに戻す")
+                              so the surrounding label/description don't jump. */}
+      {mode === "inline" ? (
+        <button
+          type="button"
+          onClick={handlePlay}
+          className="group relative block w-full overflow-hidden"
+          style={{
+            aspectRatio: "16 / 9",
+            backgroundColor: "#0E1316",
+          }}
+          aria-label="動画を再生"
+        >
+          {isYouTube && effectivePoster ? (
+            <img
+              src={effectivePoster}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
+              onError={(e) => {
+                // maxresdefault is missing for some shorter videos — fall back
+                // to mqdefault which is always available and still 16:9.
+                const img = e.currentTarget;
+                if (ytId && !img.dataset.fallback) {
+                  img.dataset.fallback = "1";
+                  img.src = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+                }
+              }}
+            />
+          ) : (
+            <video
+              src={videoUrl}
+              muted
+              playsInline
+              preload="metadata"
+              onLoadedMetadata={(e) => {
+                try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {}
+              }}
+              className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
+            />
+          )}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.4) 100%)" }}
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.55) 100%)" }}
           />
-        )}
-        {/* Mini: restore button (top-left) */}
-        {mode === "mini" && (
-          <button
-            type="button"
-            aria-label="動画を拡大"
-            onClick={() => setMode("stuck")}
-            className="absolute left-1 top-1 z-10 inline-flex items-center justify-center rounded-full text-white"
-            style={{
-              width: "20px",
-              height: "20px",
-              backgroundColor: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(8px)",
-            }}
-          >
-            <Maximize2 className="size-3" />
-          </button>
-        )}
-        <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
-          {mode === "stuck" && (
-            <button
-              type="button"
-              aria-label="動画を最小化"
-              onClick={() => setMode("mini")}
-              className="inline-flex size-7 items-center justify-center rounded-full text-white"
-              style={{ backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)" }}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <span
+              className="inline-flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-transform group-hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #D4AF37, #c8960c)",
+                boxShadow: "0 6px 20px rgba(212,175,55,0.45)",
+              }}
             >
-              <Minus className="size-4" />
-            </button>
-          )}
-          <button
-            type="button"
-            aria-label="動画を閉じてプレイヤーに戻す"
-            onClick={() => setMode("inline")}
-            className="inline-flex items-center justify-center rounded-full text-white"
-            style={{
-              width: mode === "stuck" ? "28px" : "20px",
-              height: mode === "stuck" ? "28px" : "20px",
-              backgroundColor: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(8px)",
-            }}
-          >
-            <XIcon className="size-3.5" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Inline poster card with play button. For YouTube we use the auto-thumbnail
-  // as a plain <img>; for mp4 we render the video itself with preload=metadata
-  // so the first frame shows as the poster (no download of the whole stream).
-  return (
-    <button
-      type="button"
-      onClick={handlePlay}
-      className="group relative block w-full overflow-hidden rounded-2xl"
-      style={{
-        aspectRatio: "16 / 9",
-        backgroundColor: "#0E1316",
-        boxShadow: "0 4px 18px rgba(0,0,0,0.1)",
-        border: "1px solid rgba(27,37,40,0.06)",
-      }}
-      aria-label="動画を再生"
-    >
-      {isYouTube && effectivePoster ? (
-        <img
-          src={effectivePoster}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
-        />
+              <Play className="ml-0.5 size-6" style={{ fill: "white" }} />
+            </span>
+            <span
+              className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/85"
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+            >
+              Tap to play
+            </span>
+          </div>
+        </button>
       ) : (
-        // mp4: render the video element muted with preload=metadata so the
-        // first frame is shown as the poster.
-        <video
-          src={videoUrl}
-          muted
-          playsInline
-          preload="metadata"
-          // Seeking to a tiny offset forces Safari/Chrome to paint a frame
-          // even when preload=metadata wouldn't on its own.
-          // eslint-disable-next-line react/no-unknown-property
-          onLoadedMetadata={(e) => {
-            try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {}
-          }}
-          className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
+        <PlayingPlaceholder
+          onRestore={() => setMode("inline")}
+          onClose={() => setMode("inline")}
         />
       )}
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%)" }}
-      />
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-        <span
-          className="inline-flex size-14 items-center justify-center rounded-full text-white shadow-xl transition-transform group-hover:scale-105"
-          style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
+
+      {/* ── Floating media container ────────────────────────────────────
+          Single source of truth for the actual <video> / <iframe>. We mount
+          it the first time the user hits play and never re-mount it after —
+          only the outer wrapper's classes / styles switch as mode changes.
+          This is what keeps the playback position from resetting when the
+          user toggles between stuck (top sticky) and mini (bottom-right). */}
+      {hasStarted && (
+        <div
+          className={
+            mode === "stuck"
+              ? "fixed left-0 right-0 top-0 z-40 mx-auto"
+              : "fixed bottom-20 right-3 z-40 overflow-hidden rounded-xl shadow-2xl"
+          }
+          style={
+            mode === "stuck"
+              ? { maxWidth: FRAME_WIDTH, backgroundColor: "#000" }
+              : {
+                  width: 144,
+                  height: 81,
+                  backgroundColor: "#000",
+                  border: "1px solid rgba(212,175,55,0.35)",
+                }
+          }
         >
-          <Play className="ml-0.5 size-6" style={{ fill: "white" }} />
-        </span>
-        <span
-          className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/80"
-          style={{ fontFamily: "'Outfit', sans-serif" }}
-        >
-          {isYouTube ? "Tap to play YouTube video" : "Tap to play store video"}
-        </span>
-      </div>
-    </button>
+          <div
+            className="relative w-full overflow-hidden shadow-2xl"
+            style={
+              mode === "stuck"
+                ? { aspectRatio: "16 / 9", backgroundColor: "#000" }
+                : { width: "100%", height: "100%", backgroundColor: "#000" }
+            }
+          >
+            {/* The actual media element. Rendered exactly once; we never
+                conditionally swap between two <video>s or two <iframe>s,
+                and the iframe src is constant across modes so YouTube doesn't
+                restart on minimize/restore. The mini-mode "no controls" look
+                is faked by disabling pointer events instead of changing src. */}
+            {isYouTube ? (
+              <iframe
+                title="店舗動画"
+                src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&playsinline=1&controls=1&modestbranding=1&rel=0`}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                className={
+                  mode === "mini"
+                    ? "absolute inset-0 h-full w-full pointer-events-none"
+                    : "absolute inset-0 h-full w-full"
+                }
+                style={{ border: 0 }}
+              />
+            ) : (
+              <video
+                ref={setRefs}
+                autoPlay
+                loop
+                playsInline
+                muted={mode === "mini"}
+                controls={mode === "stuck"}
+                className={
+                  mode === "stuck"
+                    ? "absolute inset-0 h-full w-full object-contain bg-black"
+                    : "absolute inset-0 h-full w-full object-cover"
+                }
+              >
+                <source src={videoUrl} type="video/mp4" />
+              </video>
+            )}
+
+            {/* Chrome — buttons differ slightly by mode but live in the same
+                wrapper so the underlying media isn't disturbed. */}
+            {mode === "stuck" ? (
+              <StickyVideoChrome
+                onMinimize={() => setMode("mini")}
+                onClose={() => setMode("inline")}
+                size="lg"
+              />
+            ) : (
+              <>
+                <button
+                  type="button"
+                  aria-label="動画を元の位置に戻す"
+                  onClick={() => setMode("stuck")}
+                  className="absolute left-1 top-1 inline-flex items-center justify-center rounded-full z-10"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    background: "rgba(27,37,40,0.7)",
+                    border: "1px solid rgba(212,175,55,0.45)",
+                    backdropFilter: "blur(8px)",
+                    color: "white",
+                  }}
+                >
+                  <Maximize2 className="size-3" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="動画を閉じる"
+                  onClick={() => setMode("inline")}
+                  className="absolute right-1 top-1 inline-flex items-center justify-center rounded-full z-10"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    background: "rgba(27,37,40,0.7)",
+                    border: "1px solid rgba(212,175,55,0.45)",
+                    backdropFilter: "blur(8px)",
+                    color: "white",
+                  }}
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 });
+
+/**
+ * Chrome shown on top of the stuck (full-width sticky) video. Two pill buttons
+ * sized to match the luxe brand — dark glass + gold hairline outline so they
+ * read against any thumbnail behind them.
+ */
+function StickyVideoChrome({
+  onMinimize,
+  onClose,
+  size,
+}: {
+  onMinimize: () => void;
+  onClose: () => void;
+  size: "lg" | "sm";
+}) {
+  const px = size === "lg" ? 32 : 22;
+  return (
+    <div className="absolute right-2 top-2 z-10 flex gap-1.5">
+      <button
+        type="button"
+        aria-label="動画を最小化"
+        onClick={onMinimize}
+        className="inline-flex items-center justify-center rounded-full text-white active:scale-95 transition-transform"
+        style={{
+          width: px,
+          height: px,
+          background: "rgba(27,37,40,0.62)",
+          border: "1px solid rgba(212,175,55,0.45)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <Minus className="size-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="動画を閉じる"
+        onClick={onClose}
+        className="inline-flex items-center justify-center rounded-full text-white active:scale-95 transition-transform"
+        style={{
+          width: px,
+          height: px,
+          background: "rgba(27,37,40,0.62)",
+          border: "1px solid rgba(212,175,55,0.45)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <XIcon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Replaces the inline video poster while the video is playing in stuck/mini
+ * mode. Keeps the 16:9 footprint so the surrounding label/description text
+ * doesn't reflow, and offers a "ここに戻す" affordance for users who want to
+ * pull the floating video back into its original slot.
+ */
+function PlayingPlaceholder({
+  onRestore,
+  onClose,
+}: {
+  onRestore: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="relative w-full overflow-hidden"
+      style={{
+        aspectRatio: "16 / 9",
+        background:
+          "radial-gradient(ellipse at top, #1b2528 0%, #0f1618 60%, #050708 100%)",
+      }}
+    >
+      {/* Soft gold ambient orb in the corner */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{
+          top: "-20%",
+          right: "-10%",
+          width: "60%",
+          height: "120%",
+          background: "radial-gradient(circle, rgba(212,175,55,0.18), transparent 70%)",
+        }}
+      />
+      <div className="relative flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
+        <span
+          className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase"
+          style={{
+            color: "rgba(212,175,55,0.9)",
+            fontFamily: "'Outfit', sans-serif",
+            letterSpacing: "0.22em",
+          }}
+        >
+          <Tv className="size-3.5" aria-hidden />
+          再生中
+        </span>
+        <button
+          type="button"
+          onClick={onRestore}
+          className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[11.5px] font-semibold active:scale-95 transition-transform"
+          style={{
+            background: "linear-gradient(135deg, #D4AF37, #c8960c)",
+            color: "#1b2528",
+            fontFamily: "'Outfit','Noto Sans JP',sans-serif",
+            boxShadow: "0 4px 14px rgba(212,175,55,0.35)",
+          }}
+        >
+          <RotateCcw className="size-3.5" aria-hidden />
+          ここに戻す
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[10.5px] underline-offset-2 hover:underline"
+          style={{ color: "rgba(255,255,255,0.55)" }}
+        >
+          再生を終了
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function SectionCard({
   icon,
