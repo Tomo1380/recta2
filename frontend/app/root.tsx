@@ -25,6 +25,12 @@ export const links: Route.LinksFunction = () => [
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
   },
+  // Great Vibes — script font used for editorial accents (e.g. the シャンパン
+  // メニューの英字銘柄). Latin only, very small (~5KB woff2).
+  {
+    rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap",
+  },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

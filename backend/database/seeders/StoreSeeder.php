@@ -777,11 +777,13 @@ class StoreSeeder extends Seeder
                     'description' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
                 ],
                 'champagne_description' => 'モエ・エ・シャンドン、ドンペリニヨン、クリュッグなど各種取り揃え。ボトルバック10%〜。',
+                // 「ボトル価格」のような自明な note は外し、特殊条件のみ残す。
+                // 全体に「参考目安」と画面側で注釈が出るので冗長な単位ラベルは不要。
                 'champagne_prices' => [
-                    'tequila'      => ['amount' => 18000, 'note' => 'ボトル価格'],
-                    'belle_epoque' => ['amount' => 80000, 'note' => 'ボトル価格'],
+                    'tequila'      => ['amount' => 18000],
+                    'belle_epoque' => ['amount' => 80000],
                     'armand'       => ['amount' => 800000, 'note' => '指名同伴のみ'],
-                    'lavay'        => ['amount' => 250000, 'note' => 'ボトル価格'],
+                    'lavay'        => ['amount' => 250000],
                 ],
                 'transfer_description' => '都内近郊は無料送りあり。終電後も安心。',
                 'transfer_km' => '20km',
@@ -863,12 +865,12 @@ class StoreSeeder extends Seeder
                     'comment' => '銀座で10年以上続く信頼のあるお店です。品のある接客を学びたい方にぴったりの環境です。',
                     'supports' => ['接客研修', 'ドレスレンタル', 'タクシー送り'],
                 ],
-                // 高級ラウンジらしくシャンパン4種を全部設定
+                // 高級ラウンジらしくシャンパン4種を全部設定。特殊条件のみ note 残す。
                 'champagne_prices' => [
                     'tequila'      => ['amount' => 22000],
-                    'belle_epoque' => ['amount' => 100000, 'note' => 'ボトル価格'],
+                    'belle_epoque' => ['amount' => 100000],
                     'armand'       => ['amount' => 1000000, 'note' => 'VIP・指名同伴推奨'],
-                    'lavay'        => ['amount' => 350000, 'note' => 'ボトル価格'],
+                    'lavay'        => ['amount' => 350000],
                 ],
                 // 銀座の高級ラウンジ — 都内・千葉・神奈川と幅広く足代対応
                 'transfer_zones' => [

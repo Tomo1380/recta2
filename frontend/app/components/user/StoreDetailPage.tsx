@@ -2447,18 +2447,21 @@ function TransferMapSection({
 }
 
 // ── Champagne prices section ──────────────────────────────────────────────
-// Each key maps to a default bottle photo bundled in /public/champagne/. The
-// admin can override per-store with image_url, but the defaults give every
-// participating store a consistent look without extra upload work.
+// Editorial menu styled after a high-end bottle list: dark slab, gold hairlines,
+// each row alternates the bottle image between right and left (zigzag) with the
+// English script label, kana, and yen price centered. Bottle images live in
+// /frontend/public/champagne/{key}.png (transparent PNG, ~600x900). Per-store
+// overrides via champagne_prices[key].image_url.
 const CHAMPAGNE_TEMPLATES: {
   key: keyof ChampagnePrices;
-  label: string;
-  defaultImage: string;
+  scriptName: string;   // English script (Great Vibes display)
+  kanaName: string;     // 日本語カナ
+  defaultImage: string; // shared bottle asset
 }[] = [
-  { key: "tequila",      label: "テキーラ",     defaultImage: "/champagne/tequila.png" },
-  { key: "belle_epoque", label: "ベル・エポック", defaultImage: "/champagne/belle_epoque.png" },
-  { key: "armand",       label: "アルマンド",    defaultImage: "/champagne/armand.png" },
-  { key: "lavay",        label: "ラベイ",       defaultImage: "/champagne/la_vie.png" },
+  { key: "tequila",      scriptName: "Tequila", kanaName: "テキーラ",  defaultImage: "/champagne/tequila.png" },
+  { key: "belle_epoque", scriptName: "Belle Epoque", kanaName: "ベル・エポック",   defaultImage: "/champagne/belle_epoque.png" },
+  { key: "armand",       scriptName: "Armand",       kanaName: "アルマンド",       defaultImage: "/champagne/armand.png" },
+  { key: "lavay",        scriptName: "La Vie",       kanaName: "ラベイ",          defaultImage: "/champagne/la_vie.png" },
 ];
 
 function ChampagnePricesSection({
@@ -2468,8 +2471,8 @@ function ChampagnePricesSection({
   prices?: ChampagnePrices | null;
   fallback?: string | null;
 }) {
-  // Only render a card if the store sets an amount for that bottle —
-  // bottles without prices are simply omitted from the grid.
+  // Only render rows where the store actually set a price — empty bottles are
+  // dropped from the menu rather than shown as "—".
   const visible = CHAMPAGNE_TEMPLATES
     .map((tpl) => ({ tpl, item: prices?.[tpl.key] }))
     .filter(({ item }) => item && (item.amount !== undefined && item.amount !== null && item.amount !== ""));
@@ -2477,85 +2480,238 @@ function ChampagnePricesSection({
   if (visible.length === 0 && !fallback) return null;
 
   return (
-    <SectionCard
-      icon={<Wine size={20} style={{ color: GOLD_HEX }} />}
-      title="シャンパン金額"
-    >
-      {visible.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
-          {visible.map(({ tpl, item }) => {
-            const src = item!.image_url || tpl.defaultImage;
-            return (
-              <div
-                key={tpl.key}
-                className="relative overflow-hidden rounded-[14px]"
+    <div className="relative overflow-hidden rounded-2xl">
+      {/* Custom dark slab — we bypass SectionCard's white surface because the
+          editorial menu vibe depends on the whole panel being dark. */}
+      <div
+        className="relative px-5 py-7"
+        style={{
+          background:
+            "radial-gradient(ellipse at top, #1b2528 0%, #0f1618 60%, #050708 100%)",
+          border: "1px solid rgba(212,175,55,0.28)",
+          boxShadow: "0 8px 28px rgba(0,0,0,0.25)",
+        }}
+      >
+        {/* Ambient gold orb, like the rest of the user site */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{
+            top: "-30%",
+            right: "-15%",
+            width: "65%",
+            height: "70%",
+            background: "radial-gradient(circle, rgba(212,175,55,0.18), transparent 70%)",
+          }}
+        />
+
+        {visible.length > 0 ? (
+          <>
+            {/* Title — Japanese-primary because this is for job seekers
+                gauging per-bottle revenue (= potential bottle-back commission),
+                not a customer-facing wine list. */}
+            <div className="relative mb-5 text-center">
+              <h3
+                className="m-0 text-[19px] font-bold leading-tight"
                 style={{
-                  background: "linear-gradient(160deg, #1b2528 0%, #2c3e46 100%)",
-                  border: "1px solid rgba(212,175,55,0.35)",
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+                  color: "#f7d976",
+                  fontFamily: "'Noto Sans JP','Outfit',sans-serif",
+                  letterSpacing: "0.06em",
+                  textShadow: "0 2px 12px rgba(0,0,0,0.4)",
                 }}
               >
-                {/* Bottle image fills the card; gold ambient glow on top-right */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute"
-                  style={{
-                    top: "-20%",
-                    right: "-20%",
-                    width: "70%",
-                    height: "70%",
-                    background: "radial-gradient(circle, rgba(212,175,55,0.22), transparent 70%)",
-                  }}
-                />
-                <div className="relative aspect-[3/4] w-full">
-                  <img
-                    src={src}
-                    alt={tpl.label}
-                    className="absolute inset-0 h-full w-full object-contain p-3"
-                    onError={(e) => {
-                      // Fall back to a wine icon if neither uploaded image
-                      // nor default asset is available (e.g. before the
-                      // designer ships /public/champagne/ images).
-                      (e.target as HTMLImageElement).style.display = "none";
+                ボトル目安価格
+              </h3>
+              <p
+                className="mt-1 text-[9.5px] font-medium uppercase"
+                style={{
+                  color: "rgba(212,175,55,0.65)",
+                  fontFamily: "'Outfit', sans-serif",
+                  letterSpacing: "0.32em",
+                }}
+              >
+                Champagne Price
+              </p>
+            </div>
+
+            {/* Rows */}
+            <ul className="relative space-y-0">
+              {visible.map(({ tpl, item }, i) => {
+                const src = item!.image_url || tpl.defaultImage;
+                const bottleOnRight = i % 2 === 0;
+                return (
+                  <li
+                    key={tpl.key}
+                    className="relative grid grid-cols-12 items-center"
+                    style={{
+                      minHeight: 96,
+                      // hairline divider between rows
+                      borderTop: i === 0 ? "none" : "1px solid rgba(212,175,55,0.18)",
                     }}
-                  />
-                </div>
-                {/* Gold "price tag" pinned to the bottom */}
-                <div
-                  className="relative px-3 py-2.5 text-center"
-                  style={{
-                    background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%)",
-                  }}
-                >
-                  <p
-                    className="text-[10px] font-medium uppercase tracking-[0.16em]"
-                    style={{ color: "rgba(212,175,55,0.85)", fontFamily: "'Outfit',sans-serif" }}
                   >
-                    {tpl.label}
-                  </p>
-                  <p
-                    className="text-[18px] font-bold leading-tight tabular-nums"
-                    style={{ color: "#ffe066", fontFamily: "'Outfit',sans-serif" }}
-                  >
-                    {formatAmount(item!.amount)}
-                  </p>
-                  {item!.note && (
-                    <p className="mt-0.5 text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>
-                      {item!.note}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
-          {fallback}
-        </p>
-      )}
-    </SectionCard>
+                    {/* Bottle photo — switch column placement to create the
+                        zigzag, leaving the text centered. */}
+                    {!bottleOnRight && (
+                      <ChampagneBottleSlot src={src} alt={tpl.kanaName} side="left" />
+                    )}
+                    <div
+                      className={
+                        bottleOnRight
+                          ? "col-span-9 pl-2 pr-1 text-center"
+                          : "col-span-9 col-start-1 pr-2 pl-1 text-center"
+                      }
+                      style={{
+                        // text always takes 9 of 12; bottle takes 3 on the
+                        // opposite side via col-start placement
+                        gridColumnStart: bottleOnRight ? 1 : 4,
+                      }}
+                    >
+                      <p
+                        className="m-0"
+                        style={{
+                          fontFamily: "'Great Vibes', cursive",
+                          fontSize: 26,
+                          lineHeight: 1.15,
+                          color: "#f7d976",
+                          textShadow: "0 1px 6px rgba(0,0,0,0.4)",
+                        }}
+                      >
+                        {tpl.scriptName}
+                      </p>
+                      <p
+                        className="mt-1 text-[11.5px]"
+                        style={{
+                          color: "rgba(255,255,255,0.7)",
+                          fontFamily: "'Noto Sans JP', sans-serif",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {tpl.kanaName}
+                        <span
+                          className="ml-3 tabular-nums"
+                          style={{
+                            fontFamily: "'Outfit', sans-serif",
+                            fontWeight: 600,
+                            color: "#ffe066",
+                          }}
+                        >
+                          ¥ {formatYen(item!.amount)}
+                        </span>
+                      </p>
+                      {item!.note && (
+                        <p
+                          className="mt-1 text-[10px]"
+                          style={{
+                            color: "rgba(255,255,255,0.42)",
+                            fontFamily: "'Noto Sans JP', sans-serif",
+                          }}
+                        >
+                          {item!.note}
+                        </p>
+                      )}
+                    </div>
+                    {bottleOnRight && (
+                      <ChampagneBottleSlot src={src} alt={tpl.kanaName} side="right" />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Footer ornament */}
+            <div className="relative mt-5 flex items-center justify-center gap-2">
+              <span
+                aria-hidden
+                style={{
+                  width: 32,
+                  height: 1,
+                  background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.7))",
+                }}
+              />
+              <Wine size={11} style={{ color: "rgba(212,175,55,0.85)" }} aria-hidden />
+              <span
+                aria-hidden
+                style={{
+                  width: 32,
+                  height: 1,
+                  background: "linear-gradient(90deg, rgba(212,175,55,0.7), transparent)",
+                }}
+              />
+            </div>
+            {/* Disclaimer — make it obvious these numbers are reference values
+                so users don't take them as the venue's actual current menu. */}
+            <p
+              className="relative mt-2 text-center text-[10px] leading-relaxed"
+              style={{
+                color: "rgba(255,255,255,0.45)",
+                fontFamily: "'Noto Sans JP', sans-serif",
+              }}
+            >
+              ※ 価格は参考目安です。詳細は店舗にお問い合わせください。
+            </p>
+          </>
+        ) : (
+          <p
+            className="relative text-sm leading-relaxed text-center"
+            style={{ color: "rgba(255,255,255,0.7)", fontFamily: "'Noto Sans JP', sans-serif" }}
+          >
+            {fallback}
+          </p>
+        )}
+      </div>
+    </div>
   );
+}
+
+/** A single bottle slot in the zigzag menu. 3/12 of the row width on the
+ *  named side; bottle PNG is shown contained so transparent backgrounds blend
+ *  into the surrounding dark slab. Hides gracefully if the asset is missing. */
+function ChampagneBottleSlot({
+  src,
+  alt,
+  side,
+}: {
+  src: string;
+  alt: string;
+  side: "left" | "right";
+}) {
+  return (
+    <div
+      className="col-span-3 flex h-full items-center"
+      style={{
+        gridColumnStart: side === "left" ? 1 : 10,
+        justifyContent: side === "left" ? "flex-start" : "flex-end",
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="h-[88px] w-auto object-contain"
+        style={{
+          filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.5))",
+          maxWidth: 80,
+        }}
+        onError={(e) => {
+          // Hide cleanly when the bottle asset hasn't been shipped yet.
+          (e.target as HTMLImageElement).style.visibility = "hidden";
+        }}
+      />
+    </div>
+  );
+}
+
+/** "18,000" — drops the leading ¥ which is rendered as a label by the caller. */
+function formatYen(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toLocaleString("ja-JP");
+  }
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[^\d.]/g, "");
+    const n = Number(cleaned);
+    if (Number.isFinite(n) && n > 0) return n.toLocaleString("ja-JP");
+    return value;
+  }
+  return "—";
 }
 
 // ── Recta-keiyū episodes section ──────────────────────────────────────────
