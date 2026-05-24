@@ -78,7 +78,6 @@ class StoreController extends Controller
             'recent_hires_summary' => 'nullable|string|max:255',
             'transfer_description' => 'nullable|string',
             'transfer_km' => 'nullable|string|max:50',
-            'transfer_map_image_url' => 'nullable|string|max:2048',
             'champagne_description' => 'nullable|string',
             'experience_guaranteed' => 'nullable|boolean',
             'publish_status' => 'nullable|in:published,unpublished,draft',
@@ -88,7 +87,6 @@ class StoreController extends Controller
             'wage' => 'nullable|array',
             'compensation' => 'nullable|array',
             'guarantee' => 'nullable|array',
-            'cast_profile' => 'nullable|array',
             'interview' => 'nullable|array',
             'feature_tags' => 'nullable|array',
             'feature_tags.*' => 'string',
@@ -96,18 +94,21 @@ class StoreController extends Controller
             'analysis' => 'nullable|array',
             'required_documents' => 'nullable|array',
             'recent_hires' => 'nullable|array',
-            'popular_features' => 'nullable|array',
             'qa' => 'nullable|array',
             'qa.*.question' => 'required|string',
             'qa.*.answer' => 'required|string',
             'staff_comment' => 'nullable|array',
             'champagne_prices' => 'nullable|array',
             'transfer_zones' => 'nullable|array',
+            'transfer_zones.*.label' => 'nullable|string|max:60',
+            'transfer_zones.*.radius_km' => 'nullable',
+            'transfer_zones.*.fee' => 'nullable',
+            'transfer_zones.*.color' => 'nullable|string|max:30',
             'dress_code' => 'nullable|array',
             'set_fee' => 'nullable|array',
-            'salary_simulator' => 'nullable|array',
             'recta_episodes' => 'nullable|array',
             'related_store_ids' => 'nullable|array',
+            'related_store_ids.*' => 'integer',
 
             // store_videos の同期に使うペイロード。配列で受け取り、
             // controller 側で順序・差分を解決して store_videos テーブルに反映する。
@@ -135,15 +136,15 @@ class StoreController extends Controller
             'name', 'area', 'address', 'nearest_station', 'category',
             'phone', 'website_url',
             'schedule',
-            'wage', 'compensation', 'guarantee', 'cast_profile', 'interview',
+            'wage', 'compensation', 'guarantee', 'interview',
             'feature_tags', 'description', 'features_text',
             'images',
             'analysis', 'required_documents',
             'recent_hires', 'recent_hires_summary',
-            'popular_features', 'qa', 'staff_comment',
+            'qa', 'staff_comment',
             'champagne_prices', 'champagne_description',
-            'transfer_description', 'transfer_km', 'transfer_map_image_url', 'transfer_zones',
-            'dress_code', 'set_fee', 'salary_simulator',
+            'transfer_description', 'transfer_km', 'transfer_zones',
+            'dress_code', 'set_fee',
             'recta_episodes', 'related_store_ids',
             'experience_guaranteed', 'publish_status',
         ];
@@ -206,9 +207,6 @@ class StoreController extends Controller
         }
         if (isset($data['compensation']) && is_array($store->compensation)) {
             $data['compensation'] = array_replace_recursive($store->compensation, $data['compensation']);
-        }
-        if (isset($data['cast_profile']) && is_array($store->cast_profile)) {
-            $data['cast_profile'] = array_replace_recursive($store->cast_profile, $data['cast_profile']);
         }
 
         // update 本体と sync* をアトミックに（途中失敗で部分反映を残さない）

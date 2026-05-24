@@ -578,7 +578,6 @@ export function ShopEditPage() {
   const [castKawaii, setCastKawaii] = useState("40");
   const [castGlamour, setCastGlamour] = useState("15");
   const [castNatural, setCastNatural] = useState("15");
-  const [expRatio, setExpRatio] = useState(50);
   const [clientAge, setClientAge] = useState<
     { label: string; value: string }[]
   >([
@@ -611,10 +610,19 @@ export function ShopEditPage() {
     },
   ]);
   const [hiringTotal, setHiringTotal] = useState("直近5ヶ月で52名採用");
-  const [popularFeatures, setPopularFeatures] = useState<string[]>([]);
   // New schema fields
   const [transferDescription, setTransferDescription] = useState("");
   const [transferKm, setTransferKm] = useState("");
+  // 距離別の足代テーブル（六本木・銀座の高級店向け）。空のままなら API に null を送る。
+  const [transferZones, setTransferZones] = useState<
+    Array<{ label: string; radius_km: string; fee: string; color: string }>
+  >([]);
+  // 系列店（管理者が明示的に紐づけた他店舗）。store.id の配列。
+  const [relatedStoreIds, setRelatedStoreIds] = useState<number[]>([]);
+  // 系列店セレクタの候補ソース — 現在の店舗以外の published 店舗一覧。
+  const [storeCandidates, setStoreCandidates] = useState<
+    Array<{ id: number; name: string; area: string | null }>
+  >([]);
   const [payrollSystemType, setPayrollSystemType] = useState("");
   const [payrollSystemDescription, setPayrollSystemDescription] = useState("");
   const [champagneDescription, setChampagneDescription] = useState("");
@@ -716,12 +724,6 @@ export function ShopEditPage() {
     } else {
       setDocuments(reqDocs || []);
     }
-    const popFeat = store.popular_features as any;
-    if (popFeat && !Array.isArray(popFeat)) {
-      setPopularFeatures(popFeat.features || []);
-    } else {
-      setPopularFeatures(popFeat || []);
-    }
     setQaItems((store.qa || []).map(q => ({ label: q.question, value: q.answer })));
 
     // Analysis data
@@ -734,7 +736,6 @@ export function ShopEditPage() {
       setCastKawaii((castStyle.cute ?? analysis.cast_kawaii)?.toString() ?? "40");
       setCastGlamour((castStyle.glamour ?? analysis.cast_glamour)?.toString() ?? "15");
       setCastNatural((castStyle.natural ?? analysis.cast_natural)?.toString() ?? "15");
-      setExpRatio(analysis.experience_ratio ?? analysis.exp_ratio ?? 50);
       setClientAge((analysis.customer_age || analysis.client_age || []).map((c: any) => ({ label: c.label, value: c.ratio?.toString() ?? c.value ?? "" })));
       setDrinkStyle(analysis.drinking_style ?? analysis.drink_style ?? 50);
     }
@@ -775,6 +776,19 @@ export function ShopEditPage() {
     // New schema fields
     setTransferDescription((store as any).transfer_description || "");
     setTransferKm((store as any).transfer_km || "");
+    const tz: any[] = (store as any).transfer_zones || [];
+    setTransferZones(
+      Array.isArray(tz)
+        ? tz.map((z: any) => ({
+            label: z?.label ?? "",
+            radius_km: z?.radius_km != null ? String(z.radius_km) : "",
+            fee: z?.fee != null ? String(z.fee) : "",
+            color: z?.color ?? "",
+          }))
+        : []
+    );
+    const rs: any[] = (store as any).related_store_ids || [];
+    setRelatedStoreIds(Array.isArray(rs) ? rs.filter((n: any) => Number.isFinite(Number(n))).map((n: any) => Number(n)) : []);
     setPayrollSystemType((store as any).payroll_system_type || "");
     setPayrollSystemDescription((store as any).payroll_system_description || "");
     setChampagneDescription((store as any).champagne_description || "");
@@ -864,6 +878,22 @@ export function ShopEditPage() {
       .finally(() => setLoading(false));
   }, [id, isNew, populateFromStore]);
 
+  // 系列店セレクタの候補ロード — 自店舗を除外した published 店舗一覧。
+  useEffect(() => {
+    api.get<{ data: Store[] }>("/admin/stores?per_page=200&publish_status=published")
+      .then((res) => {
+        const meId = id ? Number(id) : null;
+        setStoreCandidates(
+          res.data
+            .filter((s) => s.id !== meId)
+            .map((s) => ({ id: s.id, name: s.name, area: s.area }))
+        );
+      })
+      .catch(() => {
+        /* 系列店セレクタは非クリティカル機能なので失敗しても画面は止めない */
+      });
+  }, [id]);
+
   useEffect(() => {
     if (!showCopyModal) return;
     api.get<{data: Store[]}>("/admin/stores?per_page=20").then(res => {
@@ -881,7 +911,6 @@ export function ShopEditPage() {
     opening_time: openingTime || null,
     closing_time: closingTime || null,
     holidays: holiday,
-    shift_info: shiftInfo || null,
     phone,
     website_url: website,
     // store_videos に同期される。空URLや空欄行は controller 側で drop される。
@@ -920,7 +949,6 @@ export function ShopEditPage() {
     description,
     features_text: featureText,
     required_documents: { documents: documents.filter(Boolean), notes: docNote },
-    popular_features: { features: popularFeatures.filter(Boolean) },
     qa: qaItems.filter(i => i.label).map(i => ({ question: i.label, answer: i.value })),
     analysis: {
       experience_level: expLevel,
@@ -931,7 +959,6 @@ export function ShopEditPage() {
         glamour: Number(castGlamour),
         natural: Number(castNatural),
       },
-      experience_ratio: expRatio,
       customer_age: clientAge.filter(c => c.label).map(c => ({ label: c.label, ratio: Number(c.value) || 0 })),
       drinking_style: drinkStyle,
     },
@@ -957,6 +984,16 @@ export function ShopEditPage() {
     },
     transfer_description: transferDescription,
     transfer_km: transferKm,
+    transfer_zones: transferZones
+      .filter((z) => z.label.trim() || z.radius_km.trim() || z.fee.trim())
+      .map((z) => ({
+        label: z.label.trim() || null,
+        // 数値で送る方が API/UI ともに扱いやすい。空欄は null。
+        radius_km: z.radius_km.trim() ? (Number(z.radius_km) || z.radius_km.trim()) : null,
+        fee: z.fee.trim() ? (Number(z.fee.replace(/[^\d.-]/g, "")) || z.fee.trim()) : null,
+        color: z.color.trim() || null,
+      })),
+    related_store_ids: relatedStoreIds.length > 0 ? relatedStoreIds : null,
     payroll_system_type: payrollSystemType || null,
     payroll_system_description: payrollSystemDescription,
     champagne_description: champagneDescription,
@@ -1017,7 +1054,7 @@ export function ShopEditPage() {
         ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
       })),
     publish_status: publishStatus,
-  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
+  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, transferZones, relatedStoreIds, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1517,15 +1554,6 @@ export function ShopEditPage() {
               </Field>
             </div>
           </div>
-          <SliderField
-            label="経験者:未経験者 比率"
-            value={expRatio}
-            onChange={(e: any) =>
-              setExpRatio(Number(e.target.value))
-            }
-            leftLabel="未経験者多め"
-            rightLabel="経験者多め"
-          />
           <Field label="客層年齢分布">
             <DynamicPairList
               items={clientAge}
@@ -1815,18 +1843,6 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="人気の特徴" icon={Star}>
-        <div className="space-y-5">
-          <Field label="特徴リスト">
-            <DynamicTextList
-              items={popularFeatures}
-              setItems={setPopularFeatures}
-              placeholder="特徴を入力"
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
       <SectionCard title="シャンパン情報" icon={Wine}>
         <div className="space-y-5">
           <Field
@@ -2064,7 +2080,132 @@ export function ShopEditPage() {
               placeholder="例: 20km圏内"
             />
           </Field>
+          <Field
+            label="足代テーブル（高級店向け）"
+            hint="距離別の足代を設定。空のままなら詳細ページに表示されません。"
+          >
+            <div className="space-y-2">
+              {transferZones.map((z, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-12 gap-2 items-center rounded-lg border border-border bg-muted/20 p-2"
+                >
+                  <input
+                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    placeholder="ラベル (例: 都内)"
+                    value={z.label}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], label: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <input
+                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    placeholder="半径 km"
+                    value={z.radius_km}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], radius_km: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <input
+                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    placeholder="足代 ¥"
+                    value={z.fee}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], fee: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <input
+                    type="color"
+                    className="col-span-2 h-8 w-full cursor-pointer rounded border border-input bg-background"
+                    value={z.color || "#D4AF37"}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], color: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setTransferZones(transferZones.filter((_, idx) => idx !== i))}
+                    className="col-span-1 text-xs text-muted-foreground hover:text-destructive"
+                    aria-label="削除"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  setTransferZones([
+                    ...transferZones,
+                    { label: "", radius_km: "", fee: "", color: "#D4AF37" },
+                  ])
+                }
+                className="text-xs text-primary hover:underline"
+              >
+                + 距離区分を追加
+              </button>
+            </div>
+          </Field>
         </div>
+      </SectionCard>
+
+      <SectionCard title="系列店舗" icon={Building2}>
+        <Field
+          label="紐づけ店舗"
+          hint="詳細ページで「系列店舗」として表示する他店舗を選択してください。"
+        >
+          <div className="space-y-2">
+            <select
+              value=""
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (!n || relatedStoreIds.includes(n)) return;
+                setRelatedStoreIds([...relatedStoreIds, n]);
+              }}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">+ 系列店を追加</option>
+              {storeCandidates
+                .filter((s) => !relatedStoreIds.includes(s.id))
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.area ? `（${s.area}）` : ""}
+                  </option>
+                ))}
+            </select>
+            {relatedStoreIds.length > 0 && (
+              <ul className="flex flex-wrap gap-2">
+                {relatedStoreIds.map((rid) => {
+                  const c = storeCandidates.find((s) => s.id === rid);
+                  return (
+                    <li
+                      key={rid}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs"
+                    >
+                      <span>{c?.name ?? `店舗#${rid}`}</span>
+                      <button
+                        type="button"
+                        onClick={() => setRelatedStoreIds(relatedStoreIds.filter((i) => i !== rid))}
+                        aria-label="削除"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </Field>
       </SectionCard>
 
       <SectionCard title="Q&A" icon={HelpCircle}>
@@ -2419,7 +2560,6 @@ export function ShopEditPage() {
                       glamour: Number(castGlamour) || 0,
                       natural: Number(castNatural) || 0,
                     },
-                    experience_ratio: expRatio,
                     customer_age: clientAge.map((c) => ({
                       label: c.label,
                       ratio: parseFloat(c.value) || 0,
@@ -2450,9 +2590,6 @@ export function ShopEditPage() {
                       }))
                     : null,
                   recent_hires_summary: hiringTotal,
-                  popular_features: popularFeatures.length > 0
-                    ? { features: popularFeatures }
-                    : null,
                   qa: qaItems.length > 0
                     ? qaItems.map((q) => ({ question: q.label, answer: q.value }))
                     : null,
@@ -2465,12 +2602,6 @@ export function ShopEditPage() {
                       }
                     : null,
                   recruitment_standards: null,
-                  rank: null,
-                  gal_point: 50,
-                  loose_point: 50,
-                  age_point: 50,
-                  waiwai_point: 50,
-                  cute_point: 50,
                   transfer_description: transferDescription || null,
                   transfer_km: transferKm || null,
                   unit_wage_type: null,

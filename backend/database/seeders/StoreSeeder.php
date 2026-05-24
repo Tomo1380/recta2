@@ -236,7 +236,19 @@ class StoreSeeder extends Seeder
 
             $created = Store::create($storeData);
 
-            if ($videoUrl) {
+            // Anchor 店舗のみ複数動画 + スタッフ写真のリッチセットを投入。
+            // 残りの generated 店舗は単発動画のみ (60% 確率) で軽量。
+            $extras = $this->getAnchorExtras($created->name);
+            if (!empty($extras['videos'])) {
+                foreach ($extras['videos'] as $i => $v) {
+                    $created->videos()->create([
+                        'video_url' => $v['video_url'],
+                        'label' => $v['label'] ?? null,
+                        'description' => $v['description'] ?? null,
+                        'display_order' => $i,
+                    ]);
+                }
+            } elseif ($videoUrl) {
                 $created->videos()->create([
                     'video_url' => $videoUrl,
                     'label' => '店舗紹介動画',
@@ -244,7 +256,86 @@ class StoreSeeder extends Seeder
                     'display_order' => 0,
                 ]);
             }
+
+            foreach (($extras['staff_photos'] ?? []) as $i => $p) {
+                $created->staffPhotos()->create([
+                    'image_url' => $p['image_url'],
+                    'caption' => $p['caption'] ?? null,
+                    'instagram_url' => $p['instagram_url'] ?? null,
+                    'staff_type' => $p['staff_type'] ?? null,
+                    'display_order' => $i,
+                ]);
+            }
         }
+    }
+
+    /**
+     * Anchor 店舗ごとの追加メディア（複数動画 + スタッフ写真）。
+     * 名前マッチで該当時のみ値を返し、generated 店舗は空 → 軽量。
+     *
+     * @return array{videos?: array<int,array<string,string>>, staff_photos?: array<int,array<string,string>>}
+     */
+    private function getAnchorExtras(string $name): array
+    {
+        $map = [
+            'Club Lumière' => [
+                'videos' => [
+                    [
+                        'video_url' => 'https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4',
+                        'label' => '店内ツアー',
+                        'description' => 'エントランスから店内まで。落ち着いた六本木の大人空間をご案内します。',
+                    ],
+                    [
+                        'video_url' => 'https://videos.pexels.com/video-files/3209828/3209828-uhd_2560_1440_25fps.mp4',
+                        'label' => 'キャストインタビュー',
+                        'description' => '入店2年目のキャストが「Lumièreで働く理由」を語ります。',
+                    ],
+                ],
+                'staff_photos' => [
+                    ['image_url' => 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=600&q=80', 'caption' => '在籍3年目 / アヤさん', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=600&q=80', 'caption' => '入店半年 / ミナさん', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=600&q=80', 'caption' => 'No.1キャスト / ユリさん', 'staff_type' => 'cast', 'instagram_url' => 'https://instagram.com/example'],
+                ],
+            ],
+            'Lounge SEIREN' => [
+                'videos' => [
+                    [
+                        'video_url' => 'https://videos.pexels.com/video-files/3209828/3209828-uhd_2560_1440_25fps.mp4',
+                        'label' => '店内ツアー',
+                        'description' => '銀座 完全会員制ラウンジの静謐な空間。',
+                    ],
+                    [
+                        'video_url' => 'https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4',
+                        'label' => 'マネージャーインタビュー',
+                        'description' => '10年続く銀座ラウンジの接客哲学について。',
+                    ],
+                ],
+                'staff_photos' => [
+                    ['image_url' => 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&q=80', 'caption' => '在籍5年 / レイさん', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80', 'caption' => '在籍2年 / カノンさん', 'staff_type' => 'cast'],
+                ],
+            ],
+            'Girls Bar Honey' => [
+                'staff_photos' => [
+                    ['image_url' => 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80', 'caption' => '店長 / ハニーちゃん', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=600&q=80', 'caption' => '副店長 / ミミちゃん', 'staff_type' => 'cast'],
+                ],
+            ],
+            'Club GRANDEUR' => [
+                'staff_photos' => [
+                    ['image_url' => 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=600&q=80', 'caption' => 'キャストA', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&q=80', 'caption' => 'キャストB', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=600&q=80', 'caption' => 'キャストC', 'staff_type' => 'cast'],
+                ],
+            ],
+            'Lounge Crescent' => [
+                'staff_photos' => [
+                    ['image_url' => 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80', 'caption' => 'マネージャー / ナナさん', 'staff_type' => 'cast'],
+                ],
+            ],
+        ];
+
+        return $map[$name] ?? [];
     }
 
     // -----------------------------------------------------------------------
@@ -384,15 +475,6 @@ class StoreSeeder extends Seeder
             $store['interview'] = $interview;
         }
 
-        // ---------- Cast Profile JSONB ----------
-        $store['cast_profile'] = [
-            'gal' => rand(0, 100),
-            'loose' => rand(0, 100),
-            'age' => rand(0, 100),
-            'waiwai' => rand(0, 100),
-            'cute' => rand(0, 100),
-        ];
-
         // ---------- Dress Code JSONB ----------
         if ($this->chance(0.5)) {
             $dressCodeDesc = ['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'][array_rand(['ドレス貸出あり（無料）', '自前ドレスまたはワンピース', '制服貸与', '服装自由（カジュアルOK）'])];
@@ -415,8 +497,6 @@ class StoreSeeder extends Seeder
         }
 
         // New columns
-        $store['rank'] = ['S', 'A', 'A', 'B', 'B', 'B', 'C'][array_rand(['S', 'A', 'A', 'B', 'B', 'B', 'C'])];
-
         if ($this->chance(0.4)) {
             $store['champagne_description'] = ['モエ・エ・シャンドン、ヴーヴクリコなど各種あり。', 'ボトルバック10%〜。高級シャンパン多数取り揃え。', 'シャンパンタワー対応可。各種銘柄あり。'][array_rand(['モエ・エ・シャンドン、ヴーヴクリコなど各種あり。', 'ボトルバック10%〜。高級シャンパン多数取り揃え。', 'シャンパンタワー対応可。各種銘柄あり。'])];
         }
@@ -566,7 +646,6 @@ class StoreSeeder extends Seeder
                 'glamour' => rand(5, 25),
                 'natural' => rand(10, 40),
             ],
-            'experience_ratio' => $expLevel + rand(-10, 10),
             'customer_age' => [
                 ['label' => '20代', 'ratio' => $r1 = rand(5, 40)],
                 ['label' => '30代', 'ratio' => $r2 = rand(15, 40)],
@@ -618,7 +697,6 @@ class StoreSeeder extends Seeder
                 'nearest_station' => '六本木駅',
                 'category' => 'キャバクラ',
                 'phone' => '03-1234-5678',
-                'rank' => 'A',
                 'schedule' => [
                     'open' => '20:00',
                     'close' => 'LAST',
@@ -653,9 +731,6 @@ class StoreSeeder extends Seeder
                     'norma' => 'ノルマなし。ただし月8日以上の出勤推奨。',
                     'same_day_trial' => true,
                 ],
-                'cast_profile' => [
-                    'gal' => 20, 'loose' => 40, 'age' => 30, 'waiwai' => 60, 'cute' => 70,
-                ],
                 'interview' => [
                     'start' => '14:00',
                     'end' => '19:00',
@@ -683,7 +758,6 @@ class StoreSeeder extends Seeder
                 'analysis' => [
                     'experience_level' => 35, 'atmosphere' => 40,
                     'cast_style' => ['beauty' => 30, 'cute' => 40, 'glamour' => 10, 'natural' => 20],
-                    'experience_ratio' => 45,
                     'customer_age' => [['label' => '20代', 'ratio' => 15], ['label' => '30代', 'ratio' => 35], ['label' => '40代', 'ratio' => 35], ['label' => '50代〜', 'ratio' => 15]],
                     'drinking_style' => 55,
                 ],
@@ -696,13 +770,18 @@ class StoreSeeder extends Seeder
                     ['month' => '2026年2月', 'count' => 12, 'examples' => ['20歳 大学生 → 時給4,500円スタート', '28歳 経験3年 → 時給7,000円スタート']],
                 ],
                 'recent_hires_summary' => '直近2ヶ月で20名採用',
-                'popular_features' => ['features' => ['未経験歓迎', 'ノルマなし', '終電上がり'], 'hint' => '六本木エリアではノルマなしのお店が人気です'],
                 'dress_code' => [
                     'description' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
                 ],
                 'champagne_description' => 'モエ・エ・シャンドン、ドンペリニヨン、クリュッグなど各種取り揃え。ボトルバック10%〜。',
                 'transfer_description' => '都内近郊は無料送りあり。終電後も安心。',
                 'transfer_km' => '20km',
+                // 高級店向け足代テーブル — 距離別に現金支給
+                'transfer_zones' => [
+                    ['label' => '都内', 'radius_km' => 10, 'fee' => 2000, 'color' => '#D4AF37'],
+                    ['label' => '23区外', 'radius_km' => 20, 'fee' => 4000, 'color' => '#c8960c'],
+                    ['label' => '都外', 'radius_km' => 30, 'fee' => 6000, 'color' => '#9a7a20'],
+                ],
                 'qa' => [
                     ['question' => 'お酒が飲めなくても大丈夫ですか？', 'answer' => 'はい、大丈夫です。ソフトドリンクやノンアルコールカクテルをご用意しています。'],
                     ['question' => '送りはどこまで出ますか？', 'answer' => '都内近郊であれば無料で送迎いたします。詳しくはお問い合わせください。'],
@@ -761,7 +840,6 @@ class StoreSeeder extends Seeder
                 'analysis' => [
                     'experience_level' => 70, 'atmosphere' => 25,
                     'cast_style' => ['beauty' => 50, 'cute' => 15, 'glamour' => 5, 'natural' => 30],
-                    'experience_ratio' => 75,
                     'customer_age' => [['label' => '30代', 'ratio' => 20], ['label' => '40代', 'ratio' => 40], ['label' => '50代〜', 'ratio' => 40]],
                     'drinking_style' => 35,
                 ],
@@ -774,6 +852,14 @@ class StoreSeeder extends Seeder
                     'comment' => '銀座で10年以上続く信頼のあるお店です。品のある接客を学びたい方にぴったりの環境です。',
                     'supports' => ['接客研修', 'ドレスレンタル', 'タクシー送り'],
                 ],
+                // 銀座の高級ラウンジ — 都内・千葉・神奈川と幅広く足代対応
+                'transfer_zones' => [
+                    ['label' => '都内', 'radius_km' => 10, 'fee' => 3000, 'color' => '#D4AF37'],
+                    ['label' => '神奈川・埼玉', 'radius_km' => 25, 'fee' => 5000, 'color' => '#c8960c'],
+                    ['label' => '千葉', 'radius_km' => 35, 'fee' => 8000, 'color' => '#9a7a20'],
+                ],
+                'transfer_description' => '都内・神奈川・埼玉・千葉まで足代支給。タクシーチケットでの精算も可能。',
+                'transfer_km' => '35km',
                 'publish_status' => 'published',
             ],
             [
@@ -817,7 +903,6 @@ class StoreSeeder extends Seeder
                 'analysis' => [
                     'experience_level' => 15, 'atmosphere' => 80,
                     'cast_style' => ['beauty' => 10, 'cute' => 50, 'glamour' => 5, 'natural' => 35],
-                    'experience_ratio' => 20,
                     'customer_age' => [['label' => '20代', 'ratio' => 45], ['label' => '30代', 'ratio' => 35], ['label' => '40代', 'ratio' => 20]],
                     'drinking_style' => 70,
                 ],

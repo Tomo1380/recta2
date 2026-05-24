@@ -39,7 +39,6 @@ class StoreApiTransformer
         $compensation = self::pickArray($base, 'compensation');
         $guarantee    = self::pickArray($base, 'guarantee');
         $interview    = self::pickArray($base, 'interview');
-        $castProfile  = self::pickArray($base, 'cast_profile');
         $dressCode    = self::pickArray($base, 'dress_code');
 
         $regular = $wage['regular'] ?? [];
@@ -82,13 +81,6 @@ class StoreApiTransformer
             'interview_end'   => $interview['end']   ?? null,
             'interview_info'  => self::interviewInfoLegacy($interview),
             'recruitment_standards' => $interview['recruitment_standards'] ?? null,
-
-            // cast_profile
-            'gal_point'    => $castProfile['gal']    ?? null,
-            'loose_point'  => $castProfile['loose']  ?? null,
-            'age_point'    => $castProfile['age']    ?? null,
-            'waiwai_point' => $castProfile['waiwai'] ?? null,
-            'cute_point'   => $castProfile['cute']   ?? null,
 
             // dress_code: legacy was a string, expose .description as the canonical string
             'dress_code_description' => $dressCode['description'] ?? null,

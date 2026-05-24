@@ -98,7 +98,6 @@ interface Analysis {
   experience_level: number;
   atmosphere: number;
   cast_style: CastStyle;
-  experience_ratio: number;
   customer_age: CustomerAge[];
   drinking_style: number;
 }
@@ -131,11 +130,6 @@ interface RecentHire {
   month: string;
   count: number;
   examples: string[];
-}
-
-interface PopularFeatures {
-  features: string[];
-  hint?: string;
 }
 
 interface QAItem {
@@ -218,17 +212,6 @@ export interface SetFee {
   notes?: string;
 }
 
-export interface SalarySimulator {
-  default_hourly?: number;
-  default_sales?: number;
-  default_nominations?: number;
-  back_rate?: number;
-  nomination_unit?: number;
-  hours_per_day?: number;
-  days_per_month?: number;
-  formulas?: Record<string, unknown>;
-}
-
 export interface RelatedStoreLite {
   id: number;
   name: string;
@@ -288,16 +271,9 @@ export interface StoreDetailStore {
   schedule: Schedule | null;
   recent_hires: RecentHire[] | null;
   recent_hires_summary: string;
-  popular_features: PopularFeatures | null;
   qa: QAItem[] | null;
   staff_comment: StaffComment | null;
   recruitment_standards: string | null;
-  rank: string | null;
-  gal_point: number;
-  loose_point: number;
-  age_point: number;
-  waiwai_point: number;
-  cute_point: number;
   transfer_description: string | null;
   transfer_km: string | null;
   champagne_description: string | null;
@@ -313,13 +289,9 @@ export interface StoreDetailStore {
   related_store_ids?: number[] | null;
   /** Optional pre-resolved related stores (preferred over related_store_ids) */
   related_stores?: RelatedStoreLite[] | null;
-  /** Optional list of "high recruitment-standard" sibling stores */
-  high_standard_stores?: RelatedStoreLite[] | null;
-  transfer_map_image_url?: string | null;
   transfer_zones?: TransferZone[] | null;
   experience_guaranteed?: boolean | null;
   set_fee?: SetFee | null;
-  salary_simulator?: SalarySimulator | null;
 }
 
 export interface StoreDetailResponse {
@@ -1013,10 +985,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 11a. Transfer Map (送りマップ) — image + zone fee table */}
+          {/* 11a. Transfer / 足代 — distance-based zone fee table */}
           {/* ============================================================ */}
           <TransferMapSection
-            mapImageUrl={store.transfer_map_image_url}
             zones={store.transfer_zones}
             fallbackDescription={store.transfer_description}
             fallbackKm={store.transfer_km}
@@ -1044,10 +1015,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           />
 
           {/* ============================================================ */}
-          {/* 11e. Salary simulator (interactive) */}
+          {/* 11e. Salary simulator (interactive, derived from hourly_min/max) */}
           {/* ============================================================ */}
           <SalarySimulatorSection
-            simulator={store.salary_simulator}
             backItems={store.back_items}
             hourlyMin={store.hourly_min}
             hourlyMax={store.hourly_max}
@@ -1089,16 +1059,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             icon={<Building size={20} style={{ color: "#D4AF37" }} />}
             stores={store.related_stores}
             ids={store.related_store_ids}
-            currentId={store.id}
-          />
-
-          {/* ============================================================ */}
-          {/* 12b. High recruitment-standard stores */}
-          {/* ============================================================ */}
-          <RelatedStoresSection
-            title="採用基準が高い店舗"
-            icon={<Award size={20} style={{ color: "#D4AF37" }} />}
-            stores={store.high_standard_stores}
             currentId={store.id}
           />
 
@@ -2139,40 +2099,27 @@ function formatAmount(value: number | string | undefined): string {
   return `¥${n.toLocaleString()}`;
 }
 
-// ── Transfer map section ───────────────────────────────────────────────────
+// ── Transfer / 足代 zone fee section ───────────────────────────────────────
 function TransferMapSection({
-  mapImageUrl,
   zones,
   fallbackDescription,
   fallbackKm,
 }: {
-  mapImageUrl?: string | null;
   zones?: TransferZone[] | null;
   fallbackDescription?: string | null;
   fallbackKm?: string | null;
 }) {
-  const hasMap = !!mapImageUrl;
   const zoneList = zones ?? [];
   const hasZones = zoneList.length > 0;
   const hasFallback = !!(fallbackDescription || fallbackKm);
 
-  if (!hasMap && !hasZones && !hasFallback) return null;
+  if (!hasZones && !hasFallback) return null;
 
   return (
     <SectionCard
       icon={<MapIcon size={20} style={{ color: GOLD_HEX }} />}
-      title="送り（送迎範囲）"
+      title="送り・足代"
     >
-      {hasMap && (
-        <div className="overflow-hidden rounded-[12px] mb-3">
-          <img
-            src={mapImageUrl!}
-            alt="送り範囲マップ"
-            className="w-full h-auto object-cover"
-          />
-        </div>
-      )}
-
       {hasZones && (
         <div className="space-y-2">
           <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
@@ -2212,7 +2159,7 @@ function TransferMapSection({
         </div>
       )}
 
-      {!hasMap && !hasZones && hasFallback && (
+      {!hasZones && hasFallback && (
         <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
           {fallbackKm
             ? `${fallbackDescription ?? "送りあり"}（${fallbackKm}以内）`
@@ -2471,38 +2418,35 @@ function DressGallery({
   );
 }
 
-// ── Salary simulator ──────────────────────────────────────────────────────
+// ── Salary simulator (driven entirely by hourly_min/max + back_items) ──────
 function SalarySimulatorSection({
-  simulator,
   backItems,
   hourlyMin,
   hourlyMax,
 }: {
-  simulator?: SalarySimulator | null;
   backItems?: BackItem[];
   hourlyMin?: number;
   hourlyMax?: number;
 }) {
-  // Defaults: prefer simulator → fall back to store hourly_min/back/etc.
-  const baseHourly =
-    simulator?.default_hourly ??
-    (Math.max(hourlyMin ?? 0, 0) || 3000);
-  const baseSales = simulator?.default_sales ?? 200_000;
-  const baseNominations = simulator?.default_nominations ?? 0;
+  // No store-specific simulator config any more — derive sensible defaults
+  // from the store's hourly_min and back_items. Store admins tune time wages
+  // separately; this simulator is for "what could I make if I got X sales?"
+  const baseHourly = Math.max(hourlyMin ?? 0, 0) || 3000;
+  const baseSales = 200_000;
+  const baseNominations = 0;
 
-  // back_rate: prefer explicit, otherwise infer from store back_items if any
-  // are expressed as percentage values (≤ 100), otherwise a sensible 30%.
+  // back_rate: infer from store back_items if any are expressed as percentage
+  // values (≤ 100), otherwise a sensible 30%.
   const inferredBackRate = (() => {
-    if (typeof simulator?.back_rate === "number") return simulator.back_rate;
     const sample = (backItems ?? []).find(
       (b) => typeof b.amount === "number" && b.amount > 0 && b.amount <= 100,
     );
     if (sample) return sample.amount / 100;
     return 0.3;
   })();
-  const nominationUnit = simulator?.nomination_unit ?? 1500;
-  const hoursPerDay = simulator?.hours_per_day ?? 5;
-  const daysPerMonth = simulator?.days_per_month ?? 22;
+  const nominationUnit = 1500;
+  const hoursPerDay = 5;
+  const daysPerMonth = 22;
 
   const hourlyMaxBound = Math.max(
     hourlyMax ?? baseHourly * 2,
@@ -2513,7 +2457,6 @@ function SalarySimulatorSection({
   const [sales, setSales] = useState<number>(baseSales);
   const [nominations, setNominations] = useState<number>(baseNominations);
 
-  // If the input store changes, re-sync defaults (rare but tidy).
   useEffect(() => {
     setHourly(baseHourly);
     setSales(baseSales);
@@ -2525,9 +2468,8 @@ function SalarySimulatorSection({
   const nom = nominations * nominationUnit;
   const monthly = Math.round(wage + back + nom);
 
-  // Render the section only if we have a simulator config OR a usable hourly base.
-  const enabled = !!simulator || (hourlyMin && hourlyMin > 0);
-  if (!enabled) return null;
+  // Only render the section if we have a usable hourly base.
+  if (!hourlyMin || hourlyMin <= 0) return null;
 
   return (
     <SectionCard

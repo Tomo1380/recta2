@@ -113,14 +113,7 @@ export interface Store {
   schedule: Record<string, unknown> | null;
   recent_hires: Record<string, unknown>[] | null;
   recent_hires_summary: string | null;
-  popular_features: string[] | null;
   recruitment_standards: string | null;
-  rank: string | null;
-  gal_point: number | null;
-  loose_point: number | null;
-  age_point: number | null;
-  waiwai_point: number | null;
-  cute_point: number | null;
   champagne_description: string | null;
   transfer_description: string | null;
   transfer_km: string | null;
