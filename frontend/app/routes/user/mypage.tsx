@@ -118,7 +118,7 @@ export default function MyPage() {
   if (!hydrated || authLoading || !user) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex flex-1 items-center justify-center"
         style={{ backgroundColor: "#f7f6f3" }}
       >
         <div
@@ -133,7 +133,7 @@ export default function MyPage() {
   }
 
   return (
-    <div className="min-h-screen pb-12" style={{ backgroundColor: "#f7f6f3" }}>
+    <div className="pb-12" style={{ backgroundColor: "#f7f6f3", minHeight: "100%" }}>
       {/* Header */}
       <div
         className="px-4 py-6"

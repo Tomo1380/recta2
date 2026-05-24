@@ -11,7 +11,8 @@ export default [
     route("mypage", "routes/user/mypage.tsx"),
     route("stores/:id/review", "routes/user/review.tsx"),
     route("relocate-support", "routes/user/relocate-support.tsx"),
-    route("compare/:idA/:idB", "routes/user/compare.tsx"),
+    // ids はカンマ区切り (2〜4件)。例: /compare/1,5,8
+    route("compare/:ids", "routes/user/compare.tsx"),
     route("columns", "routes/user/columns.tsx"),
     route("columns/:slug", "routes/user/column-detail.tsx"),
   ]),

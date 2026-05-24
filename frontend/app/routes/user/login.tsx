@@ -55,7 +55,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center px-4"
+      className="flex flex-1 items-center justify-center px-4"
       style={{ backgroundColor: "#f7f6f3" }}
     >
       <Card className="w-full max-w-md">

@@ -43,7 +43,7 @@ export default function AuthCallbackPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center"
+      className="flex flex-1 items-center justify-center"
       style={{ backgroundColor: "#f7f6f3" }}
     >
       <div className="flex flex-col items-center gap-4">

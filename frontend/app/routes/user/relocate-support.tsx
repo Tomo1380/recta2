@@ -43,7 +43,7 @@ const VOICES = [
 
 export default function RelocateSupportPage() {
   return (
-    <div style={{ background: "#faf9f5", minHeight: "100vh", paddingBottom: "80px" }}>
+    <div style={{ background: "#faf9f5", minHeight: "100%" }}>
       {/* ── HERO ── */}
       <div
         style={{

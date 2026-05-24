@@ -69,7 +69,7 @@ export default function ColumnsPage() {
   }, [activeCategory, search]);
 
   return (
-    <div style={{ background: "#faf9f5", minHeight: "100vh", paddingBottom: "80px" }}>
+    <div style={{ background: "#faf9f5", minHeight: "100%" }}>
       {/* Hero */}
       <div
         style={{

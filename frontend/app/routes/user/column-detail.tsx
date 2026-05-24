@@ -173,7 +173,7 @@ export default function ColumnDetailPage() {
   if (notFound || !article) {
     return (
       <div
-        style={{ background: "#faf9f5", minHeight: "100vh", padding: "60px 20px" }}
+        style={{ background: "#faf9f5", minHeight: "60vh", padding: "60px 20px" }}
         className="flex flex-col items-center justify-center text-center gap-3"
       >
         <FileText className="w-8 h-8 text-stone-300" />
@@ -198,7 +198,7 @@ export default function ColumnDetailPage() {
   }
 
   return (
-    <div style={{ background: "#faf9f5", minHeight: "100vh", paddingBottom: "60px" }}>
+    <div style={{ background: "#faf9f5", minHeight: "100%", paddingBottom: "60px" }}>
       {/* Hero */}
       <div
         style={{

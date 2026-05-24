@@ -38,7 +38,6 @@ import {
 } from "lucide-react";
 
 import Footer from "~/components/user/shared/Footer";
-import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
@@ -391,7 +390,6 @@ function SectionHeading({
     <h2
       className="flex items-center gap-2 pl-3 text-[17px] font-bold tracking-tight"
       style={{
-        fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
         color: "#1b2528",
         borderLeft: "4px solid #D4AF37",
       }}
@@ -408,7 +406,7 @@ function SectionHeading({
 
 function LoadingSkeleton() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
+    <div className="space-y-6 px-4 py-8">
       <Skeleton className="h-[220px] w-full rounded-none" />
       <Skeleton className="h-8 w-64" />
       <div className="flex gap-2">
@@ -550,7 +548,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const sortedImages = (store.images ?? []).slice().sort((a, b) => a.order - b.order);
 
   return (
-    <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#f5f5f5" }}>
+    <>
       {/* ============================================================ */}
       {/* Luxe hero — image slider w/ editorial overlay                */}
       {/* ============================================================ */}
@@ -566,7 +564,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       />
 
       <div className="relative z-10" style={{ backgroundColor: "#f5f5f5" }}>
-        <div className="mx-auto max-w-3xl space-y-4 px-4 pb-24 pt-4">
+        <div className="space-y-4 px-4 pb-24 pt-4">
           {/* ============================================================ */}
           {/* Quick stats — 4 strip                                       */}
           {/* ============================================================ */}
@@ -1262,11 +1260,10 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
         <Footer />
       </div>
 
-      {/* ============================================================ */}
-      {/* Bottom Tab Bar (skipped in preview — admin preview shell renders its own) */}
-      {/* ============================================================ */}
-      {!previewData && <BottomTabBar />}
-    </div>
+      {/* BottomTabBar is rendered by routes/user/layout.tsx. The admin shop
+          preview imports StoreDetailPage directly (outside that layout), so the
+          tab bar naturally doesn't leak into admin views. */}
+    </>
   );
 }
 
@@ -1413,8 +1410,7 @@ function LuxeHero({
         <h1
           className="mt-1 text-[32px] font-bold leading-[1.1] text-white"
           style={{
-            fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
-            textShadow: "0 2px 18px rgba(0,0,0,0.5)",
+                textShadow: "0 2px 18px rgba(0,0,0,0.5)",
           }}
         >
           {name}
@@ -3121,7 +3117,7 @@ function ReviewsSection({
             <div className="min-w-0 flex-1">
               <div
                 className="text-[13px] font-semibold"
-                style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+                style={{ color: "#1b2528" }}
               >
                 続きはログインで全件公開
               </div>

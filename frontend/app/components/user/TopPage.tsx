@@ -2,19 +2,22 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import Footer from "~/components/user/shared/Footer";
-import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
+import SectionHeader from "~/components/user/shared/SectionHeader";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import { useUserAuth } from "~/lib/user-auth";
+import { LUXE } from "~/lib/luxe-tokens";
 
 // ─── Constants ─────────────────────────────────────
-const GOLD = "#D4AF37";
-const DARK = "#1b2528";
-const J = "'Noto Sans JP',sans-serif";
+// Color/gradient/font tokens live in ~/lib/luxe-tokens. Aliases kept short for
+// the heavy inline-style usage below.
+const GOLD = LUXE.gold;
+const DARK = LUXE.dark;
+const J = LUXE.fontJa;
 const AI_AVATAR_BG = "linear-gradient(135deg,#D4AF37,#9a7a20)";
 const ROBOT_SVG_PATH = "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a7 7 0 0 1-7 7H9a7 7 0 0 1-7-7H1a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 12 2zm-4 9a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm8 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z";
-const BASE_GRADIENT = `linear-gradient(180deg, ${DARK} 0px, ${DARK} 40px, rgba(27,37,40,.85) 80px, rgba(27,37,40,.55) 120px, rgba(27,37,40,.25) 162px, rgba(27,37,40,.07) 198px, #f5f5f5 230px, #f5f5f5 100%)`;
+const BASE_GRADIENT = LUXE.baseGradient;
 
 // ─── Types ─────────────────────────────────────────
 interface PickupShop {
@@ -410,10 +413,10 @@ export default function TopPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: "#f5f5f5" }}>
+      <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="size-10 animate-spin rounded-full border-4" style={{ borderColor: "rgba(212,175,55,0.2)", borderTopColor: GOLD }} />
-          <p className="text-sm" style={{ color: "rgba(27,37,40,0.5)", fontFamily: J }}>読み込み中...</p>
+          <p className="text-sm" style={{ color: "rgba(27,37,40,0.5)" }}>読み込み中...</p>
         </div>
       </div>
     );
@@ -421,7 +424,7 @@ export default function TopPage() {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: "#f5f5f5" }}>
+      <div className="flex flex-1 items-center justify-center">
         <p style={{ color: "rgba(27,37,40,0.5)" }}>データの取得に失敗しました。再度お試しください。</p>
       </div>
     );
@@ -434,10 +437,8 @@ export default function TopPage() {
   const consultations = data.consultations ?? [];
 
   return (
-    <div style={{ fontFamily: "'Outfit','Noto Sans JP',sans-serif" }} className="min-h-screen bg-[#f5f5f5] flex justify-center">
-      <div className="relative w-full max-w-[430px] bg-[#f5f5f5] min-h-screen flex flex-col pb-[68px]">
-
-        {/* ══ HERO ══ */}
+    <>
+      {/* ══ HERO ══ */}
         <div className="relative w-full" style={{ height: "82vw", maxHeight: "360px", minHeight: "260px" }}>
           <img src="/hero-top.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,rgba(8,6,16,.52) 0%,rgba(8,6,16,.1) 45%,rgba(8,6,16,.78) 100%)" }} />
@@ -473,13 +474,14 @@ export default function TopPage() {
 
         {/* ══ PICKUP STORES ══ */}
         <div className="mt-4">
-          <div className="flex items-center justify-between px-5 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-1 h-5 rounded-full" style={{ background: `linear-gradient(180deg,${GOLD},#c8960c)` }} />
-              <h2 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "17px", letterSpacing: "-0.02em", color: DARK, margin: 0 }}>ピックアップ店舗</h2>
-              <span className="px-2 py-0.5 rounded" style={{ background: `linear-gradient(135deg,${DARK},#2c3e46)`, border: `1px solid rgba(212,175,55,.4)`, fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: "8.5px", letterSpacing: "0.12em", color: GOLD }}>PR</span>
-            </div>
-            <Link to="/stores" style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: GOLD, textDecoration: "none" }}>すべて見る →</Link>
+          <div className="px-5 mb-3">
+            <SectionHeader
+              title="ピックアップ店舗"
+              badge="PR"
+              right={
+                <Link to="/stores" style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: GOLD, textDecoration: "none" }}>すべて見る →</Link>
+              }
+            />
           </div>
           <div className="flex gap-3 px-5 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
             {pickupShops.map((store, idx) => {
@@ -780,11 +782,6 @@ export default function TopPage() {
             </div>
           </footer>
         </div>
-
-      </div>
-
-      {/* Bottom Tab Bar */}
-      <BottomTabBar />
-    </div>
+    </>
   );
 }

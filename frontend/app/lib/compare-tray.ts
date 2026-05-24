@@ -1,16 +1,20 @@
 /**
  * Compare tray — 「比較に追加した店舗ID」の localStorage 保持。
  *
- * フィードバック原文「即決できない人に2件並べて選ばせる」の通り、
- * **2件揃ったら自動的に比較ページへ遷移** させる UX を採用する。
- * そのため tray は容量 2 件固定、それを超える追加は最古を弾く FIFO。
+ * フィードバック原文「即決できない人に並べて選ばせる」を受けて、
+ * **2〜4件**まで選ばせて横スクロール比較表で比較する UX に進化させた。
+ * 上限は心理学的な比較限界 (Miller's 4±1) と、スマホ幅で横スクロール
+ * 3 タップで全件見える上限から 4 件とする。
+ *
+ * 一覧ページのチェックボックス + 追従バー + 比較画面の「追加」スロット
+ * から共通で読み書きされる SSoT。
  *
  * RecentlyViewedStores (viewed-stores.ts) と異なり、こちらは
  * 「ユーザーが意図的に比較対象として選んだ店舗」のみ保持する。
  */
 
 const STORAGE_KEY = "recta:compare-tray";
-const MAX_ITEMS = 2;
+export const COMPARE_MAX_ITEMS = 4;
 const EVENT_NAME = "recta:compare-tray-changed";
 
 export interface CompareTrayItem {
@@ -71,7 +75,7 @@ export function addToCompareTray(store: Omit<CompareTrayItem, "added_at">): Comp
   if (!isBrowser()) return [];
   const current = getCompareTray();
   if (current.some((s) => s.id === store.id)) return current;
-  const next = [...current, { ...store, added_at: Date.now() }].slice(-MAX_ITEMS);
+  const next = [...current, { ...store, added_at: Date.now() }].slice(-COMPARE_MAX_ITEMS);
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     emitChange();

@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Star, ChevronDown, Search as SearchIcon, X, SlidersHorizontal } from "lucide-react";
+import { Star, ChevronDown, Search as SearchIcon, X, SlidersHorizontal, Check } from "lucide-react";
+import {
+  addToCompareTray,
+  COMPARE_MAX_ITEMS,
+  getCompareTray,
+  removeFromCompareTray,
+  subscribeCompareTray,
+  type CompareTrayItem,
+} from "~/lib/compare-tray";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
   Pagination,
@@ -12,9 +20,9 @@ import {
   PaginationEllipsis,
 } from "~/components/ui/pagination";
 import Footer from "~/components/user/shared/Footer";
-import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import AiChatPanel from "~/components/user/AiChatPanel";
+import { LUXE } from "~/lib/luxe-tokens";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,12 +89,37 @@ function getImageUrl(image: string | { url: string } | undefined): string | unde
 // Editorial list card — 1-column compact, full-height gold accent on the left
 // ---------------------------------------------------------------------------
 
-function EditorialStoreCard({ store }: { store: Store }) {
+function EditorialStoreCard({
+  store,
+  tray,
+}: {
+  store: Store;
+  tray: CompareTrayItem[];
+}) {
   const imageUrl = store.images && store.images.length > 0 ? getImageUrl(store.images[0]) : undefined;
   const rating = store.average_rating ?? 0;
   const fullStars = Math.floor(rating);
   const hasHalf = rating - fullStars >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+  const inTray = tray.some((t) => t.id === store.id);
+  const trayFull = tray.length >= COMPARE_MAX_ITEMS;
+
+  const toggleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inTray) {
+      removeFromCompareTray(store.id);
+      return;
+    }
+    if (trayFull) return; // 4件 cap、disabled 表示
+    addToCompareTray({
+      id: store.id,
+      name: store.name,
+      area: store.area,
+      category: store.category,
+      image_url: imageUrl,
+    });
+  };
 
   return (
     <Link
@@ -94,7 +127,7 @@ function EditorialStoreCard({ store }: { store: Store }) {
       className="group relative flex overflow-hidden rounded-xl bg-white transition-shadow active:scale-[0.99]"
       style={{
         boxShadow: "0 4px 14px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04)",
-        border: "1px solid rgba(27,37,40,0.06)",
+        border: inTray ? "1px solid #D4AF37" : "1px solid rgba(27,37,40,0.06)",
       }}
     >
       {/* Full-height gold accent bar */}
@@ -144,6 +177,33 @@ function EditorialStoreCard({ store }: { store: Store }) {
               体験確約
             </span>
           )}
+          {/* Compare checkbox — 画像の右上に重ねる（背面の評価★を妨げない位置） */}
+          <button
+            type="button"
+            onClick={toggleCompare}
+            disabled={!inTray && trayFull}
+            aria-pressed={inTray}
+            aria-label={
+              inTray
+                ? `${store.name} を比較から外す`
+                : trayFull
+                  ? `比較は最大${COMPARE_MAX_ITEMS}件まで`
+                  : `${store.name} を比較に追加`
+            }
+            title={!inTray && trayFull ? `比較は最大${COMPARE_MAX_ITEMS}件まで` : undefined}
+            className="absolute top-1 right-1 z-10 inline-flex items-center justify-center rounded-md active:scale-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              width: 22,
+              height: 22,
+              background: inTray ? "#D4AF37" : "rgba(255,255,255,0.92)",
+              border: inTray ? "1px solid #D4AF37" : "1px solid rgba(27,37,40,0.15)",
+              color: inTray ? "white" : "rgba(27,37,40,0.55)",
+              cursor: !inTray && trayFull ? "not-allowed" : "pointer",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+            }}
+          >
+            <Check size={12} aria-hidden style={{ opacity: inTray ? 1 : 0.85 }} />
+          </button>
         </div>
 
         {/* Meta */}
@@ -151,7 +211,7 @@ function EditorialStoreCard({ store }: { store: Store }) {
           <div className="flex items-start justify-between gap-2">
             <h3
               className="truncate text-[14px] font-bold leading-tight"
-              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+              style={{ color: "#1b2528" }}
             >
               {store.name}
             </h3>
@@ -394,7 +454,7 @@ function FilterSheet({
           <div className="flex items-center justify-between">
             <h3
               className="text-base font-bold"
-              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+              style={{ color: "#1b2528" }}
             >
               条件を絞り込む
             </h3>
@@ -527,6 +587,13 @@ export default function StoreListPage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  // 比較トレイ。localStorage と同期し、SelectionBar とカードのチェック状態の SSoT。
+  const [compareTray, setCompareTray] = useState<CompareTrayItem[]>([]);
+
+  useEffect(() => {
+    setCompareTray(getCompareTray());
+    return subscribeCompareTray(() => setCompareTray(getCompareTray()));
+  }, []);
 
   useEffect(() => {
     setSearchInput(searchParams.get("q") || "");
@@ -600,7 +667,7 @@ export default function StoreListPage() {
   const activeChipsCount = (currentArea ? 1 : 0) + (currentCategory ? 1 : 0);
 
   return (
-    <div className="min-h-screen pb-[68px]" style={{ backgroundColor: "#f5f5f5" }}>
+    <>
       {/* ----------------------------------------------------------- */}
       {/* Editorial poster hero — "STORES / お店一覧" (with login)    */}
       {/* ----------------------------------------------------------- */}
@@ -634,7 +701,7 @@ export default function StoreListPage() {
             background: "radial-gradient(ellipse at center, rgba(200,96,128,0.18) 0%, transparent 60%)",
           }}
         />
-        <div className="relative mx-auto max-w-3xl px-5 pb-6 pt-6">
+        <div className="relative px-5 pb-6 pt-6">
           <div
             className="text-[10px] font-bold uppercase"
             style={{ color: "rgba(212,175,55,0.85)", fontFamily: "'Outfit', sans-serif", letterSpacing: "0.22em" }}
@@ -644,7 +711,6 @@ export default function StoreListPage() {
           <div className="mt-1 flex items-end justify-between gap-4">
             <h1
               className="text-[26px] font-bold leading-none text-white"
-              style={{ fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
             >
               お店一覧
             </h1>
@@ -678,14 +744,14 @@ export default function StoreListPage() {
       {/* ----------------------------------------------------------- */}
       {/* AI Chat — breathing room from hero                          */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto max-w-3xl px-4 pt-4">
+      <div className="px-4 pt-4">
         <AiChatPanel pageType="list" />
       </div>
 
       {/* ----------------------------------------------------------- */}
       {/* Action bar — single filter button + active chips counter    */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 pt-5">
+      <div className="flex items-center gap-2 px-4 pt-5">
         <button
           onClick={() => setShowFilter(true)}
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium"
@@ -741,7 +807,7 @@ export default function StoreListPage() {
       {/* ----------------------------------------------------------- */}
       {/* Sort tabs — gold underline                                  */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto max-w-3xl px-4">
+      <div className="px-4">
         <div
           className="mt-3 flex gap-5 overflow-x-auto overflow-y-hidden border-b text-xs"
           style={{ borderColor: "rgba(27,37,40,0.06)" }}
@@ -771,7 +837,7 @@ export default function StoreListPage() {
       {/* ----------------------------------------------------------- */}
       {/* Results                                                     */}
       {/* ----------------------------------------------------------- */}
-      <div className="mx-auto max-w-3xl px-3 pt-4 pb-6">
+      <div className="px-3 pt-4 pb-6">
         {loading ? (
           <div className="space-y-2.5">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -788,7 +854,7 @@ export default function StoreListPage() {
             </div>
             <p
               className="mb-2 text-base font-bold"
-              style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+              style={{ color: "#1b2528" }}
             >
               条件に合うお店が見つかりませんでした
             </p>
@@ -807,7 +873,7 @@ export default function StoreListPage() {
           <>
             <div className="space-y-2.5">
               {storeList.map((store) => (
-                <EditorialStoreCard key={store.id} store={store} />
+                <EditorialStoreCard key={store.id} store={store} tray={compareTray} />
               ))}
             </div>
             {stores && (
@@ -822,12 +888,11 @@ export default function StoreListPage() {
       </div>
 
       {/* Recently viewed */}
-      <div className="mx-auto max-w-3xl pb-4">
+      <div className="pb-4">
         <RecentlyViewedStores variant="flush" />
       </div>
 
       <Footer />
-      <BottomTabBar />
 
       <FilterSheet
         open={showFilter}
@@ -843,6 +908,6 @@ export default function StoreListPage() {
           updateParam("category", "");
         }}
       />
-    </div>
+    </>
   );
 }

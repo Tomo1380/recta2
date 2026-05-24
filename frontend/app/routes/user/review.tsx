@@ -107,7 +107,7 @@ export default function ReviewPage() {
   if (storeLoading || authLoading) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex flex-1 items-center justify-center"
         style={{ backgroundColor: "#f7f6f3" }}
       >
         <div
@@ -123,8 +123,8 @@ export default function ReviewPage() {
 
   return (
     <div
-      className="min-h-screen px-4 py-8"
-      style={{ backgroundColor: "#f7f6f3" }}
+      className="px-4 py-8"
+      style={{ backgroundColor: "#f7f6f3", minHeight: "100%" }}
     >
       <div className="mx-auto max-w-lg">
         <Link

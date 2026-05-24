@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router";
 import { Home, Search, MessageCircle } from "lucide-react";
 import { openLineFriendAdd } from "~/lib/line";
+import { MOBILE_FRAME_WIDTH } from "~/lib/luxe-tokens";
 
 const tabs = [
   { label: "ホーム", icon: Home, to: "/" },
@@ -20,7 +21,12 @@ export default function BottomTabBar({ inline = false }: { inline?: boolean }) {
       }
       style={{ borderTop: "1px solid rgba(27,37,40,0.08)" }}
     >
-      <div className="mx-auto flex max-w-md items-center justify-around py-2">
+      {/* On desktop, fixed left-0/right-0 spans the viewport; the centered max-width
+          keeps the actual tabs aligned under the 430px mobile frame above. */}
+      <div
+        className="mx-auto flex items-center justify-around py-2"
+        style={{ maxWidth: MOBILE_FRAME_WIDTH }}
+      >
         {tabs.map((tab) => {
           const isActive =
             tab.to === "/"

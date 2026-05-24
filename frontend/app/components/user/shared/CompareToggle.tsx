@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { GitCompareArrows, Check, X } from "lucide-react";
 import {
   addToCompareTray,
+  COMPARE_MAX_ITEMS,
   getCompareTray,
   removeFromCompareTray,
   subscribeCompareTray,
@@ -11,11 +12,15 @@ import {
 /**
  * 「この店舗と比較する」トグル。
  *
- * 挙動：
- * - tray にこの店舗が **未追加** → ボタン押下で追加。tray が満杯になったら自動で `/compare/:a/:b` に遷移。
- * - tray にこの店舗が **既に追加済** → 「比較リストに追加済」表示＋取り消しチップ。
+ * 店舗詳細ページの末尾に置く副次動線。メインの選択動線は店舗一覧の
+ * チェックボックスだが、既に詳細を見ているユーザーがそのまま比較に
+ * 追加できる導線も提供する。
  *
- * RecentlyViewedStores の直下に配置することを想定（フィードバック原文準拠）。
+ * 挙動:
+ * - 未追加 → 押下で tray に追加。即時遷移はせず、CompareSelectionBar から
+ *   ユーザーが明示的に「比較する」を押すまで待つ（誤タップ事故防止）。
+ * - 追加済 → 「比較リストに追加済み」表示 + 取り消しボタン。
+ * - tray 満杯 (4件) + 未追加 → disabled で「最大4件まで」表示。
  */
 interface CompareToggleProps {
   storeId: number;
@@ -50,11 +55,13 @@ export default function CompareToggle({
   }
 
   const inTray = tray.some((s) => s.id === storeId);
-  const partner = tray.find((s) => s.id !== storeId);
+  const trayFull = !inTray && tray.length >= COMPARE_MAX_ITEMS;
+  const othersCount = tray.filter((s) => s.id !== storeId).length;
 
   const onAdd = () => {
-    // 即遷移はしない（誤タップ事故防止）。2 件揃ったら
-    // CompareReadyBar が画面下にフローティング表示され、ユーザー操作で遷移する。
+    if (trayFull) return;
+    // 即遷移はしない（誤タップ事故防止）。CompareSelectionBar が画面下に
+    // floating 表示され、ユーザーが「比較する」を押すまで待つ。
     addToCompareTray({
       id: storeId,
       name: storeName,
@@ -87,12 +94,12 @@ export default function CompareToggle({
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-[12.5px] font-semibold leading-tight" style={{ color: DARK }}>
-            比較リストに追加済み
+            比較リストに追加済み（{tray.length}/{COMPARE_MAX_ITEMS}）
           </p>
           <p className="text-[10.5px] mt-0.5 leading-snug" style={{ color: "rgba(27,37,40,0.55)" }}>
-            {partner
-              ? `あと1件選ぶと「${partner.name}」と並べて比較できます`
-              : "他の店舗ページからもう1件選んでください"}
+            {othersCount === 0
+              ? "店舗一覧でもう1件以上選んで比較できます"
+              : `他${othersCount}件と並べて比較できます`}
           </p>
         </div>
         <button
@@ -112,13 +119,19 @@ export default function CompareToggle({
     <button
       type="button"
       onClick={onAdd}
-      aria-label="この店舗を比較リストに追加する"
-      className="w-full rounded-2xl px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition-transform"
+      disabled={trayFull}
+      aria-label={
+        trayFull
+          ? `比較リストは最大${COMPARE_MAX_ITEMS}件まで`
+          : "この店舗を比較リストに追加する"
+      }
+      className="w-full rounded-2xl px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition-transform disabled:cursor-not-allowed"
       style={{
         background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 100%)`,
         border: `1px solid ${GOLD}59`,
         boxShadow: "0 4px 18px rgba(0,0,0,0.18)",
-        cursor: "pointer",
+        cursor: trayFull ? "not-allowed" : "pointer",
+        opacity: trayFull ? 0.55 : 1,
       }}
     >
       <span
@@ -130,12 +143,14 @@ export default function CompareToggle({
       </span>
       <span className="flex-1 min-w-0 text-left">
         <span className="block text-[13.5px] font-bold leading-tight" style={{ color: "white" }}>
-          この店舗と比較する
+          {trayFull ? `比較リスト満員（${COMPARE_MAX_ITEMS}件）` : "この店舗を比較に追加"}
         </span>
         <span className="block text-[10.5px] mt-0.5 leading-snug" style={{ color: "rgba(255,255,255,0.65)" }}>
-          {tray.length === 0
-            ? "気になる店舗を2件選んで、スペックを並べてチェック"
-            : `「${tray[0].name}」と並べて比較します`}
+          {trayFull
+            ? "比較リストから外してから追加してください"
+            : tray.length === 0
+              ? `気になる店舗を最大${COMPARE_MAX_ITEMS}件まで並べて比較できます`
+              : `既に${tray.length}件選択中 — 比較リストに加える`}
         </span>
       </span>
       <span
@@ -143,7 +158,7 @@ export default function CompareToggle({
         style={{ background: `${GOLD}26`, color: GOLD, letterSpacing: "0.08em" }}
         aria-hidden
       >
-        {tray.length === 0 ? "1/2" : "2/2 ▸"}
+        {tray.length}/{COMPARE_MAX_ITEMS}
       </span>
     </button>
   );
