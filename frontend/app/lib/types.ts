@@ -89,7 +89,24 @@ export interface Store {
   features_text: string | null;
   dress_code: string | null;
   images: { url: string; order: number }[] | null;
+  /** Legacy single-video URL — kept populated by the API as videos[0].video_url for backwards compat. */
   video_url: string | null;
+  /** Ordered videos with optional label/description. */
+  videos: {
+    video_url: string;
+    label: string | null;
+    description: string | null;
+    poster_url: string | null;
+    display_order: number;
+  }[] | null;
+  /** Ordered staff photos (在籍女性ギャラリー) */
+  staff_photos: {
+    image_url: string;
+    caption: string | null;
+    instagram_url: string | null;
+    staff_type: string | null;
+    display_order: number;
+  }[] | null;
   analysis: Record<string, unknown> | null;
   interview_info: Record<string, unknown> | null;
   required_documents: { notes: string; documents: string[] } | null;

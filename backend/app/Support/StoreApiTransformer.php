@@ -25,6 +25,14 @@ class StoreApiTransformer
     {
         $base = $store instanceof Store ? $store->toArray() : (array) $store;
 
+        // ── Videos: project store_videos rows into a plain array, ordered
+        //    by display_order, so the frontend can render multiple videos
+        //    with their own label / description text between them.
+        $videos = self::projectVideos($store, $base);
+
+        // ── Staff photos: 在籍女性ギャラリー
+        $staffPhotos = self::projectStaffPhotos($store, $base);
+
         // Pull JSONB structures (already cast to array by the model)
         $schedule     = self::pickArray($base, 'schedule');
         $wage         = self::pickArray($base, 'wage');
@@ -86,6 +94,16 @@ class StoreApiTransformer
             'dress_code_description' => $dressCode['description'] ?? null,
             // Object form for the new Dress code section (OK / NG examples)
             'dress_code_detail' => $dressCode ?: null,
+
+            // videos: ordered list of {url, label, description, poster_url}
+            'videos' => $videos,
+            // legacy single-video fallback: keep `video_url` populated from the
+            // first video so any frontend that hasn't moved to `videos[]` yet
+            // still renders something.
+            'video_url' => $videos[0]['video_url'] ?? null,
+
+            // staff_photos: ordered list of {image_url, caption, instagram_url, staff_type, display_order}
+            'staff_photos' => $staffPhotos,
         ];
 
         // Merge: base columns (which already include JSONB raw values) + flattened
@@ -132,6 +150,94 @@ class StoreApiTransformer
             'description'     => $full['description'] ?? null,
             'images'          => $full['images'] ?? [],
         ];
+    }
+
+    /**
+     * Normalize store_videos into the public array shape.
+     *
+     * Accepts either a Store model (we use its relation) or a raw array
+     * (e.g. produced by toArray() at a higher layer that already eager-loaded
+     * `videos`).
+     *
+     * @return array<int, array{video_url:string,label:?string,description:?string,poster_url:?string,display_order:int}>
+     */
+    private static function projectVideos($store, array $base): array
+    {
+        // Prefer the eager-loaded relation collection when we have a Store
+        // model, since toArray() on Store doesn't auto-include relations.
+        if ($store instanceof Store && $store->relationLoaded('videos')) {
+            $rows = $store->getRelation('videos');
+            return collect($rows)
+                ->sortBy('display_order')
+                ->values()
+                ->map(fn ($v) => [
+                    'video_url' => (string) $v->video_url,
+                    'label' => $v->label,
+                    'description' => $v->description,
+                    'poster_url' => $v->poster_url,
+                    'display_order' => (int) $v->display_order,
+                ])
+                ->all();
+        }
+
+        $raw = $base['videos'] ?? null;
+        if (!is_array($raw)) {
+            return [];
+        }
+        return collect($raw)
+            ->sortBy(fn ($v) => $v['display_order'] ?? 0)
+            ->values()
+            ->map(fn ($v) => [
+                'video_url' => (string) ($v['video_url'] ?? ''),
+                'label' => $v['label'] ?? null,
+                'description' => $v['description'] ?? null,
+                'poster_url' => $v['poster_url'] ?? null,
+                'display_order' => (int) ($v['display_order'] ?? 0),
+            ])
+            ->filter(fn ($v) => $v['video_url'] !== '')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Normalize store_staff_photos into the public array shape.
+     *
+     * @return array<int, array{image_url:string,caption:?string,instagram_url:?string,staff_type:?string,display_order:int}>
+     */
+    private static function projectStaffPhotos($store, array $base): array
+    {
+        if ($store instanceof Store && $store->relationLoaded('staffPhotos')) {
+            $rows = $store->getRelation('staffPhotos');
+            return collect($rows)
+                ->sortBy('display_order')
+                ->values()
+                ->map(fn ($p) => [
+                    'image_url' => (string) $p->image_url,
+                    'caption' => $p->caption,
+                    'instagram_url' => $p->instagram_url,
+                    'staff_type' => $p->staff_type,
+                    'display_order' => (int) $p->display_order,
+                ])
+                ->all();
+        }
+
+        $raw = $base['staff_photos'] ?? null;
+        if (!is_array($raw)) {
+            return [];
+        }
+        return collect($raw)
+            ->sortBy(fn ($p) => $p['display_order'] ?? 0)
+            ->values()
+            ->map(fn ($p) => [
+                'image_url' => (string) ($p['image_url'] ?? ''),
+                'caption' => $p['caption'] ?? null,
+                'instagram_url' => $p['instagram_url'] ?? null,
+                'staff_type' => $p['staff_type'] ?? null,
+                'display_order' => (int) ($p['display_order'] ?? 0),
+            ])
+            ->filter(fn ($p) => $p['image_url'] !== '')
+            ->values()
+            ->all();
     }
 
     private static function pickArray(array $base, string $key): array

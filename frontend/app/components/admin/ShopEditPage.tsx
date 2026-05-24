@@ -29,6 +29,8 @@ import {
   HelpCircle,
   MessageSquare,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Zap,
   CheckCircle2,
   Circle,
@@ -535,7 +537,19 @@ export function ShopEditPage() {
   const [holiday, setHoliday] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
+  // Multi-video editor state. Each row is one video with its own label and
+  // description so the public store-detail page can render them interleaved.
+  type VideoDraft = { video_url: string; label: string; description: string };
+  const [videos, setVideos] = useState<VideoDraft[]>([]);
+
+  // 在籍女性ギャラリー（StoreDetail 8b セクション）の編集 state。
+  type StaffPhotoDraft = {
+    image_url: string;
+    caption: string;
+    instagram_url: string;
+    staff_type: string;
+  };
+  const [staffPhotos, setStaffPhotos] = useState<StaffPhotoDraft[]>([]);
   const [minWage, setMinWage] = useState("");
   const [maxWage, setMaxWage] = useState("");
   const [dailyPay, setDailyPay] = useState("");
@@ -654,7 +668,30 @@ export function ShopEditPage() {
     setHoliday(store.holidays || "");
     setPhone(store.phone || "");
     setWebsite(store.website_url || "");
-    setVideoUrl(store.video_url || "");
+    // Prefer the new ordered videos[]; fall back to the legacy single video_url
+    // so stores that haven't been re-saved since the migration still render.
+    if (store.videos && store.videos.length > 0) {
+      setVideos(
+        store.videos.map((v) => ({
+          video_url: v.video_url,
+          label: v.label ?? "",
+          description: v.description ?? "",
+        })),
+      );
+    } else if (store.video_url) {
+      setVideos([{ video_url: store.video_url, label: "店舗紹介動画", description: "" }]);
+    } else {
+      setVideos([]);
+    }
+
+    setStaffPhotos(
+      (store.staff_photos ?? []).map((p) => ({
+        image_url: p.image_url,
+        caption: p.caption ?? "",
+        instagram_url: p.instagram_url ?? "",
+        staff_type: p.staff_type ?? "",
+      })),
+    );
     setMinWage(store.hourly_min?.toString() || "");
     setMaxWage(store.hourly_max?.toString() || "");
     setDailyPay(store.daily_estimate || "");
@@ -847,7 +884,23 @@ export function ShopEditPage() {
     shift_info: shiftInfo || null,
     phone,
     website_url: website,
-    video_url: videoUrl,
+    // store_videos に同期される。空URLや空欄行は controller 側で drop される。
+    videos: videos
+      .filter((v) => v.video_url.trim() !== "")
+      .map((v) => ({
+        video_url: v.video_url.trim(),
+        label: v.label.trim() || null,
+        description: v.description.trim() || null,
+      })),
+    // store_staff_photos に同期される。
+    staff_photos: staffPhotos
+      .filter((p) => p.image_url.trim() !== "")
+      .map((p) => ({
+        image_url: p.image_url.trim(),
+        caption: p.caption.trim() || null,
+        instagram_url: p.instagram_url.trim() || null,
+        staff_type: p.staff_type.trim() || null,
+      })),
     hourly_min: minWage ? Number(minWage) : null,
     hourly_max: maxWage ? Number(maxWage) : null,
     daily_estimate: dailyPay,
@@ -964,7 +1017,7 @@ export function ShopEditPage() {
         ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
       })),
     publish_status: publishStatus,
-  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videoUrl, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
+  }), [shopName, area, address, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, popularFeatures, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, expRatio, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1181,12 +1234,11 @@ export function ShopEditPage() {
               disabled={isNew}
             />
           </Field>
-          <Field label="動画URL">
-            <TextInput
-              value={videoUrl}
-              onChange={(e: any) => setVideoUrl(e.target.value)}
-              placeholder="例: https://youtube.com/..."
-            />
+          <Field label="動画（複数登録可）">
+            <VideoListEditor videos={videos} onChange={setVideos} />
+          </Field>
+          <Field label="在籍女性ギャラリー（複数登録可）">
+            <StaffPhotosEditor photos={staffPhotos} onChange={setStaffPhotos} />
           </Field>
         </div>
       </SectionCard>
@@ -2338,7 +2390,26 @@ export function ShopEditPage() {
                   description: description,
                   features_text: featureText,
                   images: storeImages.length > 0 ? storeImages.map((url, i) => ({ url, order: i })) : null,
-                  video_url: videoUrl,
+                  // Preview consumes the same `videos` shape as the public API.
+                  videos: videos
+                    .filter((v) => v.video_url.trim() !== "")
+                    .map((v, i) => ({
+                      video_url: v.video_url.trim(),
+                      label: v.label.trim() || null,
+                      description: v.description.trim() || null,
+                      poster_url: null,
+                      display_order: i,
+                    })),
+                  video_url: videos.find((v) => v.video_url.trim() !== "")?.video_url ?? null,
+                  staff_photos: staffPhotos
+                    .filter((p) => p.image_url.trim() !== "")
+                    .map((p, i) => ({
+                      image_url: p.image_url.trim(),
+                      caption: p.caption.trim() || null,
+                      instagram_url: p.instagram_url.trim() || null,
+                      staff_type: p.staff_type.trim() || null,
+                      display_order: i,
+                    })),
                   analysis: {
                     experience_level: expLevel,
                     atmosphere: atmosphere,
@@ -2720,6 +2791,314 @@ export function ShopEditPage() {
           <div className="h-8" />
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VideoListEditor — 動画の複数登録 UI
+// ---------------------------------------------------------------------------
+//
+// 動画は store_videos に 1 件 1 行で保存される。
+// ここでは「URL / ラベル / 説明」を 1 行のカードで編集し、上下ボタンで並び替え、
+// ✕ で削除、＋ボタンで新規追加できる。並び順 = display_order。
+//
+// 保存はフォーム本体の save() で他フィールドと一緒に POST/PUT される。
+// （別エンドポイント不要 — Admin StoreController が videos[] を受け取って syncVideos() する）
+function VideoListEditor({
+  videos,
+  onChange,
+}: {
+  videos: { video_url: string; label: string; description: string }[];
+  onChange: (next: { video_url: string; label: string; description: string }[]) => void;
+}) {
+  const update = (i: number, patch: Partial<{ video_url: string; label: string; description: string }>) => {
+    onChange(videos.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
+  };
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= videos.length) return;
+    const next = [...videos];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const remove = (i: number) => {
+    onChange(videos.filter((_, idx) => idx !== i));
+  };
+  const add = () => {
+    onChange([...videos, { video_url: "", label: "", description: "" }]);
+  };
+
+  return (
+    <div className="space-y-3">
+      {videos.length === 0 && (
+        <p className="text-[12px] text-muted-foreground">
+          動画はまだ登録されていません。下のボタンから追加できます。
+        </p>
+      )}
+
+      {videos.map((video, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-border bg-white p-3 space-y-2.5"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-flex items-center justify-center rounded-md bg-foreground/5 text-[11px] font-semibold text-foreground/70 px-1.5 py-0.5"
+                aria-label={`動画 ${i + 1}`}
+              >
+                #{i + 1}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                表示順は上から
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {/* 1 行のみの場合、上下移動は意味がないため非表示 */}
+              {videos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => move(i, -1)}
+                    disabled={i === 0}
+                    aria-label="この動画を1つ上へ"
+                    className="p-1.5 rounded-md hover:bg-foreground/5 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronUp className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(i, 1)}
+                    disabled={i === videos.length - 1}
+                    aria-label="この動画を1つ下へ"
+                    className="p-1.5 rounded-md hover:bg-foreground/5 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronDown className="size-4" />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                aria-label="この動画を削除"
+                className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                動画URL（YouTube / .mp4 直リンク）
+              </label>
+              <TextInput
+                value={video.video_url}
+                onChange={(e: any) => update(i, { video_url: e.target.value })}
+                placeholder="例: https://youtube.com/watch?v=... または https://example.com/video.mp4"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                ラベル（任意・例: 店内ツアー / 店長インタビュー）
+              </label>
+              <TextInput
+                value={video.label}
+                onChange={(e: any) => update(i, { label: e.target.value })}
+                placeholder="動画の見出しになります（空でも可）"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                説明テキスト（任意・動画の下に表示）
+              </label>
+              <TextArea
+                value={video.description}
+                onChange={(e: any) => update(i, { description: e.target.value })}
+                rows={2}
+                placeholder="動画の補足説明。改行は反映されます。"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={add}
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/70 hover:text-foreground px-3 py-2 rounded-md border border-dashed border-border hover:bg-foreground/5 transition-colors"
+      >
+        <Plus className="size-3.5" />
+        動画を追加
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StaffPhotosEditor — 在籍女性ギャラリーの編集 UI
+// ---------------------------------------------------------------------------
+//
+// 画像URL（外部URLまたはアップロード済の /storage/... パス）、
+// キャプション、staff_type バッジ、インスタプロフURLを編集できる。
+// VideoListEditor と同じパターン（全置換 + 上下並び替え + ＋追加）。
+function StaffPhotosEditor({
+  photos,
+  onChange,
+}: {
+  photos: { image_url: string; caption: string; instagram_url: string; staff_type: string }[];
+  onChange: (next: { image_url: string; caption: string; instagram_url: string; staff_type: string }[]) => void;
+}) {
+  const update = (
+    i: number,
+    patch: Partial<{ image_url: string; caption: string; instagram_url: string; staff_type: string }>,
+  ) => {
+    onChange(photos.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  };
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= photos.length) return;
+    const next = [...photos];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const remove = (i: number) => {
+    onChange(photos.filter((_, idx) => idx !== i));
+  };
+  const add = () => {
+    onChange([
+      ...photos,
+      { image_url: "", caption: "", instagram_url: "", staff_type: "" },
+    ]);
+  };
+
+  return (
+    <div className="space-y-3">
+      {photos.length === 0 && (
+        <p className="text-[12px] text-muted-foreground">
+          在籍女性の写真はまだ登録されていません。下のボタンから追加できます。
+        </p>
+      )}
+
+      {photos.map((photo, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-border bg-white p-3 space-y-2.5"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-flex items-center justify-center rounded-md bg-foreground/5 text-[11px] font-semibold text-foreground/70 px-1.5 py-0.5"
+                aria-label={`スタッフ写真 ${i + 1}`}
+              >
+                #{i + 1}
+              </span>
+              {photo.image_url && (
+                <span
+                  aria-hidden
+                  className="inline-block rounded overflow-hidden"
+                  style={{ width: 28, height: 28, background: "#0E1316" }}
+                >
+                  <img
+                    src={photo.image_url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {/* 1 行のみの場合、上下移動は意味がないため非表示 */}
+              {photos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => move(i, -1)}
+                    disabled={i === 0}
+                    aria-label="この写真を1つ上へ"
+                    className="p-1.5 rounded-md hover:bg-foreground/5 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronUp className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(i, 1)}
+                    disabled={i === photos.length - 1}
+                    aria-label="この写真を1つ下へ"
+                    className="p-1.5 rounded-md hover:bg-foreground/5 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronDown className="size-4" />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                aria-label="この写真を削除"
+                className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                画像URL
+              </label>
+              <TextInput
+                value={photo.image_url}
+                onChange={(e: any) => update(i, { image_url: e.target.value })}
+                placeholder="例: https://example.com/photo.jpg または /storage/stores/xxx.jpg"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                  ラベル（例: 在籍 / レクタ経由 / OG）
+                </label>
+                <TextInput
+                  value={photo.staff_type}
+                  onChange={(e: any) => update(i, { staff_type: e.target.value })}
+                  placeholder="任意"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                  Instagram URL（任意）
+                </label>
+                <TextInput
+                  value={photo.instagram_url}
+                  onChange={(e: any) => update(i, { instagram_url: e.target.value })}
+                  placeholder="https://instagram.com/..."
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                キャプション（任意）
+              </label>
+              <TextInput
+                value={photo.caption}
+                onChange={(e: any) => update(i, { caption: e.target.value })}
+                placeholder="例: 在籍2年・お酒に強くなくてもOK"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={add}
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/70 hover:text-foreground px-3 py-2 rounded-md border border-dashed border-border hover:bg-foreground/5 transition-colors"
+      >
+        <Plus className="size-3.5" />
+        在籍女性の写真を追加
+      </button>
     </div>
   );
 }

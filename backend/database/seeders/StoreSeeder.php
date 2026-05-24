@@ -229,8 +229,21 @@ class StoreSeeder extends Seeder
         $generated[73]['publish_status'] = 'unpublished';
         $generated[74]['publish_status'] = 'unpublished';
 
-        foreach (array_merge($anchors, $generated) as $store) {
-            Store::create($store);
+        foreach (array_merge($anchors, $generated) as $storeData) {
+            // store_videos is its own table now; pop the seed value before mass-assigning.
+            $videoUrl = $storeData['video_url'] ?? null;
+            unset($storeData['video_url']);
+
+            $created = Store::create($storeData);
+
+            if ($videoUrl) {
+                $created->videos()->create([
+                    'video_url' => $videoUrl,
+                    'label' => '店舗紹介動画',
+                    'description' => null,
+                    'display_order' => 0,
+                ]);
+            }
         }
     }
 

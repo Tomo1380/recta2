@@ -316,7 +316,8 @@ class AiChatController extends Controller
             'description' => $store->description,
             'features_text' => $store->features_text,
             'images' => $store->images ?? [],
-            'video_url' => $store->video_url,
+            // 旧 video_url 互換: 動画は store_videos に分離されたので 1 本目を採用
+            'video_url' => optional($store->videos()->orderBy('display_order')->first())->video_url,
             'staff_comment' => $store->staff_comment,
             'qa' => $store->qa,
             'average_rating' => round($store->averageRating(), 1),
@@ -1614,5 +1615,348 @@ class AiChatController extends Controller
         if ($storeCount > 0) $suggestions[] = 'もっと詳しく比較したい';
 
         return array_slice($suggestions, 0, 3) ?: ['未経験OKのお店', '高時給のお店', '体入できるお店'];
+    }
+
+    // -----------------------------------------------------------------------
+    // SSE streaming endpoint
+    // -----------------------------------------------------------------------
+    //
+    // 既存の chat() は完全レスポンスを一括 JSON で返す（待たされる→ドンと出る）。
+    // この chatStream() は同じ payload を受け取り、Server-Sent Events で逐次返す：
+    //
+    //   event: status   data: {"label":"店舗を検索しています…"}
+    //   event: text     data: {"delta":"こんにちは"}
+    //   event: done     data: {"stores":[...],"meta":{...}}
+    //   event: error    data: {"message":"..."}
+    //
+    // Function Calling のループは内部的には非ストリーミング（Gemini API の制約上
+    // ツール呼び出しと chunked text を綺麗に混ぜるのは煩雑なので避ける）。
+    // 代わりにツール段階ごとに status を、最終回答は短いチャンクに分けて
+    // **擬似タイプライター** として配信する。これでも体感速度は大きく向上する。
+
+    public function chatStream(Request $request)
+    {
+        $request->validate([
+            'message' => 'required|string|max:1000',
+            'page_type' => 'required|in:top,list,detail',
+            'store_id' => 'nullable|integer',
+            'history' => 'nullable|array|max:20',
+            'mode' => 'nullable|in:agent,finetuned',
+            'user_area' => 'nullable|string|max:100',
+        ]);
+
+        $ip = $request->ip();
+        $pageType = $request->input('page_type');
+        $userMessage = $request->input('message');
+        $storeId = $request->input('store_id');
+        $history = $request->input('history', []);
+        $mode = $request->input('mode', 'agent');
+        $userArea = $request->input('user_area') ?? '';
+
+        $user = auth('sanctum')->user();
+        $userId = $user?->id;
+
+        // Capture refs into the streamer closure
+        $self = $this;
+
+        $callback = function () use (
+            $self, $request, $user, $ip, $pageType, $userMessage,
+            $storeId, $history, $mode, $userArea, $userId
+        ) {
+            // Disable output buffering so each echo flushes immediately.
+            // (php-fpm + nginx with proxy_buffering off — see nginx.conf changes.)
+            @ini_set('output_buffering', '0');
+            @ini_set('zlib.output_compression', '0');
+            while (ob_get_level() > 0) { @ob_end_flush(); }
+
+            $send = function (string $event, array $data) {
+                echo "event: {$event}\n";
+                echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                @ob_flush();
+                @flush();
+            };
+
+            try {
+                // Limit checks (mirror chat())
+                $limitCheck = $self->checkUsageLimitsForStream($user, $ip);
+                if ($limitCheck !== null) {
+                    $send('error', $limitCheck);
+                    return;
+                }
+
+                $setting = AiChatSetting::where('page_type', $pageType)->first();
+                if (!$setting || !$setting->enabled) {
+                    $send('error', ['message' => 'チャットは現在無効です。']);
+                    return;
+                }
+
+                $apiKey = config('services.gemini.api_key');
+                if (!$apiKey) {
+                    // Dev fallback — stream a mock so the UI can be exercised offline.
+                    $self->streamMock($send, $userMessage, $pageType, $storeId, $mode);
+                    return;
+                }
+
+                $startTime = microtime(true);
+
+                if ($mode === 'finetuned') {
+                    // Finetuned mode is single-shot; just send progress + final text.
+                    $send('status', ['label' => 'AIが回答を作成中…']);
+                    $jsonResp = $self->handleFinetunedMode(
+                        $apiKey, $setting, $userMessage, $history,
+                        $pageType, $storeId, $ip, $startTime, $userArea, $userId
+                    );
+                    $self->streamJsonResponseAsSse($send, $jsonResp);
+                    return;
+                }
+
+                $self->streamAgentMode(
+                    $send, $apiKey, $setting, $userMessage, $history,
+                    $pageType, $storeId, $ip, $startTime, $userArea, $userId
+                );
+            } catch (\Throwable $e) {
+                \Log::error('AiChat stream error', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                $send('error', [
+                    'message' => 'ただいま混み合っております。少し時間を置いてから再度お試しください。',
+                ]);
+            }
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/event-stream; charset=utf-8',
+            'Cache-Control' => 'no-cache, no-transform',
+            'Connection' => 'keep-alive',
+            // Tell nginx to skip its own buffering for this response.
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * Mirror of checkUsageLimits() but returns an array (for SSE error event)
+     * instead of a JsonResponse.
+     */
+    private function checkUsageLimitsForStream(?object $user, string $ip): ?array
+    {
+        $limits = AiChatLimit::current();
+        $today = now()->toDateString();
+        $monthStart = now()->startOfMonth();
+
+        $globalToday = AiChatLog::whereDate('created_at', $today)->count();
+        if ($globalToday >= $limits->global_daily_limit) {
+            return ['message' => $limits->limit_reached_message, 'limit_type' => 'global_daily'];
+        }
+
+        if ($user) {
+            $userToday = AiChatLog::where('user_id', $user->id)->whereDate('created_at', $today)->count();
+            if ($userToday >= $limits->user_daily_limit) {
+                return ['message' => $limits->limit_reached_message, 'limit_type' => 'user_daily'];
+            }
+            $userMonth = AiChatLog::where('user_id', $user->id)->where('created_at', '>=', $monthStart)->count();
+            if ($userMonth >= $limits->user_monthly_limit) {
+                return ['message' => $limits->limit_reached_message, 'limit_type' => 'user_monthly'];
+            }
+        } else {
+            $ipToday = AiChatLog::where('ip_address', $ip)->whereDate('created_at', $today)->count();
+            if ($ipToday >= $limits->ip_daily_limit) {
+                return ['message' => $limits->limit_reached_message, 'limit_type' => 'ip_daily'];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Agent mode streaming. Internally runs the existing function-calling loop
+     * (no streamGenerateContent for the mid-loop turns), and emits SSE events
+     * for tool progress + a "typewriter" effect for the final text.
+     */
+    private function streamAgentMode(
+        callable $send,
+        string $apiKey,
+        AiChatSetting $setting,
+        string $userMessage,
+        array $history,
+        string $pageType,
+        ?int $storeId,
+        string $ip,
+        float $startTime,
+        string $userArea,
+        ?int $userId,
+    ): void {
+        $storeContext = $this->buildStoreContext($pageType, $storeId);
+        $systemPrompt = $this->buildAgentSystemPrompt($setting, $storeContext, $userArea, $pageType);
+        $geminiHistory = $this->buildGeminiHistory($history);
+
+        $contents = [
+            ...$geminiHistory,
+            ['role' => 'user', 'parts' => [['text' => $userMessage]]],
+        ];
+
+        $totalInputTokens = 0;
+        $totalOutputTokens = 0;
+        $toolCalls = [];
+        $maxIterations = 3;
+
+        $send('status', ['label' => 'AIが考えています…']);
+
+        for ($i = 0; $i < $maxIterations; $i++) {
+            $payload = [
+                'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
+                'contents' => $contents,
+                'tools' => [['functionDeclarations' => $this->getToolDeclarations()]],
+                'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048],
+            ];
+
+            $response = $this->callGeminiWithRetry($apiKey, $payload);
+            $data = $response->json();
+            $totalInputTokens += $data['usageMetadata']['promptTokenCount'] ?? 0;
+            $totalOutputTokens += $data['usageMetadata']['candidatesTokenCount'] ?? 0;
+
+            $candidate = $data['candidates'][0] ?? null;
+            if (!$candidate) {
+                throw new \Exception('No candidate in response');
+            }
+            $parts = $candidate['content']['parts'] ?? [];
+            $functionCalls = array_filter($parts, fn($p) => isset($p['functionCall']));
+
+            if (empty($functionCalls)) {
+                // Final text reply — stream it as typewriter chunks.
+                $aiText = collect($parts)->filter(fn($p) => isset($p['text']))->pluck('text')->implode('');
+                $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+                $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
+
+                $elapsed = round((microtime(true) - $startTime) * 1000);
+
+                AiChatLog::create([
+                    'user_id' => $userId,
+                    'ip_address' => $ip,
+                    'page_type' => $pageType,
+                    'user_message' => $userMessage,
+                    'ai_response' => $aiText,
+                    'input_tokens' => $totalInputTokens,
+                    'output_tokens' => $totalOutputTokens,
+                    'mode' => 'agent',
+                ]);
+
+                $this->streamTextAsTypewriter($send, $displayText);
+
+                $send('done', [
+                    'stores' => $recommendedStores,
+                    'follow_ups' => [],
+                    'meta' => [
+                        'mode' => 'agent',
+                        'input_tokens' => $totalInputTokens,
+                        'output_tokens' => $totalOutputTokens,
+                        'total_tokens' => $totalInputTokens + $totalOutputTokens,
+                        'response_ms' => $elapsed,
+                        'tool_calls' => count($toolCalls),
+                    ],
+                ]);
+                return;
+            }
+
+            // Function calls — show progress
+            $contents[] = ['role' => 'model', 'parts' => $parts];
+            $functionResponseParts = [];
+            foreach ($functionCalls as $part) {
+                $fc = $part['functionCall'];
+                $toolName = $fc['name'];
+                $toolArgs = $fc['args'] ?? [];
+
+                $send('status', ['label' => $this->labelForTool($toolName, $toolArgs)]);
+
+                $result = $this->executeTool($toolName, $toolArgs);
+                $toolCalls[] = ['name' => $toolName, 'args' => $toolArgs, 'result' => $result];
+
+                if ($toolName === 'search_stores' && isset($result['stores'])) {
+                    $send('status', ['label' => count($result['stores']) . '件の候補を見つけました']);
+                }
+
+                $functionResponseParts[] = [
+                    'functionResponse' => ['name' => $toolName, 'response' => $result],
+                ];
+            }
+            $contents[] = ['role' => 'user', 'parts' => $functionResponseParts];
+        }
+
+        throw new \Exception('Agent loop exceeded max iterations');
+    }
+
+    /**
+     * Convert a one-shot JsonResponse from the existing non-stream code path
+     * into a typewriter SSE stream. Used for fine-tuned mode where the loop
+     * isn't iterative.
+     */
+    private function streamJsonResponseAsSse(callable $send, JsonResponse $resp): void
+    {
+        $payload = $resp->getData(true);
+        $message = is_string($payload['message'] ?? null) ? $payload['message'] : '';
+        $this->streamTextAsTypewriter($send, $message);
+        $send('done', [
+            'stores' => $payload['stores'] ?? [],
+            'follow_ups' => $payload['follow_ups'] ?? [],
+            'meta' => $payload['meta'] ?? [],
+        ]);
+    }
+
+    /**
+     * Emit the AI text as small chunks so the client gets a typewriter feel.
+     * Chunk size and delay are tuned for Japanese (multi-byte safe via mb_*).
+     */
+    private function streamTextAsTypewriter(callable $send, string $text): void
+    {
+        $len = mb_strlen($text);
+        if ($len === 0) {
+            return;
+        }
+        // ~12 chars per chunk, ~25ms apart — feels like real streaming
+        // without overwhelming the SSE channel.
+        $chunkSize = 12;
+        $delayUs = 25_000;
+        for ($i = 0; $i < $len; $i += $chunkSize) {
+            $delta = mb_substr($text, $i, $chunkSize);
+            $send('text', ['delta' => $delta]);
+            // Avoid sleeping on the very last chunk.
+            if ($i + $chunkSize < $len) {
+                usleep($delayUs);
+            }
+        }
+    }
+
+    /**
+     * Mock SSE stream for local development without GEMINI_API_KEY.
+     */
+    private function streamMock(callable $send, string $userMessage, string $pageType, ?int $storeId, string $mode): void
+    {
+        $send('status', ['label' => '（モック）店舗を検索しています…']);
+        usleep(400_000);
+        $this->streamTextAsTypewriter(
+            $send,
+            "（モック応答）「{$userMessage}」についてですね。\n\n本番ではGemini APIから具体的なお店候補をお答えします。"
+        );
+        $send('done', [
+            'stores' => [],
+            'follow_ups' => ['未経験OKのお店', '高時給のお店', '体入できるお店'],
+            'meta' => [
+                'mode' => $mode,
+                'model' => 'mock',
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'total_tokens' => 0,
+                'response_ms' => 600,
+                'tool_calls' => 0,
+            ],
+        ]);
+    }
+
+    private function labelForTool(string $toolName, array $args): string
+    {
+        return match ($toolName) {
+            'search_stores' => '店舗を検索しています…',
+            'get_store_detail' => '店舗の詳細を確認しています…',
+            default => 'AIが情報を取得しています…',
+        };
     }
 }

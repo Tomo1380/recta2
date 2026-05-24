@@ -112,6 +112,10 @@ class PublicStoreController extends Controller
               ->limit(10);
         }]);
 
+        // Load ordered videos so the transformer can project them into the
+        // public payload as `videos: [...]`.
+        $store->load(['videos', 'staffPhotos']);
+
         $storePayload = StoreApiTransformer::toPublicArray($store);
         $storePayload['average_rating'] = round($store->averageRating(), 1);
         $storePayload['reviews_count'] = $store->reviews_count ?? $store->reviewCount();

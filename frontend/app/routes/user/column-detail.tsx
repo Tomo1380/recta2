@@ -1,9 +1,83 @@
 import { useEffect, useState, useMemo } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { Loader2, FileText, ChevronRight } from "lucide-react";
-import { userApi } from "~/lib/api";
-import { openLineFriendAdd } from "~/lib/line";
+import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
+
+// ─── SSR loader & meta ────────────────────────────────────────
+//
+// クライアントの useEffect で document.title を書き換える方式は、Twitterbot や
+// Googlebot 等 JS 非実行クローラに OG タグが届かない。Sprint 3-C の SEO 目的
+// （記事を発見されやすくする）を達成するために SSR 時点で meta を出す。
+//
+// loader は SSR でも CSR (navigation) でも走る。
+// - ブラウザでは同オリジン（空文字）で OK
+// - SSR では内部ネットワーク経由で nginx/laravel に到達するホストが必要
+//   - docker compose ローカル: `http://nginx:80`
+//   - k8s / ECS / Vercel SSR: 必ず `INTERNAL_API_BASE_URL` を env で渡す
+function resolveApiBase(): string {
+  if (typeof window !== "undefined") {
+    return ""; // 同オリジン
+  }
+  const fromEnv = process.env.INTERNAL_API_BASE_URL;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  // 本番では未設定はミスコンフィグ。loader 全 article 取得が失敗して
+  // OGP が壊れるよりも、明示的に 500 を投げて運用者に気付かせる。
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "INTERNAL_API_BASE_URL is not set. SSR loader cannot reach the API in production.",
+    );
+  }
+  // 開発 (docker compose) のみフォールバック
+  return "http://nginx:80";
+}
+
+export async function loader({ params }: LoaderFunctionArgs) {
+  const slug = params.slug;
+  if (!slug) {
+    throw new Response("Not Found", { status: 404 });
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${resolveApiBase()}/api/columns/${slug}`, {
+      headers: { Accept: "application/json" },
+    });
+  } catch (e) {
+    // ネットワーク到達不能（DNS 失敗、connection refused 等）。
+    // 200 + 空ページを返してインデックスを汚染しないように 503 で明示する。
+    // クライアントは ErrorBoundary でリトライ UI を出せる。
+    throw new Response("Upstream unavailable", { status: 503 });
+  }
+  if (!res.ok) {
+    // 404 はそのまま、それ以外はステータス透過
+    throw new Response("Not Found", {
+      status: res.status === 404 ? 404 : res.status >= 500 ? 502 : 500,
+    });
+  }
+  return (await res.json()) as PublicArticleShowResponse;
+}
+
+export function meta({ data }: { data: PublicArticleShowResponse | undefined }) {
+  const article = data?.article;
+  if (!article) {
+    return [{ title: "コラム | Recta" }];
+  }
+  const desc = article.excerpt || article.title;
+  const title = `${article.title} | Recta コラム`;
+  const tags: Array<Record<string, string>> = [
+    { title },
+    { name: "description", content: desc },
+    { property: "og:title", content: article.title },
+    { property: "og:description", content: desc },
+    { property: "og:type", content: "article" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ];
+  if (article.thumbnail_url) {
+    tags.push({ property: "og:image", content: article.thumbnail_url });
+  }
+  return tags;
+}
 
 const GOLD = "#d4af37";
 const DARK = "#1b2528";
@@ -44,40 +118,33 @@ function transformBodyHtml(html: string): { html: string; needsTikTokScript: boo
 export default function ColumnDetailPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
+  // loader が必ず成功（or throw）するので、初期値はそのまま使えば足りる。
+  // 取得失敗（5xx 等）は loader が Response を throw し、route の ErrorBoundary
+  // 経由でレンダリングが置き換わるため、ここに来た時点で article は信頼できる。
+  const initial = useLoaderData() as PublicArticleShowResponse;
 
-  const [article, setArticle] = useState<Article | null>(null);
-  const [related, setRelated] = useState<ArticleSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [article, setArticle] = useState<Article | null>(initial.article);
+  const [related, setRelated] = useState<ArticleSummary[]>(initial.related ?? []);
+  const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
+  // React Router の loader は CSR navigation でも自動で再実行されるので、
+  // useLoaderData の変化を state に反映するだけで OK（手動 fetch 不要）。
   useEffect(() => {
-    if (!slug) return;
-    let active = true;
-    setLoading(true);
-    setNotFound(false);
-    (async () => {
-      try {
-        const res = await userApi.get<PublicArticleShowResponse>(`/columns/${slug}`);
-        if (!active) return;
-        setArticle(res.article);
-        setRelated(res.related);
-      } catch (e: unknown) {
-        if (!active) return;
-        console.error("Failed to load article", e);
-        setNotFound(true);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [slug]);
+    if (initial.article && initial.article.slug === slug) {
+      setArticle(initial.article);
+      setRelated(initial.related ?? []);
+      setNotFound(false);
+    }
+  }, [slug, initial]);
 
   const { html, needsTikTokScript } = useMemo(
     () => transformBodyHtml(article?.body_html ?? ""),
     [article?.body_html],
   );
+
+  // title / OG meta は SSR meta() で出力済み。CSR navigation 時は React Router
+  // が自動で <title> を差し替えるので、useEffect での書き換えは不要。
 
   // Inject TikTok embed.js once, only when needed
   useEffect(() => {
@@ -232,52 +299,13 @@ export default function ColumnDetailPage() {
 
       {/* LINE CTA */}
       <div className="px-5 pt-8">
-        <div
-          className="rounded-2xl p-5"
-          style={{
-            background: `linear-gradient(135deg, ${DARK}, #2c3e46)`,
-            border: `1px solid rgba(212,175,55,.3)`,
-          }}
-        >
-          <p
-            style={{
-              fontFamily: J,
-              fontWeight: 700,
-              fontSize: "14.5px",
-              color: "white",
-              margin: 0,
-            }}
-          >
-            気になることがあればLINEで相談
-          </p>
-          <p
-            style={{
-              fontFamily: J,
-              fontWeight: 400,
-              fontSize: "11.5px",
-              color: "rgba(255,255,255,.65)",
-              margin: "6px 0 14px",
-              lineHeight: 1.7,
-            }}
-          >
-            お給料の仕組み、向いてるお店、上京サポートなど、なんでもお気軽にどうぞ。
-          </p>
-          <button
-            onClick={() => openLineFriendAdd()}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl active:scale-[0.98] transition-transform"
-            style={{
-              background: "#06C755",
-              border: "none",
-              cursor: "pointer",
-              color: "white",
-              fontFamily: J,
-              fontWeight: 700,
-              fontSize: "13.5px",
-            }}
-          >
-            <span>LINEで相談する</span>
-          </button>
-        </div>
+        <LineCtaCard
+          variant="dark"
+          title="気になることがあればLINEで相談"
+          description="お給料の仕組み、向いてるお店、上京サポートなど、なんでもお気軽にどうぞ。"
+          ctaLabel="LINEで相談する"
+          source="column:end"
+        />
       </div>
 
       {/* Related */}

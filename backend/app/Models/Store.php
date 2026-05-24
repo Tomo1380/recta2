@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\SeoController;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Store extends Model
 {
@@ -16,7 +18,7 @@ class Store extends Model
         'schedule',
         'wage', 'compensation', 'guarantee', 'cast_profile', 'interview',
         'feature_tags', 'description', 'features_text',
-        'images', 'video_url',
+        'images',
         'analysis', 'required_documents',
         'recent_hires', 'recent_hires_summary',
         'popular_features', 'qa', 'staff_comment',
@@ -52,9 +54,37 @@ class Store extends Model
         'experience_guaranteed' => 'boolean',
     ];
 
+    /**
+     * 店舗の publish 状態や名前が変わったら sitemap キャッシュを無効化する。
+     * tag-based cache（redis backend）でまとめて flush することで、新規店舗が
+     * 公開された直後の検索エンジンクロールに新 URL を確実に届ける。
+     */
+    protected static function booted(): void
+    {
+        $flush = function () {
+            try {
+                Cache::tags([SeoController::CACHE_TAG])->flush();
+            } catch (\Throwable $e) {
+                // tag 非対応 driver (file / database) でもアプリは落とさない
+            }
+        };
+        static::saved($flush);
+        static::deleted($flush);
+    }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    public function videos(): HasMany
+    {
+        return $this->hasMany(StoreVideo::class)->orderBy('display_order');
+    }
+
+    public function staffPhotos(): HasMany
+    {
+        return $this->hasMany(StoreStaffPhoto::class)->orderBy('display_order');
     }
 
     public function averageRating(): float

@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Support\StoreApiTransformer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -50,7 +51,11 @@ class StoreController extends Controller
 
     public function show(Store $store): JsonResponse
     {
-        $store->loadCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
+        // videos / staffPhotos を eager load しないと
+        // ShopEdit が「動画なし」表示になり、保存時に syncVideos() で全消失する。
+        $store
+            ->load(['videos', 'staffPhotos'])
+            ->loadCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
 
         return response()->json(StoreApiTransformer::toAdminArray($store));
     }
@@ -68,7 +73,6 @@ class StoreController extends Controller
             'nearest_station' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:255',
             'website_url' => 'nullable|string|max:2048',
-            'video_url' => 'nullable|string|max:2048',
             'description' => 'nullable|string',
             'features_text' => 'nullable|string',
             'recent_hires_summary' => 'nullable|string|max:255',
@@ -104,6 +108,24 @@ class StoreController extends Controller
             'salary_simulator' => 'nullable|array',
             'recta_episodes' => 'nullable|array',
             'related_store_ids' => 'nullable|array',
+
+            // store_videos の同期に使うペイロード。配列で受け取り、
+            // controller 側で順序・差分を解決して store_videos テーブルに反映する。
+            //
+            // URL は `url` validation ではなく regex で「http(s) もしくは内部 storage パス」
+            // のみ許容する。`url` だと `javascript:` や `data:` も通すブラウザがあるため。
+            'videos' => 'nullable|array',
+            'videos.*.video_url' => 'required_with:videos|string|max:500|regex:#^(https?://|/storage/)#',
+            'videos.*.label' => 'nullable|string|max:100',
+            'videos.*.description' => 'nullable|string',
+            'videos.*.poster_url' => 'nullable|string|max:500|regex:#^(https?://|/storage/)#',
+
+            // store_staff_photos の同期。videos と同じ全置換方式。
+            'staff_photos' => 'nullable|array',
+            'staff_photos.*.image_url' => 'required_with:staff_photos|string|max:500|regex:#^(https?://|/storage/)#',
+            'staff_photos.*.caption' => 'nullable|string|max:255',
+            'staff_photos.*.instagram_url' => 'nullable|string|max:500|regex:#^https?://(www\.)?instagram\.com/#i',
+            'staff_photos.*.staff_type' => 'nullable|string|max:50',
         ];
     }
 
@@ -115,7 +137,7 @@ class StoreController extends Controller
             'schedule',
             'wage', 'compensation', 'guarantee', 'cast_profile', 'interview',
             'feature_tags', 'description', 'features_text',
-            'images', 'video_url',
+            'images',
             'analysis', 'required_documents',
             'recent_hires', 'recent_hires_summary',
             'popular_features', 'qa', 'staff_comment',
@@ -129,16 +151,38 @@ class StoreController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // 旧 admin UI / API 直叩きが legacy `video_url` 単一フィールドを送る互換シナリオ。
+        // `videos` が未指定でも `video_url` があれば 1 本の動画として bridge する。
+        // （Sprint 3-A 以降のフロントは `videos[]` で送るので、新規呼び出しでは経由しない）
+        $this->bridgeLegacyVideoUrl($request);
+
         $request->validate($this->storeValidationRules());
 
-        $data = $this->normalizeIncomingPayload($request->only(array_merge($this->fillableFields(), $this->legacyCompatibilityFields())));
-        $store = Store::create($data);
+        // Store 本体作成と videos / staff_photos 同期はアトミックに行う。
+        // 途中で例外が出たら全部ロールバックして、孤児レコードや
+        // videos 全消失（delete 後 createMany 失敗）を防ぐ。
+        $store = DB::transaction(function () use ($request) {
+            $data = $this->normalizeIncomingPayload($request->only(array_merge($this->fillableFields(), $this->legacyCompatibilityFields())));
+            $store = Store::create($data);
 
-        return response()->json(StoreApiTransformer::toAdminArray($store), 201);
+            if ($request->has('videos')) {
+                $this->syncVideos($store, $request->input('videos', []));
+            }
+            if ($request->has('staff_photos')) {
+                $this->syncStaffPhotos($store, $request->input('staff_photos', []));
+            }
+
+            return $store;
+        });
+
+        return response()->json(StoreApiTransformer::toAdminArray($store->load(['videos', 'staffPhotos'])), 201);
     }
 
     public function update(Request $request, Store $store): JsonResponse
     {
+        // Legacy `video_url` 互換は store() と同じく入口で bridge する。
+        $this->bridgeLegacyVideoUrl($request);
+
         // Allow either new JSONB fields or legacy flat fields (for transitional admin UI compat)
         $rules = $this->storeValidationRules(isUpdate: true);
         $request->validate($rules + $this->legacyCompatibilityValidationRules());
@@ -167,9 +211,101 @@ class StoreController extends Controller
             $data['cast_profile'] = array_replace_recursive($store->cast_profile, $data['cast_profile']);
         }
 
-        $store->update($data);
+        // update 本体と sync* をアトミックに（途中失敗で部分反映を残さない）
+        DB::transaction(function () use ($store, $data, $request) {
+            $store->update($data);
 
-        return response()->json(StoreApiTransformer::toAdminArray($store->fresh()));
+            if ($request->has('videos')) {
+                $this->syncVideos($store, $request->input('videos', []));
+            }
+            if ($request->has('staff_photos')) {
+                $this->syncStaffPhotos($store, $request->input('staff_photos', []));
+            }
+        });
+
+        return response()->json(StoreApiTransformer::toAdminArray($store->fresh()->load(['videos', 'staffPhotos'])));
+    }
+
+    /**
+     * 受け取った videos 配列で store_videos を全置換する。
+     *
+     * 既存実装の `images` カラムと同じく、管理画面では並び順込みでフルリストを
+     * 送るシンプルな同期方式を採る（差分計算より UI が分かりやすい）。
+     *
+     * @param  array<int, array{video_url:string,label?:?string,description?:?string,poster_url?:?string}>  $videos
+     */
+    private function syncVideos(Store $store, array $videos): void
+    {
+        $store->videos()->delete();
+
+        $records = [];
+        foreach (array_values($videos) as $i => $row) {
+            if (!isset($row['video_url']) || $row['video_url'] === '') {
+                continue;
+            }
+            $records[] = [
+                'video_url' => (string) $row['video_url'],
+                'label' => $row['label'] ?? null,
+                'description' => $row['description'] ?? null,
+                'poster_url' => $row['poster_url'] ?? null,
+                'display_order' => $i,
+            ];
+        }
+        if (!empty($records)) {
+            $store->videos()->createMany($records);
+        }
+    }
+
+    /**
+     * 旧 admin UI / API 直叩き互換: `video_url` が単独で送られて `videos`
+     * が無い場合のみ、`videos: [{ video_url, label: '店舗紹介動画' }]` に
+     * リライトする。`videos` が明示的に送られていればそちらを優先（破壊しない）。
+     *
+     * 新フロントは `videos[]` のみ送るのでこの分岐は経由しない。
+     */
+    private function bridgeLegacyVideoUrl(Request $request): void
+    {
+        if ($request->has('videos')) {
+            return; // 既に新形式
+        }
+        $legacy = $request->input('video_url');
+        if (!is_string($legacy) || $legacy === '') {
+            return;
+        }
+        $request->merge([
+            'videos' => [[
+                'video_url' => $legacy,
+                'label' => '店舗紹介動画',
+            ]],
+        ]);
+    }
+
+    /**
+     * 受け取った staff_photos 配列で store_staff_photos を全置換する。
+     * 同期方式は syncVideos と同じ（差分計算より UI が分かりやすい全置換）。
+     *
+     * @param  array<int, array{image_url:string,caption?:?string,instagram_url?:?string,staff_type?:?string}>  $photos
+     */
+    private function syncStaffPhotos(Store $store, array $photos): void
+    {
+        $store->staffPhotos()->delete();
+
+        $records = [];
+        foreach (array_values($photos) as $i => $row) {
+            if (!isset($row['image_url']) || $row['image_url'] === '') {
+                continue;
+            }
+            $records[] = [
+                'image_url' => (string) $row['image_url'],
+                'caption' => $row['caption'] ?? null,
+                'instagram_url' => $row['instagram_url'] ?? null,
+                'staff_type' => $row['staff_type'] ?? null,
+                'display_order' => $i,
+            ];
+        }
+        if (!empty($records)) {
+            $store->staffPhotos()->createMany($records);
+        }
     }
 
     public function destroy(Store $store): JsonResponse

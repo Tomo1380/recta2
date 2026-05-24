@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { openLineFriendAdd } from "~/lib/line";
+import { LineIcon } from "~/components/user/shared/LineIcon";
 import {
   Send,
   Loader2,
@@ -111,6 +112,10 @@ interface ChatMessage {
   follow_ups?: string[];
   meta?: MessageMeta;
   showLineCta?: boolean;
+  /** ストリーミング中の AI 応答であることを示す。true の間はタイプライターカーソルを出す */
+  streaming?: boolean;
+  /** ストリーミング中に Function Calling 等の中間ステータスを出す（"店舗を検索しています…" 等） */
+  streamingStatus?: string;
 }
 
 type ChatMode = "agent" | "finetuned";
@@ -144,25 +149,45 @@ interface LimitError {
   limit_type: string;
 }
 
-async function sendMessage(
+interface StreamHandlers {
+  onStatus?: (label: string) => void;
+  onDelta: (delta: string) => void;
+  onDone: (payload: Pick<ChatApiResponse, "stores" | "follow_ups" | "meta">) => void;
+}
+
+/**
+ * Server-Sent Events 版の sendMessage。
+ *
+ * 旧 sendMessage は POST → 完成JSONを一括受信していた（数秒間カーソル点滅のまま）。
+ * これは `/api/chat/stream` から SSE で逐次受信し、status / text / done / error
+ * イベントごとにハンドラを呼ぶ。タイプライター表示はフロント側で `onDelta` を
+ * メッセージ末尾に追記していくだけで実現できる。
+ *
+ * リジェクト規約:
+ * - 429 (limit) → `Error & { limitType }` を throw（旧版と互換）
+ * - error イベント → 同じく Error を throw
+ * - その他HTTPエラー → Error を throw
+ */
+async function streamMessage(
   message: string,
   pageType: string,
   history: { role: string; content: string }[],
   mode: ChatMode,
-  storeId?: number,
-  userArea?: string,
-): Promise<ChatApiResponse> {
-  // Include user token if available for optional auth
+  storeId: number | undefined,
+  userArea: string | undefined,
+  signal: AbortSignal,
+  handlers: StreamHandlers,
+): Promise<void> {
   const token = typeof window !== "undefined" ? localStorage.getItem("user_token") : null;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Accept: "application/json",
+    Accept: "text/event-stream",
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch("/api/chat", {
+  const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -173,17 +198,91 @@ async function sendMessage(
       mode,
       user_area: userArea,
     }),
+    signal,
   });
 
   if (res.status === 429) {
-    const data: LimitError = await res.json();
+    const data: LimitError = await res.json().catch(() => ({ message: "上限に達しました", limit_type: "unknown" }));
     const err = new Error(data.message) as Error & { limitType?: string };
     err.limitType = data.limit_type;
     throw err;
   }
+  if (!res.ok || !res.body) {
+    throw new Error("Failed to open chat stream");
+  }
 
-  if (!res.ok) throw new Error("Failed to send message");
-  return res.json();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buf = "";
+
+  // SSE フレームは "\n\n" 区切り。`event:` と `data:` 行をペアで取り出す。
+  const handleFrame = (frame: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const raw of frame.split("\n")) {
+      if (!raw) continue;
+      if (raw.startsWith(":")) continue; // SSE コメント
+      const idx = raw.indexOf(":");
+      const field = idx >= 0 ? raw.slice(0, idx) : raw;
+      const value = idx >= 0 ? raw.slice(idx + 1).trimStart() : "";
+      if (field === "event") event = value;
+      else if (field === "data") dataLines.push(value);
+    }
+    if (dataLines.length === 0) return;
+    const dataStr = dataLines.join("\n");
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(dataStr);
+    } catch {
+      return;
+    }
+    switch (event) {
+      case "status":
+        handlers.onStatus?.(String(payload.label ?? ""));
+        break;
+      case "text":
+        if (typeof payload.delta === "string") handlers.onDelta(payload.delta);
+        break;
+      case "done":
+        handlers.onDone({
+          stores: (payload.stores ?? []) as ChatApiResponse["stores"],
+          follow_ups: (payload.follow_ups ?? []) as ChatApiResponse["follow_ups"],
+          meta: payload.meta as ChatApiResponse["meta"],
+        });
+        break;
+      case "error": {
+        const err = new Error(String(payload.message ?? "stream error")) as Error & { limitType?: string };
+        if (typeof payload.limit_type === "string") err.limitType = payload.limit_type;
+        throw err;
+      }
+      default:
+        break;
+    }
+  };
+
+  // handleFrame が throw した場合 or abort された場合でも reader を必ず解放する。
+  // releaseLock せずに gc されると接続が宙ぶらりんで残り、ブラウザの fetch
+  // pool を消費し続ける。
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      // 完成したフレーム（"\n\n" で終わるもの）を順次処理。
+      let sepIdx: number;
+      while ((sepIdx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, sepIdx);
+        buf = buf.slice(sepIdx + 2);
+        handleFrame(frame);
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // 既に解放済みなら無視
+    }
+  }
 }
 
 function formatWage(min?: number, max?: number): string {
@@ -555,6 +654,15 @@ export default function AiChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // SSE 接続を持つ AbortController を保持し、unmount or 新規送信時にキャンセルする。
+  // これがないと、ユーザーが画面遷移しても fetch が裏で生き続け、reader が
+  // chunk を待ち続ける（memory leak + 不要な PHP-FPM ワーカ占有）。
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
 
   // ---- Detect user area from geolocation (best-effort, once) ----
   useEffect(() => {
@@ -671,19 +779,37 @@ export default function AiChatPanel({
     }
   }, [introPhase]);
 
-  // ---- Auto-scroll to bottom ----
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
-    });
-  }, []);
-
+  // ---- Auto-scroll ----
+  // Once the user has sent at least one message, keep the latest user message
+  // pinned near the top of the chat viewport — even as the AI reply streams in
+  // below. Without this, new AI tokens push the question off-screen and the
+  // user has to scroll back up to remember what they asked.
+  // Before any user message exists (intro animation, suggestion chips), fall
+  // back to bottom-scroll so the latest content stays visible.
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading, scrollToBottom]);
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const userCount = messages.filter((m) => m.role === "user").length;
+
+    requestAnimationFrame(() => {
+      if (userCount > 0) {
+        const userNodes = el.querySelectorAll<HTMLElement>('[data-msg-role="user"]');
+        const lastUser = userNodes[userNodes.length - 1];
+        if (lastUser) {
+          const target = lastUser.offsetTop - el.offsetTop - 12;
+          el.scrollTo({
+            top: target,
+            // Smooth on the first jump, instant during streaming so the
+            // pinned position doesn't fight the layout shift.
+            behavior: Math.abs(el.scrollTop - target) > 4 ? "smooth" : "auto",
+          });
+          return;
+        }
+      }
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [messages, isLoading]);
 
   // ---- Send handler ----
   const handleSend = useCallback(
@@ -697,9 +823,24 @@ export default function AiChatPanel({
       }
 
       const userMessage: ChatMessage = { role: "user", content: msg };
-      setMessages((prev) => [...prev, userMessage]);
+      // 受信用 AI 吹き出しを先に追加して、以後 delta を末尾に追記する
+      const placeholder: ChatMessage = { role: "ai", content: "", streaming: true };
+      setMessages((prev) => [...prev, userMessage, placeholder]);
       setInput("");
       setIsLoading(true);
+
+      // 既存ストリームが残っていればキャンセル（連打や遷移後の再送信に備える）
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      // サーバ側で [STORE:ID] は既に除去済みなので、フロントでは LINE 定型句のみ削除する。
+      // 毎 chunk フル文字列に対して regex を回すと O(n²) になるため、対象を絞ることが重要。
+      const cleanText = (s: string) =>
+        s
+          .replace(/\n*もっと詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
+          .replace(/\n*より詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "");
+
+      let accumulated = "";
 
       try {
         const history = [...messages, userMessage].map((m) => ({
@@ -707,48 +848,83 @@ export default function AiChatPanel({
           content: m.content,
         }));
 
-        const res = await sendMessage(msg, pageType, history, mode, storeId, userArea);
-
-        // Strip [STORE:ID] markers and LINE boilerplate from AI text
-        const cleanedMessage = res.message
-          .replace(/\[STORE:\d+\]\s*/g, "")
-          .replace(/\n*もっと詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
-          .replace(/\n*より詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
-          .trim();
-
-        const aiMessage: ChatMessage = {
-          role: "ai",
-          content: cleanedMessage,
-          stores: res.stores,
-          follow_ups: res.follow_ups,
-          meta: res.meta,
-          showLineCta: true,
-        };
-        setMessages((prev) => [...prev, aiMessage]);
-        setFollowUpButtons(generateFollowUps(pageType, input, cleanedMessage));
+        await streamMessage(
+          msg,
+          pageType,
+          history,
+          mode,
+          storeId,
+          userArea,
+          controller.signal,
+          {
+            onStatus: (label) => {
+              setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last?.role === "ai" && last.streaming) {
+                  next[next.length - 1] = { ...last, streamingStatus: label };
+                }
+                return next;
+              });
+            },
+            onDelta: (delta) => {
+              accumulated += delta;
+              const visible = cleanText(accumulated).trimStart();
+              setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last?.role === "ai" && last.streaming) {
+                  next[next.length - 1] = { ...last, content: visible, streamingStatus: undefined };
+                }
+                return next;
+              });
+            },
+            onDone: ({ stores, follow_ups, meta }) => {
+              const finalText = cleanText(accumulated).trim();
+              setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last?.role === "ai") {
+                  next[next.length - 1] = {
+                    ...last,
+                    content: finalText,
+                    stores,
+                    follow_ups,
+                    meta,
+                    showLineCta: true,
+                    streaming: false,
+                    streamingStatus: undefined,
+                  };
+                }
+                return next;
+              });
+              setFollowUpButtons(generateFollowUps(pageType, input, finalText));
+            },
+          },
+        );
       } catch (err) {
         const error = err as Error & { limitType?: string };
-        if (error.limitType) {
-          // Usage limit reached
-          const limitMessage: ChatMessage = {
-            role: "ai",
-            content: error.message,
-          };
-          setMessages((prev) => [...prev, limitMessage]);
-          setLimitReached(true);
-        } else {
-          const errMessage: ChatMessage = {
-            role: "ai",
-            content:
-              "申し訳ございません。エラーが発生しました。もう一度お試しください。",
-          };
-          setMessages((prev) => [...prev, errMessage]);
-        }
+        const isLimit = !!error.limitType;
+        setMessages((prev) => {
+          const next = [...prev];
+          // ストリーミング中の placeholder を差し替える
+          const last = next[next.length - 1];
+          const errContent = isLimit
+            ? error.message
+            : "申し訳ございません。エラーが発生しました。もう一度お試しください。";
+          if (last?.role === "ai" && last.streaming) {
+            next[next.length - 1] = { role: "ai", content: errContent };
+          } else {
+            next.push({ role: "ai", content: errContent });
+          }
+          return next;
+        });
+        if (isLimit) setLimitReached(true);
       } finally {
         setIsLoading(false);
       }
     },
-    [input, isLoading, messages, pageType, storeId, introPhase, mode, userArea, limitReached],
+    [input, isLoading, messages, pageType, storeId, introPhase, mode, userArea, limitReached, preview],
   );
 
   if (!enabled) return null;
@@ -775,10 +951,10 @@ export default function AiChatPanel({
   return (
     <div
       ref={panelRef}
-      className={`overflow-hidden rounded-[16px] ${className ?? ""}`}
+      className={`overflow-hidden rounded-[14px] ${className ?? ""}`}
       style={{
         backgroundColor: "#ffffff",
-        border: "1px solid rgba(73,100,110,0.2)",
+        border: "1px solid rgba(212,175,55,0.28)",
         boxShadow: "0px 4px 16px rgba(0,0,0,0.12), 0px 1px 4px rgba(0,0,0,0.08)",
         position: "relative",
         zIndex: 3,
@@ -820,7 +996,14 @@ export default function AiChatPanel({
 
       {/* ---- Intro greeting (chat bubble style with typing animation) ---- */}
       {!hasMessages && introPhase !== "idle" && (
-        <div className="flex flex-col gap-3 px-4 py-3.5">
+        <div
+          className="flex flex-col gap-3 px-4 py-3.5"
+          style={{
+            backgroundColor: "#faf9f7",
+            borderTop: "1px solid rgba(27,37,40,0.05)",
+            borderBottom: "1px solid rgba(27,37,40,0.05)",
+          }}
+        >
           {/* User bubble */}
           {(introPhase === "show-user" || introPhase === "typing-ai" || introPhase === "show-ai" || introPhase === "done") && (
             <div className="flex justify-end">
@@ -946,13 +1129,16 @@ export default function AiChatPanel({
           className="max-h-[360px] overflow-y-auto"
           style={{
             scrollBehavior: "smooth",
+            backgroundColor: "#faf9f7",
+            borderTop: "1px solid rgba(27,37,40,0.05)",
+            borderBottom: "1px solid rgba(27,37,40,0.05)",
           }}
         >
           <div className="flex flex-col gap-3 px-4 py-3.5">
             {messages.map((msg, i) => {
               const isLimitMsg = limitReached && msg.role === "ai" && i === messages.length - 1;
               return (
-              <div key={i}>
+              <div key={i} data-msg-role={msg.role}>
                 <div
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
@@ -996,7 +1182,44 @@ export default function AiChatPanel({
                             }
                     }
                   >
-                    {msg.content}
+                    {msg.role === "ai" && msg.streaming && !msg.content ? (
+                      // Streaming placeholder: dots + optional status label (e.g. "店舗を検索しています…")
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1" aria-hidden>
+                          <span
+                            className="size-1.5 rounded-full animate-bounce [animation-delay:0ms]"
+                            style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
+                          />
+                          <span
+                            className="size-1.5 rounded-full animate-bounce [animation-delay:150ms]"
+                            style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
+                          />
+                          <span
+                            className="size-1.5 rounded-full animate-bounce [animation-delay:300ms]"
+                            style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
+                          />
+                        </span>
+                        {msg.streamingStatus && (
+                          <span className="text-[11px]" style={{ color: "rgba(27,37,40,0.55)" }}>
+                            {msg.streamingStatus}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {msg.content}
+                        {msg.role === "ai" && msg.streaming && (
+                          <span
+                            aria-hidden
+                            className="inline-block w-[2px] h-[1em] align-text-bottom ml-[2px]"
+                            style={{
+                              backgroundColor: "rgba(27,37,40,0.55)",
+                              animation: "rectaChatCursor 1s steps(2) infinite",
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1105,13 +1328,12 @@ export default function AiChatPanel({
                       </p>
                       <button
                         type="button"
-                        onClick={openLineFriendAdd}
+                        onClick={() => openLineFriendAdd("chat:line-cta")}
+                        aria-label="LINE公式で直接相談する（友だち追加）"
                         className="flex w-full items-center justify-center gap-2 rounded-[8px] py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
                         style={{ backgroundColor: "#06C755" }}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-                          <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                        </svg>
+                        <LineIcon size={18} />
                         LINE公式で直接相談する
                       </button>
                     </div>
@@ -1121,41 +1343,8 @@ export default function AiChatPanel({
             );
             })}
 
-            {/* Loading indicator */}
-            {isLoading && (
-              <div className="flex items-end gap-2">
-                <div
-                  className="flex size-6 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
-                  }}
-                >
-                  <Sparkles className="size-3.5 text-white" />
-                </div>
-                <div
-                  className="rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1"
-                  style={{
-                    backgroundColor: "white",
-                    border: "1px solid rgba(212,175,55,0.25)",
-                    boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
-                  }}
-                >
-                  <span
-                    className="size-2 rounded-full animate-bounce [animation-delay:0ms]"
-                    style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
-                  />
-                  <span
-                    className="size-2 rounded-full animate-bounce [animation-delay:150ms]"
-                    style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
-                  />
-                  <span
-                    className="size-2 rounded-full animate-bounce [animation-delay:300ms]"
-                    style={{ backgroundColor: "rgba(27,37,40,0.3)" }}
-                  />
-                </div>
-              </div>
-            )}
+            {/* Streaming cursor keyframes (kept inline so this component is self-contained) */}
+            <style>{`@keyframes rectaChatCursor{0%,49%{opacity:1}50%,100%{opacity:0}}`}</style>
 
             {/* Follow-up pills */}
             {showFollowUp && (
@@ -1190,11 +1379,11 @@ export default function AiChatPanel({
           }}
         >
           <div
-            className="relative flex flex-1 items-center rounded-[16px] px-4"
+            className="relative flex flex-1 items-center gap-2.5 rounded-[16px] px-4"
             style={{
-              backgroundColor: "#ffffff",
-              height: "32px",
-              border: "1px solid rgba(0,0,0,0.2)",
+              backgroundColor: "#f4f3f1",
+              height: "48px",
+              border: "1.5px solid rgba(27,37,40,0.12)",
             }}
           >
             <input
@@ -1202,7 +1391,7 @@ export default function AiChatPanel({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください"}
+              placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください…"}
               disabled={isLoading || limitReached}
               className="h-full w-full bg-transparent text-[13px] outline-none disabled:opacity-50"
               style={{
@@ -1213,21 +1402,23 @@ export default function AiChatPanel({
             <button
               type="submit"
               disabled={!input.trim() || isLoading || limitReached}
-              className="flex size-8 shrink-0 items-center justify-center rounded-[14px] transition-opacity disabled:opacity-30"
+              className="flex size-8 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-30 active:scale-90"
               style={{
-                backgroundColor: "rgba(27,37,40,0.1)",
+                background: input.trim() && !isLoading && !limitReached
+                  ? "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)"
+                  : "rgba(27,37,40,0.1)",
               }}
               aria-label="送信"
             >
               {isLoading ? (
                 <Loader2
                   className="size-3.5 animate-spin"
-                  style={{ color: "rgba(27,37,40,0.35)" }}
+                  style={{ color: input.trim() ? "white" : "rgba(27,37,40,0.35)" }}
                 />
               ) : (
                 <Send
                   className="size-3.5"
-                  style={{ color: "rgba(27,37,40,0.35)" }}
+                  style={{ color: input.trim() && !limitReached ? "white" : "rgba(27,37,40,0.35)" }}
                 />
               )}
             </button>

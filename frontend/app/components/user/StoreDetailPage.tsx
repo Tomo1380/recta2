@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, forwardRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import { Link } from "react-router";
 
 import { Separator } from "~/components/ui/separator";
@@ -43,6 +43,9 @@ import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores"
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
+import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
+import CompareToggle from "~/components/user/shared/CompareToggle";
 import { pushViewedStore } from "~/lib/viewed-stores";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +65,22 @@ interface FeeItem {
 interface StoreImage {
   url: string;
   order: number;
+}
+
+interface StoreVideo {
+  video_url: string;
+  label?: string | null;
+  description?: string | null;
+  poster_url?: string | null;
+  display_order: number;
+}
+
+interface StoreStaffPhoto {
+  image_url: string;
+  caption?: string | null;
+  instagram_url?: string | null;
+  staff_type?: string | null;
+  display_order: number;
 }
 
 interface CastStyle {
@@ -258,7 +277,12 @@ export interface StoreDetailStore {
   features_text: string;
   dress_code: string | DressCodeObject | null;
   images: StoreImage[] | null;
-  video_url: string;
+  /** Legacy single-video URL — still emitted by the API as the first videos[] entry. Prefer `videos`. */
+  video_url: string | null;
+  /** Ordered list of videos with their own label/description. */
+  videos?: StoreVideo[] | null;
+  /** Ordered staff photos (在籍女性ギャラリー) */
+  staff_photos?: StoreStaffPhoto[] | null;
   analysis: Analysis | null;
   interview_info: InterviewInfo | null;
   required_documents: RequiredDocuments | null;
@@ -406,8 +430,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
   const [data, setData] = useState<StoreDetailResponse | null>(previewData ?? null);
   const [loading, setLoading] = useState(!previewData);
   const [error, setError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoMode, setVideoMode] = useState<"inline" | "stuck" | "mini">("inline");
+  // Shared controller — ensures only one video can be `stuck`/`mini` at a time.
+  const stickyController = useStickyVideoController();
 
   // Keep preview data in sync when form changes
   useEffect(() => {
@@ -620,18 +644,30 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             }}
           />
 
+          {/* LINE CTA #1 — between AI chat and video */}
+          <LineCtaCard
+            variant="slim"
+            title="チャットでは聞きにくいことも"
+            description="担当スタッフがLINEで直接お答えします"
+            ctaLabel="相談する"
+            source="store-detail:chat-inline"
+          />
+
           {/* ============================================================ */}
-          {/* 3. Store video — play-to-stick (inline → mini)              */}
+          {/* 3. Store videos — multiple videos with labels & descriptions */}
+          {/*    Renders display_order ascending. Each video is               */}
+          {/*    play-to-stick; only one can be `stuck`/`mini` at a time      */}
+          {/*    thanks to the shared `stickyController`.                     */}
           {/* ============================================================ */}
-          {store.video_url && (
-            <StoreVideoSection
-              videoUrl={store.video_url}
-              posterUrl={sortedImages[0]?.url}
-              ref={videoRef}
-              mode={videoMode}
-              setMode={setVideoMode}
-            />
-          )}
+          <StoreVideosBlock
+            videos={(store.videos && store.videos.length > 0)
+              ? store.videos
+              : (store.video_url
+                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
+                  : [])}
+            fallbackPosterUrl={sortedImages[0]?.url}
+            controller={stickyController}
+          />
 
           {/* ============================================================ */}
           {/* 4. Experience Entry (体験入店情報) */}
@@ -812,6 +848,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             </div>
           </SectionCard>
 
+          {/* Relocate-support CTA — re-prompt the simulator for users coming from outside Tokyo */}
+          <RelocateSupportCta variant="salary" />
+
           {/* ============================================================ */}
           {/* 7. Analysis */}
           {/* ============================================================ */}
@@ -842,6 +881,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                   ))}
               </div>
             </SectionCard>
+          )}
+
+          {/* ============================================================ */}
+          {/* 8b. Staff gallery — 在籍女性 / レクタ経由入店女性 の写真 */}
+          {/* ============================================================ */}
+          {store.staff_photos && store.staff_photos.length > 0 && (
+            <StaffGallerySection photos={store.staff_photos} storeName={store.name} />
           )}
 
           {/* ============================================================ */}
@@ -923,6 +969,18 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 )}
               </div>
             </SectionCard>
+          )}
+
+          {/* LINE CTA #2 — only when followed by a "Required documents" section,
+              so the "面接前の不安" framing doesn't dangle without context. */}
+          {store.required_documents && (
+            <LineCtaCard
+              variant="slim"
+              title="面接前の不安、LINEで気軽に質問"
+              description="服装・持ち物・当日の流れまで個別にサポート"
+              ctaLabel="質問する"
+              source="store-detail:docs-inline"
+            />
           )}
 
           {/* ============================================================ */}
@@ -1175,10 +1233,28 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             </div>
           </SectionCard>
 
+          {/* LINE CTA #3 — between access map and recently-viewed list */}
+          <LineCtaCard
+            variant="card"
+            title="気になったら、まずLINEへ"
+            description="体入予約・条件交渉までトークで完結"
+            ctaLabel="LINE追加"
+            source="store-detail:map-card"
+          />
+
           {/* ============================================================ */}
           {/* 16. Recently viewed stores (あなたが見た記事) */}
           {/* ============================================================ */}
           <RecentlyViewedStores excludeId={store.id} variant="card" />
+
+          {/* 17. Compare CTA — fed by dev feedback「即決できない人に2件並べて選ばせる」 */}
+          <CompareToggle
+            storeId={store.id}
+            storeName={store.name}
+            storeArea={store.area}
+            storeCategory={store.category}
+            storeImageUrl={sortedImages[0]?.url}
+          />
 
         </div>
 
@@ -1443,21 +1519,127 @@ function parseYouTubeId(url: string): string | null {
   }
 }
 
+/**
+ * 複数動画がページに並ぶ場合、「同時に sticky/mini になれるのは 1 本だけ」
+ * というルールを徹底するためのコントローラ。アクティブな動画IDと
+ * そのモードを React state で唯一管理し、ある動画が再生開始したら
+ * 他の動画は強制的に inline へ戻す。
+ */
+export type StickyVideoMode = "inline" | "stuck" | "mini";
+type StickyEntry = { id: string; mode: Exclude<StickyVideoMode, "inline"> } | null;
+
+export interface StickyVideoController {
+  modeFor: (id: string) => StickyVideoMode;
+  setMode: (id: string, next: StickyVideoMode) => void;
+}
+
+function useStickyVideoController(): StickyVideoController {
+  const [active, setActive] = useState<StickyEntry>(null);
+  // controller オブジェクト参照を active が変わらない限り安定させ、
+  // 各 StoreVideoSection の useCallback / useEffect で不要な発火を防ぐ。
+  return useMemo<StickyVideoController>(
+    () => ({
+      modeFor: (id: string): StickyVideoMode =>
+        active && active.id === id ? active.mode : "inline",
+      setMode: (id: string, next: StickyVideoMode) => {
+        setActive(next === "inline" ? null : { id, mode: next });
+      },
+    }),
+    [active],
+  );
+}
+
+/**
+ * 複数動画を縦に並べる外殻。各動画はラベル(label)と説明(description)を
+ * 動画の **下** に表示する（A 案: 動画下にぶら下げる）。
+ *
+ * 動画が 1 本だけのときは見出しと余白を最小化し、従来の単一動画と同じ
+ * 見え方にする。複数本になった瞬間「店舗動画」セクション全体を 1 枚の
+ * 大きな白カードで括ると、店舗詳細の他セクションとリズムが揃う。
+ */
+function StoreVideosBlock({
+  videos,
+  fallbackPosterUrl,
+  controller,
+}: {
+  videos: StoreVideo[];
+  fallbackPosterUrl?: string;
+  controller: StickyVideoController;
+}) {
+  if (videos.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      {videos.map((v, idx) => (
+        <div key={`${v.video_url}-${idx}`} className="space-y-2">
+          <StoreVideoSection
+            id={`video-${idx}`}
+            videoUrl={v.video_url}
+            posterUrl={v.poster_url ?? fallbackPosterUrl ?? undefined}
+            controller={controller}
+          />
+          {(v.label || v.description) && (
+            <div className="px-1">
+              {v.label && (
+                <p
+                  className="text-[12.5px] font-semibold leading-tight"
+                  style={{ color: "#1b2528", fontFamily: "'Noto Sans JP',sans-serif" }}
+                >
+                  {v.label}
+                </p>
+              )}
+              {v.description && (
+                <p
+                  className="text-[12px] mt-1 leading-relaxed whitespace-pre-line"
+                  style={{ color: "rgba(27,37,40,0.65)", fontFamily: "'Noto Sans JP',sans-serif" }}
+                >
+                  {v.description}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const StoreVideoSection = forwardRef<
   HTMLVideoElement,
   {
+    /** 同じページ内で動画を一意に識別するキー */
+    id: string;
     videoUrl: string;
     posterUrl?: string;
-    mode: "inline" | "stuck" | "mini";
-    setMode: (m: "inline" | "stuck" | "mini") => void;
+    controller: StickyVideoController;
   }
->(function StoreVideoSection({ videoUrl, posterUrl, mode, setMode }, ref) {
+>(function StoreVideoSection({ id, videoUrl, posterUrl, controller }, ref) {
+  const mode = controller.modeFor(id);
+  const setMode = useCallback(
+    (next: StickyVideoMode) => controller.setMode(id, next),
+    [controller, id],
+  );
+
   const localRef = useRef<HTMLVideoElement | null>(null);
   const setRefs = (el: HTMLVideoElement | null) => {
     localRef.current = el;
     if (typeof ref === "function") ref(el);
     else if (ref) (ref as React.MutableRefObject<HTMLVideoElement | null>).current = el;
   };
+
+  // この動画がアクティブでなくなったタイミングで再生を止める。
+  // 別動画にスティッキーが切り替わったとき、こちらが裏で延々と
+  // 再生し続ける（音が二重に出る等）のを防ぐため。
+  useEffect(() => {
+    if (mode === "inline" && localRef.current) {
+      try {
+        localRef.current.pause();
+        localRef.current.currentTime = 0;
+      } catch {
+        // ignore — autoplay/permission edge cases
+      }
+    }
+  }, [mode]);
 
   const ytId = parseYouTubeId(videoUrl);
   const isYouTube = !!ytId;
@@ -1649,6 +1831,106 @@ function SectionCard({
   );
 }
 
+// ─── StaffGallerySection ──────────────────────────────────────────────────
+// 「在籍女性ギャラリー」セクション。
+// 2列グリッドで写真を並べる。各カードに staff_type バッジ、キャプション、
+// インスタリンク（あれば）を表示する。
+function StaffGallerySection({
+  photos,
+  storeName,
+}: {
+  photos: StoreStaffPhoto[];
+  storeName: string;
+}) {
+  const sorted = [...photos].sort((a, b) => a.display_order - b.display_order);
+  const GOLD_HEX_LOCAL = "#D4AF37";
+  return (
+    <SectionCard
+      icon={<Sparkles size={20} style={{ color: GOLD_HEX_LOCAL }} />}
+      title="在籍女性ギャラリー"
+    >
+      <div className="grid grid-cols-2 gap-2">
+        {sorted.map((photo, i) => {
+          const inner = (
+            <div
+              className="relative overflow-hidden rounded-[12px] aspect-[3/4]"
+              style={{ background: "#0E1316" }}
+            >
+              <img
+                src={photo.image_url}
+                alt={photo.caption ?? `${storeName} 在籍女性 ${i + 1}`}
+                className="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+              />
+              {photo.staff_type && (
+                <span
+                  className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold leading-none"
+                  style={{
+                    background: "rgba(212,175,55,0.95)",
+                    color: "#1b2528",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {photo.staff_type}
+                </span>
+              )}
+              {photo.instagram_url && (
+                <span
+                  aria-hidden
+                  className="absolute top-2 right-2 rounded-full p-1.5"
+                  style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
+                >
+                  <Instagram size={12} style={{ color: "white" }} />
+                </span>
+              )}
+              {photo.caption && (
+                <div
+                  aria-hidden
+                  className="absolute inset-x-0 bottom-0 px-2 pt-4 pb-2"
+                  style={{
+                    background: "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 100%)",
+                  }}
+                >
+                  <p
+                    className="text-[11px] font-medium leading-tight"
+                    style={{
+                      color: "white",
+                      fontFamily: "'Noto Sans JP',sans-serif",
+                      textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical" as const,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {photo.caption}
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+
+          // インスタURLがあれば外部リンク、無ければ単なる画像カード
+          return photo.instagram_url ? (
+            <a
+              key={`${photo.image_url}-${i}`}
+              href={photo.instagram_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${photo.caption ?? "在籍女性"}のInstagramを開く（外部リンク）`}
+              className="block active:scale-[0.99] transition-transform"
+            >
+              {inner}
+            </a>
+          ) : (
+            <div key={`${photo.image_url}-${i}`}>{inner}</div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
 function InfoRow({
   label,
   value,
@@ -1732,30 +2014,56 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
 
         <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
 
-        {/* Cast style */}
+        {/* Cast style — segmented stacked bar with in-bar labels for clarity. */}
         <div className="space-y-2">
           <p className="text-sm font-medium" style={{ color: "#1b2528" }}>在籍女性の系統</p>
-          <div className="flex h-4 w-full overflow-hidden rounded-full">
-            {castSegments.map((seg) =>
-              seg.value > 0 ? (
+          <div className="flex h-9 w-full overflow-hidden rounded-md" style={{ boxShadow: "inset 0 0 0 1px rgba(27,37,40,0.06)" }}>
+            {castSegments.map((seg) => {
+              if (seg.value <= 0) return null;
+              const pct = Math.round((seg.value / castTotal) * 100);
+              // Show the in-bar label only when the segment is wide enough
+              // for the text to fit cleanly (~8% of the bar).
+              const showLabel = pct >= 8;
+              // Use white text on segments where charcoal text wouldn't hit
+              // WCAG AA (4.5:1) at 10px: the dark navy and the saturated
+              // pink both fail the contrast check otherwise.
+              const useWhiteText = seg.color === "#1b2528" || seg.color === "rgba(200,96,128,1)";
+              return (
                 <div
                   key={seg.label}
-                  className="h-full transition-all"
-                  style={{ width: `${(seg.value / castTotal) * 100}%`, backgroundColor: seg.color }}
-                />
-              ) : null,
-            )}
+                  className="h-full flex items-center justify-center transition-all"
+                  style={{ width: `${pct}%`, backgroundColor: seg.color }}
+                  title={`${seg.label} ${pct}%`}
+                >
+                  {showLabel && (
+                    <span
+                      className="text-[10px] font-semibold leading-none"
+                      style={{
+                        color: useWhiteText ? "#fff" : "rgba(27,37,40,0.9)",
+                        textShadow: useWhiteText ? "0 1px 1px rgba(0,0,0,0.25)" : "none",
+                      }}
+                    >
+                      {pct}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <div className="flex flex-wrap gap-3">
-            {castSegments.map((seg) => (
-              <span key={seg.label} className="inline-flex items-center gap-1.5 text-xs">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: seg.color }}
-                />
-                {seg.label} {Math.round((seg.value / castTotal) * 100)}%
-              </span>
-            ))}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:flex sm:flex-wrap">
+            {castSegments.map((seg) => {
+              const pct = castTotal > 0 ? Math.round((seg.value / castTotal) * 100) : 0;
+              return (
+                <span key={seg.label} className="inline-flex items-center gap-1.5 text-xs" style={{ color: "rgba(27,37,40,0.7)" }}>
+                  <span
+                    className="inline-block h-3 w-3 rounded-sm shrink-0"
+                    style={{ backgroundColor: seg.color, boxShadow: "0 0 0 1px rgba(27,37,40,0.08)" }}
+                  />
+                  <span className="font-medium">{seg.label}</span>
+                  <span className="tabular-nums" style={{ color: "rgba(27,37,40,0.5)" }}>{pct}%</span>
+                </span>
+              );
+            })}
           </div>
         </div>
 
@@ -2876,3 +3184,4 @@ function ReviewItem({ review }: { review: Review }) {
     </div>
   );
 }
+

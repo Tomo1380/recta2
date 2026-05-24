@@ -4,6 +4,8 @@ import AiChatPanel from "~/components/user/AiChatPanel";
 import Footer from "~/components/user/shared/Footer";
 import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
+import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
+import { LineIcon } from "~/components/user/shared/LineIcon";
 import { useUserAuth } from "~/lib/user-auth";
 
 // ─── Constants ─────────────────────────────────────
@@ -389,13 +391,15 @@ function getImageUrl(image: string | { url: string } | undefined): string | unde
 
 // ─── Main Component ────────────────────────────────
 
+// 初期に見せるエリア数と、「他のエリアも見る」を押すたびに足す件数。
+const AREA_INITIAL = 6;
+const AREA_STEP = 8;
+
 export default function TopPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<HomeData | null>(null);
-  // Real LINE auth state from the user-auth context. Local toggle below is
-  // only used for the "preview" affordance on the locked overlay.
   const { isAuthenticated } = useUserAuth();
-  const [lineLoggedIn, setLineLoggedIn] = useState(false);
+  const [areasVisible, setAreasVisible] = useState(AREA_INITIAL);
 
   useEffect(() => {
     fetch("/api/home")
@@ -547,36 +551,7 @@ export default function TopPage() {
 
         {/* ══ 上京サポート BANNER ══ */}
         <div className="mt-6 px-5">
-          <Link
-            to="/relocate-support"
-            className="block rounded-2xl overflow-hidden active:scale-[0.99] transition-transform"
-            style={{
-              background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 60%, rgba(200,96,128,.4) 100%)`,
-              border: `1px solid rgba(212,175,55,.3)`,
-              boxShadow: "0 8px 24px rgba(0,0,0,.18)",
-              textDecoration: "none",
-              position: "relative",
-            }}
-          >
-            <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "44%", background: `radial-gradient(circle at 70% 50%, rgba(212,175,55,.18), transparent 60%)`, pointerEvents: "none" }} />
-            <div className="flex items-center gap-3 p-4 relative">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(212,175,55,.15)", border: "1px solid rgba(212,175,55,.35)" }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 21V11l9-7 9 7v10" stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M9 21v-6h6v6" stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "9.5px", letterSpacing: "0.14em", color: GOLD, textTransform: "uppercase" }}>Relocate Support</span>
-                  <span className="px-1.5 py-0 rounded" style={{ background: "rgba(255,255,255,.1)", fontFamily: J, fontWeight: 600, fontSize: "8.5px", color: "rgba(255,255,255,.85)" }}>家紹介あり</span>
-                </div>
-                <p style={{ fontFamily: J, fontWeight: 700, fontSize: "14.5px", color: "white", margin: 0, lineHeight: 1.4 }}>地方から東京で働きたい方へ</p>
-                <p style={{ fontFamily: J, fontWeight: 400, fontSize: "11px", color: "rgba(255,255,255,.7)", margin: "2px 0 0", lineHeight: 1.5 }}>体験確約・オンライン面接・住居サポートまで一気通貫</p>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0"><path d="M9 18l6-6-6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-          </Link>
+          <RelocateSupportCta variant="top" />
         </div>
 
         {/* ══ REVIEWS ══ */}
@@ -595,7 +570,7 @@ export default function TopPage() {
           ) : (
           <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
             {recentReviews.map((review, idx) => {
-              const requireLogin = !isAuthenticated && !lineLoggedIn && idx >= 3;
+              const requireLogin = !isAuthenticated && idx >= 3;
               // 口コミ表示は本人のニックネームのみ。LINE 実名はプライバシー保護のため使わない。
               const userName = review.user?.nickname || "匿名";
               const initial = (userName.charAt(0) || "?");
@@ -651,14 +626,18 @@ export default function TopPage() {
                         <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                       <span style={{ fontFamily: J, fontWeight: 400, fontSize: "10px", color: "rgba(27,37,40,.45)", marginBottom: "6px" }}>クチコミを見るにはログインが必要です</span>
-                      <button
-                        onClick={() => setLineLoggedIn(true)}
+                      <Link
+                        to="/login"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sessionStorage.setItem("recta:login-return-to", "/");
+                        }}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl active:scale-95 transition-transform"
-                        style={{ background: "#06C755", border: "none", cursor: "pointer", boxShadow: "0 4px 14px rgba(6,199,85,.3), 0 1px 3px rgba(6,199,85,.2)" }}
+                        style={{ background: "#06C755", textDecoration: "none", boxShadow: "0 4px 14px rgba(6,199,85,.3), 0 1px 3px rgba(6,199,85,.2)" }}
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596a.629.629 0 0 1-.199.031c-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.271.173-.508.43-.595a.497.497 0 0 1 .194-.033c.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" /></svg>
+                        <LineIcon size={16} />
                         <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12px", color: "white", letterSpacing: "0.02em" }}>LINEでログイン</span>
-                      </button>
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -684,7 +663,7 @@ export default function TopPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
-                {areas.map((area, i) => {
+                {areas.slice(0, areasVisible).map((area, i) => {
                   const count = area.store_count ?? 0;
                   return (
                     <Link key={area.id} to={`/stores?area=${encodeURIComponent(area.slug)}`} className="rounded-xl flex items-center gap-2.5 px-3 active:scale-[0.98] transition-transform" style={{ background: "rgba(255,255,255,.06)", border: i < 3 ? "1px solid rgba(212,175,55,.2)" : "1px solid rgba(255,255,255,.08)", height: "50px", textDecoration: "none" }}>
@@ -699,14 +678,20 @@ export default function TopPage() {
                   );
                 })}
               </div>
-              <Link
-                to="/stores"
-                className="mt-3 flex items-center justify-center gap-1.5 rounded-xl active:scale-[0.98] transition-transform"
-                style={{ height: "44px", background: "rgba(212,175,55,.1)", border: "1px solid rgba(212,175,55,.25)", textDecoration: "none" }}
-              >
-                <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: GOLD, letterSpacing: "0.02em" }}>他のエリアも見る</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </Link>
+              {areasVisible < areas.length && (
+                <button
+                  type="button"
+                  onClick={() => setAreasVisible((v) => Math.min(v + AREA_STEP, areas.length))}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl active:scale-[0.98] transition-transform"
+                  style={{ height: "44px", background: "rgba(212,175,55,.1)", border: "1px solid rgba(212,175,55,.25)", cursor: "pointer" }}
+                  aria-label={`他のエリアをさらに${Math.min(AREA_STEP, areas.length - areasVisible)}件表示`}
+                >
+                  <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: GOLD, letterSpacing: "0.02em" }}>
+                    他のエリアも見る（あと{areas.length - areasVisible}件）
+                  </span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              )}
             </div>
 
             <div style={{ height: "1px", background: "rgba(255,255,255,.06)", margin: "24px 20px" }} />

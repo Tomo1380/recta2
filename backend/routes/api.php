@@ -21,6 +21,7 @@ use App\Http\Controllers\LineAuthController;
 use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\PublicReviewController;
+use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 
 // ========== ヘルスチェック ==========
@@ -34,10 +35,18 @@ Route::get('/areas', [PublicStoreController::class, 'areas']);
 Route::get('/categories', [PublicStoreController::class, 'categories']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
 Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');
+// SSE 版 — 同じ payload を受けて Server-Sent Events で逐次返す。
+// Function Calling 中は status イベント、最終回答は text 差分イベント、完了時に done イベント。
+Route::post('/chat/stream', [AiChatController::class, 'chatStream'])->middleware('throttle:30,1');
 
 // ========== コラム記事（公開） ==========
 Route::get('/columns', [PublicArticleController::class, 'index']);
 Route::get('/columns/{slug}', [PublicArticleController::class, 'show']);
+
+// ========== SEO (sitemap / robots) ==========
+// nginx で `/sitemap.xml` → `/api/sitemap`, `/robots.txt` → `/api/robots` に rewrite している。
+Route::get('/sitemap', [SeoController::class, 'sitemap']);
+Route::get('/robots', [SeoController::class, 'robots']);
 
 // ========== LINE認証 ==========
 Route::get('/auth/line', [LineAuthController::class, 'redirect']);
