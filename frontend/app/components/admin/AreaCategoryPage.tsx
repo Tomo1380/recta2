@@ -20,8 +20,24 @@ import {
   AlertCircle,
   Upload,
 } from "lucide-react";
-import { api } from "~/lib/api";
-import type { Area, Category } from "~/lib/types";
+import {
+  areaCategoryAreas,
+  areaCategoryStoreArea,
+  areaCategoryUpdateArea,
+  areaCategoryDestroyArea,
+  areaCategoryReorderAreas,
+  areaCategoryCategories,
+  areaCategoryStoreCategory,
+  areaCategoryUpdateCategory,
+  areaCategoryDestroyCategory,
+  areaCategoryReorderCategories,
+  areaCategoryUploadCategoryImage,
+} from "../../../orval/generated/area-category";
+import type { AreaResource, CategoryResource } from "../../../orval/generated/api.schemas";
+
+// 既存コードが Area/Category 名で書かれているので、生成型に local alias する。
+type Area = AreaResource;
+type Category = CategoryResource;
 
 type Tab = "areas" | "categories";
 
@@ -57,7 +73,7 @@ export function AreaCategoryPage() {
 
   const fetchAreas = useCallback(async () => {
     try {
-      const data = await api.get<Area[]>("/admin/areas");
+      const data = await areaCategoryAreas();
       setAreas(data);
     } catch (e) {
       console.error(e);
@@ -67,7 +83,7 @@ export function AreaCategoryPage() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const data = await api.get<Category[]>("/admin/categories");
+      const data = await areaCategoryCategories();
       setCategories(data);
     } catch (e) {
       console.error(e);
@@ -95,7 +111,7 @@ export function AreaCategoryPage() {
   const handleSaveAreaName = async (area: Area) => {
     setSaving(true);
     try {
-      await api.put(`/admin/areas/${area.id}`, { name: area.name });
+      await areaCategoryUpdateArea(area.id, { name: area.name });
       setEditingArea(null);
       showToast("エリア名を更新しました");
     } catch (e) {
@@ -108,7 +124,7 @@ export function AreaCategoryPage() {
 
   const handleToggleAreaVisible = async (area: Area) => {
     try {
-      await api.put(`/admin/areas/${area.id}`, { visible: !area.visible });
+      await areaCategoryUpdateArea(area.id, { visible: !area.visible });
       setAreas(prev => prev.map(a => a.id === area.id ? { ...a, visible: !a.visible } : a));
       showToast(area.visible ? "非表示にしました" : "表示にしました");
     } catch (e) {
@@ -120,7 +136,7 @@ export function AreaCategoryPage() {
   const handleDeleteArea = async (area: Area) => {
     if (!confirm(`「${area.name}」を削除しますか？`)) return;
     try {
-      await api.delete(`/admin/areas/${area.id}`);
+      await areaCategoryDestroyArea(area.id);
       setAreas(prev => prev.filter(a => a.id !== area.id));
       showToast(`「${area.name}」を削除しました`);
     } catch (e) {
@@ -136,7 +152,7 @@ export function AreaCategoryPage() {
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
       setAreas(next);
       try {
-        await api.post("/admin/areas/reorder", { ids: next.map(a => a.id) });
+        await areaCategoryReorderAreas({ ids: next.map(a => a.id) });
         showToast("並び順を更新しました");
       } catch (e) {
         console.error(e);
@@ -148,7 +164,7 @@ export function AreaCategoryPage() {
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
       setAreas(next);
       try {
-        await api.post("/admin/areas/reorder", { ids: next.map(a => a.id) });
+        await areaCategoryReorderAreas({ ids: next.map(a => a.id) });
         showToast("並び順を更新しました");
       } catch (e) {
         console.error(e);
@@ -161,7 +177,7 @@ export function AreaCategoryPage() {
   const handleSaveCategory = async (cat: Category) => {
     setSaving(true);
     try {
-      const updated = await api.put<Category>(`/admin/categories/${cat.id}`, {
+      const updated = await areaCategoryUpdateCategory(cat.id, {
         name: cat.name,
         slug: cat.slug,
         image_url: cat.image_url,
@@ -179,7 +195,7 @@ export function AreaCategoryPage() {
 
   const handleToggleCategoryVisible = async (cat: Category) => {
     try {
-      await api.put(`/admin/categories/${cat.id}`, { visible: !cat.visible });
+      await areaCategoryUpdateCategory(cat.id, { visible: !cat.visible });
       setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, visible: !c.visible } : c));
       showToast(cat.visible ? "非表示にしました" : "表示にしました");
     } catch (e) {
@@ -191,7 +207,7 @@ export function AreaCategoryPage() {
   const handleDeleteCategory = async (cat: Category) => {
     if (!confirm(`「${cat.name}」を削除しますか？`)) return;
     try {
-      await api.delete(`/admin/categories/${cat.id}`);
+      await areaCategoryDestroyCategory(cat.id);
       setCategories(prev => prev.filter(c => c.id !== cat.id));
       showToast(`「${cat.name}」を削除しました`);
     } catch (e) {
@@ -207,7 +223,7 @@ export function AreaCategoryPage() {
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
       setCategories(next);
       try {
-        await api.post("/admin/categories/reorder", { ids: next.map(c => c.id) });
+        await areaCategoryReorderCategories({ ids: next.map(c => c.id) });
         showToast("並び順を更新しました");
       } catch (e) {
         console.error(e);
@@ -219,7 +235,7 @@ export function AreaCategoryPage() {
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
       setCategories(next);
       try {
-        await api.post("/admin/categories/reorder", { ids: next.map(c => c.id) });
+        await areaCategoryReorderCategories({ ids: next.map(c => c.id) });
         showToast("並び順を更新しました");
       } catch (e) {
         console.error(e);
@@ -236,9 +252,7 @@ export function AreaCategoryPage() {
     }
     setUploadingCategoryId(cat.id);
     try {
-      const fd = new FormData();
-      fd.append("image", file);
-      const updated = await api.upload<Category>(`/admin/categories/${cat.id}/image`, fd);
+      const updated = await areaCategoryUploadCategoryImage(cat.id, { image: file });
       setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, ...updated } : c));
       showToast("カテゴリ画像を更新しました");
     } catch (e) {
@@ -254,11 +268,11 @@ export function AreaCategoryPage() {
     setSaving(true);
     try {
       if (activeTab === "areas") {
-        await api.post("/admin/areas", { name: newName, slug: newSlug, visible: true });
+        await areaCategoryStoreArea({ name: newName, slug: newSlug, visible: true });
         await fetchAreas();
         showToast(`エリア「${newName}」を追加しました`);
       } else {
-        await api.post("/admin/categories", { name: newName, slug: newSlug, visible: true });
+        await areaCategoryStoreCategory({ name: newName, slug: newSlug, visible: true });
         await fetchCategories();
         showToast(`カテゴリ「${newName}」を追加しました`);
       }

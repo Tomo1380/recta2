@@ -5,17 +5,16 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  Area,
   AreaCategoryReorderAreas200,
-  AreaCategoryReorderAreasBody,
   AreaCategoryReorderCategories200,
-  AreaCategoryReorderCategoriesBody,
-  AreaCategoryStoreAreaBody,
-  AreaCategoryStoreCategoryBody,
-  AreaCategoryUpdateAreaBody,
-  AreaCategoryUpdateCategoryBody,
   AreaCategoryUploadCategoryImageBody,
-  Category
+  AreaResource,
+  CategoryResource,
+  ReorderRequest,
+  StoreAreaRequest,
+  StoreCategoryRequest,
+  UpdateAreaRequest,
+  UpdateCategoryRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -26,29 +25,29 @@ import { rectaMutator } from '../mutators/auth';
   export const areaCategoryAreas = (
 
  ) => {
-      return rectaMutator<Area[]>(
+      return rectaMutator<AreaResource[]>(
       {url: `/admin/areas`, method: 'GET'
     },
       );
     }
   export const areaCategoryStoreArea = (
-    areaCategoryStoreAreaBody: AreaCategoryStoreAreaBody,
+    storeAreaRequest: StoreAreaRequest,
  ) => {
-      return rectaMutator<Area>(
+      return rectaMutator<AreaResource>(
       {url: `/admin/areas`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: areaCategoryStoreAreaBody
+      data: storeAreaRequest
     },
       );
     }
   export const areaCategoryUpdateArea = (
     area: number,
-    areaCategoryUpdateAreaBody?: AreaCategoryUpdateAreaBody,
+    updateAreaRequest?: UpdateAreaRequest,
  ) => {
-      return rectaMutator<Area>(
+      return rectaMutator<AreaResource>(
       {url: `/admin/areas/${area}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: areaCategoryUpdateAreaBody
+      data: updateAreaRequest
     },
       );
     }
@@ -61,41 +60,41 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const areaCategoryReorderAreas = (
-    areaCategoryReorderAreasBody: AreaCategoryReorderAreasBody,
+    reorderRequest: ReorderRequest,
  ) => {
       return rectaMutator<AreaCategoryReorderAreas200>(
       {url: `/admin/areas/reorder`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: areaCategoryReorderAreasBody
+      data: reorderRequest
     },
       );
     }
   export const areaCategoryCategories = (
 
  ) => {
-      return rectaMutator<Category[]>(
+      return rectaMutator<CategoryResource[]>(
       {url: `/admin/categories`, method: 'GET'
     },
       );
     }
   export const areaCategoryStoreCategory = (
-    areaCategoryStoreCategoryBody: AreaCategoryStoreCategoryBody,
+    storeCategoryRequest: StoreCategoryRequest,
  ) => {
-      return rectaMutator<Category>(
+      return rectaMutator<CategoryResource>(
       {url: `/admin/categories`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: areaCategoryStoreCategoryBody
+      data: storeCategoryRequest
     },
       );
     }
   export const areaCategoryUpdateCategory = (
     category: number,
-    areaCategoryUpdateCategoryBody?: AreaCategoryUpdateCategoryBody,
+    updateCategoryRequest?: UpdateCategoryRequest,
  ) => {
-      return rectaMutator<Category>(
+      return rectaMutator<CategoryResource>(
       {url: `/admin/categories/${category}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: areaCategoryUpdateCategoryBody
+      data: updateCategoryRequest
     },
       );
     }
@@ -108,12 +107,12 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const areaCategoryReorderCategories = (
-    areaCategoryReorderCategoriesBody: AreaCategoryReorderCategoriesBody,
+    reorderRequest: ReorderRequest,
  ) => {
       return rectaMutator<AreaCategoryReorderCategories200>(
       {url: `/admin/categories/reorder`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: areaCategoryReorderCategoriesBody
+      data: reorderRequest
     },
       );
     }
@@ -126,7 +125,7 @@ export const areaCategoryUploadCategoryImage = (
  ) => {const formData = new FormData();
 formData.append(`image`, areaCategoryUploadCategoryImageBody.image);
 
-      return rectaMutator<Category>(
+      return rectaMutator<CategoryResource>(
       {url: `/admin/categories/${category}/image`, method: 'POST',
       headers: {'Content-Type': 'multipart/form-data', },
        data: formData

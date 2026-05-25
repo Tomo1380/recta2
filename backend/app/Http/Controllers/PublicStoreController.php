@@ -9,9 +9,12 @@ use App\Models\PickupShop;
 use App\Models\Consultation;
 use App\Models\Review;
 use App\Models\SiteSetting;
+use App\Http\Resources\AreaResource;
+use App\Http\Resources\CategoryResource;
 use App\Support\StoreApiTransformer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 
 class PublicStoreController extends Controller
@@ -148,25 +151,25 @@ class PublicStoreController extends Controller
     /**
      * Visible areas list.
      */
-    public function areas(): JsonResponse
+    public function areas(): AnonymousResourceCollection
     {
         $areas = Area::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug']);
+            ->get();
 
-        return response()->json($areas);
+        return AreaResource::collection($areas);
     }
 
     /**
      * Visible categories list.
      */
-    public function categories(): JsonResponse
+    public function categories(): AnonymousResourceCollection
     {
         $categories = Category::where('visible', true)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'slug', 'image_url']);
+            ->get();
 
-        return response()->json($categories);
+        return CategoryResource::collection($categories);
     }
 
     /**

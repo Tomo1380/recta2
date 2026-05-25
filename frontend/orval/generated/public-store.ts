@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  Area,
-  Category,
+  AreaResource,
+  CategoryResource,
   PublicStoreHome200,
   PublicStoreIndex200,
   PublicStoreIndexParams,
@@ -58,7 +58,7 @@ export const publicStoreShow = (
 export const publicStoreAreas = (
 
  ) => {
-      return rectaMutator<Area[]>(
+      return rectaMutator<AreaResource[]>(
       {url: `/areas`, method: 'GET'
     },
       );
@@ -69,7 +69,7 @@ export const publicStoreAreas = (
 export const publicStoreCategories = (
 
  ) => {
-      return rectaMutator<Category[]>(
+      return rectaMutator<CategoryResource[]>(
       {url: `/categories`, method: 'GET'
     },
       );

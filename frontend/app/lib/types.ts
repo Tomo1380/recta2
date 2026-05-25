@@ -290,24 +290,9 @@ export interface LineMessage {
 }
 
 // Area & Category management
-export interface Area {
-  id: number;
-  name: string;
-  slug: string;
-  visible: boolean;
-  sort_order: number;
-  shop_count: number;
-}
-
-export interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  image_url: string | null;
-  visible: boolean;
-  sort_order: number;
-  shop_count: number;
-}
+// Area / Category は orval-generated 型 (AreaResource / CategoryResource)
+// を直接 import すること: `~/orval/generated/api.schemas`。
+// 手書きの interface は 2026-05-26 に削除。
 
 export interface RelocateVoice {
   id: number;

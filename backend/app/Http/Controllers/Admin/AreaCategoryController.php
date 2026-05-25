@@ -3,105 +3,76 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ReorderRequest;
+use App\Http\Requests\Admin\StoreAreaRequest;
+use App\Http\Requests\Admin\StoreCategoryRequest;
+use App\Http\Requests\Admin\UpdateAreaRequest;
+use App\Http\Requests\Admin\UpdateCategoryRequest;
+use App\Http\Resources\AreaResource;
+use App\Http\Resources\CategoryResource;
 use App\Models\Area;
 use App\Models\Category;
 use App\Models\Store;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AreaCategoryController extends Controller
 {
-    public function areas(): JsonResponse
+    public function areas(): AnonymousResourceCollection
     {
         $areas = Area::orderBy('sort_order')->get();
-
         $areas->each(function ($area) {
             $area->shop_count = Store::where('area', $area->name)->count();
         });
 
-        return response()->json($areas);
+        return AreaResource::collection($areas);
     }
 
-    public function storeArea(Request $request): JsonResponse
+    public function storeArea(StoreAreaRequest $request): AreaResource
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:areas',
-            'visible' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-
-        $area = Area::create($validated);
-
-        return response()->json($area, 201);
+        $area = Area::create($request->validated());
+        return new AreaResource($area);
     }
 
-    public function updateArea(Request $request, Area $area): JsonResponse
+    public function updateArea(UpdateAreaRequest $request, Area $area): AreaResource
     {
-        $validated = $request->validate([
-            'name' => 'string|max:255',
-            'slug' => 'string|max:255|unique:areas,slug,' . $area->id,
-            'visible' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-
-        $area->update($validated);
-
-        return response()->json($area);
+        $area->update($request->validated());
+        return new AreaResource($area);
     }
 
     public function destroyArea(Area $area): JsonResponse
     {
         $area->delete();
-
         return response()->json(null, 204);
     }
 
-    public function categories(): JsonResponse
+    public function categories(): AnonymousResourceCollection
     {
         $categories = Category::orderBy('sort_order')->get();
-
         $categories->each(function ($category) {
             $category->shop_count = Store::where('category', $category->name)->count();
         });
 
-        return response()->json($categories);
+        return CategoryResource::collection($categories);
     }
 
-    public function storeCategory(Request $request): JsonResponse
+    public function storeCategory(StoreCategoryRequest $request): CategoryResource
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:categories',
-            'image_url' => 'nullable|string|max:500',
-            'visible' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-
-        $category = Category::create($validated);
-
-        return response()->json($category, 201);
+        $category = Category::create($request->validated());
+        return new CategoryResource($category);
     }
 
-    public function updateCategory(Request $request, Category $category): JsonResponse
+    public function updateCategory(UpdateCategoryRequest $request, Category $category): CategoryResource
     {
-        $validated = $request->validate([
-            'name' => 'string|max:255',
-            'slug' => 'string|max:255|unique:categories,slug,' . $category->id,
-            'image_url' => 'nullable|string|max:500',
-            'visible' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-
-        $category->update($validated);
-
-        return response()->json($category);
+        $category->update($request->validated());
+        return new CategoryResource($category);
     }
 
     /**
      * Upload an image for a category. Stored on the public disk.
      */
-    public function uploadCategoryImage(Request $request, Category $category): JsonResponse
+    public function uploadCategoryImage(Request $request, Category $category): CategoryResource
     {
         $request->validate([
             'image' => 'required|image|max:5120',
@@ -112,41 +83,28 @@ class AreaCategoryController extends Controller
 
         $category->update(['image_url' => $url]);
 
-        return response()->json($category);
+        return new CategoryResource($category);
     }
 
     public function destroyCategory(Category $category): JsonResponse
     {
         $category->delete();
-
         return response()->json(null, 204);
     }
 
-    public function reorderAreas(Request $request): JsonResponse
+    public function reorderAreas(ReorderRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer|exists:areas,id',
-        ]);
-
-        foreach ($validated['ids'] as $index => $id) {
+        foreach ($request->validated()['ids'] as $index => $id) {
             Area::where('id', $id)->update(['sort_order' => $index]);
         }
-
         return response()->json(['message' => 'OK']);
     }
 
-    public function reorderCategories(Request $request): JsonResponse
+    public function reorderCategories(ReorderRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer|exists:categories,id',
-        ]);
-
-        foreach ($validated['ids'] as $index => $id) {
+        foreach ($request->validated()['ids'] as $index => $id) {
             Category::where('id', $id)->update(['sort_order' => $index]);
         }
-
         return response()->json(['message' => 'OK']);
     }
 }

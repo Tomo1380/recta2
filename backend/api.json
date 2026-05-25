@@ -920,13 +920,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Array of `AreaResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/Area"
+                                        "$ref": "#/components/schemas/AreaResource"
                                     }
                                 }
                             }
@@ -947,47 +947,27 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "slug": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "name",
-                                    "slug"
-                                ]
+                                "$ref": "#/components/schemas/StoreAreaRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "",
+                    "200": {
+                        "description": "`AreaResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Area"
+                                    "$ref": "#/components/schemas/AreaResource"
                                 }
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1013,46 +993,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "slug": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateAreaRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`AreaResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Area"
+                                    "$ref": "#/components/schemas/AreaResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -1096,19 +1060,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -1133,11 +1085,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1150,13 +1102,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Array of `CategoryResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/Category"
+                                        "$ref": "#/components/schemas/CategoryResource"
                                     }
                                 }
                             }
@@ -1177,54 +1129,27 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "slug": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "image_url": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 500
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "name",
-                                    "slug"
-                                ]
+                                "$ref": "#/components/schemas/StoreCategoryRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "",
+                    "200": {
+                        "description": "`CategoryResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Category"
+                                    "$ref": "#/components/schemas/CategoryResource"
                                 }
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1250,53 +1175,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "slug": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "image_url": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 500
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateCategoryRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`CategoryResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Category"
+                                    "$ref": "#/components/schemas/CategoryResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -1340,19 +1242,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -1377,11 +1267,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1427,11 +1317,11 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`CategoryResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Category"
+                                    "$ref": "#/components/schemas/CategoryResource"
                                 }
                             }
                         }
@@ -5435,13 +5325,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Array of `AreaResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/Area"
+                                        "$ref": "#/components/schemas/AreaResource"
                                     }
                                 }
                             }
@@ -5459,13 +5349,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Array of `CategoryResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/Category"
+                                        "$ref": "#/components/schemas/CategoryResource"
                                     }
                                 }
                             }
@@ -8495,6 +8385,42 @@
                 ],
                 "title": "Area"
             },
+            "AreaResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "shop_count": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "\u7ba1\u7406\u753b\u9762\u306e\u4e00\u89a7\u3067\u300c\u3053\u306e\u30a8\u30ea\u30a2\u306b\u7d10\u3065\u304f\u5e97\u8217\u6570\u300d\u3092\u51fa\u3059\u305f\u3081\u306b\ncontroller \u5074\u3067 append \u3055\u308c\u308b\u52d5\u7684\u30d5\u30a3\u30fc\u30eb\u30c9\u3002set \u3055\u308c\u3066\u3044\u306a\u3044\nendpoint \u3067\u306f null \u306b\u306a\u308b\u3002\u30d5\u30ed\u30f3\u30c8\u5074\u306f null/undefined \u53cc\u65b9\u3092\n\u300c\u4e0d\u660e\u300d\u3068\u3057\u3066\u6271\u3048\u3070\u826f\u3044\u3002"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "visible",
+                    "sort_order",
+                    "shop_count"
+                ],
+                "title": "AreaResource"
+            },
             "Article": {
                 "type": "object",
                 "properties": {
@@ -8637,6 +8563,49 @@
                     "updated_at"
                 ],
                 "title": "Category"
+            },
+            "CategoryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "image_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "shop_count": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "\u7ba1\u7406\u753b\u9762\u306e\u4e00\u89a7\u3067\u300c\u3053\u306e\u30ab\u30c6\u30b4\u30ea\u306b\u7d10\u3065\u304f\u5e97\u8217\u6570\u300d\u3092\u51fa\u3059\u305f\u3081\u306e\n\u52d5\u7684\u30d5\u30a3\u30fc\u30eb\u30c9\u3002\u8a73\u3057\u304f\u306f AreaResource \u53c2\u7167\u3002"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "image_url",
+                    "visible",
+                    "sort_order",
+                    "shop_count"
+                ],
+                "title": "CategoryResource"
             },
             "Consultation": {
                 "type": "object",
@@ -8978,6 +8947,23 @@
                 ],
                 "title": "RelocateVoice"
             },
+            "ReorderRequest": {
+                "type": "object",
+                "description": "\u4e26\u3073\u66ff\u3048\u30a8\u30f3\u30c9\u30dd\u30a4\u30f3\u30c8 (areas/reorder, categories/reorder) \u5171\u901a\u306e\u5165\u529b\u3002\nids: \u4e26\u3073\u9806\u3092\u8868\u3059 ID \u914d\u5217\u30020 \u756a\u76ee\u3092 sort_order=0 \u306b\u5f53\u3066\u308b\u4ed5\u69d8\u3002",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "ids"
+                ],
+                "title": "ReorderRequest"
+            },
             "Review": {
                 "type": "object",
                 "properties": {
@@ -9315,6 +9301,108 @@
                     "updated_at"
                 ],
                 "title": "Store"
+            },
+            "StoreAreaRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "name",
+                    "slug"
+                ],
+                "title": "StoreAreaRequest"
+            },
+            "StoreCategoryRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "image_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "name",
+                    "slug"
+                ],
+                "title": "StoreCategoryRequest"
+            },
+            "UpdateAreaRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "title": "UpdateAreaRequest"
+            },
+            "UpdateCategoryRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "image_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "title": "UpdateCategoryRequest"
             },
             "User": {
                 "type": "object",

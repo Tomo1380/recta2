@@ -78,6 +78,22 @@ export interface Area {
   updated_at: string | null;
 }
 
+export interface AreaResource {
+  id: number;
+  name: string;
+  slug: string;
+  visible: boolean;
+  sort_order: number;
+  /**
+     * 管理画面の一覧で「このエリアに紐づく店舗数」を出すために
+   * controller 側で append される動的フィールド。set されていない
+   * endpoint では null になる。フロント側は null/undefined 双方を
+   * 「不明」として扱えば良い。
+     * @nullable
+     */
+  shop_count: number | null;
+}
+
 export interface Article {
   id: number;
   slug: string;
@@ -115,6 +131,22 @@ export interface Category {
   created_at: string | null;
   /** @nullable */
   updated_at: string | null;
+}
+
+export interface CategoryResource {
+  id: number;
+  name: string;
+  slug: string;
+  /** @nullable */
+  image_url: string | null;
+  visible: boolean;
+  sort_order: number;
+  /**
+     * 管理画面の一覧で「このカテゴリに紐づく店舗数」を出すための
+   * 動的フィールド。詳しくは AreaResource 参照。
+     * @nullable
+     */
+  shop_count: number | null;
 }
 
 export interface Consultation {
@@ -209,6 +241,15 @@ export interface RelocateVoice {
   updated_at: string | null;
 }
 
+/**
+ * 並び替えエンドポイント (areas/reorder, categories/reorder) 共通の入力。
+ * ids: 並び順を表す ID 配列。0 番目を sort_order=0 に当てる仕様。
+ */
+export interface ReorderRequest {
+  /** @minItems 1 */
+  ids: number[];
+}
+
 export interface Review {
   id: number;
   user_id: number;
@@ -297,6 +338,52 @@ export interface Store {
   created_at: string | null;
   /** @nullable */
   updated_at: string | null;
+}
+
+export interface StoreAreaRequest {
+  /** @maxLength 255 */
+  name: string;
+  /** @maxLength 255 */
+  slug: string;
+  visible?: boolean;
+  sort_order?: number;
+}
+
+export interface StoreCategoryRequest {
+  /** @maxLength 255 */
+  name: string;
+  /** @maxLength 255 */
+  slug: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  image_url?: string | null;
+  visible?: boolean;
+  sort_order?: number;
+}
+
+export interface UpdateAreaRequest {
+  /** @maxLength 255 */
+  name?: string;
+  /** @maxLength 255 */
+  slug?: string;
+  visible?: boolean;
+  sort_order?: number;
+}
+
+export interface UpdateCategoryRequest {
+  /** @maxLength 255 */
+  name?: string;
+  /** @maxLength 255 */
+  slug?: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  image_url?: string | null;
+  visible?: boolean;
+  sort_order?: number;
 }
 
 export interface User {
@@ -606,64 +693,8 @@ export type AiChatSettingUpdateLimitsBody = {
   limit_reached_message?: string;
 };
 
-export type AreaCategoryStoreAreaBody = {
-  /** @maxLength 255 */
-  name: string;
-  /** @maxLength 255 */
-  slug: string;
-  visible?: boolean;
-  sort_order?: number;
-};
-
-export type AreaCategoryUpdateAreaBody = {
-  /** @maxLength 255 */
-  name?: string;
-  /** @maxLength 255 */
-  slug?: string;
-  visible?: boolean;
-  sort_order?: number;
-};
-
-export type AreaCategoryReorderAreasBody = {
-  /** @minItems 1 */
-  ids: number[];
-};
-
 export type AreaCategoryReorderAreas200 = {
   message: 'OK';
-};
-
-export type AreaCategoryStoreCategoryBody = {
-  /** @maxLength 255 */
-  name: string;
-  /** @maxLength 255 */
-  slug: string;
-  /**
-     * @maxLength 500
-     * @nullable
-     */
-  image_url?: string | null;
-  visible?: boolean;
-  sort_order?: number;
-};
-
-export type AreaCategoryUpdateCategoryBody = {
-  /** @maxLength 255 */
-  name?: string;
-  /** @maxLength 255 */
-  slug?: string;
-  /**
-     * @maxLength 500
-     * @nullable
-     */
-  image_url?: string | null;
-  visible?: boolean;
-  sort_order?: number;
-};
-
-export type AreaCategoryReorderCategoriesBody = {
-  /** @minItems 1 */
-  ids: number[];
 };
 
 export type AreaCategoryReorderCategories200 = {
