@@ -8,6 +8,7 @@ import SectionHeader from "~/components/user/shared/SectionHeader";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import { useUserAuth } from "~/lib/user-auth";
 import { LUXE } from "~/lib/luxe-tokens";
+import type { ArticleSummary, PublicArticleIndexResponse } from "~/lib/types";
 
 // ─── Constants ─────────────────────────────────────
 // Color/gradient/font tokens live in ~/lib/luxe-tokens. Aliases kept short for
@@ -389,12 +390,22 @@ export default function TopPage() {
   const [data, setData] = useState<HomeData | null>(null);
   const { isAuthenticated } = useUserAuth();
   const [areasVisible, setAreasVisible] = useState(AREA_INITIAL);
+  // 最新コラム。0 件ならセクションごと非表示にするので別 state で軽く取る。
+  const [columns, setColumns] = useState<ArticleSummary[]>([]);
 
   useEffect(() => {
     fetch("/api/home")
       .then((res) => res.json())
       .then((json: HomeData) => { setData(json); setLoading(false); })
       .catch(() => { setLoading(false); });
+
+    fetch("/api/columns?per_page=3")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: PublicArticleIndexResponse | null) => {
+        const list = json?.articles?.data ?? [];
+        setColumns(Array.isArray(list) ? list : []);
+      })
+      .catch(() => setColumns([]));
   }, []);
 
   if (loading) {
@@ -717,6 +728,109 @@ export default function TopPage() {
           </div>
           <EdgeBottom />
         </div>
+
+        {/* ══ COLUMNS (Recta コラム) ══
+            記事 0 件ならセクションごと非表示 (空棚は逆効果)。            */}
+        {columns.length > 0 && (
+          <div className="mt-6 px-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-5 rounded-full" style={{ background: `linear-gradient(180deg,${GOLD},#c8960c)` }} />
+                <h2 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "17px", letterSpacing: "-0.02em", color: DARK, margin: 0 }}>
+                  Recta コラム
+                </h2>
+              </div>
+              <Link
+                to="/columns"
+                style={{ fontFamily: J, fontSize: "12px", fontWeight: 500, color: "rgba(27,37,40,.55)", textDecoration: "none" }}
+              >
+                もっと見る →
+              </Link>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
+              {columns.map((col) => (
+                <Link
+                  key={col.id}
+                  to={`/columns/${col.slug}`}
+                  className="shrink-0"
+                  style={{
+                    width: 220,
+                    background: "white",
+                    borderRadius: 14,
+                    border: "1px solid rgba(27,37,40,.06)",
+                    boxShadow: "0 4px 16px rgba(0,0,0,.04)",
+                    overflow: "hidden",
+                    textDecoration: "none",
+                    color: DARK,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "100%",
+                      aspectRatio: "16 / 10",
+                      background: col.thumbnail_url
+                        ? `center / cover url(${col.thumbnail_url})`
+                        : `linear-gradient(135deg, ${DARK} 0%, #2c3e46 50%, rgba(200,96,128,.4) 100%)`,
+                      position: "relative",
+                    }}
+                  >
+                    {col.category && (
+                      <span
+                        className="absolute top-2 left-2 px-2 py-0.5 rounded"
+                        style={{
+                          background: "rgba(255,255,255,.92)",
+                          fontFamily: J,
+                          fontWeight: 700,
+                          fontSize: "10px",
+                          color: DARK,
+                        }}
+                      >
+                        {col.category}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h3
+                      style={{
+                        fontFamily: J,
+                        fontWeight: 700,
+                        fontSize: "13px",
+                        lineHeight: 1.5,
+                        margin: 0,
+                        color: DARK,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical" as const,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {col.title}
+                    </h3>
+                    {col.excerpt && (
+                      <p
+                        style={{
+                          fontFamily: J,
+                          fontWeight: 400,
+                          fontSize: "11px",
+                          lineHeight: 1.6,
+                          margin: "6px 0 0",
+                          color: "rgba(27,37,40,.55)",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical" as const,
+                          overflow: "hidden",
+                        }}
+                      >
+                        {col.excerpt}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ══ RECENTLY VIEWED (あなたが見た記事) ══ */}
         <RecentlyViewedStores variant="flush" />
