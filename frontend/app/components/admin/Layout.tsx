@@ -16,6 +16,7 @@ import {
   MapPin,
   Loader2,
   FileText,
+  Plane,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "~/lib/auth";
@@ -29,6 +30,7 @@ const menuItems = [
   { path: "/admin/articles", label: "コラム管理", icon: FileText },
   { path: "/admin/content", label: "コンテンツ管理", icon: LayoutGrid },
   { path: "/admin/area-category", label: "エリア・カテゴリ", icon: MapPin },
+  { path: "/admin/relocate-voices", label: "上京者の声", icon: Plane },
   { path: "/admin/admin-users", label: "管理ユーザー", icon: KeyRound },
 ];
 
@@ -42,6 +44,7 @@ const breadcrumbMap: Record<string, string> = {
   "/admin/articles/new": "新規作成",
   "/admin/content": "コンテンツ管理",
   "/admin/area-category": "エリア・カテゴリ",
+  "/admin/relocate-voices": "上京者の声",
   "/admin/admin-users": "管理ユーザー",
 };
 

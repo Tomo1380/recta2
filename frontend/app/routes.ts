@@ -36,6 +36,7 @@ export default [
     route("admin/ai-chat", "routes/admin/ai-chat.tsx"),
     route("admin/admin-users", "routes/admin/admin-users.tsx"),
     route("admin/area-category", "routes/admin/area-category.tsx"),
+    route("admin/relocate-voices", "routes/admin/relocate-voices.tsx"),
     route("admin/content", "routes/admin/content.tsx"),
     route("admin/articles", "routes/admin/articles.tsx"),
     route("admin/articles/new", "routes/admin/article-new.tsx"),

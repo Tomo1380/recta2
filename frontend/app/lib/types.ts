@@ -309,6 +309,15 @@ export interface Category {
   shop_count: number;
 }
 
+export interface RelocateVoice {
+  id: number;
+  area_from: string;
+  area_to: string;
+  body: string;
+  visible: boolean;
+  display_order: number;
+}
+
 // Content management
 export interface PickupShop {
   id: number;

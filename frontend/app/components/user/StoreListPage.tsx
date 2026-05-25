@@ -19,7 +19,6 @@ import {
   PaginationNext,
   PaginationEllipsis,
 } from "~/components/ui/pagination";
-import Footer from "~/components/user/shared/Footer";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import { LUXE } from "~/lib/luxe-tokens";
@@ -891,8 +890,6 @@ export default function StoreListPage() {
       <div className="pb-4">
         <RecentlyViewedStores variant="flush" />
       </div>
-
-      <Footer />
 
       <FilterSheet
         open={showFilter}

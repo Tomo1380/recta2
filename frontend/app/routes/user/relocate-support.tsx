@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Home, Wallet, Plane, ShieldCheck } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import type { RelocateVoice } from "~/lib/types";
 
 const GOLD = "#d4af37";
 const DARK = "#1b2528";
@@ -29,19 +32,30 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: "🏠", label: "住居完備", note: "家具家電付き・初期費用ゼロ" },
-  { icon: "💰", label: "上京費補助", note: "最大10万円・引越し代金支援" },
-  { icon: "✈️", label: "交通費全額", note: "面接・体入時の交通費を全額負担" },
-  { icon: "🛡️", label: "保証制度", note: "最低保証3〜6ヶ月で安心スタート" },
-];
-
-const VOICES = [
-  { area: "北海道→六本木", words: "面接から入店まで全部オンラインで完結。家も用意してもらえて、上京1週間後には働けてました。" },
-  { area: "九州→銀座", words: "体験確約だったので安心して来れました。最初の家賃も補助があったので貯金ゼロでも始められた。" },
-  { area: "東北→歌舞伎町", words: "家具家電付きの家を紹介してもらえて、スーツケース1つで上京しました。" },
+  { Icon: Home, label: "住居完備", note: "家具家電付き・初期費用ゼロ" },
+  { Icon: Wallet, label: "上京費補助", note: "最大10万円・引越し代金支援" },
+  { Icon: Plane, label: "交通費全額", note: "面接・体入時の交通費を全額負担" },
+  { Icon: ShieldCheck, label: "保証制度", note: "最低保証3〜6ヶ月で安心スタート" },
 ];
 
 export default function RelocateSupportPage() {
+  const [voices, setVoices] = useState<RelocateVoice[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/relocate-voices")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: RelocateVoice[]) => {
+        if (!cancelled) setVoices(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setVoices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%" }}>
       {/* ── HERO ── */}
@@ -69,11 +83,16 @@ export default function RelocateSupportPage() {
       {/* ── FEATURES ── */}
       <div className="px-5 pt-6">
         <div className="grid grid-cols-2 gap-3">
-          {FEATURES.map((f) => (
-            <div key={f.label} className="rounded-2xl p-4" style={{ background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 16px rgba(0,0,0,.04)" }}>
-              <div style={{ fontSize: "22px", marginBottom: "6px" }}>{f.icon}</div>
-              <p style={{ fontFamily: J, fontWeight: 700, fontSize: "13px", color: DARK, margin: 0 }}>{f.label}</p>
-              <p style={{ fontFamily: J, fontWeight: 400, fontSize: "11px", color: "rgba(27,37,40,.55)", margin: "3px 0 0", lineHeight: 1.5 }}>{f.note}</p>
+          {FEATURES.map(({ Icon, label, note }) => (
+            <div key={label} className="rounded-2xl p-4" style={{ background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 16px rgba(0,0,0,.04)" }}>
+              <div
+                className="inline-flex items-center justify-center w-9 h-9 rounded-xl mb-2"
+                style={{ background: "rgba(212,175,55,.10)", color: GOLD }}
+              >
+                <Icon className="w-[18px] h-[18px]" strokeWidth={1.6} />
+              </div>
+              <p style={{ fontFamily: J, fontWeight: 700, fontSize: "13px", color: DARK, margin: 0 }}>{label}</p>
+              <p style={{ fontFamily: J, fontWeight: 400, fontSize: "11px", color: "rgba(27,37,40,.55)", margin: "3px 0 0", lineHeight: 1.5 }}>{note}</p>
             </div>
           ))}
         </div>
@@ -98,20 +117,24 @@ export default function RelocateSupportPage() {
       </div>
 
       {/* ── VOICES ── */}
-      <div className="px-5 pt-8">
-        <h2 style={{ fontFamily: J, fontWeight: 700, fontSize: "16px", color: DARK, margin: "0 0 12px" }}>上京した先輩の声</h2>
-        <div className="space-y-2.5">
-          {VOICES.map((v) => (
-            <div key={v.area} className="rounded-2xl p-4" style={{ background: "white", border: "1px solid rgba(200,96,128,.12)" }}>
-              <span className="px-2 py-0.5 rounded inline-block" style={{ background: "rgba(200,96,128,.08)", fontFamily: J, fontWeight: 600, fontSize: "10px", color: "rgba(200,96,128,.85)" }}>{v.area}</span>
-              <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12.5px", color: DARK, margin: "8px 0 0", lineHeight: 1.7 }}>「{v.words}」</p>
-            </div>
-          ))}
+      {voices.length > 0 && (
+        <div className="px-5 pt-8">
+          <h2 style={{ fontFamily: J, fontWeight: 700, fontSize: "16px", color: DARK, margin: "0 0 12px" }}>上京した先輩の声</h2>
+          <div className="space-y-2.5">
+            {voices.map((v) => (
+              <div key={v.id} className="rounded-2xl p-4" style={{ background: "white", border: "1px solid rgba(200,96,128,.12)" }}>
+                <span className="px-2 py-0.5 rounded inline-block" style={{ background: "rgba(200,96,128,.08)", fontFamily: J, fontWeight: 600, fontSize: "10px", color: "rgba(200,96,128,.85)" }}>
+                  {v.area_from}→{v.area_to}
+                </span>
+                <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12.5px", color: DARK, margin: "8px 0 0", lineHeight: 1.7 }}>「{v.body}」</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── CTA ── */}
-      <div className="px-5 pt-8">
+      <div className="px-5 pt-8 pb-10">
         <LineCtaCard
           variant="dark"
           title="まずは気軽にLINEで相談"

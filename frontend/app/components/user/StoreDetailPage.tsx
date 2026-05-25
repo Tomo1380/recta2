@@ -39,7 +39,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-import Footer from "~/components/user/shared/Footer";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
@@ -1242,8 +1241,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
         </div>
 
-        {/* Footer */}
-        <Footer />
       </div>
 
       {/* BottomTabBar is rendered by routes/user/layout.tsx. The admin shop

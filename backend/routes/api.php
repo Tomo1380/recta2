@@ -11,10 +11,12 @@ use App\Http\Controllers\Admin\FineTuningController;
 use App\Http\Controllers\Admin\FineTuningQaController;
 use App\Http\Controllers\Admin\IndustryKnowledgeController;
 use App\Http\Controllers\Admin\LineFriendController;
+use App\Http\Controllers\Admin\RelocateVoiceController;
 use App\Http\Controllers\Admin\ReviewController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PublicArticleController;
+use App\Http\Controllers\PublicRelocateController;
 use App\Http\Controllers\PublicStoreController;
 use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\LineAuthController;
@@ -33,6 +35,7 @@ Route::get('/stores', [PublicStoreController::class, 'index']);
 Route::get('/stores/{store}', [PublicStoreController::class, 'show'])->whereNumber('store');
 Route::get('/areas', [PublicStoreController::class, 'areas']);
 Route::get('/categories', [PublicStoreController::class, 'categories']);
+Route::get('/relocate-voices', [PublicRelocateController::class, 'voices']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
 Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');
 // SSE 版 — 同じ payload を受けて Server-Sent Events で逐次返す。
@@ -127,6 +130,13 @@ Route::prefix('admin')->group(function () {
         Route::delete('categories/{category}', [AreaCategoryController::class, 'destroyCategory']);
         Route::post('categories/reorder', [AreaCategoryController::class, 'reorderCategories']);
         Route::post('categories/{category}/image', [AreaCategoryController::class, 'uploadCategoryImage']);
+
+        // Relocate voices (上京した先輩の声)
+        Route::get('relocate-voices', [RelocateVoiceController::class, 'index']);
+        Route::post('relocate-voices', [RelocateVoiceController::class, 'store']);
+        Route::put('relocate-voices/{relocateVoice}', [RelocateVoiceController::class, 'update']);
+        Route::delete('relocate-voices/{relocateVoice}', [RelocateVoiceController::class, 'destroy']);
+        Route::post('relocate-voices/reorder', [RelocateVoiceController::class, 'reorder']);
 
         // Content management
         Route::get('pickup-shops', [ContentController::class, 'pickupShops']);

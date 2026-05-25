@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ChevronLeft, MapPin, Plus, Sparkles, X as XIcon } from "lucide-react";
 
-import Footer from "~/components/user/shared/Footer";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import {
   COMPARE_MAX_ITEMS,
@@ -940,8 +939,6 @@ export default function ComparePage({ ids }: ComparePageProps) {
 
           </>
         )}
-
-        <Footer />
 
       <AddStorePicker
         open={pickerOpen}

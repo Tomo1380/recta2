@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             LineFriendSeeder::class,
             FineTuningQaSeeder::class,
             IndustryKnowledgeSeeder::class,
+            RelocateVoiceSeeder::class,
         ]);
     }
 }
