@@ -40,7 +40,7 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
 - 型生成パイプライン導入: `dedoc/scramble` + `orval` (Profiit と同スタック)。
   `npm run gen:api` で Laravel → OpenAPI → TS 型 + axios client を再生成。
   サンプルケースとして admin/relocate-voices を生成 client に移行済。
-  詳細は [type-generation.md](type-generation.md)。
+  詳細は [architecture/type-generation.md](architecture/type-generation.md)。
 - 型生成パイプラインの本格展開 (Wave 0-5):
   Area / Category / PickupShop / Consultation / BannerSettings / Article /
   Review / LineFriend / LineMessage / AdminUser / User それぞれに
@@ -48,9 +48,17 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
   18 個の FormRequest 追加 + 既存 7 コントローラ refactor。
   AppServiceProvider::boot() で `JsonResource::withoutWrapping()` を有効化。
   paginator + Resource の wrap 問題を回避する `App\Support\PaginatorWithResource`
-  ヘルパも追加。詳細は [type-generation.md](type-generation.md) の移行マトリクス。
+  ヘルパも追加。詳細は [architecture/type-generation.md](architecture/type-generation.md) の移行マトリクス。
 - Dashboard / Store は型生成リターン低 (前者はネスト広い stats 構造、
   後者は StoreApiTransformer 解体が必要) のため意図的に後回し。
+- アーキテクチャ規約のドキュメント体系化:
+  - CLAUDE.md に「アーキテクチャ原則」セクション追加 (必ず守るルール)
+  - [architecture/api-design.md](architecture/api-design.md) 新規 (Resource /
+    FormRequest / Pagination のパターン集と新 endpoint 作成レシピ)
+  - `type-generation.md` を `architecture/` 配下に移動
+  - [architecture-decisions/](architecture-decisions/) (ADR) 配下に判断経緯 3 件:
+    0001 (型生成スタック選定), 0002 (Resource wrapping 無効化),
+    0003 (Dashboard / Store の Resource 化保留理由)
 
 ---
 

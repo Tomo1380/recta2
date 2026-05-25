@@ -131,12 +131,55 @@ recta2/
 - 認証: JWT
 - DB: マイグレーションで管理、JSONB活用
 
+## アーキテクチャ原則（必ず守る）
+
+新しい endpoint / 画面を作る前にこのセクションと
+[docs/architecture/api-design.md](docs/architecture/api-design.md) を読むこと。
+
+### 型の唯一の真実は backend
+- フロントの `lib/types.ts` には新規 interface を書かない。
+  Laravel 側で Eloquent model / Resource を定義 → `npm run gen:api` で
+  `frontend/orval/generated/` に流す。
+- 既存の手書き interface も段階的に生成型 alias に置き換え中。
+  ([docs/architecture/type-generation.md](docs/architecture/type-generation.md))
+
+### API レスポンスは flat shape を守る
+- フロントは Laravel paginator の `{current_page, total, last_page, data}`
+  形を root で直接読む設計。
+- `JsonResource::withoutWrapping()` を AppServiceProvider で有効化済み。
+- paginator + Resource は `App\Support\PaginatorWithResource::map($p, FooResource::class)`
+  を使う。`Resource::collection($paginator)` は data/links/meta にラップ
+  されるので NG。
+- 単体 Resource はそのまま `return new FooResource($x)` で OK。
+
+### バリデーションは FormRequest に切り出す
+- `$request->validate([...])` インラインは新規コードでは禁止。
+  `App\Http\Requests\Admin\` (admin) / `App\Http\Requests\User\` (公開)
+  配下に Store/Update 別の FormRequest を作る。
+- 命名: `StoreXxxRequest` / `UpdateXxxRequest` / `XxxActionRequest`。
+
+### Resource は契約の明示化
+- response のシリアライズ形を Resource にまとめる。
+  関係込みは `whenLoaded` を使う。
+- ただし「契約を変えるのが怖いだけ」「JSONB ネストが広い」
+  「StoreApiTransformer のような flat 互換層が既にある」場合は
+  無理に Resource 化しない。判断基準は
+  [docs/architecture/api-design.md](docs/architecture/api-design.md) 参照。
+
 ## 参考プロジェクト
 
 - `/home/isayama/ubuntu-beauty-net/` - beauty-net（React Router × Laravel × Docker on AWS）
   - Docker構成、Nginx設定、deploy.sh、JWT認証パターンを参考にしている
+- `/home/isayama/profiit/` - Profiit
+  - dedoc/scramble + orval の型生成スタックを参考にしている
 
 ## ドキュメント
 
-- `docs/admin-panel-requirements.md` - 管理画面の全機能要件
-- `docs/figma-make-prompt.md` - Figma Makeに投げるプロンプト（管理画面UI生成用）
+`docs/` 配下のインデックスは [docs/README.md](docs/README.md) 参照。
+日常的に参照する主要ドキュメント:
+
+- [docs/admin-panel-requirements.md](docs/admin-panel-requirements.md) — 管理画面の機能要件
+- [docs/architecture/](docs/architecture/) — 設計判断・運用パターン (型生成 / API 設計 / 等)
+- [docs/architecture-decisions/](docs/architecture-decisions/) — ADR (なぜそうしたかの経緯)
+- [docs/qa-prompts.md](docs/qa-prompts.md) — QA モンキーテストプロンプト集
+- [docs/changelog.md](docs/changelog.md) — リリース履歴

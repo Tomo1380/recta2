@@ -12,6 +12,14 @@
 | [admin-panel-requirements.md](admin-panel-requirements.md) | 管理画面全 10 ページの機能要件・ページ別仕様 |
 | [ai-chat-architecture.md](ai-chat-architecture.md) | AI チャット 3 モード (Agent / FT-OpenAI / FT-Gemini) のアーキテクチャ・プロンプト構造・ツール定義 |
 
+### アーキテクチャ・設計パターン
+
+| ファイル | 内容 |
+|---|---|
+| [architecture/api-design.md](architecture/api-design.md) | Laravel API 設計の「型・形・バリデーション」3 軸の指針。新規 endpoint を書く前に必読 |
+| [architecture/type-generation.md](architecture/type-generation.md) | Laravel → OpenAPI → TS 型・axios クライアント自動生成パイプライン (scramble + orval)。詳細運用・移行マトリクス |
+| [architecture-decisions/](architecture-decisions/) | ADR (Architecture Decision Records)。「なぜそうしたか」の経緯。`0001-type-generation-stack.md` 等 |
+
 ### 運用・チェックリスト
 
 | ファイル | 内容 |
@@ -19,7 +27,6 @@
 | [deploy-aws.md](deploy-aws.md) | AWS EC2 シングルインスタンス構成 + Terraform + デプロイフロー |
 | [line-setup-checklist.md](line-setup-checklist.md) | LINE Login / Messaging API のチャネル設定・ENV・Webhook + トラブル履歴 |
 | [ai-finetuning.md](ai-finetuning.md) | OpenAI Fine-tuning の v1〜v4 履歴・モデル ID 管理・訓練データの作り方 |
-| [type-generation.md](type-generation.md) | Laravel → OpenAPI → TS 型・axios クライアント自動生成パイプライン (scramble + orval) |
 
 ### テスト
 
