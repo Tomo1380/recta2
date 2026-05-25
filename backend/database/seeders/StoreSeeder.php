@@ -803,6 +803,20 @@ class StoreSeeder extends Seeder
                     'comment' => 'うちはとにかくアットホームが自慢。スタッフ全員で新人さんをサポートします！不安なことがあれば何でも聞いてくださいね。',
                     'supports' => ['面接同行', 'ドレス選びサポート', '接客マナー研修', 'メンタルケア'],
                 ],
+                'set_fee' => [
+                    'items' => [
+                        ['label' => 'セット料金 (60分)', 'amount' => '8,000円', 'note' => '指名なし'],
+                        ['label' => '指名料', 'amount' => '+3,000円'],
+                        ['label' => '延長 (30分)', 'amount' => '+4,000円'],
+                        ['label' => 'VIP ルーム', 'amount' => '+10,000円', 'note' => '完全個室'],
+                    ],
+                    'notes' => 'すべて税込。ボトル代は別途。',
+                ],
+                'recta_episodes' => [
+                    ['name' => 'Yさん (24歳)', 'comment' => 'ここに来て初めて「夜職って楽しい」と感じました。スタッフが本当に親切で、未経験の不安が初日で吹き飛びました。', 'photo_url' => 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&q=80'],
+                    ['name' => 'Aさん (26歳)', 'comment' => '昼職と両立しながら週2勤務。シフト融通が効くので無理なく続けられています。', 'photo_url' => 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&q=80', 'instagram_url' => 'https://instagram.com/example'],
+                ],
+                'related_store_ids' => [2, 4],
                 'experience_guaranteed' => true,
                 'publish_status' => 'published',
             ],
@@ -850,6 +864,12 @@ class StoreSeeder extends Seeder
                 'feature_tags' => ['経験者優遇', '高時給', '落ち着いた雰囲気', 'ボトルバック高め'],
                 'description' => '銀座の高級ラウンジ。落ち着いた大人の空間で、品のある接客を心がけています。経営者や医師など、ハイクラスなお客様が中心です。',
                 'features_text' => '銀座駅徒歩2分。完全会員制ラウンジ。20席のアットホームな空間で、お客様一人ひとりとじっくり向き合える環境です。',
+                'website_url' => 'https://example.com/lounge-seiren',
+                'images' => [
+                    ['url' => 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80', 'order' => 1],
+                    ['url' => 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80', 'order' => 2],
+                    ['url' => 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=800&q=80', 'order' => 3],
+                ],
                 'analysis' => [
                     'experience_level' => 70, 'atmosphere' => 25,
                     'cast_style' => ['beauty' => 50, 'cute' => 15, 'glamour' => 5, 'natural' => 30],
@@ -880,6 +900,29 @@ class StoreSeeder extends Seeder
                 ],
                 'transfer_description' => '都内・神奈川・埼玉・千葉まで足代支給。タクシーチケットでの精算も可能。',
                 'transfer_km' => '35km',
+                'champagne_description' => '銀座らしくドンペリ・モエ・クリュッグ・サロンを常備。VIP客向けに 100 万円超のレアボトルも。',
+                'dress_code' => [
+                    'description' => 'ドレス必須。露出控えめ・上品な装い推奨。レンタル可。',
+                    'ok_examples' => [
+                        ['image_url' => 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600&q=80', 'note' => '黒・ネイビーの上品ロングドレス'],
+                        ['image_url' => 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=600&q=80', 'note' => '袖ありの落ち着いた色味'],
+                    ],
+                    'ng_examples' => [
+                        ['image_url' => 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&q=80', 'note' => '露出の多すぎるミニ丈は不可'],
+                    ],
+                ],
+                'set_fee' => [
+                    'items' => [
+                        ['label' => 'セット料金 (60分)', 'amount' => '12,000円'],
+                        ['label' => '指名料', 'amount' => '+5,000円'],
+                        ['label' => '延長 (30分)', 'amount' => '+6,000円'],
+                    ],
+                    'notes' => '完全会員制のため一見不可。すべて税サ込。',
+                ],
+                'recta_episodes' => [
+                    ['name' => 'Mさん (28歳)', 'comment' => '前職のキャバから移籍。会話中心で長く続けられる職場を探していたら理想の店に出会えました。', 'photo_url' => 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80'],
+                ],
+                'related_store_ids' => [1, 4],
                 'publish_status' => 'published',
             ],
             [
@@ -922,12 +965,35 @@ class StoreSeeder extends Seeder
                 'feature_tags' => ['未経験歓迎', '髪色自由', 'ネイルOK', 'ピアスOK', 'カウンター越し', '全額日払い'],
                 'description' => '渋谷の人気ガールズバー。カウンター越しの接客なので初めてでも安心！20代のスタッフが活躍中。友達同士の応募も大歓迎！',
                 'features_text' => '渋谷駅徒歩5分。服装・髪色自由でありのままの自分で働けます。Wワーク・学生さん大歓迎。',
+                'website_url' => 'https://example.com/gb-honey',
+                'images' => [
+                    ['url' => 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=800&q=80', 'order' => 1],
+                    ['url' => 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80', 'order' => 2],
+                ],
                 'analysis' => [
                     'experience_level' => 15, 'atmosphere' => 80,
                     'cast_style' => ['beauty' => 10, 'cute' => 50, 'glamour' => 5, 'natural' => 35],
                     'customer_age' => [['label' => '20代', 'ratio' => 45], ['label' => '30代', 'ratio' => 35], ['label' => '40代', 'ratio' => 20]],
                     'drinking_style' => 70,
                 ],
+                'qa' => [
+                    ['question' => 'カウンター越しってどんな感じ？', 'answer' => 'お客様の隣に座らずバーカウンターを挟んで接客するスタイルです。距離感が保ちやすく、未経験の方も安心です。'],
+                    ['question' => 'お酒が飲めなくても大丈夫？', 'answer' => 'はい、ソフトドリンクで OK。お客様もそれを承知でいらっしゃいます。'],
+                ],
+                'staff_comment' => [
+                    'name' => '高橋', 'role' => '店長',
+                    'comment' => '本当にゆるく働けるお店なので、まずは話聞きにくる感覚で OK です！',
+                    'supports' => ['シフト相談', '研修制度'],
+                ],
+                'transfer_description' => '渋谷駅まで終電後タクシー代支給 (上限 2,000 円)。',
+                'set_fee' => [
+                    'items' => [
+                        ['label' => 'チャージ (60分)', 'amount' => '3,000円'],
+                        ['label' => 'ドリンク', 'amount' => '600円〜'],
+                    ],
+                    'notes' => 'お客様向けの料金です (参考)。',
+                ],
+                'related_store_ids' => [1, 5],
                 'publish_status' => 'published',
             ],
             [
@@ -938,6 +1004,8 @@ class StoreSeeder extends Seeder
                 'lng' => 139.7032500,
                 'nearest_station' => '新宿駅',
                 'category' => 'キャバクラ',
+                'phone' => '03-1111-2222',
+                'website_url' => 'https://example.com/club-grandeur',
                 'schedule' => [
                     'open' => '20:00',
                     'close' => 'LAST',
@@ -947,10 +1015,95 @@ class StoreSeeder extends Seeder
                 ],
                 'wage' => [
                     'regular' => ['min' => 5000, 'max' => 10000, 'unit' => 'hour'],
+                    'trial' => ['hourly' => '6,000円', 'avg_hourly' => '6,500円', 'days' => 3],
+                    'payroll' => ['type' => '全額日払い', 'description' => '体入も日払い対応。'],
                     'daily_estimate' => '40,000円〜70,000円',
                 ],
-                'feature_tags' => ['高時給', '大型店', '経験者優遇', '寮完備'],
+                'compensation' => [
+                    'back' => [
+                        ['label' => '指名バック', 'amount' => '2,000円'],
+                        ['label' => 'ドリンクバック', 'amount' => '500円'],
+                        ['label' => '同伴バック', 'amount' => '4,000円'],
+                    ],
+                    'fees' => [['label' => '雑費', 'amount' => '1,500円/日']],
+                    'notes' => '寮完備のため遠方からの上京者多数。',
+                ],
+                'guarantee' => [
+                    'period' => '3ヶ月',
+                    'details' => '未経験者でも時給6,000円スタート。',
+                    'norma' => 'ノルマなし。',
+                    'same_day_trial' => true,
+                ],
+                'interview' => [
+                    'start' => '14:00',
+                    'end' => '19:00',
+                    'dress_advice' => '清潔感のあるオフィスカジュアル推奨。',
+                    'tips' => ['遠方から来る場合は事前に LINE で相談を', '寮の見学も同日に可能'],
+                    'criteria' => '18歳以上 (高校生不可)。やる気重視。',
+                    'recruitment_standards' => '未経験OK。上京サポートあり。',
+                ],
+                'feature_tags' => ['高時給', '大型店', '経験者優遇', '寮完備', '上京サポート', '日払いOK'],
                 'description' => '新宿最大級の大型キャバクラ。100席以上の広々とした空間で、毎日多くのお客様にご来店いただいています。',
+                'features_text' => '歌舞伎町の中心、新宿駅徒歩7分。寮完備で地方からの上京者も多数活躍中。100席の大箱で人気のお店です。',
+                'images' => [
+                    ['url' => 'https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?w=800&q=80', 'order' => 1],
+                    ['url' => 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=800&q=80', 'order' => 2],
+                    ['url' => 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80', 'order' => 3],
+                ],
+                'analysis' => [
+                    'experience_level' => 45, 'atmosphere' => 60,
+                    'cast_style' => ['beauty' => 35, 'cute' => 30, 'glamour' => 20, 'natural' => 15],
+                    'customer_age' => [['label' => '20代', 'ratio' => 20], ['label' => '30代', 'ratio' => 40], ['label' => '40代', 'ratio' => 30], ['label' => '50代〜', 'ratio' => 10]],
+                    'drinking_style' => 60,
+                ],
+                'required_documents' => [
+                    'documents' => ['身分証明書', '住民票'],
+                    'notes' => '寮入居希望者は契約時に保証人不要。',
+                ],
+                'recent_hires' => [
+                    ['month' => '2026年4月', 'count' => 15, 'examples' => ['20歳 地方上京 → 時給6,000円 + 寮入居', '24歳 未経験 → 時給6,500円スタート']],
+                ],
+                'recent_hires_summary' => '直近1ヶ月で15名採用、うち5名が地方上京',
+                'qa' => [
+                    ['question' => '寮はどんな感じ？', 'answer' => '家具家電付きのワンルーム個室。家賃は給料から月3万円のみ。'],
+                    ['question' => '寮に住みながら何ヶ月から働ける？', 'answer' => '最短1日から OK。上京の翌日から勤務開始も可能。'],
+                ],
+                'staff_comment' => [
+                    'name' => '田中', 'role' => 'マネージャー',
+                    'comment' => '地方から上京して来てくれた子は全員、最初の3ヶ月は私が責任もってサポートします！',
+                    'supports' => ['寮手配', '面接同行', '生活立ち上げサポート'],
+                ],
+                'champagne_description' => 'モエ、ベル・エポック、アルマンドなど主要銘柄を常備。バック率10%。',
+                'champagne_prices' => [
+                    'tequila'      => ['amount' => 18000],
+                    'belle_epoque' => ['amount' => 85000],
+                    'armand'       => ['amount' => 750000],
+                    'lavay'        => ['amount' => 220000],
+                ],
+                'transfer_description' => '都内全域 + 神奈川・埼玉・千葉まで送り対応。',
+                'transfer_km' => '30km',
+                'transfer_zones' => [
+                    ['label' => '都内', 'radius_km' => 15, 'fee' => 2000, 'color' => '#D4AF37'],
+                    ['label' => '近県', 'radius_km' => 30, 'fee' => 5000, 'color' => '#c8960c'],
+                ],
+                'dress_code' => [
+                    'description' => 'ドレス貸出無料。お店に常時20着以上ストック。',
+                    'ok_examples' => [
+                        ['image_url' => 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600&q=80', 'note' => '華やかなロングドレス'],
+                    ],
+                ],
+                'set_fee' => [
+                    'items' => [
+                        ['label' => 'セット料金 (60分)', 'amount' => '10,000円'],
+                        ['label' => '指名料', 'amount' => '+3,000円'],
+                    ],
+                    'notes' => 'すべて税込。ボトル別途。',
+                ],
+                'recta_episodes' => [
+                    ['name' => 'Sさん (22歳, 北海道から)', 'comment' => '上京1日目から寮に入って、3日目には体入。サポート手厚すぎて泣きました。', 'photo_url' => 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=400&q=80'],
+                ],
+                'related_store_ids' => [1, 2],
+                'experience_guaranteed' => true,
                 'publish_status' => 'published',
             ],
             [
@@ -961,6 +1114,8 @@ class StoreSeeder extends Seeder
                 'lng' => 139.7100100,
                 'nearest_station' => '恵比寿駅',
                 'category' => 'ラウンジ',
+                'phone' => '03-3333-4444',
+                'website_url' => 'https://example.com/lounge-crescent',
                 'schedule' => [
                     'open' => '19:00',
                     'close' => '1:00',
@@ -970,9 +1125,73 @@ class StoreSeeder extends Seeder
                 ],
                 'wage' => [
                     'regular' => ['min' => 4000, 'max' => 7000, 'unit' => 'hour'],
+                    'trial' => ['hourly' => '4,500円', 'avg_hourly' => '4,800円', 'days' => 1],
+                    'payroll' => ['type' => '月末締め翌月15日払い', 'description' => null],
+                    'daily_estimate' => '25,000円〜45,000円',
+                ],
+                'compensation' => [
+                    'back' => [
+                        ['label' => '指名バック', 'amount' => '1,500円'],
+                        ['label' => 'ボトルバック', 'amount' => '8%'],
+                    ],
+                    'fees' => [['label' => '雑費', 'amount' => '1,000円/日']],
+                    'notes' => '少人数制のため一人当たりの売上バックが大きい。',
+                ],
+                'guarantee' => [
+                    'period' => '2ヶ月',
+                    'details' => '未経験者向け時給保証あり。',
+                    'norma' => 'ノルマなし。',
+                    'same_day_trial' => false,
+                ],
+                'interview' => [
+                    'start' => '15:00',
+                    'end' => '18:00',
+                    'dress_advice' => '上品な雰囲気で。',
                 ],
                 'feature_tags' => ['未経験歓迎', '終電上がりOK', '少人数制', 'アットホーム'],
                 'description' => '恵比寿の隠れ家ラウンジ。少人数制で一人ひとりに目が行き届く環境。未経験者でも丁寧に指導します。',
+                'features_text' => '恵比寿駅西口徒歩4分。15席の小さなお店。客層は30代後半〜50代の落ち着いた大人が中心。',
+                'images' => [
+                    ['url' => 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80', 'order' => 1],
+                    ['url' => 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80', 'order' => 2],
+                ],
+                'analysis' => [
+                    'experience_level' => 30, 'atmosphere' => 35,
+                    'cast_style' => ['beauty' => 25, 'cute' => 25, 'glamour' => 10, 'natural' => 40],
+                    'customer_age' => [['label' => '30代', 'ratio' => 25], ['label' => '40代', 'ratio' => 45], ['label' => '50代〜', 'ratio' => 30]],
+                    'drinking_style' => 40,
+                ],
+                'qa' => [
+                    ['question' => '掛け持ち OK？', 'answer' => 'はい、Wワーク歓迎です。'],
+                ],
+                'staff_comment' => [
+                    'name' => '中村', 'role' => '店長',
+                    'comment' => '小さなお店なので、家族みたいな雰囲気で働けますよ。',
+                    'supports' => ['シフト柔軟', 'タクシー送り'],
+                ],
+                'champagne_description' => 'モエ・ヴーヴクリコなどスタンダードを中心に。',
+                'champagne_prices' => [
+                    'tequila'      => ['amount' => 20000],
+                    'belle_epoque' => ['amount' => 95000],
+                ],
+                'transfer_description' => '都内近郊送り対応。終電後は全員タクシー送り。',
+                'transfer_km' => '15km',
+                'transfer_zones' => [
+                    ['label' => '都内', 'radius_km' => 15, 'fee' => 3000, 'color' => '#D4AF37'],
+                ],
+                'dress_code' => [
+                    'description' => '上品なドレス推奨。レンタル可。',
+                ],
+                'set_fee' => [
+                    'items' => [
+                        ['label' => 'セット料金 (60分)', 'amount' => '8,000円'],
+                        ['label' => '指名料', 'amount' => '+2,000円'],
+                    ],
+                ],
+                'recta_episodes' => [
+                    ['name' => 'Rさん (30歳)', 'comment' => 'OL から週末だけ働いてます。落ち着いた客層なので疲れない。', 'photo_url' => 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80'],
+                ],
+                'related_store_ids' => [2, 3],
                 'publish_status' => 'published',
             ],
         ];

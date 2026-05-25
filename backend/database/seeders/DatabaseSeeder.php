@@ -17,8 +17,11 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ReviewSeeder::class,
             AiChatSettingSeeder::class,
+            AiChatLimitSeeder::class,
+            AiChatLogSeeder::class,        // ← User より後 (FK)
             AreaCategorySeeder::class,
             ContentSeeder::class,
+            ArticleSeeder::class,
             LineFriendSeeder::class,
             FineTuningQaSeeder::class,
             IndustryKnowledgeSeeder::class,

@@ -37,11 +37,18 @@ class ReviewSeeder extends Seeder
     {
         $stores = Store::where('publish_status', 'published')->get();
 
-        foreach ($stores as $store) {
-            // 60% chance a store gets reviews
-            if (rand(1, 100) > 60) continue;
+        // ID 1-5 (アンカー店舗) には必ず 3〜5 件のレビューを入れる。
+        // デモ環境でトップ・詳細画面の口コミセクションが必ず生きてる状態を維持。
+        $anchorIds = [1, 2, 3, 4, 5];
 
-            $reviewCount = rand(1, 4);
+        foreach ($stores as $store) {
+            $isAnchor = in_array($store->id, $anchorIds, true);
+
+            if (!$isAnchor && rand(1, 100) > 60) {
+                continue; // 通常店舗は 60% の確率でスキップ
+            }
+
+            $reviewCount = $isAnchor ? rand(3, 5) : rand(1, 4);
             for ($i = 0; $i < $reviewCount; $i++) {
                 $rating = $this->weightedRating();
                 $bodies = self::REVIEW_BODIES[$rating] ?? self::REVIEW_BODIES[4];
