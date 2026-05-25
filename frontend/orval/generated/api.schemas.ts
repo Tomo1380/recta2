@@ -119,6 +119,17 @@ export interface Article {
   updated_at: string | null;
 }
 
+export interface BannerSettingsResource {
+  /** @nullable */
+  hero_tagline: string | null;
+  /** @nullable */
+  hero_subtitle: string | null;
+  /** @nullable */
+  hero_badge: string | null;
+  /** @nullable */
+  hero_ai_label: string | null;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -162,6 +173,17 @@ export interface Consultation {
   created_at: string | null;
   /** @nullable */
   updated_at: string | null;
+}
+
+export interface ConsultationResource {
+  id: number;
+  question: string;
+  /** @nullable */
+  answer: string | null;
+  tag: string;
+  count: number;
+  visible: boolean;
+  sort_order: number;
 }
 
 export interface FineTuningQa {
@@ -216,16 +238,25 @@ export interface LineMessage {
   updated_at: string | null;
 }
 
-export interface PickupShop {
+export type PickupShopResourceStore = {
+  id: number;
+  name: string;
+  area: string;
+  category: string;
+  /**
+     * controller 側で append される動的フィールド。一覧 endpoint でだけ付く。
+     * @nullable
+     */
+  average_rating: number | null;
+};
+
+export interface PickupShopResource {
   id: number;
   store_id: number;
   sort_order: number;
   is_pr: boolean;
   visible: boolean;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
+  store?: PickupShopResourceStore;
 }
 
 export interface RelocateVoice {
@@ -363,6 +394,24 @@ export interface StoreCategoryRequest {
   sort_order?: number;
 }
 
+export interface StoreConsultationRequest {
+  question: string;
+  /** @nullable */
+  answer?: string | null;
+  /** @maxLength 100 */
+  tag?: string;
+  count?: number;
+  visible?: boolean;
+  sort_order?: number;
+}
+
+export interface StorePickupShopRequest {
+  store_id: number;
+  sort_order?: number;
+  is_pr?: boolean;
+  visible?: boolean;
+}
+
 export interface UpdateAreaRequest {
   /** @maxLength 255 */
   name?: string;
@@ -370,6 +419,17 @@ export interface UpdateAreaRequest {
   slug?: string;
   visible?: boolean;
   sort_order?: number;
+}
+
+export interface UpdateBannerSettingsRequest {
+  /** @nullable */
+  hero_tagline?: string | null;
+  /** @nullable */
+  hero_subtitle?: string | null;
+  /** @nullable */
+  hero_badge?: string | null;
+  /** @nullable */
+  hero_ai_label?: string | null;
 }
 
 export interface UpdateCategoryRequest {
@@ -384,6 +444,24 @@ export interface UpdateCategoryRequest {
   image_url?: string | null;
   visible?: boolean;
   sort_order?: number;
+}
+
+export interface UpdateConsultationRequest {
+  question?: string;
+  /** @nullable */
+  answer?: string | null;
+  /** @maxLength 100 */
+  tag?: string;
+  count?: number;
+  visible?: boolean;
+  sort_order?: number;
+}
+
+export interface UpdatePickupShopRequest {
+  store_id?: number;
+  sort_order?: number;
+  is_pr?: boolean;
+  visible?: boolean;
 }
 
 export interface User {
@@ -809,60 +887,8 @@ export type AuthMe200 = {
   line_official_account_id: string;
 };
 
-export type ContentStorePickupShopBody = {
-  store_id: number;
-  sort_order?: number;
-  is_pr?: boolean;
-  visible?: boolean;
-};
-
-export type ContentUpdatePickupShopBody = {
-  store_id?: number;
-  sort_order?: number;
-  is_pr?: boolean;
-  visible?: boolean;
-};
-
-export type ContentReorderPickupShopsBody = {
-  /** @minItems 1 */
-  ids: number[];
-};
-
 export type ContentReorderPickupShops200 = {
   message: 'OK';
-};
-
-export type ContentStoreConsultationBody = {
-  question: string;
-  /** @nullable */
-  answer?: string | null;
-  /** @maxLength 100 */
-  tag?: string;
-  count?: number;
-  visible?: boolean;
-  sort_order?: number;
-};
-
-export type ContentUpdateConsultationBody = {
-  question?: string;
-  /** @nullable */
-  answer?: string | null;
-  /** @maxLength 100 */
-  tag?: string;
-  count?: number;
-  visible?: boolean;
-  sort_order?: number;
-};
-
-export type ContentUpdateBannerSettingsBody = {
-  /** @nullable */
-  hero_tagline?: string | null;
-  /** @nullable */
-  hero_subtitle?: string | null;
-  /** @nullable */
-  hero_badge?: string | null;
-  /** @nullable */
-  hero_ai_label?: string | null;
 };
 
 export type DashboardIndex200KpisPublishedStores = {

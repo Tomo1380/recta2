@@ -5,15 +5,16 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  Consultation,
+  BannerSettingsResource,
+  ConsultationResource,
   ContentReorderPickupShops200,
-  ContentReorderPickupShopsBody,
-  ContentStoreConsultationBody,
-  ContentStorePickupShopBody,
-  ContentUpdateBannerSettingsBody,
-  ContentUpdateConsultationBody,
-  ContentUpdatePickupShopBody,
-  PickupShop
+  PickupShopResource,
+  ReorderRequest,
+  StoreConsultationRequest,
+  StorePickupShopRequest,
+  UpdateBannerSettingsRequest,
+  UpdateConsultationRequest,
+  UpdatePickupShopRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -24,29 +25,29 @@ import { rectaMutator } from '../mutators/auth';
   export const contentPickupShops = (
 
  ) => {
-      return rectaMutator<PickupShop[]>(
+      return rectaMutator<PickupShopResource[]>(
       {url: `/admin/pickup-shops`, method: 'GET'
     },
       );
     }
   export const contentStorePickupShop = (
-    contentStorePickupShopBody: ContentStorePickupShopBody,
+    storePickupShopRequest: StorePickupShopRequest,
  ) => {
-      return rectaMutator<PickupShop>(
+      return rectaMutator<PickupShopResource>(
       {url: `/admin/pickup-shops`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: contentStorePickupShopBody
+      data: storePickupShopRequest
     },
       );
     }
   export const contentUpdatePickupShop = (
     pickupShop: number,
-    contentUpdatePickupShopBody?: ContentUpdatePickupShopBody,
+    updatePickupShopRequest?: UpdatePickupShopRequest,
  ) => {
-      return rectaMutator<PickupShop>(
+      return rectaMutator<PickupShopResource>(
       {url: `/admin/pickup-shops/${pickupShop}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: contentUpdatePickupShopBody
+      data: updatePickupShopRequest
     },
       );
     }
@@ -59,41 +60,41 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const contentReorderPickupShops = (
-    contentReorderPickupShopsBody: ContentReorderPickupShopsBody,
+    reorderRequest: ReorderRequest,
  ) => {
       return rectaMutator<ContentReorderPickupShops200>(
       {url: `/admin/pickup-shops/reorder`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: contentReorderPickupShopsBody
+      data: reorderRequest
     },
       );
     }
   export const contentConsultations = (
 
  ) => {
-      return rectaMutator<Consultation[]>(
+      return rectaMutator<ConsultationResource[]>(
       {url: `/admin/consultations`, method: 'GET'
     },
       );
     }
   export const contentStoreConsultation = (
-    contentStoreConsultationBody: ContentStoreConsultationBody,
+    storeConsultationRequest: StoreConsultationRequest,
  ) => {
-      return rectaMutator<Consultation>(
+      return rectaMutator<ConsultationResource>(
       {url: `/admin/consultations`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: contentStoreConsultationBody
+      data: storeConsultationRequest
     },
       );
     }
   export const contentUpdateConsultation = (
     consultation: number,
-    contentUpdateConsultationBody?: ContentUpdateConsultationBody,
+    updateConsultationRequest?: UpdateConsultationRequest,
  ) => {
-      return rectaMutator<Consultation>(
+      return rectaMutator<ConsultationResource>(
       {url: `/admin/consultations/${consultation}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: contentUpdateConsultationBody
+      data: updateConsultationRequest
     },
       );
     }
@@ -108,18 +109,18 @@ import { rectaMutator } from '../mutators/auth';
   export const contentBannerSettings = (
 
  ) => {
-      return rectaMutator<string>(
+      return rectaMutator<BannerSettingsResource>(
       {url: `/admin/banner-settings`, method: 'GET'
     },
       );
     }
   export const contentUpdateBannerSettings = (
-    contentUpdateBannerSettingsBody?: ContentUpdateBannerSettingsBody,
+    updateBannerSettingsRequest?: UpdateBannerSettingsRequest,
  ) => {
-      return rectaMutator<string>(
+      return rectaMutator<BannerSettingsResource>(
       {url: `/admin/banner-settings`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: contentUpdateBannerSettingsBody
+      data: updateBannerSettingsRequest
     },
       );
     }

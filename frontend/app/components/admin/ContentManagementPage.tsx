@@ -19,8 +19,30 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { api } from "~/lib/api";
-import type { PickupShop, Consultation, BannerSettings, Store } from "~/lib/types";
+import { api } from "~/lib/api"; // admin store 検索のみ (Wave 7 まで残る)
+import type { Store } from "~/lib/types";
+import {
+  contentPickupShops,
+  contentStorePickupShop,
+  contentUpdatePickupShop,
+  contentDestroyPickupShop,
+  contentReorderPickupShops,
+  contentConsultations,
+  contentStoreConsultation,
+  contentUpdateConsultation,
+  contentDestroyConsultation,
+  contentBannerSettings,
+  contentUpdateBannerSettings,
+} from "../../../orval/generated/content";
+import type {
+  PickupShopResource,
+  ConsultationResource,
+  BannerSettingsResource,
+} from "../../../orval/generated/api.schemas";
+
+type PickupShop = PickupShopResource;
+type Consultation = ConsultationResource;
+type BannerSettings = BannerSettingsResource;
 
 type Tab = "pickup" | "consultations" | "banner";
 
@@ -61,7 +83,7 @@ export function ContentManagementPage() {
 
   const fetchPickupShops = useCallback(async () => {
     try {
-      const data = await api.get<PickupShop[]>("/admin/pickup-shops");
+      const data = await contentPickupShops();
       setPickupShops(data);
     } catch (e) {
       console.error(e);
@@ -71,7 +93,7 @@ export function ContentManagementPage() {
 
   const fetchConsultations = useCallback(async () => {
     try {
-      const data = await api.get<Consultation[]>("/admin/consultations");
+      const data = await contentConsultations();
       setConsultations(data);
     } catch (e) {
       console.error(e);
@@ -81,7 +103,7 @@ export function ContentManagementPage() {
 
   const fetchBanner = useCallback(async () => {
     try {
-      const data = await api.get<BannerSettings>("/admin/banner-settings");
+      const data = await contentBannerSettings();
       setBanner(data);
     } catch (e) {
       console.error(e);
@@ -107,7 +129,7 @@ export function ContentManagementPage() {
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
       setPickupShops(next);
       try {
-        await api.post("/admin/pickup-shops/reorder", { ids: next.map(s => s.id) });
+        await contentReorderPickupShops({ ids: next.map(s => s.id) });
         showToast("並び順を更新しました");
       } catch (e) {
         console.error(e);
@@ -119,7 +141,7 @@ export function ContentManagementPage() {
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
       setPickupShops(next);
       try {
-        await api.post("/admin/pickup-shops/reorder", { ids: next.map(s => s.id) });
+        await contentReorderPickupShops({ ids: next.map(s => s.id) });
         showToast("並び順を更新しました");
       } catch (e) {
         console.error(e);
@@ -131,7 +153,7 @@ export function ContentManagementPage() {
 
   const handleTogglePickupPr = async (shop: PickupShop) => {
     try {
-      await api.put(`/admin/pickup-shops/${shop.id}`, { is_pr: !shop.is_pr });
+      await contentUpdatePickupShop(shop.id, { is_pr: !shop.is_pr });
       await fetchPickupShops();
       showToast(shop.is_pr ? "PRを解除しました" : "PRに設定しました");
     } catch (e) {
@@ -142,7 +164,7 @@ export function ContentManagementPage() {
 
   const handleTogglePickupVisible = async (shop: PickupShop) => {
     try {
-      await api.put(`/admin/pickup-shops/${shop.id}`, { visible: !shop.visible });
+      await contentUpdatePickupShop(shop.id, { visible: !shop.visible });
       await fetchPickupShops();
       showToast(shop.visible ? "非表示にしました" : "表示にしました");
     } catch (e) {
@@ -152,11 +174,11 @@ export function ContentManagementPage() {
   };
 
   const handleDeletePickupShop = async (shop: PickupShop) => {
-    if (!confirm(`「${shop.store.name}」をピックアップから削除しますか？`)) return;
+    if (!confirm(`「${shop.store?.name ?? "(店舗削除済)"}」をピックアップから削除しますか？`)) return;
     try {
-      await api.delete(`/admin/pickup-shops/${shop.id}`);
+      await contentDestroyPickupShop(shop.id);
       await fetchPickupShops();
-      showToast(`「${shop.store.name}」を削除しました`);
+      showToast(`「${shop.store?.name ?? "(店舗削除済)"}」を削除しました`);
     } catch (e) {
       console.error(e);
       showToast("削除に失敗しました", "error");
@@ -183,7 +205,7 @@ export function ContentManagementPage() {
   const handleAddPickupShop = async (storeId: number) => {
     setSaving(true);
     try {
-      await api.post("/admin/pickup-shops", { store_id: storeId, visible: true, is_pr: false });
+      await contentStorePickupShop({ store_id: storeId, visible: true, is_pr: false });
       await fetchPickupShops();
       setShowAddPickupModal(false);
       setStoreSearch("");
@@ -199,7 +221,7 @@ export function ContentManagementPage() {
 
   const handleToggleConsultationVisible = async (item: Consultation) => {
     try {
-      await api.put(`/admin/consultations/${item.id}`, { visible: !item.visible });
+      await contentUpdateConsultation(item.id, { visible: !item.visible });
       await fetchConsultations();
       showToast(item.visible ? "非表示にしました" : "表示にしました");
     } catch (e) {
@@ -211,7 +233,7 @@ export function ContentManagementPage() {
   const handleDeleteConsultation = async (item: Consultation) => {
     if (!confirm(`「${item.question}」を削除しますか？`)) return;
     try {
-      await api.delete(`/admin/consultations/${item.id}`);
+      await contentDestroyConsultation(item.id);
       await fetchConsultations();
       showToast("トピックを削除しました");
     } catch (e) {
@@ -224,7 +246,7 @@ export function ContentManagementPage() {
     if (!newQuestion.trim()) return;
     setSaving(true);
     try {
-      await api.post("/admin/consultations", {
+      await contentStoreConsultation({
         question: newQuestion,
         tag: newTag || "#相談",
         count: newCount,
@@ -248,7 +270,7 @@ export function ContentManagementPage() {
     if (!editingConsultation) return;
     setSaving(true);
     try {
-      await api.put(`/admin/consultations/${editingConsultation.id}`, {
+      await contentUpdateConsultation(editingConsultation.id, {
         question: editingConsultation.question,
         tag: editingConsultation.tag,
         count: editingConsultation.count,
@@ -267,7 +289,7 @@ export function ContentManagementPage() {
   const handleSaveBanner = async () => {
     setSaving(true);
     try {
-      await api.put("/admin/banner-settings", banner);
+      await contentUpdateBannerSettings(banner);
       setEditingBanner(false);
       showToast("バナー設定を保存しました");
     } catch (e) {
@@ -372,18 +394,18 @@ export function ContentManagementPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-[13px] text-foreground">{shop.store.name}</span>
+                          <span className="text-[13px] text-foreground">{shop.store?.name ?? "(店舗削除済)"}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-[13px] text-muted-foreground">{shop.store.area}</span>
+                          <span className="text-[13px] text-muted-foreground">{shop.store?.area ?? ""}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600">{shop.store.category || "未設定"}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-pink-50 text-pink-600">{shop.store?.category || "未設定"}</span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                            <span className="text-[13px] text-foreground">{shop.average_rating ?? "-"}</span>
+                            <span className="text-[13px] text-foreground">{shop.store?.average_rating ?? "-"}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -577,7 +599,7 @@ export function ContentManagementPage() {
                   <label className="block text-[12px] text-muted-foreground mb-1.5">タグライン</label>
                   <input
                     type="text"
-                    value={banner.hero_tagline}
+                    value={banner.hero_tagline ?? ""}
                     onChange={(e) => setBanner(prev => ({ ...prev, hero_tagline: e.target.value }))}
                     disabled={!editingBanner}
                     className="w-full px-3 py-2 text-[13px] border border-border rounded-lg bg-background disabled:bg-muted/30 disabled:text-muted-foreground"
@@ -587,7 +609,7 @@ export function ContentManagementPage() {
                   <label className="block text-[12px] text-muted-foreground mb-1.5">サブタイトル</label>
                   <input
                     type="text"
-                    value={banner.hero_subtitle}
+                    value={banner.hero_subtitle ?? ""}
                     onChange={(e) => setBanner(prev => ({ ...prev, hero_subtitle: e.target.value }))}
                     disabled={!editingBanner}
                     className="w-full px-3 py-2 text-[13px] border border-border rounded-lg bg-background disabled:bg-muted/30 disabled:text-muted-foreground"
@@ -597,7 +619,7 @@ export function ContentManagementPage() {
                   <label className="block text-[12px] text-muted-foreground mb-1.5">バッジテキスト</label>
                   <input
                     type="text"
-                    value={banner.hero_badge}
+                    value={banner.hero_badge ?? ""}
                     onChange={(e) => setBanner(prev => ({ ...prev, hero_badge: e.target.value }))}
                     disabled={!editingBanner}
                     className="w-full px-3 py-2 text-[13px] border border-border rounded-lg bg-background disabled:bg-muted/30 disabled:text-muted-foreground"
@@ -607,7 +629,7 @@ export function ContentManagementPage() {
                   <label className="block text-[12px] text-muted-foreground mb-1.5">AIラベル</label>
                   <input
                     type="text"
-                    value={banner.hero_ai_label}
+                    value={banner.hero_ai_label ?? ""}
                     onChange={(e) => setBanner(prev => ({ ...prev, hero_ai_label: e.target.value }))}
                     disabled={!editingBanner}
                     className="w-full px-3 py-2 text-[13px] border border-border rounded-lg bg-background disabled:bg-muted/30 disabled:text-muted-foreground"

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Home, Wallet, Plane, ShieldCheck } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
-import type { RelocateVoice } from "~/lib/types";
+import type { RelocateVoice } from "../../../orval/generated/api.schemas";
 
 const GOLD = "#d4af37";
 const DARK = "#1b2528";

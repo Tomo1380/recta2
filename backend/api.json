@@ -1904,13 +1904,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Array of `PickupShopResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/PickupShop"
+                                        "$ref": "#/components/schemas/PickupShopResource"
                                     }
                                 }
                             }
@@ -1931,44 +1931,27 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "store_id": {
-                                        "type": "integer"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    },
-                                    "is_pr": {
-                                        "type": "boolean"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    }
-                                },
-                                "required": [
-                                    "store_id"
-                                ]
+                                "$ref": "#/components/schemas/StorePickupShopRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "",
+                    "200": {
+                        "description": "`PickupShopResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PickupShop"
+                                    "$ref": "#/components/schemas/PickupShopResource"
                                 }
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1994,44 +1977,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "store_id": {
-                                        "type": "integer"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    },
-                                    "is_pr": {
-                                        "type": "boolean"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdatePickupShopRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`PickupShopResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PickupShop"
+                                    "$ref": "#/components/schemas/PickupShopResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -2075,19 +2044,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -2112,11 +2069,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -2129,13 +2086,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Array of `ConsultationResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/Consultation"
+                                        "$ref": "#/components/schemas/ConsultationResource"
                                     }
                                 }
                             }
@@ -2156,54 +2113,27 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "question": {
-                                        "type": "string"
-                                    },
-                                    "answer": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "tag": {
-                                        "type": "string",
-                                        "maxLength": 100
-                                    },
-                                    "count": {
-                                        "type": "integer"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "question"
-                                ]
+                                "$ref": "#/components/schemas/StoreConsultationRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "",
+                    "200": {
+                        "description": "`ConsultationResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Consultation"
+                                    "$ref": "#/components/schemas/ConsultationResource"
                                 }
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -2229,54 +2159,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "question": {
-                                        "type": "string"
-                                    },
-                                    "answer": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "tag": {
-                                        "type": "string",
-                                        "maxLength": 100
-                                    },
-                                    "count": {
-                                        "type": "integer"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateConsultationRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`ConsultationResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Consultation"
+                                    "$ref": "#/components/schemas/ConsultationResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -2317,11 +2223,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`BannerSettingsResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/BannerSettingsResource"
                                 }
                             }
                         }
@@ -2340,53 +2246,27 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "hero_tagline": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "hero_subtitle": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "hero_badge": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "hero_ai_label": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateBannerSettingsRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`BannerSettingsResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/BannerSettingsResource"
                                 }
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -8513,6 +8393,42 @@
                 ],
                 "title": "Article"
             },
+            "BannerSettingsResource": {
+                "type": "object",
+                "properties": {
+                    "hero_tagline": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "hero_subtitle": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "hero_badge": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "hero_ai_label": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "hero_tagline",
+                    "hero_subtitle",
+                    "hero_badge",
+                    "hero_ai_label"
+                ],
+                "title": "BannerSettingsResource"
+            },
             "Category": {
                 "type": "object",
                 "properties": {
@@ -8661,6 +8577,45 @@
                     "updated_at"
                 ],
                 "title": "Consultation"
+            },
+            "ConsultationResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tag": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "question",
+                    "answer",
+                    "tag",
+                    "count",
+                    "visible",
+                    "sort_order"
+                ],
+                "title": "ConsultationResource"
             },
             "FineTuningQa": {
                 "type": "object",
@@ -8855,7 +8810,7 @@
                 ],
                 "title": "LineMessage"
             },
-            "PickupShop": {
+            "PickupShopResource": {
                 "type": "object",
                 "properties": {
                     "id": {
@@ -8873,19 +8828,36 @@
                     "visible": {
                         "type": "boolean"
                     },
-                    "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                    "store": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "area": {
+                                "type": "string"
+                            },
+                            "category": {
+                                "type": "string"
+                            },
+                            "average_rating": {
+                                "type": [
+                                    "number",
+                                    "null"
+                                ],
+                                "description": "controller \u5074\u3067 append \u3055\u308c\u308b\u52d5\u7684\u30d5\u30a3\u30fc\u30eb\u30c9\u3002\u4e00\u89a7 endpoint \u3067\u3060\u3051\u4ed8\u304f\u3002"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "area",
+                            "category",
+                            "average_rating"
+                        ]
                     }
                 },
                 "required": [
@@ -8893,11 +8865,9 @@
                     "store_id",
                     "sort_order",
                     "is_pr",
-                    "visible",
-                    "created_at",
-                    "updated_at"
+                    "visible"
                 ],
-                "title": "PickupShop"
+                "title": "PickupShopResource"
             },
             "RelocateVoice": {
                 "type": "object",
@@ -9357,6 +9327,58 @@
                 ],
                 "title": "StoreCategoryRequest"
             },
+            "StoreConsultationRequest": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tag": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "question"
+                ],
+                "title": "StoreConsultationRequest"
+            },
+            "StorePickupShopRequest": {
+                "type": "object",
+                "properties": {
+                    "store_id": {
+                        "type": "integer"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "is_pr": {
+                        "type": "boolean"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "store_id"
+                ],
+                "title": "StorePickupShopRequest"
+            },
             "UpdateAreaRequest": {
                 "type": "object",
                 "properties": {
@@ -9376,6 +9398,36 @@
                     }
                 },
                 "title": "UpdateAreaRequest"
+            },
+            "UpdateBannerSettingsRequest": {
+                "type": "object",
+                "properties": {
+                    "hero_tagline": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "hero_subtitle": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "hero_badge": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "hero_ai_label": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "title": "UpdateBannerSettingsRequest"
             },
             "UpdateCategoryRequest": {
                 "type": "object",
@@ -9403,6 +9455,52 @@
                     }
                 },
                 "title": "UpdateCategoryRequest"
+            },
+            "UpdateConsultationRequest": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tag": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "title": "UpdateConsultationRequest"
+            },
+            "UpdatePickupShopRequest": {
+                "type": "object",
+                "properties": {
+                    "store_id": {
+                        "type": "integer"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "is_pr": {
+                        "type": "boolean"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdatePickupShopRequest"
             },
             "User": {
                 "type": "object",

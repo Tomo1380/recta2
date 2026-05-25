@@ -3,15 +3,24 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ReorderRequest;
+use App\Http\Requests\Admin\StoreConsultationRequest;
+use App\Http\Requests\Admin\StorePickupShopRequest;
+use App\Http\Requests\Admin\UpdateBannerSettingsRequest;
+use App\Http\Requests\Admin\UpdateConsultationRequest;
+use App\Http\Requests\Admin\UpdatePickupShopRequest;
+use App\Http\Resources\BannerSettingsResource;
+use App\Http\Resources\ConsultationResource;
+use App\Http\Resources\PickupShopResource;
 use App\Models\Consultation;
 use App\Models\PickupShop;
 use App\Models\SiteSetting;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ContentController extends Controller
 {
-    public function pickupShops(): JsonResponse
+    public function pickupShops(): AnonymousResourceCollection
     {
         $pickupShops = PickupShop::with(['store' => function ($query) {
             $query->select('id', 'name', 'area', 'category');
@@ -23,108 +32,64 @@ class ContentController extends Controller
             }
         });
 
-        return response()->json($pickupShops);
+        return PickupShopResource::collection($pickupShops);
     }
 
-    public function storePickupShop(Request $request): JsonResponse
+    public function storePickupShop(StorePickupShopRequest $request): PickupShopResource
     {
-        $validated = $request->validate([
-            'store_id' => 'required|exists:stores,id',
-            'sort_order' => 'integer',
-            'is_pr' => 'boolean',
-            'visible' => 'boolean',
-        ]);
-
-        $pickupShop = PickupShop::create($validated);
-
-        return response()->json($pickupShop, 201);
+        $pickupShop = PickupShop::create($request->validated());
+        $pickupShop->load(['store' => fn ($q) => $q->select('id', 'name', 'area', 'category')]);
+        return new PickupShopResource($pickupShop);
     }
 
-    public function updatePickupShop(Request $request, PickupShop $pickupShop): JsonResponse
+    public function updatePickupShop(UpdatePickupShopRequest $request, PickupShop $pickupShop): PickupShopResource
     {
-        $validated = $request->validate([
-            'store_id' => 'exists:stores,id',
-            'sort_order' => 'integer',
-            'is_pr' => 'boolean',
-            'visible' => 'boolean',
-        ]);
-
-        $pickupShop->update($validated);
-
-        return response()->json($pickupShop);
+        $pickupShop->update($request->validated());
+        $pickupShop->load(['store' => fn ($q) => $q->select('id', 'name', 'area', 'category')]);
+        return new PickupShopResource($pickupShop);
     }
 
     public function destroyPickupShop(PickupShop $pickupShop): JsonResponse
     {
         $pickupShop->delete();
-
         return response()->json(null, 204);
     }
 
-    public function reorderPickupShops(Request $request): JsonResponse
+    public function reorderPickupShops(ReorderRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer|exists:pickup_shops,id',
-        ]);
-
-        foreach ($validated['ids'] as $index => $id) {
+        foreach ($request->validated()['ids'] as $index => $id) {
             PickupShop::where('id', $id)->update(['sort_order' => $index]);
         }
-
         return response()->json(['message' => 'OK']);
     }
 
-    public function consultations(): JsonResponse
+    public function consultations(): AnonymousResourceCollection
     {
         $consultations = Consultation::orderBy('sort_order')->get();
-
-        return response()->json($consultations);
+        return ConsultationResource::collection($consultations);
     }
 
-    public function storeConsultation(Request $request): JsonResponse
+    public function storeConsultation(StoreConsultationRequest $request): ConsultationResource
     {
-        $validated = $request->validate([
-            'question' => 'required|string',
-            'answer' => 'nullable|string',
-            'tag' => 'string|max:100',
-            'count' => 'integer',
-            'visible' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-
-        $consultation = Consultation::create($validated);
-
-        return response()->json($consultation, 201);
+        $consultation = Consultation::create($request->validated());
+        return new ConsultationResource($consultation);
     }
 
-    public function updateConsultation(Request $request, Consultation $consultation): JsonResponse
+    public function updateConsultation(UpdateConsultationRequest $request, Consultation $consultation): ConsultationResource
     {
-        $validated = $request->validate([
-            'question' => 'string',
-            'answer' => 'nullable|string',
-            'tag' => 'string|max:100',
-            'count' => 'integer',
-            'visible' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-
-        $consultation->update($validated);
-
-        return response()->json($consultation);
+        $consultation->update($request->validated());
+        return new ConsultationResource($consultation);
     }
 
     public function destroyConsultation(Consultation $consultation): JsonResponse
     {
         $consultation->delete();
-
         return response()->json(null, 204);
     }
 
-    public function bannerSettings(): JsonResponse
+    public function bannerSettings(): BannerSettingsResource
     {
         $keys = ['hero_tagline', 'hero_subtitle', 'hero_badge', 'hero_ai_label'];
-
         $settings = SiteSetting::whereIn('key', $keys)->pluck('value', 'key');
 
         $result = [];
@@ -132,25 +97,15 @@ class ContentController extends Controller
             $result[$key] = $settings[$key] ?? null;
         }
 
-        return response()->json($result);
+        return new BannerSettingsResource($result);
     }
 
-    public function updateBannerSettings(Request $request): JsonResponse
+    public function updateBannerSettings(UpdateBannerSettingsRequest $request): BannerSettingsResource
     {
-        $validated = $request->validate([
-            'hero_tagline' => 'nullable|string',
-            'hero_subtitle' => 'nullable|string',
-            'hero_badge' => 'nullable|string',
-            'hero_ai_label' => 'nullable|string',
-        ]);
-
+        $validated = $request->validated();
         foreach ($validated as $key => $value) {
-            SiteSetting::updateOrCreate(
-                ['key' => $key],
-                ['value' => $value],
-            );
+            SiteSetting::updateOrCreate(['key' => $key], ['value' => $value]);
         }
-
-        return response()->json($validated);
+        return new BannerSettingsResource($validated);
     }
 }

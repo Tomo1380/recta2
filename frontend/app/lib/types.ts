@@ -294,46 +294,10 @@ export interface LineMessage {
 // を直接 import すること: `~/orval/generated/api.schemas`。
 // 手書きの interface は 2026-05-26 に削除。
 
-export interface RelocateVoice {
-  id: number;
-  area_from: string;
-  area_to: string;
-  body: string;
-  visible: boolean;
-  display_order: number;
-}
-
-// Content management
-export interface PickupShop {
-  id: number;
-  store_id: number;
-  sort_order: number;
-  is_pr: boolean;
-  visible: boolean;
-  store: {
-    id: number;
-    name: string;
-    area: string;
-    category: string | null;
-  };
-  average_rating: number | null;
-}
-
-export interface Consultation {
-  id: number;
-  question: string;
-  tag: string;
-  count: number;
-  visible: boolean;
-  sort_order: number;
-}
-
-export interface BannerSettings {
-  hero_tagline: string;
-  hero_subtitle: string;
-  hero_badge: string;
-  hero_ai_label: string;
-}
+// RelocateVoice / PickupShop / Consultation / BannerSettings は
+// orval-generated 型 (RelocateVoice / PickupShopResource /
+// ConsultationResource / BannerSettingsResource) を直接 import すること。
+// 手書きの interface は 2026-05-26 に削除。
 
 // コラム記事 (CMS)
 export interface Article {
