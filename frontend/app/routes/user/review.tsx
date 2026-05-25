@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { Star, ArrowLeft, Loader2 } from "lucide-react";
+import { Star, ArrowLeft, Loader2, Lock } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
@@ -50,14 +50,16 @@ export default function ReviewPage() {
   const tweetId = tweetIdMatch?.[2];
   const tweetAuthor = tweetIdMatch?.[1];
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (hydrated && !authLoading && !isAuthenticated) {
-      // ログイン後にこの口コミ投稿フォームへ自動で戻れるよう、return-to を保存。
-      sessionStorage.setItem("recta:login-return-to", `/stores/${storeId}/review`);
-      navigate(`/login`);
-    }
-  }, [hydrated, authLoading, isAuthenticated, navigate, storeId]);
+  // 未認証時は「ログインが必要です」カードを描画する（下の方の return 参照）。
+  // 自動 redirect は廃止 — フォームをチラ見せしない+「なぜ画面が切り替わったか」が
+  // ユーザーに伝わるよう、明示的に CTA を出す方針。
+  const requireLogin = hydrated && !authLoading && !isAuthenticated;
+
+  const handleGoToLogin = () => {
+    // ログイン後にこの口コミ投稿フォームへ自動で戻れるよう、return-to を保存。
+    sessionStorage.setItem("recta:login-return-to", `/stores/${storeId}/review`);
+    navigate(`/login`);
+  };
 
   // Fetch store info
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function ReviewPage() {
     }
   };
 
-  if (storeLoading || authLoading) {
+  if (storeLoading || authLoading || !hydrated) {
     return (
       <div
         className="flex flex-1 items-center justify-center"
@@ -117,6 +119,53 @@ export default function ReviewPage() {
             borderTopColor: "#d4af37",
           }}
         />
+      </div>
+    );
+  }
+
+  // 未認証: フォーム自体は描画せず、ログイン誘導カードに差し替える。
+  if (requireLogin) {
+    return (
+      <div
+        className="px-4 py-8"
+        style={{ backgroundColor: "#f7f6f3", minHeight: "100%" }}
+      >
+        <div className="mx-auto max-w-lg">
+          <Link
+            to={`/stores/${storeId}`}
+            className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            店舗詳細に戻る
+          </Link>
+
+          <Card>
+            <CardHeader className="items-center text-center">
+              <div
+                className="mb-3 inline-flex size-12 items-center justify-center rounded-full"
+                style={{ background: "rgba(212,175,55,0.12)", color: "#b8941f" }}
+              >
+                <Lock className="size-5" />
+              </div>
+              <CardTitle className="text-lg">口コミ投稿にはログインが必要です</CardTitle>
+              <CardDescription className="text-sm">
+                {store?.name ? `「${store.name}」への口コミ投稿に進むには、LINE でログインしてください。` : "LINE でログインすると口コミを投稿できます。"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={handleGoToLogin}
+                className="h-12 w-full text-base font-semibold"
+                style={{ background: "#06C755", color: "white" }}
+              >
+                LINE でログインして続ける
+              </Button>
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                ログイン後、自動でこの画面に戻ります。
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
