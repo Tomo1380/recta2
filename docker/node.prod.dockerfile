@@ -6,6 +6,10 @@ COPY ./frontend/package*.json ./
 RUN npm ci
 
 COPY ./frontend .
+
+ARG VITE_GOOGLE_MAPS_API_KEY=""
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+
 RUN npm run build
 
 FROM node:24-alpine

@@ -22,7 +22,13 @@ services:
     build:
       context: .
       dockerfile: docker/node.prod.dockerfile
+      args:
+        # Vite bakes VITE_* values into the bundle at build time, so they have
+        # to come in via build args rather than runtime env.
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     restart: unless-stopped
+    env_file:
+      - .env.prod
     environment:
       - NODE_ENV=production
       - PORT=4055
