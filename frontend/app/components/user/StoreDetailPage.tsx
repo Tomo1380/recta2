@@ -659,14 +659,27 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             title="体験入店情報"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              <InfoRow label="平均時給" value={formatCurrency(store.trial_avg_hourly ?? 0)} />
-              <InfoRow label="体験時給" value={formatCurrency(store.trial_hourly ?? 0)} />
+              {/* 数値がない店舗で「¥0」を出すと「タダ働き？」と読まれる
+                  ので、未設定は「—」（薄いダッシュ）にして空欄であることを
+                  はっきり示す。 */}
+              {store.trial_avg_hourly ? (
+                <InfoRow label="平均時給" value={formatCurrency(store.trial_avg_hourly)} />
+              ) : (
+                <InfoRow label="平均時給" value={<EmptyValue />} />
+              )}
+              {store.trial_hourly ? (
+                <InfoRow label="体験時給" value={formatCurrency(store.trial_hourly)} />
+              ) : (
+                <InfoRow label="体験時給" value={<EmptyValue />} />
+              )}
               <InfoRow
                 label="面接可能時間"
                 value={
                   store.interview_start && store.interview_end
                     ? `${store.interview_start}〜${store.interview_end}`
                     : store.interview_hours
+                      ? store.interview_hours
+                      : <EmptyValue />
                 }
               />
               <InfoRow
@@ -750,7 +763,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           <SectionCard
             icon={<Building size={20} style={{ color: "#D4AF37" }} />}
-            title={`【${store.name}】の特徴は？`}
+            // features_text が空の店舗ではタイトルを「店舗情報」に倒す。
+            // 「特徴は？」だけ残して下が単なるメタ表組みなのは見出し詐欺。
+            title={
+              store.features_text
+                ? `【${store.name}】の特徴は？`
+                : "店舗情報"
+            }
           >
             {store.features_text && (
               <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.65)" }}>
@@ -2166,6 +2185,13 @@ function InfoRow({
   );
 }
 
+// 値が未設定の InfoRow を「タダ」「0円」と読まれないように薄いダッシュで埋める。
+function EmptyValue() {
+  return (
+    <span style={{ color: "rgba(27,37,40,0.35)" }}>—</span>
+  );
+}
+
 
 function AnalysisSection({ analysis }: { analysis: Analysis }) {
   const castTotal =
@@ -2649,12 +2675,40 @@ function ChampagnePricesSection({
             </p>
           </>
         ) : (
-          <p
-            className="relative text-sm leading-relaxed text-center"
-            style={{ color: "rgba(255,255,255,0.7)", fontFamily: "'Noto Sans JP', sans-serif" }}
-          >
-            {fallback}
-          </p>
+          // Fallback ブランチでも見出しを出さないと、店舗詳細を縦に流したときに
+          // 「モエ・エ・シャンドンなど各種あり。」がただの裸テキストとして浮く。
+          // 見出し+本文の塊にすることで他のセクションと一貫した重みを与える。
+          <>
+            <div className="relative mb-3 text-center">
+              <h3
+                className="m-0 text-[19px] font-bold leading-tight"
+                style={{
+                  color: "#f7d976",
+                  fontFamily: "'Noto Sans JP','Outfit',sans-serif",
+                  letterSpacing: "0.06em",
+                  textShadow: "0 2px 12px rgba(0,0,0,0.4)",
+                }}
+              >
+                ボトル目安価格
+              </h3>
+              <p
+                className="mt-1 text-[9.5px] font-medium uppercase"
+                style={{
+                  color: "rgba(212,175,55,0.65)",
+                  fontFamily: "'Outfit', sans-serif",
+                  letterSpacing: "0.32em",
+                }}
+              >
+                Champagne Price
+              </p>
+            </div>
+            <p
+              className="relative text-sm leading-relaxed text-center"
+              style={{ color: "rgba(255,255,255,0.8)", fontFamily: "'Noto Sans JP', sans-serif" }}
+            >
+              {fallback}
+            </p>
+          </>
         )}
       </div>
     </div>

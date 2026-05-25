@@ -85,8 +85,11 @@ const J = "'Noto Sans JP',sans-serif";
 
 function formatDate(s: string | null): string {
   if (!s) return "";
+  // SSR(UTC) と CSR(JST 等) で getMonth/getDate がズレると React が hydration
+  // mismatch を出すので、UTC 基準で固定。日付として "公開日" を見せたいだけ
+  // なので時刻成分は無視して OK。
   const d = new Date(s);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
 /**

@@ -459,7 +459,7 @@ export default function TopPage() {
             </div>
             <div className="mb-3" style={{ width: "52px", height: "1px", background: "linear-gradient(90deg,rgba(212,175,55,.9),transparent)" }} />
             <p style={{ fontFamily: J, fontWeight: 500, fontSize: "15px", letterSpacing: "0.04em", color: "rgba(255,255,255,.96)", lineHeight: 1.5, textShadow: "0 1px 12px rgba(0,0,0,.5)", margin: "0 0 4px" }}>AIと探す、理想のナイトワーク</p>
-            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>キャバクラ・ラウンジ・クラブ｜全国1,200件以上</p>
+            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>キャバクラ・ラウンジ・クラブ｜都内厳選</p>
           </div>
         </div>
 
@@ -625,18 +625,18 @@ export default function TopPage() {
                         <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                       <span style={{ fontFamily: J, fontWeight: 400, fontSize: "10px", color: "rgba(27,37,40,.45)", marginBottom: "6px" }}>クチコミを見るにはログインが必要です</span>
-                      <Link
-                        to="/login"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          sessionStorage.setItem("recta:login-return-to", "/");
-                        }}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl active:scale-95 transition-transform"
-                        style={{ background: "#06C755", textDecoration: "none", boxShadow: "0 4px 14px rgba(6,199,85,.3), 0 1px 3px rgba(6,199,85,.2)" }}
+                      {/* 親要素がもう <Link to="/login"> なので、ここは
+                          presentational なボタン外見だけ。<a> をネストすると
+                          React Router の hydrate が壊れて Invalid HTML 警告
+                          になるため、敢えてただの <span> にする。クリックは
+                          外側カードの Link が拾う。 */}
+                      <span
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl"
+                        style={{ background: "#06C755", boxShadow: "0 4px 14px rgba(6,199,85,.3), 0 1px 3px rgba(6,199,85,.2)" }}
                       >
                         <LineIcon size={16} />
                         <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12px", color: "white", letterSpacing: "0.02em" }}>LINEでログイン</span>
-                      </Link>
+                      </span>
                     </div>
                   )}
                 </div>

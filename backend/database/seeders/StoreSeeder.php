@@ -324,9 +324,9 @@ class StoreSeeder extends Seeder
             ],
             'Club GRANDEUR' => [
                 'staff_photos' => [
-                    ['image_url' => 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=600&q=80', 'caption' => 'キャストA', 'staff_type' => 'cast'],
-                    ['image_url' => 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&q=80', 'caption' => 'キャストB', 'staff_type' => 'cast'],
-                    ['image_url' => 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=600&q=80', 'caption' => 'キャストC', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=600&q=80', 'caption' => 'No.1キャスト / 在籍3年', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&q=80', 'caption' => '新人 / 入店半年', 'staff_type' => 'cast'],
+                    ['image_url' => 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=600&q=80', 'caption' => '指名ランカー', 'staff_type' => 'cast'],
                 ],
             ],
             'Lounge Crescent' => [
