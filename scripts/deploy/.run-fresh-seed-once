@@ -1,1 +1,0 @@
-2026-05-26: reseed to pick up ArticleSeeder + AiChatLogSeeder + AiChatLimitSeeder + enriched StoreSeeder (id 1-5 full fields) + ReviewSeeder anchor guarantee. Remove this file in the next commit after the deploy completes.
