@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useNavigate } from "react-router";
 import { Home, Wallet, Plane, ShieldCheck } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import type { RelocateVoice } from "~/lib/types";
@@ -39,7 +39,18 @@ const FEATURES = [
 ];
 
 export default function RelocateSupportPage() {
+  const navigate = useNavigate();
   const [voices, setVoices] = useState<RelocateVoice[]>([]);
+
+  const goBack = () => {
+    // SPA 内遷移で来た場合は直前画面に戻す。直リンク/新タブで開いた場合は
+    // window.history.length が小さく ( <=1 ) なるのでトップに逃がす。
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -68,7 +79,21 @@ export default function RelocateSupportPage() {
         }}
       >
         <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "60%", background: `radial-gradient(circle at 70% 30%, rgba(212,175,55,.18), transparent 60%)`, pointerEvents: "none" }} />
-        <Link to="/" style={{ color: "rgba(255,255,255,.6)", fontSize: "13px", textDecoration: "none", fontFamily: J }}>← トップに戻る</Link>
+        <button
+          type="button"
+          onClick={goBack}
+          style={{
+            color: "rgba(255,255,255,.6)",
+            fontSize: "13px",
+            fontFamily: J,
+            background: "transparent",
+            border: 0,
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
+          ← 戻る
+        </button>
         <div style={{ marginTop: "20px", position: "relative" }}>
           <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "11px", letterSpacing: "0.16em", color: GOLD, textTransform: "uppercase" }}>Recta Relocate Support</span>
           <h1 style={{ fontFamily: J, fontWeight: 700, fontSize: "26px", color: "white", margin: "8px 0 12px", lineHeight: 1.35 }}>
