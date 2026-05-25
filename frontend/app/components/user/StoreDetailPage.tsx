@@ -1077,15 +1077,16 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           />
 
           {/* ============================================================ */}
-          {/* 12c. Reviews — first 3 visible, 4th+ blurred behind LINE login */}
+          {/* 12c. Reviews — first 3 visible, 4th+ blurred behind LINE login. */}
+          {/*      0 件でもセクションごと出して「口コミを書く」導線を維持する */}
+          {/*      (隠すと最初の 1 件を誰も投稿できない鶏卵問題になる)。       */}
           {/* ============================================================ */}
-          {(store.reviews ?? []).length > 0 && (
-            <ReviewsSection
-              storeId={store.id}
-              reviews={store.reviews ?? []}
-              reviewsCount={store.reviews_count ?? 0}
-            />
-          )}
+          <ReviewsSection
+            storeId={store.id}
+            reviews={store.reviews ?? []}
+            reviewsCount={store.reviews_count ?? 0}
+          />
+
 
           {/* ============================================================ */}
           {/* 13. Staff Comment */}
@@ -3468,12 +3469,32 @@ function ReviewsSection({
         </div>
       )}
 
-      {/* Visible reviews (first 3) */}
-      <div className="space-y-2.5 px-5">
-        {visible.map((review) => (
-          <ReviewItem key={review.id} review={review} />
-        ))}
-      </div>
+      {/* Visible reviews (first 3) — or an empty-state nudge if there's none. */}
+      {visible.length > 0 ? (
+        <div className="space-y-2.5 px-5">
+          {visible.map((review) => (
+            <ReviewItem key={review.id} review={review} />
+          ))}
+        </div>
+      ) : (
+        <div className="mx-5 mb-5 rounded-2xl border border-dashed p-6 text-center"
+          style={{ borderColor: "rgba(212,175,55,0.35)", background: "rgba(255,253,246,0.6)" }}
+        >
+          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>
+            まだ口コミがありません
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "rgba(27,37,40,0.55)" }}>
+            体験入店した方や、お店の雰囲気を知っている方の<br />最初の1件をぜひお寄せください。
+          </p>
+          <a
+            href={`/stores/${storeId}/review`}
+            className="mt-4 inline-flex items-center justify-center rounded-full px-5 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
+          >
+            最初の口コミを書く
+          </a>
+        </div>
+      )}
 
       {/* Blurred locked reviews + login CTA */}
       {hasHidden && (
