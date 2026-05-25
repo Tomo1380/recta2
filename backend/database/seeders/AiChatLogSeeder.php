@@ -35,9 +35,14 @@ class AiChatLogSeeder extends Seeder
         $logs = [];
         for ($i = 0; $i < 80; $i++) {
             $sample = $samples[$i % count($samples)];
+            // fake() ヘルパは fakerphp/faker (require-dev) に依存するため
+            // production composer install では使えない。素の PHP で代替。
+            $hasUser = rand(1, 100) <= 70;
+            $ip = sprintf('%d.%d.%d.%d', rand(1, 254), rand(0, 254), rand(0, 254), rand(1, 254));
+
             $logs[] = [
-                'user_id' => fake()->boolean(70) ? $userIds[array_rand($userIds)] : null,
-                'ip_address' => fake()->ipv4(),
+                'user_id' => $hasUser ? $userIds[array_rand($userIds)] : null,
+                'ip_address' => $ip,
                 'page_type' => $sample[0],
                 'user_message' => $sample[2],
                 'ai_response' => $sample[3],
