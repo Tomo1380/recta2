@@ -3,7 +3,11 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
+// Read the unified env from the repo root (../.env) rather than frontend/.env
+// so the project keeps a single source of truth. envDir resolves relative to
+// the vite project root (this dir), so '../' = the repo root.
 export default defineConfig({
+  envDir: "../",
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   // Force a single copy of React across the app + every external package
   // (TipTap, Radix, etc.). Without dedupe, dev with linked node_modules

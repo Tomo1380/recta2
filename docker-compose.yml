@@ -23,6 +23,10 @@ services:
       - node-modules-store:/app/node_modules
     environment:
       - NODE_ENV=${NODE_ENV:-development}
+      # Vite reads VITE_* at dev-server time. Pass it in from root .env so the
+      # frontend doesn't need its own .env file.
+      - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-}
+      - VITE_APP_NAME=${VITE_APP_NAME:-Recta2}
     networks:
       - recta2
 
@@ -33,14 +37,8 @@ services:
     volumes:
       - ./backend:/var/www/html
       - laravel-vendor-store:/var/www/html/vendor
-    environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-recta2}
-      - DB_USERNAME=${DB_USERNAME:-recta2}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
-      - REDIS_HOST=redis
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,14 +68,8 @@ services:
       - ./backend:/var/www/html
       - laravel-vendor-store:/var/www/html/vendor
     entrypoint: ["php", "artisan"]
-    environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-recta2}
-      - DB_USERNAME=${DB_USERNAME:-recta2}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
-      - REDIS_HOST=redis
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,14 +113,8 @@ services:
       - ./backend:/var/www/html
       - laravel-vendor-store:/var/www/html/vendor
     entrypoint: ["/bin/sh", "-c", "while true; do php /var/www/html/artisan schedule:run --verbose --no-interaction & sleep 60; done"]
-    environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-recta2}
-      - DB_USERNAME=${DB_USERNAME:-recta2}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
-      - REDIS_HOST=redis
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy

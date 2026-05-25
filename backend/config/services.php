@@ -33,7 +33,9 @@ return [
         'tuned_model_id' => env('GEMINI_TUNED_MODEL_ID'),
         // Default は preview の取れた GA 安定版。料金は preview 版と同じだが
         // レート上限が緩く、突然 deprecated されるリスクも無い。
-        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
+        // env('GEMINI_MODEL') が空文字を返した場合もデフォルトに倒すため ?: で書く。
+        // ('?:' は left-side が falsy ('' や null) なら right-side に落ちる)。
+        'model' => env('GEMINI_MODEL') ?: 'gemini-3.1-flash-lite',
     ],
 
     'google_maps' => [
