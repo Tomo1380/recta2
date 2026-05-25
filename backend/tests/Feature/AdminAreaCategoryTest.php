@@ -46,7 +46,6 @@ class AdminAreaCategoryTest extends TestCase
             ->postJson('/api/admin/areas', [
                 'name' => '銀座',
                 'slug' => 'ginza',
-                'tier' => 'gold',
                 'visible' => true,
                 'sort_order' => 0,
             ]);
@@ -67,7 +66,6 @@ class AdminAreaCategoryTest extends TestCase
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/admin/areas/{$area->id}", [
                 'name' => '新宿エリア',
-                'tier' => 'gold',
             ]);
 
         $response->assertStatus(200)
@@ -147,7 +145,7 @@ class AdminAreaCategoryTest extends TestCase
             ->postJson('/api/admin/categories', [
                 'name' => 'ガールズバー',
                 'slug' => 'girls-bar',
-                'color' => '#ff6699',
+                'image_url' => 'https://example.com/gb.jpg',
                 'visible' => true,
                 'sort_order' => 0,
             ]);
@@ -156,7 +154,7 @@ class AdminAreaCategoryTest extends TestCase
             ->assertJson([
                 'name' => 'ガールズバー',
                 'slug' => 'girls-bar',
-                'color' => '#ff6699',
+                'image_url' => 'https://example.com/gb.jpg',
             ]);
 
         $this->assertDatabaseHas('categories', ['slug' => 'girls-bar']);
@@ -167,16 +165,16 @@ class AdminAreaCategoryTest extends TestCase
         $category = Category::create([
             'name' => 'キャバクラ',
             'slug' => 'cabaret',
-            'color' => '#000000',
+            'image_url' => 'https://example.com/old.jpg',
         ]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/admin/categories/{$category->id}", [
-                'color' => '#ff0000',
+                'image_url' => 'https://example.com/new.jpg',
             ]);
 
         $response->assertStatus(200)
-            ->assertJson(['color' => '#ff0000']);
+            ->assertJson(['image_url' => 'https://example.com/new.jpg']);
     }
 
     public function test_admin_can_delete_category(): void

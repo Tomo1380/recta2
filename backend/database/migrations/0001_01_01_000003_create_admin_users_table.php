@@ -4,8 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+/**
+ * 管理画面のログインユーザー。求職者の users とは完全に別物。
+ * super_admin だけが管理ユーザーの作成・削除権限を持つ想定。
+ */
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('admin_users', function (Blueprint $table) {
