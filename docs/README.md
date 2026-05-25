@@ -19,6 +19,7 @@
 | [deploy-aws.md](deploy-aws.md) | AWS EC2 シングルインスタンス構成 + Terraform + デプロイフロー |
 | [line-setup-checklist.md](line-setup-checklist.md) | LINE Login / Messaging API のチャネル設定・ENV・Webhook + トラブル履歴 |
 | [ai-finetuning.md](ai-finetuning.md) | OpenAI Fine-tuning の v1〜v4 履歴・モデル ID 管理・訓練データの作り方 |
+| [type-generation.md](type-generation.md) | Laravel → OpenAPI → TS 型・axios クライアント自動生成パイプライン (scramble + orval) |
 
 ### テスト
 

@@ -74,3 +74,8 @@ chat-test.cjs
 top-screenshot.cjs
 top-screenshot.png
 recta-*.png
+
+# orval inputs are copies of backend/api.json (the real source of truth).
+# The generated/ outputs ARE committed (so PR diffs show API changes) but
+# the local copy of the spec is just a build artifact.
+frontend/orval/api.json

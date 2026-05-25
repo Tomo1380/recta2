@@ -8,7 +8,9 @@
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "gen:api:spec": "cd .. && docker compose exec -T laravel php artisan scramble:export --path=/var/www/html/api.json && cp backend/api.json frontend/orval/api.json",
+    "gen:api": "npm run gen:api:spec && orval --config ./orval/orval.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -29,6 +31,7 @@
     "@tiptap/extension-youtube": "^3.23.1",
     "@tiptap/react": "^3.23.1",
     "@tiptap/starter-kit": "^3.23.1",
+    "axios": "^1.16.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "express": "^5.2.1",
@@ -49,6 +52,7 @@
     "@types/node": "^22",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "orval": "^8.12.3",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",

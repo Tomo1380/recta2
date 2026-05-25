@@ -12,8 +12,17 @@ import {
   Loader2,
   Plane,
 } from "lucide-react";
-import { api } from "~/lib/api";
-import type { RelocateVoice } from "~/lib/types";
+// orval-generated client (Laravel scramble → OpenAPI → axios-functions).
+// 既存 ~/lib/api と ~/lib/types の手書きは段階的にこちら側へ寄せていく。
+// この画面が先行サンプル。
+import {
+  relocateVoiceIndex,
+  relocateVoiceStore,
+  relocateVoiceUpdate,
+  relocateVoiceDestroy,
+  relocateVoiceReorder,
+} from "../../../orval/generated/relocate-voice";
+import type { RelocateVoice } from "../../../orval/generated/api.schemas";
 
 interface Toast {
   message: string;
@@ -45,7 +54,7 @@ export function RelocateVoicesPage() {
 
   const fetchVoices = useCallback(async () => {
     try {
-      const data = await api.get<RelocateVoice[]>("/admin/relocate-voices");
+      const data = await relocateVoiceIndex();
       setVoices(data);
     } catch (e) {
       console.error(e);
@@ -78,7 +87,7 @@ export function RelocateVoicesPage() {
     }
     setSaving(true);
     try {
-      await api.put(`/admin/relocate-voices/${id}`, editDraft);
+      await relocateVoiceUpdate(id, editDraft);
       await fetchVoices();
       cancelEdit();
       showToast("更新しました");
@@ -97,7 +106,7 @@ export function RelocateVoicesPage() {
     }
     setSaving(true);
     try {
-      await api.post("/admin/relocate-voices", {
+      await relocateVoiceStore({
         ...newDraft,
         visible: true,
         display_order: voices.length,
@@ -117,7 +126,7 @@ export function RelocateVoicesPage() {
   const remove = async (id: number) => {
     if (!confirm("削除しますか？")) return;
     try {
-      await api.delete(`/admin/relocate-voices/${id}`);
+      await relocateVoiceDestroy(id);
       await fetchVoices();
       showToast("削除しました");
     } catch (e) {
@@ -128,9 +137,7 @@ export function RelocateVoicesPage() {
 
   const toggleVisible = async (voice: RelocateVoice) => {
     try {
-      await api.put(`/admin/relocate-voices/${voice.id}`, {
-        visible: !voice.visible,
-      });
+      await relocateVoiceUpdate(voice.id, { visible: !voice.visible });
       await fetchVoices();
     } catch (e) {
       console.error(e);
@@ -145,9 +152,7 @@ export function RelocateVoicesPage() {
     [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
     setVoices(reordered);
     try {
-      await api.post("/admin/relocate-voices/reorder", {
-        ids: reordered.map((v) => v.id),
-      });
+      await relocateVoiceReorder({ ids: reordered.map((v) => v.id) });
     } catch (e) {
       console.error(e);
       showToast("並び替えに失敗しました", "error");

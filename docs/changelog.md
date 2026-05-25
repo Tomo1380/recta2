@@ -37,6 +37,10 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
 - マイグレーション集約：プレリリース期の 36 ファイル → テーブル単位 10 ファイル
 - 本番デプロイ：node の VITE_* を build args で焼き込み（`VITE_GOOGLE_MAPS_API_KEY` 等）
 - `docs/qa-prompts.md` 追加：再利用可能な QA モンキーテストプロンプト集
+- 型生成パイプライン導入: `dedoc/scramble` + `orval` (Profiit と同スタック)。
+  `npm run gen:api` で Laravel → OpenAPI → TS 型 + axios client を再生成。
+  サンプルケースとして admin/relocate-voices を生成 client に移行済。
+  詳細は [type-generation.md](type-generation.md)。
 
 ---
 
