@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\User\StoreReviewRequest;
+use App\Http\Resources\ReviewResource;
 use App\Models\Review;
 use App\Models\Store;
+use App\Support\PaginatorWithResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PublicReviewController extends Controller
@@ -11,13 +15,9 @@ class PublicReviewController extends Controller
     /**
      * 口コミ投稿
      */
-    public function store(Request $request, Store $store)
+    public function store(StoreReviewRequest $request, Store $store): JsonResponse|ReviewResource
     {
-        $validated = $request->validate([
-            'rating' => 'required|integer|min:1|max:5',
-            'body' => 'required|string|min:10',
-            'tweet_url' => 'nullable|string|max:500',
-        ]);
+        $validated = $request->validated();
 
         $tweetId = null;
         $tweetAuthor = null;
@@ -53,13 +53,22 @@ class PublicReviewController extends Controller
             'status' => 'published',
         ]);
 
-        return response()->json($review->load('store'), 201);
+        $review->load('store:id,name');
+        return new ReviewResource($review);
     }
 
     /**
      * 自分の口コミ一覧
+     *
+     * @response array{
+     *   data: ReviewResource[],
+     *   current_page: int,
+     *   last_page: int,
+     *   per_page: int,
+     *   total: int
+     * }
      */
-    public function userReviews(Request $request)
+    public function userReviews(Request $request): JsonResponse
     {
         $reviews = Review::with('store:id,name,area,category')
             ->where('user_id', $request->user()->id)
@@ -67,13 +76,13 @@ class PublicReviewController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        return response()->json($reviews);
+        return response()->json(PaginatorWithResource::map($reviews, ReviewResource::class));
     }
 
     /**
      * 自分の口コミを削除（ソフトデリート）
      */
-    public function destroy(Request $request, Review $review)
+    public function destroy(Request $request, Review $review): JsonResponse
     {
         if ($review->user_id !== $request->user()->id) {
             return response()->json([

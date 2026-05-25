@@ -41,6 +41,16 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
   `npm run gen:api` で Laravel → OpenAPI → TS 型 + axios client を再生成。
   サンプルケースとして admin/relocate-voices を生成 client に移行済。
   詳細は [type-generation.md](type-generation.md)。
+- 型生成パイプラインの本格展開 (Wave 0-5):
+  Area / Category / PickupShop / Consultation / BannerSettings / Article /
+  Review / LineFriend / LineMessage / AdminUser / User それぞれに
+  Resource + FormRequest を整備。控えめに見ても 15 個の Resource +
+  18 個の FormRequest 追加 + 既存 7 コントローラ refactor。
+  AppServiceProvider::boot() で `JsonResource::withoutWrapping()` を有効化。
+  paginator + Resource の wrap 問題を回避する `App\Support\PaginatorWithResource`
+  ヘルパも追加。詳細は [type-generation.md](type-generation.md) の移行マトリクス。
+- Dashboard / Store は型生成リターン低 (前者はネスト広い stats 構造、
+  後者は StoreApiTransformer 解体が必要) のため意図的に後回し。
 
 ---
 

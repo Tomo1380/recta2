@@ -5,13 +5,13 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  AdminUser,
   AdminUserIndex200,
   AdminUserIndexParams,
   AdminUserResetPassword200,
-  AdminUserResetPasswordBody,
-  AdminUserStoreBody,
-  AdminUserUpdateBody
+  AdminUserResource,
+  ResetAdminPasswordRequest,
+  StoreAdminUserRequest,
+  UpdateAdminUserRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -29,23 +29,23 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const adminUserStore = (
-    adminUserStoreBody: AdminUserStoreBody,
+    storeAdminUserRequest: StoreAdminUserRequest,
  ) => {
-      return rectaMutator<AdminUser>(
+      return rectaMutator<AdminUserResource>(
       {url: `/admin/admin-users`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: adminUserStoreBody
+      data: storeAdminUserRequest
     },
       );
     }
   export const adminUserUpdate = (
     adminUser: number,
-    adminUserUpdateBody?: AdminUserUpdateBody,
+    updateAdminUserRequest?: UpdateAdminUserRequest,
  ) => {
-      return rectaMutator<AdminUser>(
+      return rectaMutator<AdminUserResource>(
       {url: `/admin/admin-users/${adminUser}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: adminUserUpdateBody
+      data: updateAdminUserRequest
     },
       );
     }
@@ -59,12 +59,12 @@ import { rectaMutator } from '../mutators/auth';
     }
   export const adminUserResetPassword = (
     adminUser: number,
-    adminUserResetPasswordBody: AdminUserResetPasswordBody,
+    resetAdminPasswordRequest: ResetAdminPasswordRequest,
  ) => {
       return rectaMutator<AdminUserResetPassword200>(
       {url: `/admin/admin-users/${adminUser}/reset-password`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: adminUserResetPasswordBody
+      data: resetAdminPasswordRequest
     },
       );
     }

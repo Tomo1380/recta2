@@ -18,6 +18,17 @@ export interface AdminUser {
   updated_at: string | null;
 }
 
+export interface AdminUserResource {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  last_login_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AiChatLimit {
   id: number;
   user_daily_limit: number;
@@ -233,7 +244,7 @@ export interface IndustryKnowledge {
   updated_at: string | null;
 }
 
-export interface LineMessage {
+export interface LineMessageResource {
   id: number;
   line_user_id: string;
   /** @nullable */
@@ -243,14 +254,14 @@ export interface LineMessage {
   content: string;
   /** @nullable */
   content_meta: unknown[] | null;
-  /** @nullable */
+  /**
+     * JSONB (free-form)
+     * @nullable
+     */
   line_message_id: string | null;
-  /** @nullable */
-  read_at: string | null;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
+  read_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type PickupShopResourceStore = {
@@ -296,7 +307,32 @@ export interface ReorderRequest {
   ids: number[];
 }
 
-export interface Review {
+export interface ResetAdminPasswordRequest {
+  /** @minLength 8 */
+  password: string;
+}
+
+/**
+ * Lightweight relationships — only included when eager-loaded.
+ */
+export type ReviewResourceUser = {
+  id: number;
+  line_display_name: string;
+  /** @nullable */
+  nickname: string | null;
+  /** @nullable */
+  line_picture_url: string | null;
+  use_line_avatar: boolean;
+};
+
+export type ReviewResourceStore = {
+  id: number;
+  name: string;
+  area: string;
+  category: string;
+};
+
+export interface ReviewResource {
   id: number;
   user_id: number;
   store_id: number;
@@ -307,10 +343,21 @@ export interface Review {
   /** @nullable */
   tweet_author_screen_name: string | null;
   status: string;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Lightweight relationships — only included when eager-loaded. */
+  user?: ReviewResourceUser;
+  store?: ReviewResourceStore;
+}
+
+export interface SendLineBroadcastRequest {
+  /** @maxLength 5000 */
+  message: string;
+}
+
+export interface SendUserLineMessageRequest {
+  /** @maxLength 5000 */
+  message: string;
 }
 
 export interface Store {
@@ -384,6 +431,23 @@ export interface Store {
   created_at: string | null;
   /** @nullable */
   updated_at: string | null;
+}
+
+export type StoreAdminUserRequestRole = typeof StoreAdminUserRequestRole[keyof typeof StoreAdminUserRequestRole];
+
+
+export const StoreAdminUserRequestRole = {
+  super_admin: 'super_admin',
+  admin: 'admin',
+} as const;
+
+export interface StoreAdminUserRequest {
+  /** @maxLength 255 */
+  name: string;
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  role?: StoreAdminUserRequestRole;
 }
 
 export interface StoreAreaRequest {
@@ -475,6 +539,45 @@ export interface StorePickupShopRequest {
   sort_order?: number;
   is_pr?: boolean;
   visible?: boolean;
+}
+
+export interface StoreReviewRequest {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /** @minLength 10 */
+  body: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  tweet_url?: string | null;
+}
+
+export type UpdateAdminUserRequestRole = typeof UpdateAdminUserRequestRole[keyof typeof UpdateAdminUserRequestRole];
+
+
+export const UpdateAdminUserRequestRole = {
+  super_admin: 'super_admin',
+  admin: 'admin',
+} as const;
+
+export type UpdateAdminUserRequestStatus = typeof UpdateAdminUserRequestStatus[keyof typeof UpdateAdminUserRequestStatus];
+
+
+export const UpdateAdminUserRequestStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+
+export interface UpdateAdminUserRequest {
+  /** @maxLength 255 */
+  name?: string;
+  email?: string;
+  role?: UpdateAdminUserRequestRole;
+  status?: UpdateAdminUserRequestStatus;
 }
 
 export interface UpdateAreaRequest {
@@ -579,6 +682,39 @@ export interface UpdatePickupShopRequest {
   visible?: boolean;
 }
 
+export type UpdateReviewStatusRequestStatus = typeof UpdateReviewStatusRequestStatus[keyof typeof UpdateReviewStatusRequestStatus];
+
+
+export const UpdateReviewStatusRequestStatus = {
+  published: 'published',
+  unpublished: 'unpublished',
+  deleted: 'deleted',
+} as const;
+
+export interface UpdateReviewStatusRequest {
+  status: UpdateReviewStatusRequestStatus;
+}
+
+export interface UpdateUserNotesRequest {
+  /**
+     * @maxLength 5000
+     * @nullable
+     */
+  admin_notes?: string | null;
+}
+
+export type UpdateUserStatusRequestStatus = typeof UpdateUserStatusRequestStatus[keyof typeof UpdateUserStatusRequestStatus];
+
+
+export const UpdateUserStatusRequestStatus = {
+  active: 'active',
+  suspended: 'suspended',
+} as const;
+
+export interface UpdateUserStatusRequest {
+  status: UpdateUserStatusRequestStatus;
+}
+
 export interface User {
   id: number;
   line_user_id: string;
@@ -612,6 +748,77 @@ export interface User {
   is_line_friend: string;
 }
 
+/**
+ * @nullable
+ */
+export type UserResourceReviewsItemStore = {
+  id: number;
+  name: string;
+} | null;
+
+export type UserResourceReviewsItem = {
+  id: number;
+  store_id: number;
+  rating: number;
+  body: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  /** @nullable */
+  store: UserResourceReviewsItemStore;
+};
+
+/**
+ * @nullable
+ */
+export type UserResourceLineFriend = {
+  id: number;
+  is_following: boolean;
+  followed_at: string;
+  unfollowed_at: string;
+} | null;
+
+export interface UserResource {
+  id: number;
+  line_user_id: string;
+  line_display_name: string;
+  /** @nullable */
+  line_picture_url: string | null;
+  use_line_avatar: boolean;
+  /**
+     * プロフィール
+     * @nullable
+     */
+  nickname: string | null;
+  /** @nullable */
+  age: number | null;
+  /** @nullable */
+  preferred_area: string | null;
+  /** @nullable */
+  preferred_category: string | null;
+  /** @nullable */
+  experience: string | null;
+  /** @nullable */
+  bio: string | null;
+  /**
+     * 運用
+     * @nullable
+     */
+  admin_notes: string | null;
+  status: string;
+  last_login_at: string;
+  created_at: string;
+  updated_at: string;
+  /**
+     * 関連
+     * @nullable
+     */
+  reviews_count: number | null;
+  reviews?: UserResourceReviewsItem[];
+  /** @nullable */
+  line_friend?: UserResourceLineFriend;
+}
+
 export type ModelNotFoundExceptionResponse = {
   /** Error overview. */
   message: string;
@@ -642,101 +849,12 @@ export type AdminUserIndexParams = {
 per_page?: string;
 };
 
-export type AdminUserIndex200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
 export type AdminUserIndex200 = {
-  /** @minimum 1 */
+  data: AdminUserResource[];
   current_page: number;
-  data: AdminUser[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
   last_page: number;
-  /** Generated paginator links. */
-  links: AdminUserIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
   per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
   total: number;
-};
-
-export type AdminUserStoreBodyRole = typeof AdminUserStoreBodyRole[keyof typeof AdminUserStoreBodyRole];
-
-
-export const AdminUserStoreBodyRole = {
-  super_admin: 'super_admin',
-  admin: 'admin',
-} as const;
-
-export type AdminUserStoreBody = {
-  /** @maxLength 255 */
-  name: string;
-  email: string;
-  /** @minLength 8 */
-  password: string;
-  role?: AdminUserStoreBodyRole;
-};
-
-export type AdminUserUpdateBodyRole = typeof AdminUserUpdateBodyRole[keyof typeof AdminUserUpdateBodyRole];
-
-
-export const AdminUserUpdateBodyRole = {
-  super_admin: 'super_admin',
-  admin: 'admin',
-} as const;
-
-export type AdminUserUpdateBodyStatus = typeof AdminUserUpdateBodyStatus[keyof typeof AdminUserUpdateBodyStatus];
-
-
-export const AdminUserUpdateBodyStatus = {
-  active: 'active',
-  inactive: 'inactive',
-} as const;
-
-export type AdminUserUpdateBody = {
-  /** @maxLength 255 */
-  name?: string;
-  email?: string;
-  role?: AdminUserUpdateBodyRole;
-  status?: AdminUserUpdateBodyStatus;
-};
-
-export type AdminUserResetPasswordBody = {
-  /** @minLength 8 */
-  password: string;
 };
 
 export type AdminUserResetPassword200 = {
@@ -903,63 +1021,12 @@ export type ArticlesIndexParams = {
 per_page?: string;
 };
 
-export type ArticlesIndex200Links = {
-  /** @nullable */
-  first: string | null;
-  /** @nullable */
-  last: string | null;
-  /** @nullable */
-  prev: string | null;
-  /** @nullable */
-  next: string | null;
-};
-
-export type ArticlesIndex200MetaLinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
-export type ArticlesIndex200Meta = {
-  /** @minimum 1 */
-  current_page: number;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @minimum 1 */
-  last_page: number;
-  /** Generated paginator links. */
-  links: ArticlesIndex200MetaLinksItem[];
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
-  per_page: number;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
-  total: number;
-};
-
 export type ArticlesIndex200 = {
   data: ArticleResource[];
-  links: ArticlesIndex200Links;
-  meta: ArticlesIndex200Meta;
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
 };
 
 export type ArticleUploadThumbnailBody = {
@@ -1410,11 +1477,6 @@ code: string;
 state: string;
 };
 
-export type LineFriendBroadcastBody = {
-  /** @maxLength 5000 */
-  message: string;
-};
-
 export type LineFriendBroadcast200 = {
   success: boolean;
 };
@@ -1453,70 +1515,12 @@ export type PublicArticleShow200 = {
   related: ArticleSummaryResource[];
 };
 
-export type PublicReviewUserReviews200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
 export type PublicReviewUserReviews200 = {
-  /** @minimum 1 */
+  data: ReviewResource[];
   current_page: number;
-  data: Review[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
   last_page: number;
-  /** Generated paginator links. */
-  links: PublicReviewUserReviews200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
   per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
   total: number;
-};
-
-export type PublicReviewStoreBody = {
-  /**
-     * @minimum 1
-     * @maximum 5
-     */
-  rating: number;
-  /** @minLength 10 */
-  body: string;
-  /**
-     * @maxLength 500
-     * @nullable
-     */
-  tweet_url?: string | null;
 };
 
 export type PublicReviewDestroy200 = {
@@ -1685,68 +1689,12 @@ export type ReviewIndexParams = {
 per_page?: string;
 };
 
-export type ReviewIndex200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
 export type ReviewIndex200 = {
-  /** @minimum 1 */
+  data: ReviewResource[];
   current_page: number;
-  data: Review[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
   last_page: number;
-  /** Generated paginator links. */
-  links: ReviewIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
   per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
   total: number;
-};
-
-export type ReviewUpdateStatusBodyStatus = typeof ReviewUpdateStatusBodyStatus[keyof typeof ReviewUpdateStatusBodyStatus];
-
-
-export const ReviewUpdateStatusBodyStatus = {
-  published: 'published',
-  unpublished: 'unpublished',
-  deleted: 'deleted',
-} as const;
-
-export type ReviewUpdateStatusBody = {
-  status: ReviewUpdateStatusBodyStatus;
 };
 
 export type StoreGeocodeBody = {
@@ -2312,68 +2260,20 @@ export type StoreDeleteImage200 = {
 };
 
 export type UserIndexParams = {
-/**
- * LINE friend status filter
- */
 line_status?: string;
 per_page?: string;
 };
 
-export type UserIndex200UsersLinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
 export type UserIndex200Users = {
-  /** @minimum 1 */
+  data: UserResource[];
   current_page: number;
-  data: User[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
   last_page: number;
-  /** Generated paginator links. */
-  links: UserIndex200UsersLinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
   per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
   total: number;
 };
 
 export type UserIndex200LineStats = {
-  /** @minimum 0 */
   total_users: number;
-  /** @minimum 0 */
   line_friend_count: number;
 };
 
@@ -2383,33 +2283,8 @@ export type UserIndex200 = {
 };
 
 export type UserShow200 = {
-  user: User;
-  line_messages: LineMessage[];
-};
-
-export type UserUpdateStatusBodyStatus = typeof UserUpdateStatusBodyStatus[keyof typeof UserUpdateStatusBodyStatus];
-
-
-export const UserUpdateStatusBodyStatus = {
-  active: 'active',
-  suspended: 'suspended',
-} as const;
-
-export type UserUpdateStatusBody = {
-  status: UserUpdateStatusBodyStatus;
-};
-
-export type UserUpdateNotesBody = {
-  /**
-     * @maxLength 5000
-     * @nullable
-     */
-  admin_notes?: string | null;
-};
-
-export type UserSendLineMessageBody = {
-  /** @maxLength 5000 */
-  message: string;
+  user: UserResource;
+  line_messages: LineMessageResource[];
 };
 
 export type UserSendLineMessage200 = {
@@ -2430,61 +2305,11 @@ export type UserMessages200Friend = {
   /** @nullable */
   picture_url: string | null;
   is_following: boolean;
-  /** @nullable */
-  followed_at: string | null;
-  user: User;
+  followed_at: string;
+  user: unknown[];
 } | null;
 
-export type UserMessages200MessagesLinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
-export type UserMessages200Messages = {
-  /** @minimum 1 */
-  current_page: number;
-  data: LineMessage[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
-  last_page: number;
-  /** Generated paginator links. */
-  links: UserMessages200MessagesLinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
-  per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
-  total: number;
-};
+export type UserMessages200Messages = { [key: string]: unknown };
 
 export type UserMessages200 = {
   /** @nullable */

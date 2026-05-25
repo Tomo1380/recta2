@@ -7,9 +7,9 @@ use App\Http\Requests\Admin\StoreArticleRequest;
 use App\Http\Requests\Admin\UpdateArticleRequest;
 use App\Http\Resources\ArticleResource;
 use App\Models\Article;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -17,7 +17,16 @@ use Illuminate\Support\Str;
 
 class ArticleController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    /**
+     * @response array{
+     *   data: ArticleResource[],
+     *   current_page: int,
+     *   last_page: int,
+     *   per_page: int,
+     *   total: int
+     * }
+     */
+    public function index(Request $request): JsonResponse
     {
         $query = Article::query();
 
@@ -41,7 +50,7 @@ class ArticleController extends Controller
         $articles = $query->orderByDesc('updated_at')
             ->paginate($request->input('per_page', 20));
 
-        return ArticleResource::collection($articles);
+        return response()->json(PaginatorWithResource::map($articles, ArticleResource::class));
     }
 
     public function show(Article $article): ArticleResource

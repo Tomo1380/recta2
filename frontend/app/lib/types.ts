@@ -125,18 +125,11 @@ export interface Store {
   reviews_count?: number;
 }
 
-export interface Review {
-  id: number;
-  user_id: number;
-  store_id: number;
-  rating: number;
-  body: string;
-  status: "published" | "unpublished" | "deleted";
-  created_at: string;
-  updated_at: string;
-  user?: User;
-  store?: Store;
-}
+// Review は orval-generated ReviewResource (../orval/generated/api.schemas)
+// を直接 import すること。status は string 型 (backend は published/
+// unpublished/deleted enum validation を返す)。
+import type { ReviewResource } from "../../orval/generated/api.schemas";
+export type Review = ReviewResource;
 
 export interface AiChatSetting {
   id: number;
@@ -240,6 +233,11 @@ export interface DashboardData {
   };
 }
 
+// LineFriend / LineMessage / LineMessageMeta は手書きで残す。
+// Wave 4 で backend は Resource 化したが、Scramble は
+// AnonymousResourceCollection を経由する型を実用的に推論できないため、
+// 生成型に頼らない方が consumer 側がシンプル。
+// (将来 Scramble 改善 or Resource 直返し API が増えたら移行検討)
 export interface LineFriend {
   id: number;
   user_id: number | null;
@@ -253,6 +251,20 @@ export interface LineFriend {
   updated_at: string;
   messages_count?: number;
   user?: User;
+}
+
+export interface LineMessage {
+  id: number;
+  line_user_id: string;
+  user_id: number | null;
+  direction: "inbound" | "outbound";
+  message_type: string;
+  content: string;
+  content_meta?: LineMessageMeta | null;
+  line_message_id: string | null;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LineMessageMeta {
@@ -273,20 +285,6 @@ export interface LineMessageMeta {
   address?: string;
   latitude?: number;
   longitude?: number;
-}
-
-export interface LineMessage {
-  id: number;
-  line_user_id: string;
-  user_id: number | null;
-  direction: "inbound" | "outbound";
-  message_type: string;
-  content: string;
-  content_meta?: LineMessageMeta | null;
-  line_message_id: string | null;
-  read_at: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 // Area & Category management

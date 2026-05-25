@@ -117,7 +117,66 @@ RelocateVoice は最小フィールドだったので Resource 化なしで綺�
 - **生成ファイルは編集禁止**: `generated/` 配下に手を入れると次の
   `gen:api` で消える。挙動カスタマイズは mutator に。
 
+## 移行マトリクス (2026-05-26 時点)
+
+| Wave | テーブル / endpoint | Backend Resource | FormRequest | Frontend 移行状況 |
+|---|---|---|---|---|
+| 0 | RelocateVoice | ❌ (モデル直推論で十分) | ❌ | ✅ admin 完全移行 |
+| 0 | Area / Category | `AreaResource` / `CategoryResource` | ✅ | ✅ admin 完全移行 |
+| 1 | PickupShop / Consultation / BannerSettings | ✅ | ✅ | ✅ admin 完全移行 |
+| 2 | Article / ArticleSummary | ✅ (Full + Summary 分離) | ✅ | ✅ 型 alias 化、画面はそのまま動作 |
+| 3 | Review | ✅ | ✅ | ✅ 型 alias 化 |
+| 4 | LineFriend / LineMessage | ✅ + FormRequests | ✅ | ⚠️ 型は手書き維持 (Scramble の制約。下記参照) |
+| 5 | AdminUser / User | ✅ + 6 FormRequests | ✅ | ⚠️ 型は手書き維持 |
+| 6 | AiChatSetting / Dashboard | ⏸ 保留 | ⏸ | ⏸ stats/dashboard はネスト構造が大きく Resource 1 つで包めない |
+| 7 | Store | ⏸ 保留 | ⏸ | ⏸ StoreApiTransformer の解体が必要なため大規模、別途 |
+
+## 既知の Scramble 制約 と回避策
+
+### `AnonymousResourceCollection` 経由だと Scramble が中身を見ない
+
+```php
+public function index(): AnonymousResourceCollection {
+    return MyResource::collection($paginator);  // 戻り型は MyResource[] だが Scramble は unknown 扱い
+}
+```
+
+回避策: `@response array{...}` 形式の PHPDoc で **シリアライズ後の形を直書き**する。
+`MyResource[]` のように Resource クラス名を書けば Scramble が辿る:
+
+```php
+/**
+ * @response array{
+ *   data: MyResource[],
+ *   current_page: int,
+ *   total: int
+ * }
+ */
+public function index(): JsonResponse { /* ... */ }
+```
+
+### `Resource::collection($paginator)` が `data/links/meta` 形にラップする
+
+`JsonResource::withoutWrapping()` を AppServiceProvider で呼んでいても、
+paginator 経由の Resource Collection だけは `data/links/meta` に勝手にラップする
+(Laravel 仕様)。フロント側が `data.total / data.last_page` を直接読む設計の場合、
+そのまま返すと壊れる。
+
+回避: `App\Support\PaginatorWithResource::map($paginator, FooResource::class)`
+を経由する。これは paginator の `getCollection()->transform()` で要素だけ
+Resource に変換し、外形は paginator のまま返すヘルパ。
+
+```php
+return response()->json(
+    PaginatorWithResource::map($reviews, ReviewResource::class)
+);
+```
+
 ## 履歴
 
-- 2026-05-26: Phase 1 (パイプライン構築) + Phase 2 (relocate-voices を
-  サンプルケースとして admin 画面まで移行) 完了。残りの endpoint は順次。
+- 2026-05-26: Phase 1 (パイプライン構築) + Phase 2 (relocate-voices) +
+  Phase 3-7 (Area/Category, Content, Article, Review, LineFriend/Message,
+  Admin/User の Resource化 + FormRequest化) 完了。
+  Dashboard と Store は意図的に後回し（理由はマトリクス参照）。
+  Scramble × paginated AnonymousResourceCollection で詰まる罠を発見、
+  PaginatorWithResource ヘルパ + @response docblock 二段構えで対処。

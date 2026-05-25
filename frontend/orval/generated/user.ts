@@ -5,16 +5,16 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  User,
+  SendUserLineMessageRequest,
+  UpdateUserNotesRequest,
+  UpdateUserStatusRequest,
   UserIndex200,
   UserIndexParams,
   UserMessages200,
   UserMessagesParams,
+  UserResource,
   UserSendLineMessage200,
-  UserSendLineMessageBody,
-  UserShow200,
-  UserUpdateNotesBody,
-  UserUpdateStatusBody
+  UserShow200
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -41,23 +41,23 @@ import { rectaMutator } from '../mutators/auth';
     }
   export const userUpdateStatus = (
     user: number,
-    userUpdateStatusBody: UserUpdateStatusBody,
+    updateUserStatusRequest: UpdateUserStatusRequest,
  ) => {
-      return rectaMutator<User>(
+      return rectaMutator<UserResource>(
       {url: `/admin/users/${user}/status`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: userUpdateStatusBody
+      data: updateUserStatusRequest
     },
       );
     }
   export const userUpdateNotes = (
     user: number,
-    userUpdateNotesBody?: UserUpdateNotesBody,
+    updateUserNotesRequest?: UpdateUserNotesRequest,
  ) => {
-      return rectaMutator<User>(
+      return rectaMutator<UserResource>(
       {url: `/admin/users/${user}/notes`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: userUpdateNotesBody
+      data: updateUserNotesRequest
     },
       );
     }
@@ -66,12 +66,12 @@ import { rectaMutator } from '../mutators/auth';
  */
 export const userSendLineMessage = (
     user: number,
-    userSendLineMessageBody: UserSendLineMessageBody,
+    sendUserLineMessageRequest: SendUserLineMessageRequest,
  ) => {
       return rectaMutator<UserSendLineMessage200>(
       {url: `/admin/users/${user}/line-message`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: userSendLineMessageBody
+      data: sendUserLineMessageRequest
     },
       );
     }

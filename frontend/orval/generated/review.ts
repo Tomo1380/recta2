@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  Review,
   ReviewIndex200,
   ReviewIndexParams,
-  ReviewUpdateStatusBody
+  ReviewResource,
+  UpdateReviewStatusRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -28,19 +28,19 @@ import { rectaMutator } from '../mutators/auth';
   export const reviewShow = (
     review: number,
  ) => {
-      return rectaMutator<Review>(
+      return rectaMutator<ReviewResource>(
       {url: `/admin/reviews/${review}`, method: 'GET'
     },
       );
     }
   export const reviewUpdateStatus = (
     review: number,
-    reviewUpdateStatusBody: ReviewUpdateStatusBody,
+    updateReviewStatusRequest: UpdateReviewStatusRequest,
  ) => {
-      return rectaMutator<Review>(
+      return rectaMutator<ReviewResource>(
       {url: `/admin/reviews/${review}/status`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: reviewUpdateStatusBody
+      data: updateReviewStatusRequest
     },
       );
     }

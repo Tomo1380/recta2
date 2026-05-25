@@ -3,15 +3,32 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\LineFriend;
+use App\Http\Requests\Admin\SendUserLineMessageRequest;
+use App\Http\Requests\Admin\UpdateUserNotesRequest;
+use App\Http\Requests\Admin\UpdateUserStatusRequest;
+use App\Http\Resources\LineMessageResource;
+use App\Http\Resources\UserResource;
 use App\Models\LineMessage;
 use App\Models\User;
 use App\Services\LineMessagingService;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
+    /**
+     * @response array{
+     *   users: array{
+     *     data: UserResource[],
+     *     current_page: int,
+     *     last_page: int,
+     *     per_page: int,
+     *     total: int
+     *   },
+     *   line_stats: array{total_users: int, line_friend_count: int}
+     * }
+     */
     public function index(Request $request): JsonResponse
     {
         $query = User::with('lineFriend');
@@ -22,12 +39,9 @@ class UserController extends Controller
                   ->orWhere('admin_notes', 'ilike', "%{$search}%");
             });
         }
-
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
-
-        // LINE friend status filter
         $lineStatus = $request->input('line_status');
         if ($lineStatus === 'friend') {
             $query->whereHas('lineFriend', fn ($q) => $q->where('is_following', true));
@@ -42,12 +56,11 @@ class UserController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate($request->input('per_page', 20));
 
-        // LINE friend stats
         $totalUsers = User::count();
         $lineFriendCount = User::whereHas('lineFriend', fn ($q) => $q->where('is_following', true))->count();
 
         return response()->json([
-            'users' => $users,
+            'users' => PaginatorWithResource::map($users, UserResource::class),
             'line_stats' => [
                 'total_users' => $totalUsers,
                 'line_friend_count' => $lineFriendCount,
@@ -55,6 +68,9 @@ class UserController extends Controller
         ]);
     }
 
+    /**
+     * @response array{user: UserResource, line_messages: LineMessageResource[]}
+     */
     public function show(User $user): JsonResponse
     {
         $user->load([
@@ -66,8 +82,7 @@ class UserController extends Controller
             'lineFriend',
         ])->loadCount('reviews');
 
-        // Include recent LINE messages if lineFriend exists
-        $lineMessages = [];
+        $lineMessages = collect();
         if ($user->lineFriend) {
             $lineMessages = LineMessage::where('line_user_id', $user->line_user_id)
                 ->orderByDesc('created_at')
@@ -76,60 +91,41 @@ class UserController extends Controller
         }
 
         return response()->json([
-            'user' => $user,
-            'line_messages' => $lineMessages,
+            'user' => (new UserResource($user))->resolve(),
+            'line_messages' => LineMessageResource::collection($lineMessages)->resolve(),
         ]);
     }
 
-    public function updateStatus(Request $request, User $user): JsonResponse
+    public function updateStatus(UpdateUserStatusRequest $request, User $user): UserResource
     {
-        $request->validate([
-            'status' => 'required|in:active,suspended',
-        ]);
-
-        $user->update(['status' => $request->status]);
-
-        return response()->json($user);
+        $user->update(['status' => $request->validated()['status']]);
+        return new UserResource($user);
     }
 
-    public function updateNotes(Request $request, User $user): JsonResponse
+    public function updateNotes(UpdateUserNotesRequest $request, User $user): UserResource
     {
-        $request->validate([
-            'admin_notes' => 'nullable|string|max:5000',
-        ]);
-
-        $user->update(['admin_notes' => $request->admin_notes]);
-
-        return response()->json($user);
+        $user->update(['admin_notes' => $request->validated()['admin_notes'] ?? null]);
+        return new UserResource($user);
     }
 
     /**
      * Send a LINE push message to a user via their line_user_id.
+     *
+     * @response array{success: bool}
      */
-    public function sendLineMessage(Request $request, User $user, LineMessagingService $lineService): JsonResponse
+    public function sendLineMessage(SendUserLineMessageRequest $request, User $user, LineMessagingService $lineService): JsonResponse
     {
-        $request->validate([
-            'message' => 'required|string|max:5000',
-        ]);
-
         if (!$user->line_user_id) {
-            return response()->json([
-                'error' => 'このユーザーにはLINE IDが紐付けられていません',
-            ], 422);
+            return response()->json(['error' => 'このユーザーにはLINE IDが紐付けられていません'], 422);
         }
 
-        // Check if user is a LINE friend
         $friend = $user->lineFriend;
         if (!$friend || !$friend->is_following) {
-            return response()->json([
-                'error' => 'このユーザーはLINE友だちではないためメッセージを送信できません',
-            ], 422);
+            return response()->json(['error' => 'このユーザーはLINE友だちではないためメッセージを送信できません'], 422);
         }
 
-        $messageText = $request->input('message');
-        $messages = [
-            ['type' => 'text', 'text' => $messageText],
-        ];
+        $messageText = $request->validated()['message'];
+        $messages = [['type' => 'text', 'text' => $messageText]];
 
         $result = $lineService->pushMessage($user->line_user_id, $messages);
 
@@ -140,7 +136,6 @@ class UserController extends Controller
             ], 422);
         }
 
-        // Store outbound message
         LineMessage::create([
             'line_user_id' => $user->line_user_id,
             'user_id' => $user->id,
@@ -169,11 +164,11 @@ class UserController extends Controller
                 'line_user_id' => $friend->line_user_id,
                 'display_name' => $user->line_display_name,
                 'picture_url' => $user->line_picture_url,
-                'is_following' => $friend->is_following,
-                'followed_at' => $friend->followed_at,
-                'user' => $user,
+                'is_following' => (bool) $friend->is_following,
+                'followed_at' => $friend->followed_at?->toIso8601String(),
+                'user' => (new UserResource($user))->resolve(),
             ] : null,
-            'messages' => $messages,
+            'messages' => PaginatorWithResource::map($messages, LineMessageResource::class),
         ]);
     }
 }

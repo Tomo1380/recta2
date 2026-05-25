@@ -6,9 +6,9 @@
  */
 import type {
   PublicReviewDestroy200,
-  PublicReviewStoreBody,
   PublicReviewUserReviews200,
-  Review
+  ReviewResource,
+  StoreReviewRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -32,12 +32,12 @@ export const publicReviewUserReviews = (
  */
 export const publicReviewStore = (
     store: number,
-    publicReviewStoreBody: PublicReviewStoreBody,
+    storeReviewRequest: StoreReviewRequest,
  ) => {
-      return rectaMutator<Review>(
+      return rectaMutator<ReviewResource>(
       {url: `/stores/${store}/reviews`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: publicReviewStoreBody
+      data: storeReviewRequest
     },
       );
     }

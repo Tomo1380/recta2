@@ -6,7 +6,7 @@
  */
 import type {
   LineFriendBroadcast200,
-  LineFriendBroadcastBody
+  SendLineBroadcastRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -18,12 +18,12 @@ import { rectaMutator } from '../mutators/auth';
  * @summary Broadcast message to all friends
  */
 export const lineFriendBroadcast = (
-    lineFriendBroadcastBody: LineFriendBroadcastBody,
+    sendLineBroadcastRequest: SendLineBroadcastRequest,
  ) => {
       return rectaMutator<LineFriendBroadcast200>(
       {url: `/admin/users/broadcast`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: lineFriendBroadcastBody
+      data: sendLineBroadcastRequest
     },
       );
     }

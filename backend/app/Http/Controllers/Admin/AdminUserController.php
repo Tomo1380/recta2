@@ -3,63 +3,55 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ResetAdminPasswordRequest;
+use App\Http\Requests\Admin\StoreAdminUserRequest;
+use App\Http\Requests\Admin\UpdateAdminUserRequest;
+use App\Http\Resources\AdminUserResource;
 use App\Models\AdminUser;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminUserController extends Controller
 {
+    /**
+     * @response array{
+     *   data: AdminUserResource[],
+     *   current_page: int,
+     *   last_page: int,
+     *   per_page: int,
+     *   total: int
+     * }
+     */
     public function index(Request $request): JsonResponse
     {
         $admins = AdminUser::orderBy('created_at', 'desc')
             ->paginate($request->input('per_page', 20));
 
-        return response()->json($admins);
+        return response()->json(PaginatorWithResource::map($admins, AdminUserResource::class));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreAdminUserRequest $request): AdminUserResource
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:admin_users,email',
-            'password' => 'required|string|min:8',
-            'role' => 'in:super_admin,admin',
-        ]);
-
-        $admin = AdminUser::create($request->only(['name', 'email', 'password', 'role']));
-
-        return response()->json($admin, 201);
+        $admin = AdminUser::create($request->validated());
+        return new AdminUserResource($admin);
     }
 
-    public function update(Request $request, AdminUser $adminUser): JsonResponse
+    public function update(UpdateAdminUserRequest $request, AdminUser $adminUser): AdminUserResource
     {
-        $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:admin_users,email,' . $adminUser->id,
-            'role' => 'sometimes|in:super_admin,admin',
-            'status' => 'sometimes|in:active,inactive',
-        ]);
-
-        $adminUser->update($request->only(['name', 'email', 'role', 'status']));
-
-        return response()->json($adminUser);
+        $adminUser->update($request->validated());
+        return new AdminUserResource($adminUser);
     }
 
-    public function resetPassword(Request $request, AdminUser $adminUser): JsonResponse
+    public function resetPassword(ResetAdminPasswordRequest $request, AdminUser $adminUser): JsonResponse
     {
-        $request->validate([
-            'password' => 'required|string|min:8',
-        ]);
-
-        $adminUser->update(['password' => $request->password]);
-
+        $adminUser->update(['password' => $request->validated()['password']]);
         return response()->json(['message' => 'パスワードをリセットしました。']);
     }
 
     public function destroy(AdminUser $adminUser): JsonResponse
     {
         $adminUser->delete();
-
         return response()->json(null, 204);
     }
 }

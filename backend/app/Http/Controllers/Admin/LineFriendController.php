@@ -3,27 +3,38 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SendLineBroadcastRequest;
+use App\Http\Requests\Admin\SendLinePushRequest;
+use App\Http\Resources\LineFriendResource;
+use App\Http\Resources\LineMessageResource;
 use App\Models\LineFriend;
 use App\Models\LineMessage;
 use App\Services\LineMessagingService;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
 class LineFriendController extends Controller
 {
     public function __construct(
-        private LineMessagingService $lineService
+        private LineMessagingService $lineService,
     ) {}
 
     /**
      * Paginated friends list with user info.
+     *
+     * @response array{
+     *   data: LineFriendResource[],
+     *   current_page: int,
+     *   last_page: int,
+     *   per_page: int,
+     *   total: int
+     * }
      */
     public function index(Request $request): JsonResponse
     {
         $query = LineFriend::with('user')
             ->withCount('messages');
 
-        // Search by display_name
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('display_name', 'ilike', "%{$search}%")
@@ -31,7 +42,6 @@ class LineFriendController extends Controller
             });
         }
 
-        // Filter by is_following
         if ($request->has('is_following')) {
             $query->where('is_following', $request->boolean('is_following'));
         }
@@ -39,11 +49,22 @@ class LineFriendController extends Controller
         $friends = $query->orderByDesc('updated_at')
             ->paginate($request->input('per_page', 20));
 
-        return response()->json($friends);
+        return response()->json(PaginatorWithResource::map($friends, LineFriendResource::class));
     }
 
     /**
-     * Paginated message history for a specific LINE user.
+     * Paginated message history for a specific LINE user, with the friend record.
+     *
+     * @response array{
+     *   friend: ?LineFriendResource,
+     *   messages: array{
+     *     data: LineMessageResource[],
+     *     current_page: int,
+     *     last_page: int,
+     *     per_page: int,
+     *     total: int
+     *   }
+     * }
      */
     public function messages(Request $request, string $lineUserId): JsonResponse
     {
@@ -56,28 +77,22 @@ class LineFriendController extends Controller
             ->first();
 
         return response()->json([
-            'friend' => $friend,
-            'messages' => $messages,
+            'friend' => $friend ? (new LineFriendResource($friend))->resolve() : null,
+            'messages' => PaginatorWithResource::map($messages, LineMessageResource::class),
         ]);
     }
 
     /**
      * Send a push message to a specific user.
+     *
+     * @response array{success: bool}
      */
-    public function push(Request $request): JsonResponse
+    public function push(SendLinePushRequest $request): JsonResponse
     {
-        $request->validate([
-            'line_user_id' => 'required|string',
-            'message' => 'required|string|max:5000',
-        ]);
+        $lineUserId = $request->validated()['line_user_id'];
+        $messageText = $request->validated()['message'];
 
-        $lineUserId = $request->input('line_user_id');
-        $messageText = $request->input('message');
-
-        $messages = [
-            ['type' => 'text', 'text' => $messageText],
-        ];
-
+        $messages = [['type' => 'text', 'text' => $messageText]];
         $result = $this->lineService->pushMessage($lineUserId, $messages);
 
         if (!$result['success']) {
@@ -87,10 +102,7 @@ class LineFriendController extends Controller
             ], 422);
         }
 
-        // Find friend to get user_id
         $friend = LineFriend::where('line_user_id', $lineUserId)->first();
-
-        // Store outbound message
         LineMessage::create([
             'line_user_id' => $lineUserId,
             'user_id' => $friend?->user_id,
@@ -104,19 +116,14 @@ class LineFriendController extends Controller
 
     /**
      * Broadcast message to all friends.
+     *
+     * @response array{success: bool}
      */
-    public function broadcast(Request $request): JsonResponse
+    public function broadcast(SendLineBroadcastRequest $request): JsonResponse
     {
-        $request->validate([
-            'message' => 'required|string|max:5000',
-        ]);
+        $messageText = $request->validated()['message'];
 
-        $messageText = $request->input('message');
-
-        $messages = [
-            ['type' => 'text', 'text' => $messageText],
-        ];
-
+        $messages = [['type' => 'text', 'text' => $messageText]];
         $result = $this->lineService->broadcastMessage($messages);
 
         if (!$result['success']) {
@@ -126,7 +133,6 @@ class LineFriendController extends Controller
             ], 422);
         }
 
-        // Store as broadcast message (line_user_id = 'broadcast')
         LineMessage::create([
             'line_user_id' => 'broadcast',
             'user_id' => null,

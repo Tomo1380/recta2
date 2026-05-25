@@ -59,116 +59,30 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "current_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/AdminUser"
+                                                "$ref": "#/components/schemas/AdminUserResource"
                                             }
                                         },
-                                        "first_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "from": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "minimum": 1
-                                        },
-                                        "last_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
+                                        "current_page": {
+                                            "type": "integer"
                                         },
                                         "last_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "links": {
-                                            "type": "array",
-                                            "description": "Generated paginator links.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "url": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "label": {
-                                                        "type": "string"
-                                                    },
-                                                    "active": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "url",
-                                                    "label",
-                                                    "active"
-                                                ]
-                                            }
-                                        },
-                                        "next_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "path": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ],
-                                            "description": "Base path for paginator generated URLs."
+                                            "type": "integer"
                                         },
                                         "per_page": {
-                                            "type": "integer",
-                                            "description": "Number of items shown per page.",
-                                            "minimum": 0
-                                        },
-                                        "prev_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "to": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "description": "Number of the last item in the slice.",
-                                            "minimum": 1
+                                            "type": "integer"
                                         },
                                         "total": {
-                                            "type": "integer",
-                                            "description": "Total number of items being paginated.",
-                                            "minimum": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
-                                        "current_page",
                                         "data",
-                                        "first_page_url",
-                                        "from",
-                                        "last_page_url",
+                                        "current_page",
                                         "last_page",
-                                        "links",
-                                        "next_page_url",
-                                        "path",
                                         "per_page",
-                                        "prev_page_url",
-                                        "to",
                                         "total"
                                     ]
                                 }
@@ -190,53 +104,27 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email"
-                                    },
-                                    "password": {
-                                        "type": "string",
-                                        "minLength": 8
-                                    },
-                                    "role": {
-                                        "type": "string",
-                                        "enum": [
-                                            "super_admin",
-                                            "admin"
-                                        ]
-                                    }
-                                },
-                                "required": [
-                                    "name",
-                                    "email",
-                                    "password"
-                                ]
+                                "$ref": "#/components/schemas/StoreAdminUserRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "",
+                    "200": {
+                        "description": "`AdminUserResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AdminUser"
+                                    "$ref": "#/components/schemas/AdminUserResource"
                                 }
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -262,54 +150,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email"
-                                    },
-                                    "role": {
-                                        "type": "string",
-                                        "enum": [
-                                            "super_admin",
-                                            "admin"
-                                        ]
-                                    },
-                                    "status": {
-                                        "type": "string",
-                                        "enum": [
-                                            "active",
-                                            "inactive"
-                                        ]
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateAdminUserRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`AdminUserResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AdminUser"
+                                    "$ref": "#/components/schemas/AdminUserResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -364,16 +228,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "password": {
-                                        "type": "string",
-                                        "minLength": 8
-                                    }
-                                },
-                                "required": [
-                                    "password"
-                                ]
+                                "$ref": "#/components/schemas/ResetAdminPasswordRequest"
                             }
                         }
                     }
@@ -398,14 +253,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1356,7 +1211,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Paginated set of `ArticleResource`",
+                        "description": "",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1368,127 +1223,25 @@
                                                 "$ref": "#/components/schemas/ArticleResource"
                                             }
                                         },
-                                        "links": {
-                                            "type": "object",
-                                            "properties": {
-                                                "first": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "last": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "prev": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "next": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                }
-                                            },
-                                            "required": [
-                                                "first",
-                                                "last",
-                                                "prev",
-                                                "next"
-                                            ]
+                                        "current_page": {
+                                            "type": "integer"
                                         },
-                                        "meta": {
-                                            "type": "object",
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "minimum": 1
-                                                },
-                                                "from": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ],
-                                                    "minimum": 1
-                                                },
-                                                "last_page": {
-                                                    "type": "integer",
-                                                    "minimum": 1
-                                                },
-                                                "links": {
-                                                    "type": "array",
-                                                    "description": "Generated paginator links.",
-                                                    "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "url": {
-                                                                "type": [
-                                                                    "string",
-                                                                    "null"
-                                                                ]
-                                                            },
-                                                            "label": {
-                                                                "type": "string"
-                                                            },
-                                                            "active": {
-                                                                "type": "boolean"
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "url",
-                                                            "label",
-                                                            "active"
-                                                        ]
-                                                    }
-                                                },
-                                                "path": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ],
-                                                    "description": "Base path for paginator generated URLs."
-                                                },
-                                                "per_page": {
-                                                    "type": "integer",
-                                                    "description": "Number of items shown per page.",
-                                                    "minimum": 0
-                                                },
-                                                "to": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ],
-                                                    "description": "Number of the last item in the slice.",
-                                                    "minimum": 1
-                                                },
-                                                "total": {
-                                                    "type": "integer",
-                                                    "description": "Total number of items being paginated.",
-                                                    "minimum": 0
-                                                }
-                                            },
-                                            "required": [
-                                                "current_page",
-                                                "from",
-                                                "last_page",
-                                                "links",
-                                                "path",
-                                                "per_page",
-                                                "to",
-                                                "total"
-                                            ]
+                                        "last_page": {
+                                            "type": "integer"
+                                        },
+                                        "per_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
                                         "data",
-                                        "links",
-                                        "meta"
+                                        "current_page",
+                                        "last_page",
+                                        "per_page",
+                                        "total"
                                     ]
                                 }
                             }
@@ -4193,16 +3946,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "message": {
-                                        "type": "string",
-                                        "maxLength": 5000
-                                    }
-                                },
-                                "required": [
-                                    "message"
-                                ]
+                                "$ref": "#/components/schemas/SendLineBroadcastRequest"
                             }
                         }
                     }
@@ -4226,11 +3970,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -4459,116 +4203,30 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "current_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Review"
+                                                "$ref": "#/components/schemas/ReviewResource"
                                             }
                                         },
-                                        "first_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "from": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "minimum": 1
-                                        },
-                                        "last_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
+                                        "current_page": {
+                                            "type": "integer"
                                         },
                                         "last_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "links": {
-                                            "type": "array",
-                                            "description": "Generated paginator links.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "url": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "label": {
-                                                        "type": "string"
-                                                    },
-                                                    "active": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "url",
-                                                    "label",
-                                                    "active"
-                                                ]
-                                            }
-                                        },
-                                        "next_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "path": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ],
-                                            "description": "Base path for paginator generated URLs."
+                                            "type": "integer"
                                         },
                                         "per_page": {
-                                            "type": "integer",
-                                            "description": "Number of items shown per page.",
-                                            "minimum": 0
-                                        },
-                                        "prev_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "to": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "description": "Number of the last item in the slice.",
-                                            "minimum": 1
+                                            "type": "integer"
                                         },
                                         "total": {
-                                            "type": "integer",
-                                            "description": "Total number of items being paginated.",
-                                            "minimum": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
-                                        "current_page",
                                         "data",
-                                        "first_page_url",
-                                        "from",
-                                        "last_page_url",
+                                        "current_page",
                                         "last_page",
-                                        "links",
-                                        "next_page_url",
-                                        "path",
                                         "per_page",
-                                        "prev_page_url",
-                                        "to",
                                         "total"
                                     ]
                                 }
@@ -4604,40 +4262,18 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "rating": {
-                                        "type": "integer",
-                                        "minimum": 1,
-                                        "maximum": 5
-                                    },
-                                    "body": {
-                                        "type": "string",
-                                        "minLength": 10
-                                    },
-                                    "tweet_url": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 500
-                                    }
-                                },
-                                "required": [
-                                    "rating",
-                                    "body"
-                                ]
+                                "$ref": "#/components/schemas/StoreReviewRequest"
                             }
                         }
                     }
                 },
                 "responses": {
-                    "201": {
-                        "description": "",
+                    "200": {
+                        "description": "`ReviewResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Review"
+                                    "$ref": "#/components/schemas/ReviewResource"
                                 }
                             }
                         }
@@ -5448,116 +5084,30 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "current_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Review"
+                                                "$ref": "#/components/schemas/ReviewResource"
                                             }
                                         },
-                                        "first_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "from": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "minimum": 1
-                                        },
-                                        "last_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
+                                        "current_page": {
+                                            "type": "integer"
                                         },
                                         "last_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "links": {
-                                            "type": "array",
-                                            "description": "Generated paginator links.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "url": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "label": {
-                                                        "type": "string"
-                                                    },
-                                                    "active": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "url",
-                                                    "label",
-                                                    "active"
-                                                ]
-                                            }
-                                        },
-                                        "next_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "path": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ],
-                                            "description": "Base path for paginator generated URLs."
+                                            "type": "integer"
                                         },
                                         "per_page": {
-                                            "type": "integer",
-                                            "description": "Number of items shown per page.",
-                                            "minimum": 0
-                                        },
-                                        "prev_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "to": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "description": "Number of the last item in the slice.",
-                                            "minimum": 1
+                                            "type": "integer"
                                         },
                                         "total": {
-                                            "type": "integer",
-                                            "description": "Total number of items being paginated.",
-                                            "minimum": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
-                                        "current_page",
                                         "data",
-                                        "first_page_url",
-                                        "from",
-                                        "last_page_url",
+                                        "current_page",
                                         "last_page",
-                                        "links",
-                                        "next_page_url",
-                                        "path",
                                         "per_page",
-                                        "prev_page_url",
-                                        "to",
                                         "total"
                                     ]
                                 }
@@ -5589,11 +5139,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`ReviewResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Review"
+                                    "$ref": "#/components/schemas/ReviewResource"
                                 }
                             }
                         }
@@ -5629,43 +5179,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "status": {
-                                        "type": "string",
-                                        "enum": [
-                                            "published",
-                                            "unpublished",
-                                            "deleted"
-                                        ]
-                                    }
-                                },
-                                "required": [
-                                    "status"
-                                ]
+                                "$ref": "#/components/schemas/UpdateReviewStatusRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`ReviewResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Review"
+                                    "$ref": "#/components/schemas/ReviewResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7201,7 +6738,6 @@
                     {
                         "name": "line_status",
                         "in": "query",
-                        "description": "LINE friend status filter",
                         "schema": {
                             "type": "string"
                         }
@@ -7226,116 +6762,30 @@
                                         "users": {
                                             "type": "object",
                                             "properties": {
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "minimum": 1
-                                                },
                                                 "data": {
                                                     "type": "array",
                                                     "items": {
-                                                        "$ref": "#/components/schemas/User"
+                                                        "$ref": "#/components/schemas/UserResource"
                                                     }
                                                 },
-                                                "first_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "from": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ],
-                                                    "minimum": 1
-                                                },
-                                                "last_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
+                                                "current_page": {
+                                                    "type": "integer"
                                                 },
                                                 "last_page": {
-                                                    "type": "integer",
-                                                    "minimum": 1
-                                                },
-                                                "links": {
-                                                    "type": "array",
-                                                    "description": "Generated paginator links.",
-                                                    "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "url": {
-                                                                "type": [
-                                                                    "string",
-                                                                    "null"
-                                                                ]
-                                                            },
-                                                            "label": {
-                                                                "type": "string"
-                                                            },
-                                                            "active": {
-                                                                "type": "boolean"
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "url",
-                                                            "label",
-                                                            "active"
-                                                        ]
-                                                    }
-                                                },
-                                                "next_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "path": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ],
-                                                    "description": "Base path for paginator generated URLs."
+                                                    "type": "integer"
                                                 },
                                                 "per_page": {
-                                                    "type": "integer",
-                                                    "description": "Number of items shown per page.",
-                                                    "minimum": 0
-                                                },
-                                                "prev_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "to": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ],
-                                                    "description": "Number of the last item in the slice.",
-                                                    "minimum": 1
+                                                    "type": "integer"
                                                 },
                                                 "total": {
-                                                    "type": "integer",
-                                                    "description": "Total number of items being paginated.",
-                                                    "minimum": 0
+                                                    "type": "integer"
                                                 }
                                             },
                                             "required": [
-                                                "current_page",
                                                 "data",
-                                                "first_page_url",
-                                                "from",
-                                                "last_page_url",
+                                                "current_page",
                                                 "last_page",
-                                                "links",
-                                                "next_page_url",
-                                                "path",
                                                 "per_page",
-                                                "prev_page_url",
-                                                "to",
                                                 "total"
                                             ]
                                         },
@@ -7343,12 +6793,10 @@
                                             "type": "object",
                                             "properties": {
                                                 "total_users": {
-                                                    "type": "integer",
-                                                    "minimum": 0
+                                                    "type": "integer"
                                                 },
                                                 "line_friend_count": {
-                                                    "type": "integer",
-                                                    "minimum": 0
+                                                    "type": "integer"
                                                 }
                                             },
                                             "required": [
@@ -7397,12 +6845,12 @@
                                     "type": "object",
                                     "properties": {
                                         "user": {
-                                            "$ref": "#/components/schemas/User"
+                                            "$ref": "#/components/schemas/UserResource"
                                         },
                                         "line_messages": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/LineMessage"
+                                                "$ref": "#/components/schemas/LineMessageResource"
                                             }
                                         }
                                     },
@@ -7445,42 +6893,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "status": {
-                                        "type": "string",
-                                        "enum": [
-                                            "active",
-                                            "suspended"
-                                        ]
-                                    }
-                                },
-                                "required": [
-                                    "status"
-                                ]
+                                "$ref": "#/components/schemas/UpdateUserStatusRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`UserResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/User"
+                                    "$ref": "#/components/schemas/UserResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7506,39 +6942,30 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "admin_notes": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 5000
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateUserNotesRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "`UserResource`",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/User"
+                                    "$ref": "#/components/schemas/UserResource"
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7566,16 +6993,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "message": {
-                                        "type": "string",
-                                        "maxLength": 5000
-                                    }
-                                },
-                                "required": [
-                                    "message"
-                                ]
+                                "$ref": "#/components/schemas/SendUserLineMessageRequest"
                             }
                         }
                     }
@@ -7599,14 +7017,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7670,14 +7088,11 @@
                                                     "type": "boolean"
                                                 },
                                                 "followed_at": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ],
-                                                    "format": "date-time"
+                                                    "type": "string"
                                                 },
                                                 "user": {
-                                                    "$ref": "#/components/schemas/User"
+                                                    "type": "array",
+                                                    "items": {}
                                                 }
                                             },
                                             "required": [
@@ -7691,120 +7106,7 @@
                                             ]
                                         },
                                         "messages": {
-                                            "type": "object",
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "minimum": 1
-                                                },
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "$ref": "#/components/schemas/LineMessage"
-                                                    }
-                                                },
-                                                "first_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "from": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ],
-                                                    "minimum": 1
-                                                },
-                                                "last_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "last_page": {
-                                                    "type": "integer",
-                                                    "minimum": 1
-                                                },
-                                                "links": {
-                                                    "type": "array",
-                                                    "description": "Generated paginator links.",
-                                                    "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "url": {
-                                                                "type": [
-                                                                    "string",
-                                                                    "null"
-                                                                ]
-                                                            },
-                                                            "label": {
-                                                                "type": "string"
-                                                            },
-                                                            "active": {
-                                                                "type": "boolean"
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "url",
-                                                            "label",
-                                                            "active"
-                                                        ]
-                                                    }
-                                                },
-                                                "next_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "path": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ],
-                                                    "description": "Base path for paginator generated URLs."
-                                                },
-                                                "per_page": {
-                                                    "type": "integer",
-                                                    "description": "Number of items shown per page.",
-                                                    "minimum": 0
-                                                },
-                                                "prev_page_url": {
-                                                    "type": [
-                                                        "string",
-                                                        "null"
-                                                    ]
-                                                },
-                                                "to": {
-                                                    "type": [
-                                                        "integer",
-                                                        "null"
-                                                    ],
-                                                    "description": "Number of the last item in the slice.",
-                                                    "minimum": 1
-                                                },
-                                                "total": {
-                                                    "type": "integer",
-                                                    "description": "Total number of items being paginated.",
-                                                    "minimum": 0
-                                                }
-                                            },
-                                            "required": [
-                                                "current_page",
-                                                "data",
-                                                "first_page_url",
-                                                "from",
-                                                "last_page_url",
-                                                "last_page",
-                                                "links",
-                                                "next_page_url",
-                                                "path",
-                                                "per_page",
-                                                "prev_page_url",
-                                                "to",
-                                                "total"
-                                            ]
+                                            "type": "object"
                                         }
                                     },
                                     "required": [
@@ -7987,6 +7289,46 @@
                     "updated_at"
                 ],
                 "title": "AdminUser"
+            },
+            "AdminUserResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "last_login_at": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "role",
+                    "status",
+                    "last_login_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "AdminUserResource"
             },
             "AiChatLimit": {
                 "type": "object",
@@ -8721,7 +8063,7 @@
                 ],
                 "title": "IndustryKnowledge"
             },
-            "LineMessage": {
+            "LineMessageResource": {
                 "type": "object",
                 "properties": {
                     "id": {
@@ -8756,28 +8098,17 @@
                         "type": [
                             "string",
                             "null"
-                        ]
+                        ],
+                        "description": "JSONB (free-form)"
                     },
                     "read_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                        "type": "string"
                     },
                     "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                        "type": "string"
                     },
                     "updated_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -8793,7 +8124,7 @@
                     "created_at",
                     "updated_at"
                 ],
-                "title": "LineMessage"
+                "title": "LineMessageResource"
             },
             "PickupShopResource": {
                 "type": "object",
@@ -8919,7 +8250,20 @@
                 ],
                 "title": "ReorderRequest"
             },
-            "Review": {
+            "ResetAdminPasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "password": {
+                        "type": "string",
+                        "minLength": 8
+                    }
+                },
+                "required": [
+                    "password"
+                ],
+                "title": "ResetAdminPasswordRequest"
+            },
+            "ReviewResource": {
                 "type": "object",
                 "properties": {
                     "id": {
@@ -8953,18 +8297,67 @@
                         "type": "string"
                     },
                     "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                        "type": "string"
                     },
                     "updated_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
+                        "type": "string"
+                    },
+                    "user": {
+                        "type": "object",
+                        "description": "Lightweight relationships \u2014 only included when eager-loaded.",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "line_display_name": {
+                                "type": "string"
+                            },
+                            "nickname": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "line_picture_url": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "use_line_avatar": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "line_display_name",
+                            "nickname",
+                            "line_picture_url",
+                            "use_line_avatar"
+                        ]
+                    },
+                    "store": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "area": {
+                                "type": "string"
+                            },
+                            "category": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "area",
+                            "category"
+                        ]
                     }
                 },
                 "required": [
@@ -8979,7 +8372,33 @@
                     "created_at",
                     "updated_at"
                 ],
-                "title": "Review"
+                "title": "ReviewResource"
+            },
+            "SendLineBroadcastRequest": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "maxLength": 5000
+                    }
+                },
+                "required": [
+                    "message"
+                ],
+                "title": "SendLineBroadcastRequest"
+            },
+            "SendUserLineMessageRequest": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "maxLength": 5000
+                    }
+                },
+                "required": [
+                    "message"
+                ],
+                "title": "SendUserLineMessageRequest"
             },
             "Store": {
                 "type": "object",
@@ -9257,6 +8676,36 @@
                 ],
                 "title": "Store"
             },
+            "StoreAdminUserRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "super_admin",
+                            "admin"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "email",
+                    "password"
+                ],
+                "title": "StoreAdminUserRequest"
+            },
             "StoreAreaRequest": {
                 "type": "object",
                 "properties": {
@@ -9447,6 +8896,60 @@
                     "store_id"
                 ],
                 "title": "StorePickupShopRequest"
+            },
+            "StoreReviewRequest": {
+                "type": "object",
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                    },
+                    "body": {
+                        "type": "string",
+                        "minLength": 10
+                    },
+                    "tweet_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "rating",
+                    "body"
+                ],
+                "title": "StoreReviewRequest"
+            },
+            "UpdateAdminUserRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "super_admin",
+                            "admin"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ]
+                    }
+                },
+                "title": "UpdateAdminUserRequest"
             },
             "UpdateAreaRequest": {
                 "type": "object",
@@ -9652,6 +9155,52 @@
                 },
                 "title": "UpdatePickupShopRequest"
             },
+            "UpdateReviewStatusRequest": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "published",
+                            "unpublished",
+                            "deleted"
+                        ]
+                    }
+                },
+                "required": [
+                    "status"
+                ],
+                "title": "UpdateReviewStatusRequest"
+            },
+            "UpdateUserNotesRequest": {
+                "type": "object",
+                "properties": {
+                    "admin_notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 5000
+                    }
+                },
+                "title": "UpdateUserNotesRequest"
+            },
+            "UpdateUserStatusRequest": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "suspended"
+                        ]
+                    }
+                },
+                "required": [
+                    "status"
+                ],
+                "title": "UpdateUserStatusRequest"
+            },
             "User": {
                 "type": "object",
                 "properties": {
@@ -9771,6 +9320,195 @@
                     "is_line_friend"
                 ],
                 "title": "User"
+            },
+            "UserResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "line_user_id": {
+                        "type": "string"
+                    },
+                    "line_display_name": {
+                        "type": "string"
+                    },
+                    "line_picture_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "use_line_avatar": {
+                        "type": "boolean"
+                    },
+                    "nickname": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "\u30d7\u30ed\u30d5\u30a3\u30fc\u30eb"
+                    },
+                    "age": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "preferred_area": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "preferred_category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "experience": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "bio": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "admin_notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "\u904b\u7528"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "last_login_at": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "reviews_count": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "\u95a2\u9023"
+                    },
+                    "reviews": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "store_id": {
+                                    "type": "integer"
+                                },
+                                "rating": {
+                                    "type": "integer"
+                                },
+                                "body": {
+                                    "type": "string"
+                                },
+                                "status": {
+                                    "type": "string"
+                                },
+                                "created_at": {
+                                    "type": "string"
+                                },
+                                "updated_at": {
+                                    "type": "string"
+                                },
+                                "store": {
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "store_id",
+                                "rating",
+                                "body",
+                                "status",
+                                "created_at",
+                                "updated_at",
+                                "store"
+                            ]
+                        }
+                    },
+                    "line_friend": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "is_following": {
+                                "type": "boolean"
+                            },
+                            "followed_at": {
+                                "type": "string"
+                            },
+                            "unfollowed_at": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "is_following",
+                            "followed_at",
+                            "unfollowed_at"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "line_user_id",
+                    "line_display_name",
+                    "line_picture_url",
+                    "use_line_avatar",
+                    "nickname",
+                    "age",
+                    "preferred_area",
+                    "preferred_category",
+                    "experience",
+                    "bio",
+                    "admin_notes",
+                    "status",
+                    "last_login_at",
+                    "created_at",
+                    "updated_at",
+                    "reviews_count"
+                ],
+                "title": "UserResource"
             }
         },
         "responses": {
