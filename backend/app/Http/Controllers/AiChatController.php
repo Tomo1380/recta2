@@ -889,7 +889,7 @@ class AiChatController extends Controller
         $systemPrompt = $this->buildSystemPrompt($setting, $storeContext, $userArea, $pageType);
         $geminiHistory = $this->buildGeminiHistory($history);
 
-        $model = 'gemini-3.1-flash-lite-preview';
+        $model = config('services.gemini.model');
         $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         $payload = [
@@ -1331,7 +1331,8 @@ class AiChatController extends Controller
      */
     private function callGeminiWithRetry(string $apiKey, array $payload): \Illuminate\Http\Client\Response
     {
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={$apiKey}";
+        $model = config('services.gemini.model');
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
         $response = Http::timeout(30)->post($endpoint, $payload);
 
