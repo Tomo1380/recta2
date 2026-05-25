@@ -5,13 +5,16 @@ import { ApiError, api } from "~/lib/api";
 import type { Article } from "~/lib/types";
 import { ArticleEditor } from "./ArticleEditor";
 
+// status は backend で 'draft' | 'published' に正規化されているが、
+// 生成型 (ArticleResource) では string となっている。フォーム側はゆるく
+// string で受けて、UI 側の <select> の value 列挙でガードする。
 interface FormState {
   title: string;
   slug: string;
   excerpt: string;
   category: string;
   tags: string;          // comma-separated UI input
-  status: "draft" | "published";
+  status: string;
   thumbnail_url: string | null;
 }
 
@@ -41,6 +44,9 @@ export function ArticleEditPage() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  // 生成型 (ArticleResource.body) は unknown[] | null となるが、実体は
+  // TipTap JSON ドキュメント (object)。エディタへの渡し方が JSON 単位なので、
+  // ここはルーズに unknown で受けてエディタコンポーネント側の型に任せる。
   const [body, setBody] = useState<Record<string, unknown> | null>(null);
   const [bodyHtml, setBodyHtml] = useState<string>("");
   const [loading, setLoading] = useState(!isNew);
@@ -66,7 +72,7 @@ export function ArticleEditPage() {
           status: a.status,
           thumbnail_url: a.thumbnail_url,
         });
-        setBody(a.body ?? null);
+        setBody((a.body as Record<string, unknown> | null) ?? null);
         setBodyHtml(a.body_html ?? "");
       } catch (e) {
         console.error("Failed to load article", e);

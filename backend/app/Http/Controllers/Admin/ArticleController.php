@@ -3,16 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreArticleRequest;
+use App\Http\Requests\Admin\UpdateArticleRequest;
+use App\Http\Resources\ArticleResource;
 use App\Models\Article;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ArticleController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): AnonymousResourceCollection
     {
         $query = Article::query();
 
@@ -32,20 +37,21 @@ class ArticleController extends Controller
             $query->where('category', $category);
         }
 
+        /** @var LengthAwarePaginator $articles */
         $articles = $query->orderByDesc('updated_at')
             ->paginate($request->input('per_page', 20));
 
-        return response()->json($articles);
+        return ArticleResource::collection($articles);
     }
 
-    public function show(Article $article): JsonResponse
+    public function show(Article $article): ArticleResource
     {
-        return response()->json($article);
+        return new ArticleResource($article);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreArticleRequest $request): ArticleResource
     {
-        $data = $this->validateData($request);
+        $data = $request->validated();
 
         $slug = $data['slug'] ?? null;
         if (!$slug) {
@@ -63,12 +69,12 @@ class ArticleController extends Controller
         Cache::forget('public_articles_index');
         Cache::forget('industry_knowledges');
 
-        return response()->json($article, 201);
+        return new ArticleResource($article);
     }
 
-    public function update(Request $request, Article $article): JsonResponse
+    public function update(UpdateArticleRequest $request, Article $article): ArticleResource
     {
-        $data = $this->validateData($request, isUpdate: true);
+        $data = $request->validated();
 
         if (!empty($data['slug']) && $data['slug'] !== $article->slug) {
             if (Article::where('slug', $data['slug'])->where('id', '!=', $article->id)->exists()) {
@@ -86,7 +92,7 @@ class ArticleController extends Controller
         Cache::forget("public_article_{$article->slug}");
         Cache::forget('industry_knowledges');
 
-        return response()->json($article);
+        return new ArticleResource($article);
     }
 
     public function destroy(Article $article): JsonResponse
@@ -113,29 +119,8 @@ class ArticleController extends Controller
 
         return response()->json([
             'thumbnail_url' => $url,
-            'article' => $article->fresh(),
+            'article' => new ArticleResource($article->fresh()),
         ]);
-    }
-
-    private function validateData(Request $request, bool $isUpdate = false): array
-    {
-        $prefix = $isUpdate ? 'sometimes|' : '';
-
-        $rules = [
-            'slug' => 'nullable|string|max:200|regex:/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i',
-            'title' => $prefix . 'required|string|max:200',
-            'excerpt' => 'nullable|string|max:500',
-            'body' => 'nullable|array',
-            'body_html' => 'nullable|string',
-            'thumbnail_url' => 'nullable|string|max:2048',
-            'category' => 'nullable|string|max:50',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
-            'status' => 'nullable|in:draft,published',
-            'published_at' => 'nullable|date',
-        ];
-
-        return $request->validate($rules);
     }
 
     private function generateUniqueSlug(string $title): string

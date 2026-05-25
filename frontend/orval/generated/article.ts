@@ -5,11 +5,13 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  Article,
+  ArticleResource,
   ArticleUploadThumbnail200,
   ArticleUploadThumbnailBody,
   ArticlesIndex200,
-  ArticlesIndexParams
+  ArticlesIndexParams,
+  StoreArticleRequest,
+  UpdateArticleRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -27,26 +29,31 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const articlesStore = (
-
+    storeArticleRequest: StoreArticleRequest,
  ) => {
-      return rectaMutator<Article>(
-      {url: `/admin/articles`, method: 'POST'
+      return rectaMutator<ArticleResource>(
+      {url: `/admin/articles`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: storeArticleRequest
     },
       );
     }
   export const articlesShow = (
     article: number,
  ) => {
-      return rectaMutator<Article>(
+      return rectaMutator<ArticleResource>(
       {url: `/admin/articles/${article}`, method: 'GET'
     },
       );
     }
   export const articlesUpdate = (
     article: number,
+    updateArticleRequest?: UpdateArticleRequest,
  ) => {
-      return rectaMutator<Article>(
-      {url: `/admin/articles/${article}`, method: 'PUT'
+      return rectaMutator<ArticleResource>(
+      {url: `/admin/articles/${article}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateArticleRequest
     },
       );
     }

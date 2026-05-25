@@ -283,7 +283,7 @@ export default function ColumnDetailPage() {
       {/* Tags */}
       {article.tags && article.tags.length > 0 && (
         <div className="px-5 pt-6 flex flex-wrap gap-1.5">
-          {article.tags.map((t) => (
+          {(article.tags as string[]).map((t) => (
             <span
               key={t}
               className="px-2.5 py-1 rounded-full text-[11px]"

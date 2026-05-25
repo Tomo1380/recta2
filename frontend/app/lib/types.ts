@@ -299,33 +299,18 @@ export interface LineMessage {
 // ConsultationResource / BannerSettingsResource) を直接 import すること。
 // 手書きの interface は 2026-05-26 に削除。
 
-// コラム記事 (CMS)
-export interface Article {
-  id: number;
-  slug: string;
-  title: string;
-  excerpt: string | null;
-  body: Record<string, unknown> | null;   // TipTap JSON
-  body_html: string | null;
-  thumbnail_url: string | null;
-  category: string | null;
-  tags: string[] | null;
-  status: "draft" | "published";
-  published_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// コラム記事 (CMS) — 生成型への alias。
+// Article / ArticleSummary は ../orval/generated/api.schemas で
+// ArticleResource / ArticleSummaryResource として定義されている。
+// 各画面は import type { ArticleResource } from "../../../orval/generated/..."
+// を使うのが望ましいが、移行コスト低減のため types.ts に alias を残す。
+import type {
+  ArticleResource as GeneratedArticleResource,
+  ArticleSummaryResource as GeneratedArticleSummaryResource,
+} from "../../orval/generated/api.schemas";
 
-export interface ArticleSummary {
-  id: number;
-  slug: string;
-  title: string;
-  excerpt: string | null;
-  thumbnail_url: string | null;
-  category: string | null;
-  tags?: string[] | null;
-  published_at: string | null;
-}
+export type Article = GeneratedArticleResource;
+export type ArticleSummary = GeneratedArticleSummaryResource;
 
 export interface PublicArticleIndexResponse {
   articles: Paginated<ArticleSummary>;

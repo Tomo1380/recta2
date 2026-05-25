@@ -94,7 +94,7 @@ export interface AreaResource {
   shop_count: number | null;
 }
 
-export interface Article {
+export interface ArticleResource {
   id: number;
   slug: string;
   title: string;
@@ -102,7 +102,10 @@ export interface Article {
   excerpt: string | null;
   /** @nullable */
   body: unknown[] | null;
-  /** @nullable */
+  /**
+     * TipTap JSON
+     * @nullable
+     */
   body_html: string | null;
   /** @nullable */
   thumbnail_url: string | null;
@@ -111,12 +114,24 @@ export interface Article {
   /** @nullable */
   tags: unknown[] | null;
   status: string;
+  published_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArticleSummaryResource {
+  id: number;
+  slug: string;
+  title: string;
   /** @nullable */
-  published_at: string | null;
+  excerpt: string | null;
   /** @nullable */
-  created_at: string | null;
+  thumbnail_url: string | null;
   /** @nullable */
-  updated_at: string | null;
+  category: string | null;
+  /** @nullable */
+  tags: unknown[] | null;
+  published_at: string;
 }
 
 export interface BannerSettingsResource {
@@ -380,6 +395,56 @@ export interface StoreAreaRequest {
   sort_order?: number;
 }
 
+/**
+ * @nullable
+ */
+export type StoreArticleRequestStatus = typeof StoreArticleRequestStatus[keyof typeof StoreArticleRequestStatus] | null;
+
+
+export const StoreArticleRequestStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export interface StoreArticleRequest {
+  /**
+     * @maxLength 200
+     * @nullable
+     * @pattern ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$
+     */
+  slug?: string | null;
+  /** @maxLength 200 */
+  title: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  excerpt?: string | null;
+  /** @nullable */
+  body?: string[] | null;
+  /** @nullable */
+  body_html?: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  thumbnail_url?: string | null;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  category?: string | null;
+  /** @nullable */
+  status?: StoreArticleRequestStatus;
+  /** @nullable */
+  published_at?: string | null;
+  /**
+     * @nullable
+     * @items.maxLength 50
+     */
+  tags?: string[] | null;
+}
+
 export interface StoreCategoryRequest {
   /** @maxLength 255 */
   name: string;
@@ -419,6 +484,56 @@ export interface UpdateAreaRequest {
   slug?: string;
   visible?: boolean;
   sort_order?: number;
+}
+
+/**
+ * @nullable
+ */
+export type UpdateArticleRequestStatus = typeof UpdateArticleRequestStatus[keyof typeof UpdateArticleRequestStatus] | null;
+
+
+export const UpdateArticleRequestStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export interface UpdateArticleRequest {
+  /**
+     * @maxLength 200
+     * @nullable
+     * @pattern ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$
+     */
+  slug?: string | null;
+  /** @maxLength 200 */
+  title?: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  excerpt?: string | null;
+  /** @nullable */
+  body?: string[] | null;
+  /** @nullable */
+  body_html?: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  thumbnail_url?: string | null;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  category?: string | null;
+  /** @nullable */
+  status?: UpdateArticleRequestStatus;
+  /** @nullable */
+  published_at?: string | null;
+  /**
+     * @nullable
+     * @items.maxLength 50
+     */
+  tags?: string[] | null;
 }
 
 export interface UpdateBannerSettingsRequest {
@@ -788,32 +903,36 @@ export type ArticlesIndexParams = {
 per_page?: string;
 };
 
-export type ArticlesIndex200LinksItem = {
+export type ArticlesIndex200Links = {
+  /** @nullable */
+  first: string | null;
+  /** @nullable */
+  last: string | null;
+  /** @nullable */
+  prev: string | null;
+  /** @nullable */
+  next: string | null;
+};
+
+export type ArticlesIndex200MetaLinksItem = {
   /** @nullable */
   url: string | null;
   label: string;
   active: boolean;
 };
 
-export type ArticlesIndex200 = {
+export type ArticlesIndex200Meta = {
   /** @minimum 1 */
   current_page: number;
-  data: Article[];
-  /** @nullable */
-  first_page_url: string | null;
   /**
      * @minimum 1
      * @nullable
      */
   from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
   /** @minimum 1 */
   last_page: number;
   /** Generated paginator links. */
-  links: ArticlesIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
+  links: ArticlesIndex200MetaLinksItem[];
   /**
      * Base path for paginator generated URLs.
      * @nullable
@@ -824,8 +943,6 @@ export type ArticlesIndex200 = {
      * @minimum 0
      */
   per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
   /**
      * Number of the last item in the slice.
      * @minimum 1
@@ -839,6 +956,12 @@ export type ArticlesIndex200 = {
   total: number;
 };
 
+export type ArticlesIndex200 = {
+  data: ArticleResource[];
+  links: ArticlesIndex200Links;
+  meta: ArticlesIndex200Meta;
+};
+
 export type ArticleUploadThumbnailBody = {
   /** @maxLength 5120 */
   image: Blob;
@@ -846,7 +969,7 @@ export type ArticleUploadThumbnailBody = {
 
 export type ArticleUploadThumbnail200 = {
   thumbnail_url: string;
-  article: Article | null;
+  article: ArticleResource;
 };
 
 export type AuthLoginBody = {
@@ -1312,65 +1435,22 @@ export type PublicArticleIndexParams = {
 per_page?: string;
 };
 
-export type PublicArticleIndex200ArticlesLinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
 export type PublicArticleIndex200Articles = {
-  /** @minimum 1 */
+  data: ArticleSummaryResource[];
   current_page: number;
-  data: Article[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
   last_page: number;
-  /** Generated paginator links. */
-  links: PublicArticleIndex200ArticlesLinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
   per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
   total: number;
 };
 
 export type PublicArticleIndex200 = {
   articles: PublicArticleIndex200Articles;
-  categories: unknown[];
+  categories: string[];
 };
 
 export type PublicArticleShow200 = {
-  article: Article | null;
-  related: Article[];
+  article: ArticleResource;
+  related: ArticleSummaryResource[];
 };
 
 export type PublicReviewUserReviews200LinksItem = {

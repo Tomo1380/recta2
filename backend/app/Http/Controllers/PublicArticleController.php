@@ -2,14 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\ArticleResource;
+use App\Http\Resources\ArticleSummaryResource;
 use App\Models\Article;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class PublicArticleController extends Controller
 {
     /**
      * Public list of published articles, paginated.
+     *
+     * @response array{
+     *   articles: array{
+     *     data: ArticleSummaryResource[],
+     *     current_page: int,
+     *     last_page: int,
+     *     per_page: int,
+     *     total: int
+     *   },
+     *   categories: string[]
+     * }
      */
     public function index(Request $request): JsonResponse
     {
@@ -30,13 +44,14 @@ class PublicArticleController extends Controller
             });
         }
 
+        /** @var LengthAwarePaginator $articles */
         $articles = $query->orderByDesc('published_at')
             ->paginate($request->input('per_page', 12), [
                 'id', 'slug', 'title', 'excerpt', 'thumbnail_url',
                 'category', 'tags', 'published_at',
             ]);
 
-        // Distinct categories for filter chips (cheap, just for visible articles)
+        // Distinct categories for filter chips
         $categories = Article::published()
             ->whereNotNull('category')
             ->distinct()
@@ -44,13 +59,15 @@ class PublicArticleController extends Controller
             ->pluck('category');
 
         return response()->json([
-            'articles' => $articles,
+            'articles' => ArticleSummaryResource::collection($articles)->response()->getData(true),
             'categories' => $categories,
         ]);
     }
 
     /**
      * Public detail by slug.
+     *
+     * @response array{article: ArticleResource, related: ArticleSummaryResource[]}
      */
     public function show(string $slug): JsonResponse
     {
@@ -59,7 +76,6 @@ class PublicArticleController extends Controller
             abort(404);
         }
 
-        // Lightweight related: same category, latest 3
         $related = Article::published()
             ->where('id', '!=', $article->id)
             ->when($article->category, fn ($q) => $q->where('category', $article->category))
@@ -68,8 +84,8 @@ class PublicArticleController extends Controller
             ->get(['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'published_at']);
 
         return response()->json([
-            'article' => $article,
-            'related' => $related,
+            'article' => (new ArticleResource($article))->resolve(),
+            'related' => ArticleSummaryResource::collection($related)->resolve(),
         ]);
     }
 }
