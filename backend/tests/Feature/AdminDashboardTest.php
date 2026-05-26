@@ -64,24 +64,31 @@ class AdminDashboardTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'stats' => [
-                    'user_count',
-                    'store_count',
-                    'review_count',
-                    'today_chat_count',
+                'generated_at',
+                'kpis' => [
+                    'published_stores' => ['value', 'delta_30d'],
+                    'active_users_30d' => ['value', 'delta_vs_prev'],
+                    'line_friends' => ['value', 'delta_30d'],
+                    'reviews_today' => ['value', 'delta_vs_yesterday'],
+                    'chat_today' => ['value', 'avg_tokens'],
                 ],
-                'user_trend',
                 'chat_trend',
-                'line_stats',
+                'line_friend_trend',
+                'stores_by_area',
+                'stores_by_category',
+                'recent_reviews',
                 'recent_messages',
-                'activity_logs',
+                'recent_chats',
+                'secondary' => [
+                    'unread_messages',
+                    'pending_reviews',
+                    'published_articles',
+                    'fine_tuning_qa_active',
+                ],
             ]);
 
-        // Verify stats values
         $data = $response->json();
-        $this->assertEquals(1, $data['stats']['user_count']);
-        $this->assertEquals(1, $data['stats']['store_count']);
-        $this->assertEquals(1, $data['stats']['review_count']);
+        $this->assertEquals(1, $data['kpis']['published_stores']['value']);
     }
 
     public function test_dashboard_requires_authentication(): void
