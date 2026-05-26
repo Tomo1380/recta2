@@ -65,6 +65,14 @@ class UserResource extends JsonResource
                     'unfollowed_at' => $this->lineFriend->unfollowed_at?->toIso8601String(),
                 ] : null;
             }),
+            // フロント (UsersPage の友だちバッジ) はトップレベルの is_line_friend を見るので
+            // boolean を別に立てる (BUG-E04)。lineFriend が eager load されていれば
+            // モデルの appends でも取れるが、Resource で明示する方が契約として安全。
+            'is_line_friend' => $this->whenLoaded(
+                'lineFriend',
+                fn () => (bool) ($this->lineFriend?->is_following ?? false),
+                false,
+            ),
         ];
     }
 }

@@ -36,7 +36,8 @@ class AreaCategorySeeder extends Seeder
         // /admin/area-category screen.
         $categories = [
             ['name' => 'ラウンジ', 'slug' => 'lounge', 'image_url' => 'https://images.unsplash.com/photo-1573830540758-68d5a242fc79?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400', 'visible' => true, 'sort_order' => 1],
-            ['name' => 'キャバクラ', 'slug' => 'cabaret', 'image_url' => 'https://images.unsplash.com/photo-1620022604911-126743712882?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400', 'visible' => true, 'sort_order' => 2],
+            // BUG-E14: 「キャバレー」と誤解されない `cabaclub` に統一 (Article slug 等と揃える)。
+            ['name' => 'キャバクラ', 'slug' => 'cabaclub', 'image_url' => 'https://images.unsplash.com/photo-1620022604911-126743712882?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400', 'visible' => true, 'sort_order' => 2],
             ['name' => 'クラブ', 'slug' => 'club', 'image_url' => 'https://images.unsplash.com/photo-1628500548389-3557986eba8c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400', 'visible' => true, 'sort_order' => 3],
             ['name' => 'ガールズバー', 'slug' => 'girls-bar', 'image_url' => 'https://images.unsplash.com/photo-1758526348234-2dd7170514d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400', 'visible' => true, 'sort_order' => 4],
             ['name' => 'コンカフェ', 'slug' => 'concafe', 'image_url' => 'https://images.unsplash.com/photo-1612452556802-f9e9ab097eaf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400', 'visible' => true, 'sort_order' => 5],

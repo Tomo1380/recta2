@@ -667,6 +667,10 @@ export function ShopEditPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
+  // エリア/業種カテゴリのマスタ。マスタテーブルと options が乖離するとSelectの復元が壊れる
+  // (BUG-001) ので、ハードコードせず API から取得する。
+  const [areaOptions, setAreaOptions] = useState<string[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -718,8 +722,12 @@ export function ShopEditPage() {
     setGuaranteePeriod(store.guarantee_period || "");
     setGuaranteeDetail(store.guarantee_details || "");
     setNormaInfo(store.norma_info || "");
-    setAvgWage(store.trial_avg_hourly || "");
-    setTrialWage(store.trial_hourly || "");
+    // BUG-013: 既存DBに `"5,000円"` のような単位込み文字列が残っていても、
+    // input type=number に流すと無効値で空欄化するため、数字以外を剥がして拾う。
+    const stripUnit = (v: unknown) =>
+      v == null ? "" : String(v).replace(/[^\d]/g, "");
+    setAvgWage(stripUnit(store.trial_avg_hourly));
+    setTrialWage(stripUnit(store.trial_hourly));
     setInterviewStart(store.interview_start || "");
     setInterviewEnd(store.interview_end || "");
     setSameDayTrial(store.same_day_trial ? "可" : "不可");
@@ -886,6 +894,23 @@ export function ShopEditPage() {
       })
       .finally(() => setLoading(false));
   }, [id, isNew, populateFromStore]);
+
+  // エリア/業種マスタを取得して Select options に流す。
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/areas").then((r) => r.ok ? r.json() : []),
+      fetch("/api/categories").then((r) => r.ok ? r.json() : []),
+    ])
+      .then(([areas, categories]: [any, any]) => {
+        const areaList = Array.isArray(areas) ? areas : (areas?.data ?? []);
+        const catList = Array.isArray(categories) ? categories : (categories?.data ?? []);
+        setAreaOptions(areaList.map((a: any) => a.name).filter(Boolean));
+        setCategoryOptions(catList.map((c: any) => c.name).filter(Boolean));
+      })
+      .catch(() => {
+        /* マスタが取れなくても画面は止めない。Select は空になり、保存できない状態で気付ける。 */
+      });
+  }, []);
 
   // 系列店セレクタの候補ロード — 自店舗を除外した published 店舗一覧。
   useEffect(() => {
@@ -1145,9 +1170,27 @@ export function ShopEditPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const progress = Math.round(
-    ((completedSteps.size + (currentStep > 0 ? 0 : 0)) / steps.length) * 100
-  );
+  // BUG-010: 進捗バーは「『次へ』で踏んだ Step 数」だけで計算していたため、
+  // データ入力済みの既存店舗を開いた直後は 0% で固定だった。
+  // 各 Step の代表フィールドの充足を見て充足率を計算する。
+  const stepFilled: boolean[] = [
+    // Step1: 基本情報
+    !!(shopName && area && category && station && address),
+    // Step2: 給与・待遇
+    !!(minWage && maxWage),
+    // Step3: 特徴・分析
+    !!(tags.length > 0 || featureText),
+    // Step4: 採用・勤務
+    !!(hiringCriteria || hiringEntries.length > 0 || shiftInfo),
+    // Step5: その他
+    !!(qaItems.length > 0 || staffComment || publishStatus === "published"),
+  ];
+  // 「次へ」で完了マークされた Step も加味する（重複は Set でケア）。
+  const visitedSet = new Set([
+    ...Array.from(completedSteps),
+    ...stepFilled.map((f, i) => f ? i : -1).filter((i) => i >= 0),
+  ]);
+  const progress = Math.round((visitedSet.size / steps.length) * 100);
 
   // --- Step Content Renderers ---
   const renderStep1 = () => (
@@ -1168,15 +1211,13 @@ export function ShopEditPage() {
               value={area}
               onChange={(e: any) => setArea(e.target.value)}
               placeholder="エリアを選択"
-              options={[
-                "新宿・歌舞伎町",
-                "銀座",
-                "六本木",
-                "渋谷",
-                "池袋",
-                "上野",
-                "横浜",
-              ]}
+              // 既存店舗の area がマスタに無い旧表記 ("新宿・歌舞伎町" 等) でも、
+              // 現在値を options に合流させて value 復元を維持する。
+              options={
+                area && !areaOptions.includes(area)
+                  ? [area, ...areaOptions]
+                  : areaOptions
+              }
             />
           </Field>
           <Field label="最寄り駅" required>
@@ -1248,14 +1289,11 @@ export function ShopEditPage() {
               value={category}
               onChange={(e: any) => setCategory(e.target.value)}
               placeholder="業種を選択"
-              options={[
-                "キャバクラ",
-                "ラウンジ",
-                "クラブ",
-                "ガールズバー",
-                "コンカフェ",
-                "スナック",
-              ]}
+              options={
+                category && !categoryOptions.includes(category)
+                  ? [category, ...categoryOptions]
+                  : categoryOptions
+              }
             />
           </Field>
           <Field label="営業時間（開始）">
@@ -1366,7 +1404,7 @@ export function ShopEditPage() {
               <TextInput
                 value={dailyPay}
                 onChange={(e: any) => setDailyPay(e.target.value)}
-                placeholder="30,000円〜60,000円"
+                placeholder="例: 30000〜60000"
               />
             </Field>
           </div>
@@ -1452,18 +1490,25 @@ export function ShopEditPage() {
 
       <SectionCard title="体入（体験入店）情報" icon={Sparkles}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <Field label="平均時給">
+          {/* BUG-013: 平均/体入時給は単位なしの数値だけ受け付ける。
+              表示側 (StoreDetailPage) は数値前提で `.toLocaleString()` を呼ぶ
+              ため、`"5,000円"` のような文字列が入ると表示が崩れる。 */}
+          <Field label="平均時給（円）">
             <TextInput
+              type="number"
+              inputMode="numeric"
               value={avgWage}
-              onChange={(e: any) => setAvgWage(e.target.value)}
-              placeholder="例: 5,000円"
+              onChange={(e: any) => setAvgWage(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="例: 5000"
             />
           </Field>
-          <Field label="体入時給">
+          <Field label="体入時給（円）">
             <TextInput
+              type="number"
+              inputMode="numeric"
               value={trialWage}
-              onChange={(e: any) => setTrialWage(e.target.value)}
-              placeholder="例: 4,500円"
+              onChange={(e: any) => setTrialWage(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="例: 4500"
             />
           </Field>
           <Field label="面接可能時間（開始）">
@@ -1534,14 +1579,10 @@ export function ShopEditPage() {
               className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </Field>
-          <Field label="店舗紹介文">
-            <TextArea
-              value={description}
-              onChange={(e: any) => setDescription(e.target.value)}
-              rows={4}
-              placeholder="お店の雰囲気や魅力を伝える紹介文を入力してください"
-            />
-          </Field>
+          {/* BUG-009: 「店舗紹介文」(description) はユーザー画面に表示位置が無く、
+              「お店の特徴テキスト」と二重入力になっていたため UI から外した。
+              既存DB値は保持 (state/payload は残してある) ので、必要になれば
+              UI を復活させるだけで再開できる。 */}
           <Field label="お店の特徴テキスト">
             <TextArea
               value={featureText}
@@ -1577,14 +1618,15 @@ export function ShopEditPage() {
               <OptionalBadge />
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Field label="美人系">
+              {/* BUG-006: ラベル表記をユーザー画面に揃える (JSONキー beauty/cute/glamour/natural は不変)。 */}
+              <Field label="綺麗系">
                 <TextInput
                   type="number"
                   value={castBijin}
                   onChange={(e: any) => setCastBijin(e.target.value)}
                 />
               </Field>
-              <Field label="かわいい系">
+              <Field label="可愛い系">
                 <TextInput
                   type="number"
                   value={castKawaii}
@@ -1593,7 +1635,7 @@ export function ShopEditPage() {
                   }
                 />
               </Field>
-              <Field label="グラマー系">
+              <Field label="派手系">
                 <TextInput
                   type="number"
                   value={castGlamour}
@@ -1602,7 +1644,7 @@ export function ShopEditPage() {
                   }
                 />
               </Field>
-              <Field label="ナチュラル系">
+              <Field label="素人系">
                 <TextInput
                   type="number"
                   value={castNatural}
@@ -2319,44 +2361,21 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
+      {/* BUG-E08: ここのトグル・優先度 input は state にも save にも繋がって
+          おらず、ピックアップを切り替えたつもりでも `pickup_shops` テーブルに
+          反映されない。連動を実装するまで誤動作させないように、
+          編集UIではなく案内パネルだけ残す。 */}
       <SectionCard title="ピックアップ設定" icon={Crown}>
-        <div className="space-y-5">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
-            <p className="text-[12px] text-amber-800">
-              ここでの設定はトップページの「ピックアップ店舗」セクションの表示に反映されます。
-              「コンテンツ管理」ページでも並び順の調整が可能です。
+        <div className="space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-[12px] text-amber-800 leading-relaxed">
+              ピックアップ掲載・PRバッジ・表示優先度の編集は
+              「<a href="/admin/content" className="underline font-medium">コンテンツ管理 → ピックアップ店舗</a>」
+              から行ってください。
+              <br />
+              （店舗側からの直接編集UIは未実装のため、ここからは設定できません）
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="ピックアップ掲載" hint="ONにするとトップページのピックアップ欄に表示候補になります">
-              <div className="flex items-center gap-3">
-                <button
-                  className="relative w-11 h-6 rounded-full bg-emerald-500 transition"
-                >
-                  <span className="absolute left-[22px] top-[2px] w-5 h-5 rounded-full bg-white shadow transition-all" />
-                </button>
-                <span className="text-[13px] text-emerald-600">掲載中</span>
-              </div>
-            </Field>
-            <Field label="PRバッジ" hint="ONにするとゴールドのPRタグが表示されます">
-              <div className="flex items-center gap-3">
-                <button
-                  className="relative w-11 h-6 rounded-full bg-gray-200 transition"
-                >
-                  <span className="absolute left-[2px] top-[2px] w-5 h-5 rounded-full bg-white shadow transition-all" />
-                </button>
-                <span className="text-[13px] text-muted-foreground">OFF</span>
-              </div>
-            </Field>
-          </div>
-          <Field label="表示優先度" hint="数値が小さいほど先に表示されます（1が最優先）">
-            <TextInput
-              type="number"
-              value="3"
-              onChange={() => {}}
-              placeholder="例: 1"
-            />
-          </Field>
         </div>
       </SectionCard>
 

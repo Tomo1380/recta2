@@ -128,17 +128,21 @@ export default function AdminLayout() {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar
+          BUG-E12: ブレイクポイントを lg (1024px) → md (768px) に下げて、
+          中サイズビューポートでも常時サイドバーが見えるようにする。
+          一部画面でハンバーガー固定だった原因は lg 未満で全画面が折りたたみ
+          扱いだったため。 */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-[240px] bg-gradient-to-b from-[#111827] to-[#030712] flex flex-col shrink-0
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:relative lg:translate-x-0 lg:z-auto
+        md:relative md:translate-x-0 md:z-auto
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -154,7 +158,7 @@ export default function AdminLayout() {
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-gray-400 hover:text-white transition"
+              className="md:hidden text-gray-400 hover:text-white transition"
             >
               <X className="w-5 h-5" />
             </button>
@@ -216,7 +220,7 @@ export default function AdminLayout() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden text-muted-foreground hover:text-foreground transition p-1 -ml-1"
+                className="md:hidden text-muted-foreground hover:text-foreground transition p-1 -ml-1"
               >
                 <Menu className="w-5 h-5" />
               </button>

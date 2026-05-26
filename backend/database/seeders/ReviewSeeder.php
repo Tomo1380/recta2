@@ -60,7 +60,9 @@ class ReviewSeeder extends Seeder
                     'rating' => $rating,
                     'body' => $body,
                     'status' => 'published',
-                    'created_at' => now()->subDays(rand(1, 90)),
+                    // BUG-E06: 時刻もランダム化。これまで now()->subDays() だけだったので
+                    // 全レビューが seed 実行時刻 (例: 03:37) でクラスタリングしていた。
+                    'created_at' => $this->randomPastTimestamp(1, 90),
                 ]);
             }
         }
@@ -70,12 +72,12 @@ class ReviewSeeder extends Seeder
         Review::create([
             'user_id' => 5, 'store_id' => $someStore->id, 'rating' => 2,
             'body' => 'スタッフの対応がイマイチだった。', 'status' => 'unpublished',
-            'created_at' => now()->subDays(rand(1, 30)),
+            'created_at' => $this->randomPastTimestamp(1, 30),
         ]);
         Review::create([
             'user_id' => 5, 'store_id' => $stores->random()->id, 'rating' => 1,
             'body' => '合わなかった。', 'status' => 'deleted',
-            'created_at' => now()->subDays(rand(1, 30)),
+            'created_at' => $this->randomPastTimestamp(1, 30),
         ]);
     }
 
@@ -85,5 +87,16 @@ class ReviewSeeder extends Seeder
         if ($rand <= 35) return 5;
         if ($rand <= 70) return 4;
         return 3;
+    }
+
+    /**
+     * 過去 N日〜M日の範囲で「時刻まで」ランダムなタイムスタンプを返す。
+     * `now()->subDays(rand(...))` だと時:分:秒は seed 実行時刻に揃ってしまう。
+     */
+    private function randomPastTimestamp(int $minDays, int $maxDays): \Illuminate\Support\Carbon
+    {
+        return now()
+            ->subDays(rand($minDays, $maxDays))
+            ->setTime(rand(0, 23), rand(0, 59), rand(0, 59));
     }
 }

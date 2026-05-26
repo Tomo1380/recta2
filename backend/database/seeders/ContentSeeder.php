@@ -60,7 +60,9 @@ class ContentSeeder extends Seeder
         // Site settings
         $settings = [
             'hero_tagline' => 'AIと探す、理想のナイトワーク',
-            'hero_subtitle' => 'キャバクラ・ラウンジ・クラブ｜全国1,200件以上',
+            // BUG-E13: 実店舗数 (75件規模) と乖離していたため修正。
+            // 数値を明示せず、エリア感を出すコピーに寄せる。
+            'hero_subtitle' => 'キャバクラ・ラウンジ・クラブ｜都内主要エリアを網羅',
             'hero_badge' => 'ナイトワーク求人',
             'hero_ai_label' => 'AI MATCHING',
         ];

@@ -777,6 +777,25 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               </p>
             )}
 
+            {/* Feature tags — 管理画面 STEP3 で入力された特徴タグ (BUG-008) */}
+            {(store.feature_tags ?? []).length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {store.feature_tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
+                    style={{
+                      backgroundColor: "rgba(212,175,55,0.12)",
+                      color: "#8a7124",
+                      border: "1px solid rgba(212,175,55,0.3)",
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Store data table */}
             <div className="mt-4 divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <InfoRow label="業種" value={store.category} />

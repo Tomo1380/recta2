@@ -117,7 +117,9 @@ export function ContentManagementPage() {
   }, [fetchPickupShops, fetchConsultations, fetchBanner]);
 
   const tabs: { key: Tab; label: string; icon: typeof Star; count?: number }[] = [
-    { key: "pickup", label: "ピックアップ店舗", icon: Crown, count: pickupShops.filter(s => s.visible).length },
+    // BUG-E07: バッジはテーブルに並ぶ件数 (全件) と一致させる。
+    // 「表示中のみ」を出したい場合は別ラベルにすべき。
+    { key: "pickup", label: "ピックアップ店舗", icon: Crown, count: pickupShops.length },
     { key: "consultations", label: "みんなの相談", icon: MessageCircle, count: consultations.length },
     { key: "banner", label: "バナー・ヒーロー", icon: Image },
   ];

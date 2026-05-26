@@ -16,7 +16,8 @@ const STATUS_REVERSE: Record<string, string> = {
   "下書き": "draft",
 };
 
-const areas = ["全て", "新宿・歌舞伎町", "銀座", "六本木", "渋谷", "池袋"];
+// エリアはマスタAPI (`/api/areas`) から動的に取得する (BUG-E01)。
+// ハードコードだと管理画面 STEP1 / 店舗一覧 / マスタ管理で別々の選択肢になる。
 const statuses = ["全て", "公開", "非公開", "下書き"];
 
 function formatDate(dateStr: string): string {
@@ -37,6 +38,18 @@ export function ShopsPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const [areaOptions, setAreaOptions] = useState<string[]>(["全て"]);
+
+  useEffect(() => {
+    fetch("/api/areas")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any) => {
+        const list = Array.isArray(data) ? data : (data?.data ?? []);
+        const names = list.map((a: any) => a.name).filter(Boolean);
+        setAreaOptions(["全て", ...names]);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchStores = useCallback(async () => {
     setLoading(true);
@@ -88,7 +101,8 @@ export function ShopsPage() {
     type: s.category || "—",
     status: statusLabel(s),
     reviews: s.reviews_count ?? 0,
-    rating: 0,
+    // BUG-E03: 管理一覧でも average_rating を出す。Controller 側で transform に追加済み。
+    rating: typeof (s as any).average_rating === "number" ? (s as any).average_rating : 0,
     updated: s.updated_at ? formatDate(s.updated_at) : "—",
     thumb: s.name.slice(0, 2),
   }));
@@ -132,7 +146,7 @@ export function ShopsPage() {
           onChange={(e) => setAreaFilter(e.target.value)}
           className="px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
         >
-          {areas.map((a) => <option key={a}>{a}</option>)}
+          {areaOptions.map((a) => <option key={a}>{a}</option>)}
         </select>
         <select
           value={statusFilter}

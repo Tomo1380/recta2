@@ -641,13 +641,24 @@ export default function AiChatPanel({
   const [mode, setMode] = useState<ChatMode>("agent");
   const [limitReached, setLimitReached] = useState(false);
 
-  // Intro animation state
+  // Intro animation state.
+  // BUG-E15: タブ切替などで AiChatPanel が再マウントされると intro が再生され、
+  // 「条件に合うお店を探したいです」が勝手に挿入されるバグの原因だった。
+  // sessionStorage で同一セッション内では再生済みフラグを保持する。
+  const introStorageKey = `recta:intro-played:${pageType}`;
   const [introPhase, setIntroPhase] = useState<
     "idle" | "typing-user" | "show-user" | "typing-ai" | "show-ai" | "done"
   >("idle");
   const [introUserText, setIntroUserText] = useState("");
   const [introAiText, setIntroAiText] = useState("");
-  const [introPlayed, setIntroPlayed] = useState(false);
+  const [introPlayed, setIntroPlayed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem(introStorageKey) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   const [userArea, setUserArea] = useState<string>("");
 
@@ -772,6 +783,13 @@ export default function AiChatPanel({
           setTimeout(() => {
             setIntroPhase("done");
             setIntroPlayed(true);
+            // BUG-E15: 同一セッション内では再生済みとして記録、再マウントで
+            // 「条件に合うお店を探したいです」が再注入されないようにする。
+            try {
+              sessionStorage.setItem(introStorageKey, "1");
+            } catch {
+              /* ignore */
+            }
           }, 500);
         }
       }, 30);

@@ -33,8 +33,11 @@ class PublicStoreController extends Controller
         }
 
         if ($category = $request->input('category')) {
-            // Support both slug (from frontend selects) and name
-            $categoryName = Category::where('slug', $category)->value('name') ?? $category;
+            // Support both slug (from frontend selects) and name.
+            // BUG-E14: 旧 slug `cabaret` を新 slug `cabaclub` へ正規化する後方互換。
+            // 旧 URL (`?category=cabaret`) が共有・ブックマークされていても拾える。
+            $aliasedCategory = $category === 'cabaret' ? 'cabaclub' : $category;
+            $categoryName = Category::where('slug', $aliasedCategory)->value('name') ?? $category;
             $query->where('category', $categoryName);
         }
 
@@ -60,7 +63,20 @@ class PublicStoreController extends Controller
             $query->where('wage->regular->min', '>=', (int) $minWage);
         }
 
+        // reviews_count は popular/newest 問わず一覧の評価表示で要るので、
+        // switch の外で一度だけ呼ぶ。switch 内でも withCount すると重複 SELECT
+        // で空が返るバグになっていた (BUG-E02)。
+        $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
+
+        // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+        // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
+        // 絞り込み。リボンを出している条件 (guarantee.same_day_trial=true)
+        // と一致させる。
         $sort = $request->input('sort', 'newest');
+        if ($sort === 'experience_guaranteed') {
+            $query->where('guarantee->same_day_trial', true);
+        }
+
         switch ($sort) {
             case 'hourly_desc':
                 $driver = $query->getConnection()->getDriverName();
@@ -75,15 +91,20 @@ class PublicStoreController extends Controller
                     : "CAST(json_extract(wage, '$.regular.min') AS INTEGER) asc");
                 break;
             case 'popular':
-                $query->withCount(['reviews' => fn($q) => $q->where('status', 'published')])
+                // フロントのタブラベルは「評価順」。平均評価の高い順に並べ、
+                // 同率は口コミ数の多い順。レビューが無い店舗は最下段へ送る。
+                $driver = $query->getConnection()->getDriverName();
+                $avgSql = $driver === 'pgsql'
+                    ? "(select avg(rating) from reviews where reviews.store_id = stores.id and reviews.status = 'published')"
+                    : "(select avg(rating) from reviews where reviews.store_id = stores.id and reviews.status = 'published')";
+                $query->orderByRaw("$avgSql desc nulls last")
                       ->orderByDesc('reviews_count');
                 break;
             default: // newest
                 $query->orderByDesc('created_at');
         }
 
-        $stores = $query->withCount(['reviews' => fn($q) => $q->where('status', 'published')])
-                        ->paginate($request->input('per_page', 20));
+        $stores = $query->paginate($request->input('per_page', 20));
 
         // Transform: flatten JSONB into legacy fields for frontend compat + add average_rating
         $stores->getCollection()->transform(function ($store) {

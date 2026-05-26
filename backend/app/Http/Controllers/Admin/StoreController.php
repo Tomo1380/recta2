@@ -42,9 +42,13 @@ class StoreController extends Controller
             ->orderBy('updated_at', 'desc')
             ->paginate($request->input('per_page', 20));
 
-        // Transform each store to include backward-compatible flattened fields
+        // Transform each store to include backward-compatible flattened fields.
+        // 管理一覧 (ShopsPage) のテーブルが評価列を出せるよう average_rating も付ける。
         $stores->getCollection()->transform(function ($store) {
-            return StoreApiTransformer::toAdminArray($store);
+            $arr = StoreApiTransformer::toAdminArray($store);
+            $arr['average_rating'] = round($store->averageRating(), 1);
+            $arr['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
+            return $arr;
         });
 
         return response()->json($stores);
