@@ -581,18 +581,16 @@ export function ShopEditPage() {
   const [featureText, setFeatureText] = useState("");
   const [expLevel, setExpLevel] = useState(50);
   const [atmosphere, setAtmosphere] = useState(50);
-  const [castBijin, setCastBijin] = useState("30");
-  const [castKawaii, setCastKawaii] = useState("40");
-  const [castGlamour, setCastGlamour] = useState("15");
-  const [castNatural, setCastNatural] = useState("15");
+  // BUG-Live-03 (続き): 新規作成時に prefill 値があると、未編集のまま保存して
+  // 全店舗が同じ「綺麗系30/可愛い系40/...」「20代20%/30代35%/...」になる事故が起きる。
+  // populateFromStore() で既存店舗の値は復元される。
+  const [castBijin, setCastBijin] = useState("");
+  const [castKawaii, setCastKawaii] = useState("");
+  const [castGlamour, setCastGlamour] = useState("");
+  const [castNatural, setCastNatural] = useState("");
   const [clientAge, setClientAge] = useState<
     { label: string; value: string }[]
-  >([
-    { label: "20代", value: "20%" },
-    { label: "30代", value: "35%" },
-    { label: "40代", value: "30%" },
-    { label: "50代以上", value: "15%" },
-  ]);
+  >([]);
   const [drinkStyle, setDrinkStyle] = useState(50);
   const [dressAdvice, setDressAdvice] = useState("");
   const [dressTips, setDressTips] = useState<string[]>([]);
@@ -604,19 +602,14 @@ export function ShopEditPage() {
   const [documents, setDocuments] = useState<string[]>([]);
   const [docNote, setDocNote] = useState("");
   const [shiftInfo, setShiftInfo] = useState("");
+  // BUG-Live-03: 新規作成時にダミー値が入っていると、保存ボタンを押した瞬間に
+  // 「2026年2月 12人 採用」「直近5ヶ月で52名採用」などのテキストが実 DB に
+  // 入ってしまう。新規作成では空にし、既存店舗を開いたときだけ
+  // populateFromStore() で実データを流す。
   const [hiringEntries, setHiringEntries] = useState<
     { month: string; count: string; examples: string[] }[]
-  >([
-    {
-      month: "2026年2月",
-      count: "12",
-      examples: [
-        "20歳 未経験 → 時給5,000円スタート",
-        "25歳 経験者 → 時給7,000円スタート",
-      ],
-    },
-  ]);
-  const [hiringTotal, setHiringTotal] = useState("直近5ヶ月で52名採用");
+  >([]);
+  const [hiringTotal, setHiringTotal] = useState("");
   // New schema fields
   const [transferDescription, setTransferDescription] = useState("");
   const [transferKm, setTransferKm] = useState("");
@@ -749,10 +742,12 @@ export function ShopEditPage() {
       setExpLevel(analysis.experience_level ?? analysis.exp_level ?? 50);
       setAtmosphere(analysis.atmosphere ?? 50);
       const castStyle = analysis.cast_style || {};
-      setCastBijin((castStyle.beauty ?? analysis.cast_bijin)?.toString() ?? "30");
-      setCastKawaii((castStyle.cute ?? analysis.cast_kawaii)?.toString() ?? "40");
-      setCastGlamour((castStyle.glamour ?? analysis.cast_glamour)?.toString() ?? "15");
-      setCastNatural((castStyle.natural ?? analysis.cast_natural)?.toString() ?? "15");
+      // 値が無い (DB JSONB に未保存) なら空文字。デフォルト 30/40/15/15 を
+      // 立てると未編集の店舗が一律で「綺麗系30 可愛い系40...」に揃って嘘の分析になる。
+      setCastBijin((castStyle.beauty ?? analysis.cast_bijin)?.toString() ?? "");
+      setCastKawaii((castStyle.cute ?? analysis.cast_kawaii)?.toString() ?? "");
+      setCastGlamour((castStyle.glamour ?? analysis.cast_glamour)?.toString() ?? "");
+      setCastNatural((castStyle.natural ?? analysis.cast_natural)?.toString() ?? "");
       setClientAge((analysis.customer_age || analysis.client_age || []).map((c: any) => ({ label: c.label, value: c.ratio?.toString() ?? c.value ?? "" })));
       setDrinkStyle(analysis.drinking_style ?? analysis.drink_style ?? 50);
     }
@@ -778,6 +773,10 @@ export function ShopEditPage() {
         examples: h.examples || [],
       })));
     }
+    // BUG-Live-06: 「直近の合計テキスト」(recent_hires_summary) を populate
+    // から拾い漏れていたため、編集画面を開くと空欄になり、未編集のまま保存
+    // すると DB の値が空文字で上書きされる事故が起きていた。
+    setHiringTotal((store as any).recent_hires_summary || "");
 
     // Staff comment
     const staffData = store.staff_comment as any;
@@ -990,10 +989,10 @@ export function ShopEditPage() {
       experience_level: expLevel,
       atmosphere,
       cast_style: {
-        beauty: Number(castBijin),
-        cute: Number(castKawaii),
-        glamour: Number(castGlamour),
-        natural: Number(castNatural),
+        beauty: Number(castBijin) || 0,
+        cute: Number(castKawaii) || 0,
+        glamour: Number(castGlamour) || 0,
+        natural: Number(castNatural) || 0,
       },
       customer_age: clientAge.filter(c => c.label).map(c => ({ label: c.label, ratio: Number(c.value) || 0 })),
       drinking_style: drinkStyle,
@@ -1768,17 +1767,26 @@ export function ShopEditPage() {
               key={i}
               className="border border-border rounded-xl p-5 space-y-4 bg-muted/20"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground px-2.5 py-1 bg-primary/5 text-primary rounded-lg">
-                  {entry.month}
-                </span>
+              <div className="flex items-center justify-between gap-2">
+                {/* BUG-Live-07: 月名を編集可能に。これまで <span> で固定表示
+                    だったため、「月を追加」で出る `"2026年3月"` を任意の月に
+                    変えられず、過去月の実績を入力できなかった。 */}
+                <TextInput
+                  value={entry.month}
+                  onChange={(e: any) => {
+                    const updated = [...hiringEntries];
+                    updated[i] = { ...updated[i], month: e.target.value };
+                    setHiringEntries(updated);
+                  }}
+                  placeholder="例: 2026年4月"
+                />
                 <button
                   onClick={() =>
                     setHiringEntries(
                       hiringEntries.filter((_, idx) => idx !== i)
                     )
                   }
-                  className="text-muted-foreground hover:text-destructive transition"
+                  className="text-muted-foreground hover:text-destructive transition shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1815,12 +1823,14 @@ export function ShopEditPage() {
             </div>
           ))}
           <button
-            onClick={() =>
+            onClick={() => {
+              const now = new Date();
+              const defaultMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
               setHiringEntries([
                 ...hiringEntries,
-                { month: "2026年3月", count: "", examples: [] },
-              ])
-            }
+                { month: defaultMonth, count: "", examples: [] },
+              ]);
+            }}
             className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition"
           >
             <Plus className="w-3.5 h-3.5" /> 月を追加

@@ -314,8 +314,20 @@ interface StoreDetailPageProps {
 // ---------------------------------------------------------------------------
 
 function formatCurrency(amount: number | string): string {
-  if (typeof amount === "string") return amount;
-  return `¥${amount.toLocaleString()}`;
+  // 数値型なら ¥カンマ区切り。
+  if (typeof amount === "number") return `¥${amount.toLocaleString()}`;
+  // 文字列: 数字だけなら number として整形、`30000〜80000` のような範囲表記は
+  // 各数値を整形して `¥` を付けて返す。それ以外 (既に「¥5,000」等) は素通し。
+  const s = String(amount).trim();
+  if (!s) return s;
+  if (/^\d+$/.test(s)) return `¥${Number(s).toLocaleString()}`;
+  const rangeMatch = s.match(/^(\d+)\s*[〜~\-ー]\s*(\d+)$/);
+  if (rangeMatch) {
+    const lo = Number(rangeMatch[1]).toLocaleString();
+    const hi = Number(rangeMatch[2]).toLocaleString();
+    return `¥${lo}〜¥${hi}`;
+  }
+  return s;
 }
 
 function renderStars(rating: number, size = 16) {
@@ -567,7 +579,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 className="mt-0.5 text-[14px] font-bold tabular-nums"
                 style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
               >
-                ¥{(store.trial_hourly ?? store.hourly_min ?? 0).toLocaleString()}
+                ¥{(Number(store.trial_hourly ?? store.hourly_min ?? 0) || 0).toLocaleString()}
               </div>
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>

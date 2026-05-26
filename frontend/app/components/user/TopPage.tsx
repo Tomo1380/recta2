@@ -458,8 +458,11 @@ export default function TopPage() {
               <div className="mb-1.5 w-[5px] h-[5px] rounded-full shrink-0" style={{ background: GOLD, boxShadow: "0 0 8px rgba(212,175,55,.8)" }} />
             </div>
             <div className="mb-3" style={{ width: "52px", height: "1px", background: "linear-gradient(90deg,rgba(212,175,55,.9),transparent)" }} />
-            <p style={{ fontFamily: J, fontWeight: 500, fontSize: "15px", letterSpacing: "0.04em", color: "rgba(255,255,255,.96)", lineHeight: 1.5, textShadow: "0 1px 12px rgba(0,0,0,.5)", margin: "0 0 4px" }}>AIと探す、理想のナイトワーク</p>
-            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>キャバクラ・ラウンジ・クラブ｜都内厳選</p>
+            {/* BUG-Live-08: ヒーロー文言は site_settings (DB) で管理する想定だが、
+                ここでハードコードされていたため、管理画面で変えても反映されなかった。
+                API レスポンス (data.banner) を優先し、無い場合だけ既定文言にフォールバック。 */}
+            <p style={{ fontFamily: J, fontWeight: 500, fontSize: "15px", letterSpacing: "0.04em", color: "rgba(255,255,255,.96)", lineHeight: 1.5, textShadow: "0 1px 12px rgba(0,0,0,.5)", margin: "0 0 4px" }}>{data.banner?.hero_tagline || "AIと探す、理想のナイトワーク"}</p>
+            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>{data.banner?.hero_subtitle || "キャバクラ・ラウンジ・クラブ｜都内厳選"}</p>
           </div>
         </div>
 
@@ -469,7 +472,10 @@ export default function TopPage() {
           <AiChatPanel pageType="top" />
         </div>
 
-        {/* ══ PICKUP STORES ══ */}
+        {/* ══ PICKUP STORES ══
+            BUG-Live-09: 0件のとき空のセクションタイトルだけ出てた。
+            データがあるときだけセクション全体を描画する。 */}
+        {pickupShops.length > 0 && (
         <div className="mt-4">
           <div className="px-5 mb-3">
             <SectionHeader
@@ -547,6 +553,7 @@ export default function TopPage() {
             })}
           </div>
         </div>
+        )}
 
         {/* ══ 上京サポート BANNER ══ */}
         <div className="mt-6 px-5">
