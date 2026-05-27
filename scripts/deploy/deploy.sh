@@ -24,12 +24,18 @@ docker compose -f docker-compose.prod.yml exec -T laravel php artisan migrate --
 # Why marker files in git instead of a separate workflow: pushing
 # `.github/workflows/*.yml` requires the `workflow` PAT scope, which not all
 # clones have. Marker files are plain text and pushable with any token.
+#
+# 重要: 本番では `ProductionSeeder` (管理者/マスター/設定/AI 教材のみ、
+# 冪等) を必ず使うこと。DatabaseSeeder (デフォルト) は Faker で作った
+# dummy 店舗 80 件などを投入するので本番に流すと事故になる。
 if [ -f scripts/deploy/.run-fresh-seed-once ]; then
   echo "=== One-shot fresh-seed (DESTRUCTIVE — marker file present) ==="
-  docker compose -f docker-compose.prod.yml exec -T laravel php artisan migrate:fresh --seed --force
+  echo "    -> migrate:fresh + ProductionSeeder (master/config only)"
+  docker compose -f docker-compose.prod.yml exec -T laravel php artisan migrate:fresh --seeder=Database\\Seeders\\ProductionSeeder --force
 elif [ -f scripts/deploy/.run-seed-once ]; then
   echo "=== One-shot seed (additive, marker file present) ==="
-  docker compose -f docker-compose.prod.yml exec -T laravel php artisan db:seed --force
+  echo "    -> db:seed --class=ProductionSeeder (idempotent)"
+  docker compose -f docker-compose.prod.yml exec -T laravel php artisan db:seed --class=Database\\Seeders\\ProductionSeeder --force
 fi
 
 echo "=== Refreshing caches ==="

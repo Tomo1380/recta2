@@ -144,6 +144,19 @@ Seeder を書くときの注意:
 - **id を hard-code しない**。`auto-increment` がリセットされると id 範囲が変わるので、`User::pluck('id')->random()` のように動的に拾う。
 - ReviewSeeder / ContentSeeder が旧来 `user_id=1〜10` や `store_id=1〜20` を hard-code していて、`migrate:fresh` 以外では FK violation を起こす不具合があった (Phase 4 で修正済み)。
 
+### デプロイ時の seed 自動化
+
+`scripts/deploy/deploy.sh` は GitHub Actions (push to `main`) 経由で
+毎回 `php artisan migrate --force` を自動実行する。**seed は自動では走らない**。
+
+初回投入 or 再投入したいときは marker file を repo に置いて push する:
+- `scripts/deploy/.run-seed-once` → 次回 deploy で `db:seed --class=ProductionSeeder` (冪等) を実行
+- `scripts/deploy/.run-fresh-seed-once` → 次回 deploy で `migrate:fresh --seeder=ProductionSeeder` を実行 (**破壊的、本番 DB 全消し**)
+
+両方とも **必ず ProductionSeeder を使う**設計 (DatabaseSeeder は Faker dummy
+店舗 80 件を入れてしまうので本番では絶対に使わない)。実行後は marker file
+を別 commit で削除すること (残すと毎 deploy で再実行される)。
+
 ## アーキテクチャ原則（必ず守る）
 
 新しい endpoint / 画面を作る前にこのセクションと
