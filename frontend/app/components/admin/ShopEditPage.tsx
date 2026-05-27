@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
+import { useShopImages } from "~/hooks/useShopImages";
 import type { Store } from "~/lib/types";
 import {
   ArrowLeft,
@@ -656,8 +657,17 @@ export function ShopEditPage() {
   const [supportItems, setSupportItems] = useState<string[]>([]);
 
   const [publishStatus, setPublishStatus] = useState<"published" | "unpublished" | "draft">("draft");
-  const [storeImages, setStoreImages] = useState<string[]>([]);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  // 画像アップロード/削除の state とハンドラは useShopImages フックに集約。
+  // setStoreImages は populate (既存店舗 GET 後の反映) と save 後の reset で
+  // 使うので、フックから返ってきた setter を引き続きそのまま使う。
+  const {
+    images: storeImages,
+    setImages: setStoreImages,
+    upload: uploadShopImages,
+    remove: removeShopImage,
+    uploading: uploadingImage,
+    error: shopImageError,
+  } = useShopImages(isNew ? null : (id ?? null));
 
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
   // エリア/業種カテゴリのマスタ。マスタテーブルと options が乖離するとSelectの復元が壊れる
@@ -1113,41 +1123,12 @@ export function ShopEditPage() {
     }
   }, [isNew, id, buildPayload, navigate]);
 
-  const handleImageUpload = useCallback(async (files: FileList) => {
-    if (isNew || !id) {
-      setSaveError("画像をアップロードするには、まず店舗を保存してください。");
-      return;
-    }
-    setUploadingImage(true);
-    setSaveError(null);
-    try {
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append("image", file);
-        const res = await api.upload<{ url: string; images: string[] }>(
-          `/admin/stores/${id}/images`,
-          formData,
-        );
-        setStoreImages(res.images);
-      }
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "画像のアップロードに失敗しました");
-    } finally {
-      setUploadingImage(false);
-    }
-  }, [id, isNew]);
-
-  const handleImageDelete = useCallback(async (index: number) => {
-    if (!id) return;
-    try {
-      const res = await api.delete<{ images: string[] }>(
-        `/admin/stores/${id}/images/${index}`,
-      );
-      setStoreImages(res.images);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "画像の削除に失敗しました");
-    }
-  }, [id]);
+  // 旧 handleImageUpload / handleImageDelete は useShopImages フックに移管 (Phase 3-1)。
+  // 呼び出し側は uploadShopImages / removeShopImage を使う。
+  // hook の error は別 state なので、save 結果欄に集約するため effect で saveError に流す。
+  useEffect(() => {
+    if (shopImageError) setSaveError(shopImageError);
+  }, [shopImageError]);
 
   const handleNext = useCallback(() => {
     setCompletedSteps((prev) => new Set([...prev, currentStep]));
@@ -1352,7 +1333,7 @@ export function ShopEditPage() {
                       </span>
                     )}
                     <button
-                      onClick={() => handleImageDelete(idx)}
+                      onClick={() => removeShopImage(idx)}
                       className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -1362,7 +1343,7 @@ export function ShopEditPage() {
               </div>
             )}
             <ImageUploadZone
-              onUpload={handleImageUpload}
+              onUpload={uploadShopImages}
               uploading={uploadingImage}
               disabled={isNew}
             />
