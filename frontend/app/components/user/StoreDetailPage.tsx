@@ -1409,7 +1409,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           <LineCtaCard
             variant="card"
             title="気になったら、まずLINEへ"
-            description="体入予約・条件交渉までトークで完結"
+            description="体入予約・条件交渉までLINEで完結"
             ctaLabel="LINE追加"
             source="store-detail:map-card"
           />
@@ -3833,7 +3833,7 @@ function ReviewsSection({
                 boxShadow: "0 4px 14px rgba(6,199,85,0.3)",
               }}
             >
-              LINEで開く
+              ログイン
             </span>
           </button>
         </div>

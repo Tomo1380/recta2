@@ -59,22 +59,41 @@ interface StepConfig {
   sections: { id: string; title: string; icon: React.ComponentType<{ className?: string }>; required?: boolean }[];
 }
 
+// 6 ステップ構成。ユーザー画面 (StoreDetailPage) の上から下への並びに
+// 揃えて、運営がプレビューを見ながら上から順に入力できるようにしてある。
+//
+//   STEP1 店舗情報            ←→ ユーザー画面「【店名】の特徴は？」
+//   STEP2 画像・動画          ←→ 動画 / 店内写真 / 在籍女性ギャラリー
+//   STEP3 報酬・体入          ←→ 報酬・待遇 / 体験入店情報
+//   STEP4 分析・面接          ←→ お店の分析 / 面接情報 (必要書類含む)
+//   STEP5 価格・サービス      ←→ 送り・足代 / ボトル / セット / ドレス / レクタ
+//   STEP6 コミュニケーション・公開 ←→ FAQ / スタッフ / 系列 + 運営用 (ピックアップ / 公開)
 const steps: StepConfig[] = [
   {
     id: "step1",
-    title: "基本情報",
-    subtitle: "店舗の基本的な情報",
+    title: "店舗情報",
+    subtitle: "基本情報・特徴・SEO",
     icon: Building2,
     gradient: "from-indigo-500 to-violet-500",
     sections: [
       { id: "basic", title: "店舗基本情報", icon: Building2, required: true },
-      { id: "images", title: "店舗画像・動画", icon: ImageIcon },
+      { id: "features", title: "店舗の特徴", icon: Star },
     ],
   },
   {
     id: "step2",
-    title: "報酬・待遇",
-    subtitle: "報酬の内訳と保証・体入情報",
+    title: "画像・動画",
+    subtitle: "店舗画像・動画・在籍女性ギャラリー",
+    icon: ImageIcon,
+    gradient: "from-pink-500 to-rose-500",
+    sections: [
+      { id: "images", title: "店舗画像・動画", icon: ImageIcon },
+    ],
+  },
+  {
+    id: "step3",
+    title: "報酬・体入",
+    subtitle: "報酬の内訳・体入条件・採用実績",
     icon: DollarSign,
     gradient: "from-emerald-500 to-teal-500",
     sections: [
@@ -84,41 +103,42 @@ const steps: StepConfig[] = [
     ],
   },
   {
-    id: "step3",
-    title: "特徴・分析",
-    subtitle: "お店の魅力を伝える情報",
-    icon: Star,
+    id: "step4",
+    title: "分析・面接",
+    subtitle: "お店の分析・面接情報・必要書類",
+    icon: BarChart3,
     gradient: "from-amber-500 to-orange-500",
     sections: [
-      { id: "features", title: "店舗の特徴", icon: Star },
       { id: "analysis", title: "店舗分析", icon: BarChart3 },
-    ],
-  },
-  {
-    id: "step4",
-    title: "採用・勤務",
-    subtitle: "面接から勤務までの情報",
-    icon: UserCheck,
-    gradient: "from-sky-500 to-blue-500",
-    sections: [
       { id: "interview", title: "面接・採用", icon: UserCheck },
       { id: "documents", title: "必要書類", icon: FileText },
-      { id: "schedule", title: "勤務スケジュール", icon: Calendar },
-      { id: "hiring", title: "直近の採用実績", icon: TrendingUp },
     ],
   },
   {
     id: "step5",
-    title: "その他情報",
-    subtitle: "補足情報とQ&A",
+    title: "価格・サービス",
+    subtitle: "送り・ボトル・セット・ドレス・エピソード",
+    icon: Wine,
+    gradient: "from-sky-500 to-blue-500",
+    sections: [
+      { id: "transport", title: "送り・交通サポート", icon: Car },
+      { id: "champagne_info", title: "シャンパン情報", icon: Wine },
+      { id: "champagne_price", title: "シャンパン金額", icon: Wine },
+      { id: "set_fee", title: "セット料金", icon: DollarSign },
+      { id: "dress_code", title: "ドレスコード", icon: Star },
+      { id: "recta_episodes", title: "レクタ経由エピソード", icon: Sparkles },
+    ],
+  },
+  {
+    id: "step6",
+    title: "コミュニケーション・公開",
+    subtitle: "Q&A・スタッフ・系列・ピックアップ・公開設定",
     icon: MessageSquare,
     gradient: "from-fuchsia-500 to-purple-500",
     sections: [
-      { id: "popular", title: "人気の特徴", icon: Star },
-      { id: "champagne", title: "シャンパン情報", icon: Wine },
-      { id: "transport", title: "送り・交通サポート", icon: Car },
       { id: "qa", title: "Q&A", icon: HelpCircle },
       { id: "staff", title: "スタッフコメント", icon: MessageSquare },
+      { id: "related", title: "系列店舗", icon: Building2 },
       { id: "pickup", title: "ピックアップ設定", icon: Crown },
       { id: "publish", title: "公開設定", icon: Globe },
     ],
@@ -642,8 +662,8 @@ export function ShopEditPage() {
   // "new shop" mode.
   const isNew = id === "new" || id === undefined;
   // ステップ管理 (currentStep / completedSteps / next/prev/goTo / 進捗計算) は
-  // useStepProgression に集約 (Phase 3-1)。stepCount は 5 固定 (下の steps 配列と整合)。
-  const stepFlow = useStepProgression(5);
+  // useStepProgression に集約 (Phase 3-1)。stepCount は 6 固定 (上の steps 配列と整合)。
+  const stepFlow = useStepProgression(6);
   const { currentStep, completedSteps } = stepFlow;
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -1044,15 +1064,19 @@ export function ShopEditPage() {
   // データ入力済みの既存店舗を開いた直後は 0% で固定だった。
   // 各 Step の代表フィールドの充足を見て充足率を計算する。
   const stepFilled: boolean[] = [
-    // Step1: 基本情報
+    // Step1: 店舗情報 (基本情報 + 特徴)
     !!(shopName && area && category && station && address),
-    // Step2: 報酬・待遇
+    // Step2: 画像・動画
+    storeImages.length > 0 || videos.length > 0 || staffPhotos.length > 0,
+    // Step3: 報酬・体入
     !!(minWage && maxWage),
-    // Step3: 特徴・分析
-    !!(tags.length > 0 || featureText),
-    // Step4: 採用・勤務
-    !!(hiringCriteria || hiringEntries.length > 0 || shiftInfo),
-    // Step5: その他
+    // Step4: 分析・面接
+    !!(hiringCriteria || interviewDialog.length > 0 || expLevel > 0 || atmosphere > 0),
+    // Step5: 価格・サービス
+    !!(setFeeList.length > 0 || transferDescription || transferZones.length > 0
+      || champagneDescription || rectaEpisodes.length > 0
+      || dressCodeDescription || dressCodeOk.length > 0 || dressCodeNg.length > 0),
+    // Step6: コミュニケーション・公開
     !!(qaItems.length > 0 || staffComment || publishStatus === "published"),
   ];
   const { progress } = stepFlow.computeProgress(stepFilled);
@@ -1250,47 +1274,109 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="店舗画像・動画" icon={ImageIcon}>
-        <div className="space-y-5">
-          <Field
-            label="店舗画像"
-            hint={isNew ? "店舗を保存した後に画像をアップロードできます。" : "最大10枚まで。1枚目がサムネイルになります。"}
-          >
-            {storeImages.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                {storeImages.map((url, idx) => (
-                  <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-square">
-                    <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
-                    {idx === 0 && (
-                      <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
-                        サムネイル
-                      </span>
-                    )}
-                    <button
-                      onClick={() => removeShopImage(idx)}
-                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <ImageUploadZone
-              onUpload={uploadShopImages}
-              uploading={uploadingImage}
-              disabled={isNew}
-            />
-          </Field>
-          <Field label="動画（複数登録可）">
-            <VideoListEditor videos={videos} onChange={setVideos} />
-          </Field>
-          <Field label="在籍女性ギャラリー（複数登録可）">
-            <StaffPhotosEditor photos={staffPhotos} onChange={setStaffPhotos} />
-          </Field>
-        </div>
-      </SectionCard>
+      {sectionFeatures()}
     </div>
+  );
+
+  // 「店舗画像・動画」は新 STEP2 で別レンダラとして使うため切り出し。
+  const sectionImages = () => (
+    <SectionCard title="店舗画像・動画" icon={ImageIcon}>
+      <div className="space-y-5">
+        <Field
+          label="店舗画像"
+          hint={isNew ? "店舗を保存した後に画像をアップロードできます。" : "最大10枚まで。1枚目がサムネイルになります。"}
+        >
+          {storeImages.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {storeImages.map((url, idx) => (
+                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-square">
+                  <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
+                  {idx === 0 && (
+                    <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
+                      サムネイル
+                    </span>
+                  )}
+                  <button
+                    onClick={() => removeShopImage(idx)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <ImageUploadZone
+            onUpload={uploadShopImages}
+            uploading={uploadingImage}
+            disabled={isNew}
+          />
+        </Field>
+        <Field label="動画（複数登録可）">
+          <VideoListEditor videos={videos} onChange={setVideos} />
+        </Field>
+        <Field label="在籍女性ギャラリー（複数登録可）">
+          <StaffPhotosEditor photos={staffPhotos} onChange={setStaffPhotos} />
+        </Field>
+      </div>
+    </SectionCard>
+  );
+
+  // === sectionFeatures に続く section helpers ===
+  // NOTE: 「店舗の特徴」は renderStep1 末尾 (店舗画像・動画 SectionCard の
+  // *直後*) に挿入するが、JSX の構造を最小修正にするため renderStep1 の return
+  // 内で別 fragment として組み込まず、renderStep1 を後方互換のため触らない。
+  // ユーザー画面 (詳細ページ) の「【店名】の特徴は？」カードと対応させるため、
+  // sectionFeatures というレンダラを別出ししておく。
+  const sectionFeatures = () => (
+    <SectionCard title="店舗の特徴" icon={Star}>
+      <div className="space-y-5">
+        <Field
+          label="特徴タグ"
+          hint="Enterキーでタグを追加できます"
+        >
+          <div className="flex flex-wrap gap-2 mb-3">
+            {tags.map((tag, i) => (
+              <span
+                key={i}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/8 text-primary rounded-full text-sm border border-primary/15"
+              >
+                {tag}
+                <button
+                  onClick={() =>
+                    setTags(tags.filter((_, idx) => idx !== i))
+                  }
+                  className="hover:text-destructive transition"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && tagInput.trim()) {
+                e.preventDefault();
+                setTags([...tags, tagInput.trim()]);
+                setTagInput("");
+              }
+            }}
+            placeholder="タグを入力してEnter（例: 未経験歓迎）"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+        </Field>
+        <Field label="お店の特徴テキスト">
+          <TextArea
+            value={featureText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFeatureText(e.target.value)}
+            rows={3}
+            placeholder="他店との差別化ポイントや特徴を入力してください"
+          />
+        </Field>
+      </div>
+    </SectionCard>
   );
 
   const renderStep2 = () => (
@@ -1518,59 +1604,7 @@ export function ShopEditPage() {
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <SectionCard title="店舗の特徴" icon={Star}>
-        <div className="space-y-5">
-          <Field
-            label="特徴タグ"
-            hint="Enterキーでタグを追加できます"
-          >
-            <div className="flex flex-wrap gap-2 mb-3">
-              {tags.map((tag, i) => (
-                <span
-                  key={i}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/8 text-primary rounded-full text-sm border border-primary/15"
-                >
-                  {tag}
-                  <button
-                    onClick={() =>
-                      setTags(tags.filter((_, idx) => idx !== i))
-                    }
-                    className="hover:text-destructive transition"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && tagInput.trim()) {
-                  e.preventDefault();
-                  setTags([...tags, tagInput.trim()]);
-                  setTagInput("");
-                }
-              }}
-              placeholder="タグを入力してEnter（例: 未経験歓迎）"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
-          </Field>
-          {/* BUG-009: 「店舗紹介文」(description) はユーザー画面に表示位置が無く、
-              「お店の特徴テキスト」と二重入力になっていたため UI から外した。
-              既存DB値は保持 (state/payload は残してある) ので、必要になれば
-              UI を復活させるだけで再開できる。 */}
-          <Field label="お店の特徴テキスト">
-            <TextArea
-              value={featureText}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFeatureText(e.target.value)}
-              rows={3}
-              placeholder="他店との差別化ポイントや特徴を入力してください"
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
+      {/* 「店舗の特徴」は STEP1 末尾に移動 (sectionFeatures)。 */}
       <SectionCard title="店舗分析" icon={BarChart3}>
         <div className="space-y-6">
           <SliderField
@@ -1732,111 +1766,110 @@ export function ShopEditPage() {
     </div>
   );
 
+  // STEP5 価格・サービス — 送り → ボトル目安 → セット料金 → ドレスコード → レクタ経由
+  // (ユーザー画面の順序: 送り足代 / ボトル目安 / セット / レクタ / ドレス)
   const renderStep5 = () => (
     <div className="space-y-6">
-      <SectionCard title="ドレスコード（OK / NG）" icon={Star}>
+      {/* 送り・足代 (ユーザー画面で先に出るので先頭に) */}
+      <SectionCard title="送り・交通サポート" icon={Car}>
         <div className="space-y-5">
-          <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
+          <Field
+            label="送りの説明"
+            hint="送りサービスの詳細を記載してください"
+          >
             <TextArea
-              value={dressCodeDescription}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
+              value={transferDescription}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferDescription(e.target.value)}
               rows={3}
-              placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
+              placeholder="例: 営業終了後、自宅まで無料送迎あり"
             />
           </Field>
-          <Field label="OKな例" hint="OKな服装の説明文（任意で画像URL）を登録できます">
-            <div className="space-y-2">
-              {dressCodeOk.map((item, i) => (
-                <div key={i} className="flex gap-2 items-start group">
-                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <input
-                      value={item.note}
-                      onChange={(e) => {
-                        const next = [...dressCodeOk];
-                        next[i] = { ...next[i], note: e.target.value };
-                        setDressCodeOk(next);
-                      }}
-                      placeholder="例: 明るめのカラードレス"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                    <ImageUrlInput
-                      value={item.image_url}
-                      onChange={(next) => {
-                        const arr = [...dressCodeOk];
-                        arr[i] = { ...arr[i], image_url: next };
-                        setDressCodeOk(arr);
-                      }}
-                      kind="dress-code"
-                      placeholder="画像URL（任意）または「画像を選択」"
-                    />
-                  </div>
-                  <button
-                    onClick={() => setDressCodeOk(dressCodeOk.filter((_, idx) => idx !== i))}
-                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => setDressCodeOk([...dressCodeOk, { note: "", image_url: "" }])}
-                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
-              >
-                <Plus className="w-3.5 h-3.5" /> OK例を追加
-              </button>
-            </div>
+          <Field label="送り距離">
+            <TextInput
+              value={transferKm}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferKm(e.target.value)}
+              placeholder="例: 20km圏内"
+            />
           </Field>
-          <Field label="NGな例" hint="NGな服装の説明文（任意で画像URL）を登録できます">
+          <Field
+            label="足代テーブル（高級店向け）"
+            hint="距離別の足代を設定。空のままなら詳細ページに表示されません。"
+          >
             <div className="space-y-2">
-              {dressCodeNg.map((item, i) => (
-                <div key={i} className="flex gap-2 items-start group">
-                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <input
-                      value={item.note}
-                      onChange={(e) => {
-                        const next = [...dressCodeNg];
-                        next[i] = { ...next[i], note: e.target.value };
-                        setDressCodeNg(next);
-                      }}
-                      placeholder="例: 黒ドレス・ビジュー付き"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                    <ImageUrlInput
-                      value={item.image_url}
-                      onChange={(next) => {
-                        const arr = [...dressCodeNg];
-                        arr[i] = { ...arr[i], image_url: next };
-                        setDressCodeNg(arr);
-                      }}
-                      kind="dress-code"
-                      placeholder="画像URL（任意）または「画像を選択」"
-                    />
-                  </div>
+              {transferZones.map((z, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-12 gap-2 items-center rounded-lg border border-border bg-muted/20 p-2"
+                >
+                  <input
+                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    placeholder="ラベル (例: 都内)"
+                    value={z.label}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], label: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <input
+                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    placeholder="半径 km"
+                    value={z.radius_km}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], radius_km: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <input
+                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    placeholder="足代 ¥"
+                    value={z.fee}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], fee: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
+                  <input
+                    type="color"
+                    className="col-span-2 h-8 w-full cursor-pointer rounded border border-input bg-background"
+                    value={z.color || "#D4AF37"}
+                    onChange={(e) => {
+                      const next = [...transferZones];
+                      next[i] = { ...next[i], color: e.target.value };
+                      setTransferZones(next);
+                    }}
+                  />
                   <button
-                    onClick={() => setDressCodeNg(dressCodeNg.filter((_, idx) => idx !== i))}
-                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
+                    type="button"
+                    onClick={() => setTransferZones(transferZones.filter((_, idx) => idx !== i))}
+                    className="col-span-1 text-xs text-muted-foreground hover:text-destructive"
+                    aria-label="削除"
                   >
-                    <X className="w-4 h-4" />
+                    ×
                   </button>
                 </div>
               ))}
               <button
-                onClick={() => setDressCodeNg([...dressCodeNg, { note: "", image_url: "" }])}
-                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+                type="button"
+                onClick={() =>
+                  setTransferZones([
+                    ...transferZones,
+                    { label: "", radius_km: "", fee: "", color: "#D4AF37" },
+                  ])
+                }
+                className="text-xs text-primary hover:underline"
               >
-                <Plus className="w-3.5 h-3.5" /> NG例を追加
+                + 距離区分を追加
               </button>
             </div>
           </Field>
         </div>
       </SectionCard>
 
+      {/* シャンパン情報 (説明文) → シャンパン金額 (4 銘柄) → セット料金 の順で
+          単価系を並べる。ユーザー画面でもこの並びになっている。 */}
       <SectionCard title="シャンパン情報" icon={Wine}>
         <div className="space-y-5">
           <Field
@@ -1972,6 +2005,111 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
+      <SectionCard title="ドレスコード（OK / NG）" icon={Star}>
+        <div className="space-y-5">
+          <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
+            <TextArea
+              value={dressCodeDescription}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
+              rows={3}
+              placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
+            />
+          </Field>
+          <Field label="OKな例" hint="OKな服装の説明文（任意で画像URL）を登録できます">
+            <div className="space-y-2">
+              {dressCodeOk.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start group">
+                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={item.note}
+                      onChange={(e) => {
+                        const next = [...dressCodeOk];
+                        next[i] = { ...next[i], note: e.target.value };
+                        setDressCodeOk(next);
+                      }}
+                      placeholder="例: 明るめのカラードレス"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                    <ImageUrlInput
+                      value={item.image_url}
+                      onChange={(next) => {
+                        const arr = [...dressCodeOk];
+                        arr[i] = { ...arr[i], image_url: next };
+                        setDressCodeOk(arr);
+                      }}
+                      kind="dress-code"
+                      placeholder="画像URL（任意）または「画像を選択」"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setDressCodeOk(dressCodeOk.filter((_, idx) => idx !== i))}
+                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setDressCodeOk([...dressCodeOk, { note: "", image_url: "" }])}
+                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+              >
+                <Plus className="w-3.5 h-3.5" /> OK例を追加
+              </button>
+            </div>
+          </Field>
+          <Field label="NGな例" hint="NGな服装の説明文（任意で画像URL）を登録できます">
+            <div className="space-y-2">
+              {dressCodeNg.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start group">
+                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={item.note}
+                      onChange={(e) => {
+                        const next = [...dressCodeNg];
+                        next[i] = { ...next[i], note: e.target.value };
+                        setDressCodeNg(next);
+                      }}
+                      placeholder="例: 黒ドレス・ビジュー付き"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                    <ImageUrlInput
+                      value={item.image_url}
+                      onChange={(next) => {
+                        const arr = [...dressCodeNg];
+                        arr[i] = { ...arr[i], image_url: next };
+                        setDressCodeNg(arr);
+                      }}
+                      kind="dress-code"
+                      placeholder="画像URL（任意）または「画像を選択」"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setDressCodeNg(dressCodeNg.filter((_, idx) => idx !== i))}
+                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setDressCodeNg([...dressCodeNg, { note: "", image_url: "" }])}
+                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
+              >
+                <Plus className="w-3.5 h-3.5" /> NG例を追加
+              </button>
+            </div>
+          </Field>
+        </div>
+      </SectionCard>
+
+      {/* シャンパン情報・金額・セット料金は STEP5 上部 (送り直後) に移動済み。 */}
+
       <SectionCard title="レクタ経由入店女性エピソード" icon={Sparkles}>
         <p className="text-xs text-muted-foreground mb-4">
           レクタ経由で入店した在籍キャストのエピソードを登録できます（顔出しOK時のみ）。
@@ -2053,100 +2191,60 @@ export function ShopEditPage() {
           </button>
         </div>
       </SectionCard>
+    </div>
+  );
 
-      <SectionCard title="送り・交通サポート" icon={Car}>
+  // STEP6 コミュニケーション・公開 — Q&A → スタッフコメント → 系列店舗 → ピックアップ → 公開設定
+  const renderStep6 = () => (
+    <div className="space-y-6">
+      <SectionCard title="Q&A" icon={HelpCircle}>
+        <Field
+          label="よくある質問"
+          hint="求職者からよく聞かれる質問と回答を登録してください"
+        >
+          <DynamicPairList
+            items={qaItems}
+            setItems={setQaItems}
+            labelPlaceholder="質問"
+            valuePlaceholder="回答"
+          />
+        </Field>
+      </SectionCard>
+
+      <SectionCard title="スタッフコメント" icon={MessageSquare}>
         <div className="space-y-5">
-          <Field
-            label="送りの説明"
-            hint="送りサービスの詳細を記載してください"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Field label="スタッフ名">
+              <TextInput
+                value={staffName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffName(e.target.value)}
+                placeholder="例: 田中"
+              />
+            </Field>
+            <Field label="スタッフ役職">
+              <TextInput
+                value={staffRole}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffRole(e.target.value)}
+                placeholder="例: 店長"
+              />
+            </Field>
+          </div>
+          <Field label="コメント">
             <TextArea
-              value={transferDescription}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferDescription(e.target.value)}
-              rows={3}
-              placeholder="例: 営業終了後、自宅まで無料送迎あり"
+              value={staffComment}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                setStaffComment(e.target.value)
+              }
+              rows={4}
+              placeholder="求職者へのメッセージを入力してください"
             />
           </Field>
-          <Field label="送り距離">
-            <TextInput
-              value={transferKm}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferKm(e.target.value)}
-              placeholder="例: 20km圏内"
+          <Field label="サポート内容">
+            <DynamicTextList
+              items={supportItems}
+              setItems={setSupportItems}
+              placeholder="例: 面接時の送迎"
             />
-          </Field>
-          <Field
-            label="足代テーブル（高級店向け）"
-            hint="距離別の足代を設定。空のままなら詳細ページに表示されません。"
-          >
-            <div className="space-y-2">
-              {transferZones.map((z, i) => (
-                <div
-                  key={i}
-                  className="grid grid-cols-12 gap-2 items-center rounded-lg border border-border bg-muted/20 p-2"
-                >
-                  <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                    placeholder="ラベル (例: 都内)"
-                    value={z.label}
-                    onChange={(e) => {
-                      const next = [...transferZones];
-                      next[i] = { ...next[i], label: e.target.value };
-                      setTransferZones(next);
-                    }}
-                  />
-                  <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                    placeholder="半径 km"
-                    value={z.radius_km}
-                    onChange={(e) => {
-                      const next = [...transferZones];
-                      next[i] = { ...next[i], radius_km: e.target.value };
-                      setTransferZones(next);
-                    }}
-                  />
-                  <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                    placeholder="足代 ¥"
-                    value={z.fee}
-                    onChange={(e) => {
-                      const next = [...transferZones];
-                      next[i] = { ...next[i], fee: e.target.value };
-                      setTransferZones(next);
-                    }}
-                  />
-                  <input
-                    type="color"
-                    className="col-span-2 h-8 w-full cursor-pointer rounded border border-input bg-background"
-                    value={z.color || "#D4AF37"}
-                    onChange={(e) => {
-                      const next = [...transferZones];
-                      next[i] = { ...next[i], color: e.target.value };
-                      setTransferZones(next);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setTransferZones(transferZones.filter((_, idx) => idx !== i))}
-                    className="col-span-1 text-xs text-muted-foreground hover:text-destructive"
-                    aria-label="削除"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() =>
-                  setTransferZones([
-                    ...transferZones,
-                    { label: "", radius_km: "", fee: "", color: "#D4AF37" },
-                  ])
-                }
-                className="text-xs text-primary hover:underline"
-              >
-                + 距離区分を追加
-              </button>
-            </div>
           </Field>
         </div>
       </SectionCard>
@@ -2202,58 +2300,6 @@ export function ShopEditPage() {
         </Field>
       </SectionCard>
 
-      <SectionCard title="Q&A" icon={HelpCircle}>
-        <Field
-          label="よくある質問"
-          hint="求職者からよく聞かれる質問と回答を登録してください"
-        >
-          <DynamicPairList
-            items={qaItems}
-            setItems={setQaItems}
-            labelPlaceholder="質問"
-            valuePlaceholder="回答"
-          />
-        </Field>
-      </SectionCard>
-
-      <SectionCard title="スタッフコメント" icon={MessageSquare}>
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="スタッフ名">
-              <TextInput
-                value={staffName}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffName(e.target.value)}
-                placeholder="例: 田中"
-              />
-            </Field>
-            <Field label="スタッフ役職">
-              <TextInput
-                value={staffRole}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffRole(e.target.value)}
-                placeholder="例: 店長"
-              />
-            </Field>
-          </div>
-          <Field label="コメント">
-            <TextArea
-              value={staffComment}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setStaffComment(e.target.value)
-              }
-              rows={4}
-              placeholder="求職者へのメッセージを入力してください"
-            />
-          </Field>
-          <Field label="サポート内容">
-            <DynamicTextList
-              items={supportItems}
-              setItems={setSupportItems}
-              placeholder="例: 面接時の送迎"
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
       {/* BUG-E08: ここのトグル・優先度 input は state にも save にも繋がって
           おらず、ピックアップを切り替えたつもりでも `pickup_shops` テーブルに
           反映されない。連動を実装するまで誤動作させないように、
@@ -2285,41 +2331,37 @@ export function ShopEditPage() {
               <option value="unpublished">非公開</option>
             </select>
           </Field>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Field label="公開開始日時">
-              <TextInput
-                type="datetime-local"
-                value=""
-                onChange={() => {}}
-              />
-            </Field>
-            <Field label="公開終了日時">
-              <TextInput
-                type="datetime-local"
-                value=""
-                onChange={() => {}}
-              />
-            </Field>
-          </div>
-          <Field label="SEOメタディスクリプション" hint="検索エンジン向けの説明文（120文字以内推奨）">
-            <TextArea
-              value=""
-              onChange={() => {}}
-              rows={2}
-              placeholder="店舗の特徴を簡潔に記述してください"
-            />
-          </Field>
+          {/* 公開開始/終了日時・SEO メタディスクリプション は STEP1 / 他で
+              扱うため公開設定からは撤去。日時スケジューラは未実装、SEO は
+              STEP1「店舗基本情報」末尾にある。 */}
         </div>
       </SectionCard>
     </div>
   );
 
+  // 新 6 ステップ構成に合わせた renderers のマッピング:
+  //   新 STEP1 店舗情報            → 旧 renderStep1 (基本情報 + sectionFeatures)
+  //   新 STEP2 画像・動画          → sectionImages のみ
+  //   新 STEP3 報酬・体入          → 旧 renderStep2 (報酬・体入・採用実績)
+  //   新 STEP4 分析・面接          → 旧 renderStep3 (店舗分析) + 旧 renderStep4 (面接 + 必要書類)
+  //   新 STEP5 価格・サービス      → renderStep5
+  //   新 STEP6 コミュ・公開        → renderStep6
+  const renderStepImages = () => (
+    <div className="space-y-6">{sectionImages()}</div>
+  );
+  const renderStepAnalysisInterview = () => (
+    <>
+      {renderStep3()}
+      {renderStep4()}
+    </>
+  );
   const stepRenderers = [
     renderStep1,
+    renderStepImages,
     renderStep2,
-    renderStep3,
-    renderStep4,
+    renderStepAnalysisInterview,
     renderStep5,
+    renderStep6,
   ];
 
   if (loading) {
