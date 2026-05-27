@@ -694,7 +694,8 @@ export function ShopEditPage() {
   const [trialMaxWage, setTrialMaxWage] = useState("");
   const [interviewStart, setInterviewStart] = useState("");
   const [interviewEnd, setInterviewEnd] = useState("");
-  const [sameDayTrial, setSameDayTrial] = useState("可");
+  // 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし)。
+  const [sameDayTrial, setSameDayTrial] = useState<"same_day" | "normal" | "none">("normal");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [description, setDescription] = useState("");
@@ -1385,14 +1386,18 @@ export function ShopEditPage() {
             placeholder="例: 19:00"
           />
         </Field>
-        <Field label="当日体入可否">
-          <SelectInput
+        <Field label="体入の種類" hint="店舗詳細やフィルターで「即日体入OK」リボンの出し分けに使用">
+          <select
             value={sameDayTrial}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-              setSameDayTrial(e.target.value)
+            onChange={(e) =>
+              setSameDayTrial(e.target.value as "same_day" | "normal" | "none")
             }
-            options={["可", "不可"]}
-          />
+            className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
+          >
+            <option value="same_day">即日体入</option>
+            <option value="normal">通常体入</option>
+            <option value="none">体入なし</option>
+          </select>
         </Field>
       </div>
     </SectionCard>
@@ -2501,7 +2506,10 @@ export function ShopEditPage() {
                   interview_hours: interviewStart && interviewEnd ? `${interviewStart}〜${interviewEnd}` : "",
                   interview_start: interviewStart || null,
                   interview_end: interviewEnd || null,
-                  same_day_trial: sameDayTrial === "可",
+                  // 体入タイプを enum string でそのまま渡す (プレビュー表示側は
+                  // trial_type を読む)。同期保存時に backend が same_day_trial
+                  // (JSONB) に書き込む。
+                  trial_type: sameDayTrial,
                   feature_tags: tags,
                   description: description,
                   features_text: featureText,

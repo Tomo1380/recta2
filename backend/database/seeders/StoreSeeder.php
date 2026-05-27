@@ -452,8 +452,13 @@ class StoreSeeder extends Seeder
         if ($this->chance(0.5)) {
             $guarantee['norma'] = ['ノルマなし', 'ノルマなし。ただし月8日以上の出勤推奨。', '月間売上目標あり（未達でもペナルティなし）'][array_rand(['ノルマなし', 'ノルマなし。ただし月8日以上の出勤推奨。', '月間売上目標あり（未達でもペナルティなし）'])];
         }
+        // 体入タイプ: enum string ('same_day' | 'normal' | 'none')。
+        // 体入設定があれば 40% 即日、50% 通常、10% なし。なければ none 固定。
         if (isset($wage['trial'])) {
-            $guarantee['same_day_trial'] = $this->chance(0.4);
+            $r = mt_rand(1, 100);
+            $guarantee['same_day_trial'] = $r <= 40 ? 'same_day' : ($r <= 90 ? 'normal' : 'none');
+        } else {
+            $guarantee['same_day_trial'] = 'none';
         }
         if (!empty($guarantee)) {
             $store['guarantee'] = $guarantee;
@@ -732,7 +737,7 @@ class StoreSeeder extends Seeder
                     'period' => '最大3ヶ月',
                     'details' => '未経験者は時給5,000円保証。3ヶ月目以降は実績ベースに移行。',
                     'norma' => 'ノルマなし。ただし月8日以上の出勤推奨。',
-                    'same_day_trial' => true,
+                    'same_day_trial' => 'same_day',
                 ],
                 'interview' => [
                     'start' => '14:00',
@@ -855,7 +860,7 @@ class StoreSeeder extends Seeder
                     'period' => '1ヶ月',
                     'details' => '経験者は面談にて応相談。',
                     'norma' => '月間売上目標あり（未達でもペナルティなし）',
-                    'same_day_trial' => false,
+                    'same_day_trial' => 'none',
                 ],
                 'interview' => [
                     'start' => '13:00',
@@ -956,7 +961,7 @@ class StoreSeeder extends Seeder
                     'notes' => '全額日払い。交通費支給（上限1,000円）。',
                 ],
                 'guarantee' => [
-                    'same_day_trial' => true,
+                    'same_day_trial' => 'same_day',
                 ],
                 'interview' => [
                     'start' => '15:00',
@@ -1032,7 +1037,7 @@ class StoreSeeder extends Seeder
                     'period' => '3ヶ月',
                     'details' => '未経験者でも時給6,000円スタート。',
                     'norma' => 'ノルマなし。',
-                    'same_day_trial' => true,
+                    'same_day_trial' => 'same_day',
                 ],
                 'interview' => [
                     'start' => '14:00',
@@ -1141,7 +1146,7 @@ class StoreSeeder extends Seeder
                     'period' => '2ヶ月',
                     'details' => '未経験者向け時給保証あり。',
                     'norma' => 'ノルマなし。',
-                    'same_day_trial' => false,
+                    'same_day_trial' => 'none',
                 ],
                 'interview' => [
                     'start' => '15:00',

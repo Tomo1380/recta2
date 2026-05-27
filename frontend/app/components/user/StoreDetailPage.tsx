@@ -270,7 +270,8 @@ export interface StoreDetailStore {
   interview_hours: string;
   interview_start: string | null;
   interview_end: string | null;
-  same_day_trial: boolean;
+  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  trial_type: "same_day" | "normal" | "none";
   feature_tags: string[];
   description: string;
   features_text: string;
@@ -674,7 +675,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
         nearestStation={store.nearest_station}
         averageRating={store.average_rating}
         reviewsCount={store.reviews_count}
-        sameDayTrial={store.same_day_trial}
+        trialType={store.trial_type}
       />
 
       <div className="relative z-10" style={{ backgroundColor: "#f5f5f5" }}>
@@ -729,9 +730,19 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               </div>
               <div
                 className="mt-0.5 text-[12px] font-bold"
-                style={{ color: store.same_day_trial ? "#6FB37D" : "rgba(27,37,40,0.4)" }}
+                style={{
+                  color: store.trial_type === "same_day"
+                    ? "#6FB37D"
+                    : store.trial_type === "normal"
+                      ? "#1b2528"
+                      : "rgba(27,37,40,0.4)",
+                }}
               >
-                {store.same_day_trial ? "即日OK" : "—"}
+                {store.trial_type === "same_day"
+                  ? "即日OK"
+                  : store.trial_type === "normal"
+                    ? "あり"
+                    : "なし"}
               </div>
             </div>
           </div>
@@ -753,7 +764,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               feature_tags: store.feature_tags,
               description: store.description,
               business_hours: store.business_hours,
-              same_day_trial: store.same_day_trial,
+              // 後方互換: AiChatPanel.StoreContext は same_day_trial: boolean
+              // を期待しているので、即日体入のときだけ true を渡す。
+              same_day_trial: store.trial_type === "same_day",
               trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
             }}
           />
@@ -819,24 +832,37 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 }
               />
               <InfoRow
-                label="当日体験"
-                value={
-                  store.same_day_trial ? (
-                    <span
-                      className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                      style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
-                    >
-                      可能
-                    </span>
-                  ) : (
+                label="体入"
+                value={(() => {
+                  if (store.trial_type === "same_day") {
+                    return (
+                      <span
+                        className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
+                        style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
+                      >
+                        即日体入OK
+                      </span>
+                    );
+                  }
+                  if (store.trial_type === "normal") {
+                    return (
+                      <span
+                        className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                        style={{ border: "1px solid rgba(212,175,55,0.4)", color: "rgba(168,130,20,0.9)", background: "rgba(212,175,55,0.06)" }}
+                      >
+                        通常体入あり
+                      </span>
+                    );
+                  }
+                  return (
                     <span
                       className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium"
                       style={{ border: "1px solid rgba(27,37,40,0.15)", color: "rgba(27,37,40,0.45)" }}
                     >
-                      不可
+                      体入なし
                     </span>
-                  )
-                }
+                  );
+                })()}
               />
               {store.recent_hires_summary && (
                 <InfoRow label="直近の採用" value={store.recent_hires_summary} />
@@ -1488,7 +1514,7 @@ function LuxeHero({
   nearestStation,
   averageRating,
   reviewsCount,
-  sameDayTrial,
+  trialType,
 }: {
   images: string[];
   category?: string;
@@ -1497,7 +1523,7 @@ function LuxeHero({
   nearestStation?: string;
   averageRating?: number;
   reviewsCount?: number;
-  sameDayTrial?: boolean;
+  trialType?: "same_day" | "normal" | "none";
 }) {
   const slides = images.length > 0 ? images : [];
   const hasSlides = slides.length > 0;
@@ -1713,12 +1739,20 @@ function LuxeHero({
           {nearestStation && (
             <span className="text-[11px] text-white/80">⌖ {nearestStation}</span>
           )}
-          {sameDayTrial && (
+          {trialType === "same_day" && (
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              即日体験OK
+              即日体入OK
+            </span>
+          )}
+          {trialType === "normal" && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+              style={{ background: "rgba(255,255,255,0.18)" }}
+            >
+              体入あり
             </span>
           )}
         </div>

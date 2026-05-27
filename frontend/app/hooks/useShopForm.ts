@@ -88,7 +88,10 @@ export interface ShopForm {
   trialMaxWage: string;
   interviewStart: string;
   interviewEnd: string;
-  sameDayTrial: string;
+  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし)。
+      フォーム内ではそのまま日本語ラベルを使わず enum string で持ち、表示時に
+      ラベル変換する。 */
+  sameDayTrial: "same_day" | "normal" | "none";
   payrollSystemType: string;
   payrollSystemDescription: string;
 
@@ -156,7 +159,7 @@ export const INITIAL_FORM: ShopForm = {
   backItems: [], feeItems: [], salaryNote: "",
   guaranteePeriod: "", guaranteeDetail: "", normaInfo: "",
   trialMinWage: "", trialMaxWage: "",
-  interviewStart: "", interviewEnd: "", sameDayTrial: "可",
+  interviewStart: "", interviewEnd: "", sameDayTrial: "normal",
   payrollSystemType: "", payrollSystemDescription: "",
   tags: [], description: "", featureText: "",
   expLevel: 50, atmosphere: 50,
@@ -412,7 +415,12 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     trialMaxWage: stripUnit(store.trial_hourly_max ?? store.trial_hourly),
     interviewStart: store.interview_start ?? "",
     interviewEnd: store.interview_end ?? "",
-    sameDayTrial: store.same_day_trial ? "可" : "不可",
+    // 体入タイプ: Resource は trial_type を返す ('same_day'|'normal'|'none')。
+    // 旧フィールド (same_day_trial=boolean) は廃止済みなので参照しない。
+    sameDayTrial: (() => {
+      const t = (store as AnyStore).trial_type;
+      return t === "same_day" || t === "normal" || t === "none" ? t : "none";
+    })(),
     tags: store.feature_tags ?? [],
     description: store.description ?? "",
     featureText: store.features_text ?? "",
@@ -548,7 +556,9 @@ export function formToPayload(
         : null,
     interview_start: form.interviewStart || null,
     interview_end: form.interviewEnd || null,
-    same_day_trial: form.sameDayTrial === "可",
+    // 体入タイプは enum string をそのまま送る (backend は in:same_day,normal,none で
+    // 検証)。JSONB guarantee.same_day_trial に保存される。
+    same_day_trial: form.sameDayTrial,
     feature_tags: form.tags,
     description: form.description,
     features_text: form.featureText,

@@ -73,7 +73,9 @@ class StoreResource extends JsonResource
             'guarantee_period'  => $guarantee['period']  ?? null,
             'guarantee_details' => $guarantee['details'] ?? null,
             'norma_info'        => $guarantee['norma']   ?? null,
-            'same_day_trial'    => (bool) ($guarantee['same_day_trial'] ?? false),
+            // 体入タイプ: 'same_day' | 'normal' | 'none' の 3 値。
+            // 旧 boolean フィールド (same_day_trial) は廃止し、trial_type 一本へ統合。
+            'trial_type'        => self::resolveTrialType($guarantee['same_day_trial'] ?? null),
 
             // interview
             'interview_hours' => self::buildHoursText($interview['start'] ?? null, $interview['end'] ?? null),
@@ -222,6 +224,16 @@ class StoreResource extends JsonResource
 
         $out = mb_substr(implode('', $parts), 0, 140);
         return $out !== '' ? $out : ($name !== '' ? $name : 'recta');
+    }
+
+    /**
+     * 体入タイプ guarantee.same_day_trial を 'same_day' | 'normal' | 'none' に
+     * 正規化。未設定 / 想定外値はすべて 'none'。
+     */
+    private static function resolveTrialType(mixed $v): string
+    {
+        return is_string($v) && in_array($v, ['same_day', 'normal', 'none'], true)
+            ? $v : 'none';
     }
 
     private static function wageUnitToLabel(?string $unit): ?string

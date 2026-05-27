@@ -70,11 +70,10 @@ class PublicStoreController extends Controller
 
         // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
         // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
-        // 絞り込み。リボンを出している条件 (guarantee.same_day_trial=true)
-        // と一致させる。
+        // 絞り込み。「即日体入」リボンを出している店舗を抽出。
         $sort = $request->input('sort', 'newest');
         if ($sort === 'experience_guaranteed') {
-            $query->where('guarantee->same_day_trial', true);
+            $query->where('guarantee->same_day_trial', 'same_day');
         }
 
         switch ($sort) {

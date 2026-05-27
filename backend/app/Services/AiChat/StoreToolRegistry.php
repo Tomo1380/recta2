@@ -170,7 +170,8 @@ class StoreToolRegistry
             $query->where('nearest_station', 'ilike', "%{$args['nearest_station']}%");
         }
         if (!empty($args['same_day_trial'])) {
-            $query->where('guarantee->same_day_trial', true);
+            // 体入タイプは enum string 'same_day' に正規化済み。
+            $query->where('guarantee->same_day_trial', 'same_day');
         }
         if (!empty($args['has_guarantee'])) {
             $query->whereNotNull('guarantee->period')->where('guarantee->period', '!=', '');
@@ -261,7 +262,9 @@ class StoreToolRegistry
             'norma_info' => $guarantee['norma'] ?? null,
             'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
             'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
-            'same_day_trial' => (bool) ($guarantee['same_day_trial'] ?? false),
+            // 体入タイプ: 'same_day' | 'normal' | 'none' (enum string)
+            'trial_type' => in_array($guarantee['same_day_trial'] ?? null, ['same_day', 'normal', 'none'], true)
+                ? $guarantee['same_day_trial'] : 'none',
             'interview_hours' => (isset($interview['start']) || isset($interview['end']))
                 ? (($interview['start'] ?? '') . '〜' . ($interview['end'] ?? ''))
                 : null,
@@ -439,7 +442,9 @@ class StoreToolRegistry
             'hourly_min' => $regular['min'] ?? null,
             'hourly_max' => $regular['max'] ?? null,
             'daily_estimate' => $wage['daily_estimate'] ?? null,
-            'same_day_trial' => (bool) ($guarantee['same_day_trial'] ?? false),
+            // 体入タイプ: 'same_day' | 'normal' | 'none' (enum string)
+            'trial_type' => in_array($guarantee['same_day_trial'] ?? null, ['same_day', 'normal', 'none'], true)
+                ? $guarantee['same_day_trial'] : 'none',
             'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
             'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
             'guarantee_period' => $guarantee['period'] ?? null,

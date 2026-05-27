@@ -339,7 +339,8 @@ class StoreController extends Controller
             'guarantee_period' => 'nullable|string|max:255',
             'guarantee_details' => 'nullable|string',
             'norma_info' => 'nullable|string',
-            'same_day_trial' => 'nullable|boolean',
+            // 体入タイプ: 'same_day' | 'normal' | 'none'。
+            'same_day_trial' => 'nullable|string|in:same_day,normal,none',
             // 旧キー (deprecated, 互換受け入れのみ)
             'trial_avg_hourly' => 'nullable|string|max:255',
             'trial_hourly' => 'nullable|string|max:255',
@@ -426,7 +427,12 @@ class StoreController extends Controller
         if (array_key_exists('guarantee_period', $legacy)) $guarantee['period'] = $legacy['guarantee_period'];
         if (array_key_exists('guarantee_details', $legacy)) $guarantee['details'] = $legacy['guarantee_details'];
         if (array_key_exists('norma_info', $legacy)) $guarantee['norma'] = $legacy['norma_info'];
-        if (array_key_exists('same_day_trial', $legacy)) $guarantee['same_day_trial'] = (bool)$legacy['same_day_trial'];
+        if (array_key_exists('same_day_trial', $legacy)) {
+            // 体入タイプ: 'same_day' | 'normal' | 'none'。それ以外は 'none' に倒す。
+            $raw = $legacy['same_day_trial'];
+            $guarantee['same_day_trial'] = in_array($raw, ['same_day', 'normal', 'none'], true)
+                ? $raw : 'none';
+        }
         if (!empty($guarantee)) {
             $data['guarantee'] = $guarantee;
         }

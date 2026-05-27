@@ -10,7 +10,7 @@ describe("useShopForm", () => {
     expect(result.current.form.area).toBe("");
     expect(result.current.form.lat).toBeNull();
     expect(result.current.form.tags).toEqual([]);
-    expect(result.current.form.sameDayTrial).toBe("可");
+    expect(result.current.form.sameDayTrial).toBe("normal");
     expect(result.current.form.champagnePrices.tequila).toEqual({ amount: "", note: "" });
   });
 
@@ -53,7 +53,7 @@ describe("storeToForm", () => {
       hourly_min: 4000,
       hourly_max: 8000,
       daily_estimate: "50000",
-      same_day_trial: true,
+      trial_type: "same_day",
       feature_tags: ["未経験歓迎"],
       description: "desc",
       features_text: "特徴",
@@ -65,7 +65,7 @@ describe("storeToForm", () => {
     expect(form.area).toBe("六本木");
     expect(form.minWage).toBe("4000");
     expect(form.maxWage).toBe("8000");
-    expect(form.sameDayTrial).toBe("可");
+    expect(form.sameDayTrial).toBe("same_day");
     expect(form.tags).toEqual(["未経験歓迎"]);
   });
 
@@ -189,11 +189,17 @@ describe("formToPayload", () => {
     ]);
   });
 
-  it("converts same_day_trial '可' to true, '不可' to false", () => {
+  it("sends sameDayTrial enum string as-is in payload", () => {
     const { result } = renderHook(() => useShopForm());
-    act(() => result.current.setField("sameDayTrial", "不可"));
+    act(() => result.current.setField("sameDayTrial", "none"));
     const payload = result.current.buildPayload({ storeImages: [], publishStatus: "draft" });
-    expect(payload.same_day_trial).toBe(false);
+    expect(payload.same_day_trial).toBe("none");
+  });
+
+  it("defaults sameDayTrial to 'normal' on init", () => {
+    const { result } = renderHook(() => useShopForm());
+    const payload = result.current.buildPayload({ storeImages: [], publishStatus: "draft" });
+    expect(payload.same_day_trial).toBe("normal");
   });
 
   it("emits null for empty champagne_prices block", () => {

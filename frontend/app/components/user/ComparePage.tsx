@@ -50,7 +50,8 @@ interface ComparableStore {
   trial_hourly?: number | string | null;
   /** @deprecated 旧キー (フォールバック用) */
   trial_avg_hourly?: number | string | null;
-  same_day_trial?: boolean;
+  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  trial_type?: "same_day" | "normal" | "none";
   back_items?: BackItem[];
   norma_info?: string;
   feature_tags?: string[];
@@ -703,9 +704,18 @@ export default function ComparePage({ ids }: ComparePageProps) {
       ],
       trial: [
         {
-          label: "当日体験",
-          values: valid.map((s) => (s.same_day_trial ? "可能" : "—")),
-          bestAt: bestIndex(valid.map((s) => (s.same_day_trial ? 1 : 0))),
+          label: "体入",
+          values: valid.map((s) => {
+            if (s.trial_type === "same_day") return "即日OK";
+            if (s.trial_type === "normal") return "あり";
+            return "なし";
+          }),
+          // best 判定: 即日 > 通常 > なし。0/1/2 にスコア化して max を best に。
+          bestAt: bestIndex(
+            valid.map((s) =>
+              s.trial_type === "same_day" ? 2 : s.trial_type === "normal" ? 1 : 0,
+            ),
+          ),
         },
         { label: "ノルマ", values: valid.map((s) => s.norma_info ?? "—"), bestAt: null },
         {

@@ -71,7 +71,8 @@ export interface Store {
   interview_hours: string | null;
   interview_start: string | null; // 例: "14:00"
   interview_end: string | null;   // 例: "19:00"
-  same_day_trial: boolean;
+  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  trial_type: "same_day" | "normal" | "none";
   feature_tags: string[] | null;
   description: string | null;
   features_text: string | null;
