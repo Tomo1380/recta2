@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
 import { useShopImages } from "~/hooks/useShopImages";
+import { useStepProgression } from "~/hooks/useStepProgression";
 import type { Store } from "~/lib/types";
 import {
   ArrowLeft,
@@ -523,9 +524,11 @@ export function ShopEditPage() {
   // so id will be undefined. Treat both "new" string and missing param as
   // "new shop" mode.
   const isNew = id === "new" || id === undefined;
-  const [currentStep, setCurrentStep] = useState(0);
+  // ステップ管理 (currentStep / completedSteps / next/prev/goTo / 進捗計算) は
+  // useStepProgression に集約 (Phase 3-1)。stepCount は 5 固定 (下の steps 配列と整合)。
+  const stepFlow = useStepProgression(5);
+  const { currentStep, completedSteps } = stepFlow;
   const [showCopyModal, setShowCopyModal] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
 
   // --- State ---
@@ -1130,25 +1133,25 @@ export function ShopEditPage() {
     if (shopImageError) setSaveError(shopImageError);
   }, [shopImageError]);
 
+  // step ナビゲーションは useStepProgression に集約。ハンドラはスクロール処理だけ
+  // 上乗せして wrapping する (旧コードはスクロール込みだったので挙動互換のため)。
   const handleNext = useCallback(() => {
-    setCompletedSteps((prev) => new Set([...prev, currentStep]));
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [currentStep]);
+    stepFlow.next();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stepFlow]);
 
   const handlePrev = useCallback(() => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [currentStep]);
-
-  const handleStepClick = useCallback((index: number) => {
-    setCurrentStep(index);
+    stepFlow.prev();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [stepFlow]);
+
+  const handleStepClick = useCallback(
+    (index: number) => {
+      stepFlow.goTo(index);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [stepFlow],
+  );
 
   // BUG-010: 進捗バーは「『次へ』で踏んだ Step 数」だけで計算していたため、
   // データ入力済みの既存店舗を開いた直後は 0% で固定だった。
@@ -1165,12 +1168,7 @@ export function ShopEditPage() {
     // Step5: その他
     !!(qaItems.length > 0 || staffComment || publishStatus === "published"),
   ];
-  // 「次へ」で完了マークされた Step も加味する（重複は Set でケア）。
-  const visitedSet = new Set([
-    ...Array.from(completedSteps),
-    ...stepFilled.map((f, i) => f ? i : -1).filter((i) => i >= 0),
-  ]);
-  const progress = Math.round((visitedSet.size / steps.length) * 100);
+  const { progress } = stepFlow.computeProgress(stepFilled);
 
   // --- Step Content Renderers ---
   const renderStep1 = () => (
