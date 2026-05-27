@@ -32,12 +32,21 @@ export async function apiFetch<T = unknown>(
   });
 
   if (res.status === 401) {
-    if (typeof window !== "undefined") {
+    // ログイン/ログアウト endpoint からの 401 はリダイレクトしない。
+    // login 画面で「資格情報違い → 401」が返るとき、リダイレクトすると
+    // window.location.href でページ全リロードが走り、setError したエラー
+    // メッセージが一瞬で消えてしまう (ログインできない症状の原因)。
+    // それ以外 (期限切れトークンで /admin/me 等が叩かれたケース) は従来通り
+    // localStorage を掃除してログイン画面へ。
+    const isAuthEndpoint = path === "/admin/login" || path === "/admin/logout";
+    if (!isAuthEndpoint && typeof window !== "undefined") {
       localStorage.removeItem("admin_token");
       localStorage.removeItem("admin_user");
       window.location.href = "/admin/login";
     }
-    throw new ApiError(401, { message: "Unauthorized" });
+    // body をパースしてエラー詳細を渡す (resp の message を活かす)
+    const data = await res.json().catch(() => ({ message: "Unauthorized" }));
+    throw new ApiError(401, data);
   }
 
   if (!res.ok) {
@@ -73,6 +82,8 @@ export async function apiUpload<T = unknown>(
   });
 
   if (res.status === 401) {
+    // upload は admin 認証下でしか叩かないので、401 はトークン失効と判断
+    // してログイン画面へ。
     if (typeof window !== "undefined") {
       localStorage.removeItem("admin_token");
       localStorage.removeItem("admin_user");
@@ -130,12 +141,17 @@ export async function userApiFetch<T = unknown>(
   });
 
   if (res.status === 401) {
-    if (typeof window !== "undefined") {
+    // line-login endpoint からの 401 はリダイレクトしない (login 画面で
+    // エラー表示できなくなるため)。それ以外は localStorage を掃除して
+    // top または login 画面へ。
+    const isAuthEndpoint = path.startsWith("/auth/line") || path === "/auth/logout";
+    if (!isAuthEndpoint && typeof window !== "undefined") {
       localStorage.removeItem("user_token");
       localStorage.removeItem("user_data");
       window.location.href = "/login";
     }
-    throw new ApiError(401, { message: "Unauthorized" });
+    const data = await res.json().catch(() => ({ message: "Unauthorized" }));
+    throw new ApiError(401, data);
   }
 
   if (!res.ok) {

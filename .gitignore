@@ -74,6 +74,12 @@ chat-test.cjs
 top-screenshot.cjs
 top-screenshot.png
 recta-*.png
+# レポルートに置いたスクショ等 (frontend/public, docs/images など正規の置き場
+# にあるものは別途追加で除外しない)。誤コミット防止用。
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
 
 # orval inputs are copies of backend/api.json (the real source of truth).
 # The generated/ outputs ARE committed (so PR diffs show API changes) but
