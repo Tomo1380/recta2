@@ -2891,24 +2891,17 @@ function ChampagnePricesSection({
       <div
         className="relative px-5 py-7"
         style={{
+          // ベースは深い緑黒。元は ambient gold orb を右上に重ねていたが、
+          // orb の bounding-box 右端と下端で透明境界が直線になって「黒と
+          // 黄色で半分に分かれて見える」現象が出たので廃止。代わりに
+          // 背景自体の radial-gradient で右上にうっすら金を入れて
+          // 「ゴールド気配」だけ残す。
           background:
-            "radial-gradient(ellipse at top, #1b2528 0%, #0f1618 60%, #050708 100%)",
+            "radial-gradient(120% 100% at 80% 0%, rgba(212,175,55,0.12) 0%, transparent 55%), radial-gradient(ellipse at top, #1b2528 0%, #0f1618 60%, #050708 100%)",
           border: "1px solid rgba(212,175,55,0.28)",
           boxShadow: "0 8px 28px rgba(0,0,0,0.25)",
         }}
       >
-        {/* Ambient gold orb, like the rest of the user site */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute"
-          style={{
-            top: "-30%",
-            right: "-15%",
-            width: "65%",
-            height: "70%",
-            background: "radial-gradient(circle, rgba(212,175,55,0.18), transparent 70%)",
-          }}
-        />
 
         {visible.length > 0 ? (
           <>

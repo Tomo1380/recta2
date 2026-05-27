@@ -33,7 +33,7 @@ export default function ReviewPage() {
   const { id } = useParams();
   const storeId = Number(id);
   const navigate = useNavigate();
-  const { isAuthenticated, loading: authLoading } = useUserAuth();
+  const { isAuthenticated, loading: authLoading, user } = useUserAuth();
 
   const [store, setStore] = useState<Store | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
@@ -41,10 +41,16 @@ export default function ReviewPage() {
   const [hoveredRating, setHoveredRating] = useState(0);
   const [body, setBody] = useState("");
   const [tweetUrl, setTweetUrl] = useState("");
+  // ニックネーム: ログイン user に保存済みなら初期表示、未保存なら空。
+  // 投稿時に変更/設定して送信 → 成功時に user.nickname に保存される。
+  const [nickname, setNickname] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => { setHydrated(true); }, []);
+  useEffect(() => {
+    if (user?.nickname) setNickname(user.nickname);
+  }, [user?.nickname]);
 
   const tweetIdMatch = tweetUrl.match(/https?:\/\/(?:x|twitter|mobile\.twitter)\.com\/([^/]+)\/status\/(\d+)/);
   const tweetId = tweetIdMatch?.[2];
@@ -78,6 +84,15 @@ export default function ReviewPage() {
   const handleSubmit = async () => {
     setError("");
 
+    const trimmedNickname = nickname.trim();
+    if (!trimmedNickname) {
+      setError("ニックネームを入力してください");
+      return;
+    }
+    if (trimmedNickname.length > 20) {
+      setError("ニックネームは20文字以内で入力してください");
+      return;
+    }
     if (rating === 0) {
       setError("評価を選択してください");
       return;
@@ -93,6 +108,17 @@ export default function ReviewPage() {
 
     setSubmitting(true);
     try {
+      // 口コミ投稿前にニックネームを保存。次回フォームを開いたとき
+      // user.nickname として戻ってきてプリフィルされる。
+      if (trimmedNickname !== (user?.nickname ?? "")) {
+        try {
+          await userApi.put("/user/profile", { nickname: trimmedNickname });
+        } catch {
+          // プロフィール保存に失敗しても口コミ投稿は続ける。
+          // 表示名は API レスポンス側で nickname || line_display_name の
+          // フォールバックなので最悪 LINE 名で表示される。
+        }
+      }
       await userApi.post(`/stores/${storeId}/reviews`, {
         rating,
         body,
@@ -227,6 +253,27 @@ export default function ReviewPage() {
                   </span>
                 )}
               </div>
+            </div>
+
+            {/* Nickname */}
+            <div className="space-y-2">
+              <Label htmlFor="review-nickname">
+                ニックネーム
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  必須・口コミに表示されます (1〜20文字)
+                </span>
+              </Label>
+              <Input
+                id="review-nickname"
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="例: ゆきな"
+                maxLength={20}
+              />
+              <p className="text-xs text-muted-foreground">
+                LINE の表示名は使われません。投稿後に保存され、次回からは自動で入力欄に表示されます。
+              </p>
             </div>
 
             {/* Body */}
