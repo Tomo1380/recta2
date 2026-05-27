@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
 import { useShopImages } from "~/hooks/useShopImages";
 import { useStepProgression } from "~/hooks/useStepProgression";
+import { formToPayload, storeToForm, type ShopForm } from "~/hooks/useShopForm";
 import type { Store } from "~/lib/types";
 import {
   ArrowLeft,
@@ -682,212 +683,88 @@ export function ShopEditPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Phase 3-2: 旧 200 行の populateFromStore は useShopForm の storeToForm に移管。
+  // 結果の Partial<ShopForm> を個別 setter にディスパッチする薄い wrapper だけ残す。
+  // 88 useState 自体は historical reasons でここに残してあるが、変換ロジックは
+  // hook 内で Unit テストできる純粋関数になった。
   const populateFromStore = useCallback((store: Store) => {
-    setShopName(store.name || "");
-    setArea(store.area || "");
-    setAddress(store.address || "");
-    setLat(typeof (store as any).lat === "number" ? (store as any).lat : (store as any).lat ? Number((store as any).lat) : null);
-    setLng(typeof (store as any).lng === "number" ? (store as any).lng : (store as any).lng ? Number((store as any).lng) : null);
-    setStation(store.nearest_station || "");
-    setCategory(store.category || "");
-    setOpeningTime(store.opening_time || "");
-    setClosingTime(store.closing_time || "");
-    setHoliday(store.holidays || "");
-    setPhone(store.phone || "");
-    setWebsite(store.website_url || "");
-    // Prefer the new ordered videos[]; fall back to the legacy single video_url
-    // so stores that haven't been re-saved since the migration still render.
-    if (store.videos && store.videos.length > 0) {
-      setVideos(
-        store.videos.map((v) => ({
-          video_url: v.video_url,
-          label: v.label ?? "",
-          description: v.description ?? "",
-        })),
-      );
-    } else if (store.video_url) {
-      setVideos([{ video_url: store.video_url, label: "店舗紹介動画", description: "" }]);
-    } else {
-      setVideos([]);
-    }
-
-    setStaffPhotos(
-      (store.staff_photos ?? []).map((p) => ({
-        image_url: p.image_url,
-        caption: p.caption ?? "",
-        instagram_url: p.instagram_url ?? "",
-        staff_type: p.staff_type ?? "",
-      })),
-    );
-    setMinWage(store.hourly_min?.toString() || "");
-    setMaxWage(store.hourly_max?.toString() || "");
-    setDailyPay(store.daily_estimate || "");
-    setBackItems((store.back_items || []).map(i => ({ label: i.label, value: i.amount })));
-    setFeeItems((store.fee_items || []).map(i => ({ label: i.label, value: i.amount })));
-    setSalaryNote(store.salary_notes || "");
-    setGuaranteePeriod(store.guarantee_period || "");
-    setGuaranteeDetail(store.guarantee_details || "");
-    setNormaInfo(store.norma_info || "");
-    // BUG-013: 既存DBに `"5,000円"` のような単位込み文字列が残っていても、
-    // input type=number に流すと無効値で空欄化するため、数字以外を剥がして拾う。
-    const stripUnit = (v: unknown) =>
-      v == null ? "" : String(v).replace(/[^\d]/g, "");
-    setAvgWage(stripUnit(store.trial_avg_hourly));
-    setTrialWage(stripUnit(store.trial_hourly));
-    setInterviewStart(store.interview_start || "");
-    setInterviewEnd(store.interview_end || "");
-    setSameDayTrial(store.same_day_trial ? "可" : "不可");
-    setTags(store.feature_tags || []);
-    setDescription(store.description || "");
-    setFeatureText(store.features_text || "");
-    const reqDocs = store.required_documents as any;
-    if (reqDocs && !Array.isArray(reqDocs)) {
-      setDocuments(reqDocs.documents || []);
-      setDocNote(reqDocs.notes || "");
-    } else {
-      setDocuments(reqDocs || []);
-    }
-    setQaItems((store.qa || []).map(q => ({ label: q.question, value: q.answer })));
-
-    // Analysis data
-    const analysis = store.analysis as any;
-    if (analysis) {
-      setExpLevel(analysis.experience_level ?? analysis.exp_level ?? 50);
-      setAtmosphere(analysis.atmosphere ?? 50);
-      const castStyle = analysis.cast_style || {};
-      // 値が無い (DB JSONB に未保存) なら空文字。デフォルト 30/40/15/15 を
-      // 立てると未編集の店舗が一律で「綺麗系30 可愛い系40...」に揃って嘘の分析になる。
-      setCastBijin((castStyle.beauty ?? analysis.cast_bijin)?.toString() ?? "");
-      setCastKawaii((castStyle.cute ?? analysis.cast_kawaii)?.toString() ?? "");
-      setCastGlamour((castStyle.glamour ?? analysis.cast_glamour)?.toString() ?? "");
-      setCastNatural((castStyle.natural ?? analysis.cast_natural)?.toString() ?? "");
-      setClientAge((analysis.customer_age || analysis.client_age || []).map((c: any) => ({ label: c.label, value: c.ratio?.toString() ?? c.value ?? "" })));
-      setDrinkStyle(analysis.drinking_style ?? analysis.drink_style ?? 50);
-    }
-
-    // Interview info
-    const interview = store.interview_info as any;
-    if (interview) {
-      setDressAdvice(interview.dress_advice || "");
-      setDressTips(interview.tips || interview.dress_tips || []);
-      setDressCode(interview.dress_code || "");
-      setHiringCriteria(interview.criteria || interview.hiring_criteria || "");
-      setInterviewDialog((interview.dialog || []).map((d: any) => ({ label: d.text ?? d.label ?? "", value: d.speaker ?? d.value ?? "" })));
-    }
-
-    // shift_info（独立フィールド、scheduleオブジェクトからも互換読み込み）
-    setShiftInfo(store.shift_info || (store.schedule as any)?.shift_info || "");
-
-    // Recent hires
-    if (store.recent_hires) {
-      setHiringEntries((store.recent_hires as any[]).map(h => ({
-        month: h.month || "",
-        count: h.count?.toString() || "",
-        examples: h.examples || [],
-      })));
-    }
-    // BUG-Live-06: 「直近の合計テキスト」(recent_hires_summary) を populate
-    // から拾い漏れていたため、編集画面を開くと空欄になり、未編集のまま保存
-    // すると DB の値が空文字で上書きされる事故が起きていた。
-    setHiringTotal((store as any).recent_hires_summary || "");
-
-    // Staff comment
-    const staffData = store.staff_comment as any;
-    if (staffData && typeof staffData === 'object') {
-      setStaffName(staffData.name || "");
-      setStaffRole(staffData.role || "");
-      setStaffComment(staffData.comment || "");
-      setSupportItems(staffData.supports || staffData.support_items || []);
-    } else if (typeof staffData === 'string') {
-      setStaffComment(staffData);
-    }
-
-    // New schema fields
-    setTransferDescription((store as any).transfer_description || "");
-    setTransferKm((store as any).transfer_km || "");
-    const tz: any[] = (store as any).transfer_zones || [];
-    setTransferZones(
-      Array.isArray(tz)
-        ? tz.map((z: any) => ({
-            label: z?.label ?? "",
-            radius_km: z?.radius_km != null ? String(z.radius_km) : "",
-            fee: z?.fee != null ? String(z.fee) : "",
-            color: z?.color ?? "",
-          }))
-        : []
-    );
-    const rs: any[] = (store as any).related_store_ids || [];
-    setRelatedStoreIds(Array.isArray(rs) ? rs.filter((n: any) => Number.isFinite(Number(n))).map((n: any) => Number(n)) : []);
-    setPayrollSystemType((store as any).payroll_system_type || "");
-    setPayrollSystemDescription((store as any).payroll_system_description || "");
-    setChampagneDescription((store as any).champagne_description || "");
-
-    // FB-driven detail features (Part B)
-    const cp = (store as any).champagne_prices || {};
-    setChampagnePrices({
-      tequila: {
-        amount: cp.tequila?.amount != null ? String(cp.tequila.amount) : "",
-        note: cp.tequila?.note ?? "",
-      },
-      belle_epoque: {
-        amount: cp.belle_epoque?.amount != null ? String(cp.belle_epoque.amount) : "",
-        note: cp.belle_epoque?.note ?? "",
-      },
-      armand: {
-        amount: cp.armand?.amount != null ? String(cp.armand.amount) : "",
-        note: cp.armand?.note ?? "",
-      },
-      lavay: {
-        amount: cp.lavay?.amount != null ? String(cp.lavay.amount) : "",
-        note: cp.lavay?.note ?? "",
-      },
-    });
-
-    const dressDetail = (store as any).dress_code_detail
-      ?? (typeof (store as any).dress_code === "object" ? (store as any).dress_code : null);
-    if (dressDetail && typeof dressDetail === "object") {
-      setDressCodeDescription(dressDetail.description ?? "");
-      setDressCodeOk(
-        (dressDetail.ok_examples ?? []).map((e: any) => ({
-          note: e?.note ?? "",
-          image_url: e?.image_url ?? "",
-        })),
-      );
-      setDressCodeNg(
-        (dressDetail.ng_examples ?? []).map((e: any) => ({
-          note: e?.note ?? "",
-          image_url: e?.image_url ?? "",
-        })),
-      );
-    } else {
-      setDressCodeDescription("");
-      setDressCodeOk([]);
-      setDressCodeNg([]);
-    }
-
-    const sf = (store as any).set_fee || {};
-    setSetFeeList(
-      (sf.items ?? []).map((it: any) => ({
-        label: it?.label ?? "",
-        amount: it?.amount != null ? String(it.amount) : "",
-        note: it?.note ?? "",
-      })),
-    );
-    setSetFeeNotes(sf.notes ?? "");
-
-    setRectaEpisodes(
-      ((store as any).recta_episodes ?? []).map((ep: any) => ({
-        name: ep?.name ?? "",
-        comment: ep?.comment ?? "",
-        instagram_url: ep?.instagram_url ?? "",
-        photo_url: ep?.photo_url ?? "",
-      })),
-    );
-
-    // Publish status & images
+    const f = storeToForm(store);
+    if (f.shopName !== undefined) setShopName(f.shopName);
+    if (f.area !== undefined) setArea(f.area);
+    if (f.address !== undefined) setAddress(f.address);
+    if (f.lat !== undefined) setLat(f.lat);
+    if (f.lng !== undefined) setLng(f.lng);
+    if (f.station !== undefined) setStation(f.station);
+    if (f.category !== undefined) setCategory(f.category);
+    if (f.openingTime !== undefined) setOpeningTime(f.openingTime);
+    if (f.closingTime !== undefined) setClosingTime(f.closingTime);
+    if (f.holiday !== undefined) setHoliday(f.holiday);
+    if (f.phone !== undefined) setPhone(f.phone);
+    if (f.website !== undefined) setWebsite(f.website);
+    if (f.videos !== undefined) setVideos(f.videos);
+    if (f.staffPhotos !== undefined) setStaffPhotos(f.staffPhotos);
+    if (f.minWage !== undefined) setMinWage(f.minWage);
+    if (f.maxWage !== undefined) setMaxWage(f.maxWage);
+    if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
+    if (f.backItems !== undefined) setBackItems(f.backItems);
+    if (f.feeItems !== undefined) setFeeItems(f.feeItems);
+    if (f.salaryNote !== undefined) setSalaryNote(f.salaryNote);
+    if (f.guaranteePeriod !== undefined) setGuaranteePeriod(f.guaranteePeriod);
+    if (f.guaranteeDetail !== undefined) setGuaranteeDetail(f.guaranteeDetail);
+    if (f.normaInfo !== undefined) setNormaInfo(f.normaInfo);
+    if (f.avgWage !== undefined) setAvgWage(f.avgWage);
+    if (f.trialWage !== undefined) setTrialWage(f.trialWage);
+    if (f.interviewStart !== undefined) setInterviewStart(f.interviewStart);
+    if (f.interviewEnd !== undefined) setInterviewEnd(f.interviewEnd);
+    if (f.sameDayTrial !== undefined) setSameDayTrial(f.sameDayTrial);
+    if (f.payrollSystemType !== undefined) setPayrollSystemType(f.payrollSystemType);
+    if (f.payrollSystemDescription !== undefined) setPayrollSystemDescription(f.payrollSystemDescription);
+    if (f.tags !== undefined) setTags(f.tags);
+    if (f.description !== undefined) setDescription(f.description);
+    if (f.featureText !== undefined) setFeatureText(f.featureText);
+    if (f.expLevel !== undefined) setExpLevel(f.expLevel);
+    if (f.atmosphere !== undefined) setAtmosphere(f.atmosphere);
+    if (f.castBijin !== undefined) setCastBijin(f.castBijin);
+    if (f.castKawaii !== undefined) setCastKawaii(f.castKawaii);
+    if (f.castGlamour !== undefined) setCastGlamour(f.castGlamour);
+    if (f.castNatural !== undefined) setCastNatural(f.castNatural);
+    if (f.clientAge !== undefined) setClientAge(f.clientAge);
+    if (f.drinkStyle !== undefined) setDrinkStyle(f.drinkStyle);
+    if (f.dressAdvice !== undefined) setDressAdvice(f.dressAdvice);
+    if (f.dressTips !== undefined) setDressTips(f.dressTips);
+    if (f.dressCode !== undefined) setDressCode(f.dressCode);
+    if (f.hiringCriteria !== undefined) setHiringCriteria(f.hiringCriteria);
+    if (f.interviewDialog !== undefined) setInterviewDialog(f.interviewDialog);
+    if (f.documents !== undefined) setDocuments(f.documents);
+    if (f.docNote !== undefined) setDocNote(f.docNote);
+    if (f.shiftInfo !== undefined) setShiftInfo(f.shiftInfo);
+    if (f.hiringEntries !== undefined) setHiringEntries(f.hiringEntries);
+    if (f.hiringTotal !== undefined) setHiringTotal(f.hiringTotal);
+    if (f.transferDescription !== undefined) setTransferDescription(f.transferDescription);
+    if (f.transferKm !== undefined) setTransferKm(f.transferKm);
+    if (f.transferZones !== undefined) setTransferZones(f.transferZones);
+    if (f.relatedStoreIds !== undefined) setRelatedStoreIds(f.relatedStoreIds);
+    if (f.champagneDescription !== undefined) setChampagneDescription(f.champagneDescription);
+    if (f.champagnePrices !== undefined) setChampagnePrices(f.champagnePrices);
+    if (f.dressCodeDescription !== undefined) setDressCodeDescription(f.dressCodeDescription);
+    if (f.dressCodeOk !== undefined) setDressCodeOk(f.dressCodeOk);
+    if (f.dressCodeNg !== undefined) setDressCodeNg(f.dressCodeNg);
+    if (f.setFeeList !== undefined) setSetFeeList(f.setFeeList);
+    if (f.setFeeNotes !== undefined) setSetFeeNotes(f.setFeeNotes);
+    if (f.rectaEpisodes !== undefined) setRectaEpisodes(f.rectaEpisodes);
+    if (f.qaItems !== undefined) setQaItems(f.qaItems);
+    if (f.staffName !== undefined) setStaffName(f.staffName);
+    if (f.staffRole !== undefined) setStaffRole(f.staffRole);
+    if (f.staffComment !== undefined) setStaffComment(f.staffComment);
+    if (f.supportItems !== undefined) setSupportItems(f.supportItems);
+    // publish_status と images は ShopForm 範囲外
     setPublishStatus(store.publish_status || "draft");
-    setStoreImages((store.images || []).map((img: any) => typeof img === 'string' ? img : img.url));
-  }, []);
+    setStoreImages(
+      ((store.images as unknown[]) || []).map((img) =>
+        typeof img === "string" ? img : (img as { url: string }).url,
+      ),
+    );
+  }, [setStoreImages]);
 
   const [notFound, setNotFound] = useState(false);
   useEffect(() => {
@@ -947,162 +824,49 @@ export function ShopEditPage() {
     });
   }, [showCopyModal]);
 
-  const buildPayload = useCallback(() => ({
-    name: shopName,
-    area,
-    address,
-    lat,
-    lng,
-    nearest_station: station,
-    category,
-    business_hours: openingTime && closingTime ? `${openingTime}〜${closingTime}` : null,
-    opening_time: openingTime || null,
-    closing_time: closingTime || null,
-    holidays: holiday,
-    phone,
-    website_url: website,
-    // store_videos に同期される。空URLや空欄行は controller 側で drop される。
-    videos: videos
-      .filter((v) => v.video_url.trim() !== "")
-      .map((v) => ({
-        video_url: v.video_url.trim(),
-        label: v.label.trim() || null,
-        description: v.description.trim() || null,
-      })),
-    // store_staff_photos に同期される。
-    staff_photos: staffPhotos
-      .filter((p) => p.image_url.trim() !== "")
-      .map((p) => ({
-        image_url: p.image_url.trim(),
-        caption: p.caption.trim() || null,
-        instagram_url: p.instagram_url.trim() || null,
-        staff_type: p.staff_type.trim() || null,
-      })),
-    hourly_min: minWage ? Number(minWage) : null,
-    hourly_max: maxWage ? Number(maxWage) : null,
-    daily_estimate: dailyPay,
-    back_items: backItems.filter(i => i.label).map(i => ({ label: i.label, amount: i.value })),
-    fee_items: feeItems.filter(i => i.label).map(i => ({ label: i.label, amount: i.value })),
-    salary_notes: salaryNote,
-    guarantee_period: guaranteePeriod,
-    guarantee_details: guaranteeDetail,
-    norma_info: normaInfo,
-    trial_avg_hourly: avgWage,
-    trial_hourly: trialWage,
-    interview_hours: interviewStart && interviewEnd ? `${interviewStart}〜${interviewEnd}` : null,
-    interview_start: interviewStart || null,
-    interview_end: interviewEnd || null,
-    same_day_trial: sameDayTrial === "可",
-    feature_tags: tags,
-    description,
-    features_text: featureText,
-    required_documents: { documents: documents.filter(Boolean), notes: docNote },
-    qa: qaItems.filter(i => i.label).map(i => ({ question: i.label, answer: i.value })),
-    analysis: {
-      experience_level: expLevel,
-      atmosphere,
-      cast_style: {
-        beauty: Number(castBijin) || 0,
-        cute: Number(castKawaii) || 0,
-        glamour: Number(castGlamour) || 0,
-        natural: Number(castNatural) || 0,
-      },
-      customer_age: clientAge.filter(c => c.label).map(c => ({ label: c.label, ratio: Number(c.value) || 0 })),
-      drinking_style: drinkStyle,
-    },
-    interview_info: {
-      dress_advice: dressAdvice,
-      tips: dressTips.filter(Boolean),
-      dress_code: dressCode,
-      criteria: hiringCriteria,
-      dialog: interviewDialog.filter(i => i.label).map(i => ({ text: i.label, speaker: i.value })),
-    },
-    schedule: shiftInfo ? { shift_info: shiftInfo } : null,
-    recent_hires: hiringEntries.map(h => ({
-      month: h.month,
-      count: Number(h.count) || 0,
-      examples: h.examples,
-    })),
-    recent_hires_summary: hiringTotal,
-    staff_comment: {
-      name: staffName,
-      role: staffRole,
-      comment: staffComment,
-      supports: supportItems.filter(Boolean),
-    },
-    transfer_description: transferDescription,
-    transfer_km: transferKm,
-    transfer_zones: transferZones
-      .filter((z) => z.label.trim() || z.radius_km.trim() || z.fee.trim())
-      .map((z) => ({
-        label: z.label.trim() || null,
-        // 数値で送る方が API/UI ともに扱いやすい。空欄は null。
-        radius_km: z.radius_km.trim() ? (Number(z.radius_km) || z.radius_km.trim()) : null,
-        fee: z.fee.trim() ? (Number(z.fee.replace(/[^\d.-]/g, "")) || z.fee.trim()) : null,
-        color: z.color.trim() || null,
-      })),
-    related_store_ids: relatedStoreIds.length > 0 ? relatedStoreIds : null,
-    payroll_system_type: payrollSystemType || null,
-    payroll_system_description: payrollSystemDescription,
-    champagne_description: champagneDescription,
-    // Part B: FB-driven detail-page features
-    champagne_prices: (() => {
-      const out: Record<string, { amount: number; note?: string }> = {};
-      (Object.keys(champagnePrices) as Array<keyof typeof champagnePrices>).forEach((k) => {
-        const item = champagnePrices[k];
-        const trimmedAmount = item.amount.trim();
-        if (!trimmedAmount && !item.note.trim()) return;
-        const num = Number(trimmedAmount.replace(/[^\d.-]/g, ""));
-        if (!Number.isFinite(num) && !item.note.trim()) return;
-        out[k as string] = {
-          amount: Number.isFinite(num) ? num : 0,
-          ...(item.note.trim() ? { note: item.note.trim() } : {}),
-        };
-      });
-      return Object.keys(out).length > 0 ? out : null;
-    })(),
-    dress_code: (dressCodeDescription.trim() || dressCodeOk.length > 0 || dressCodeNg.length > 0)
-      ? {
-          description: dressCodeDescription.trim() || undefined,
-          ok_examples: dressCodeOk
-            .filter((e) => e.note.trim() || e.image_url.trim())
-            .map((e) => ({
-              note: e.note.trim() || undefined,
-              image_url: e.image_url.trim() || undefined,
-            })),
-          ng_examples: dressCodeNg
-            .filter((e) => e.note.trim() || e.image_url.trim())
-            .map((e) => ({
-              note: e.note.trim() || undefined,
-              image_url: e.image_url.trim() || undefined,
-            })),
-        }
-      : null,
-    set_fee: (setFeeList.some((it) => it.label.trim() || it.amount.trim()) || setFeeNotes.trim())
-      ? {
-          items: setFeeList
-            .filter((it) => it.label.trim() || it.amount.trim())
-            .map((it) => {
-              const num = Number(it.amount.replace(/[^\d.-]/g, ""));
-              return {
-                label: it.label.trim(),
-                amount: Number.isFinite(num) ? num : it.amount.trim(),
-                ...(it.note.trim() ? { note: it.note.trim() } : {}),
-              };
-            }),
-          ...(setFeeNotes.trim() ? { notes: setFeeNotes.trim() } : {}),
-        }
-      : null,
-    recta_episodes: rectaEpisodes
-      .filter((ep) => ep.name.trim())
-      .map((ep) => ({
-        name: ep.name.trim(),
-        ...(ep.comment.trim() ? { comment: ep.comment.trim() } : {}),
-        ...(ep.instagram_url.trim() ? { instagram_url: ep.instagram_url.trim() } : {}),
-        ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
-      })),
-    publish_status: publishStatus,
-  }), [shopName, area, address, lat, lng, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, transferZones, relatedStoreIds, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
+  // Phase 3-2: 旧 240 行の buildPayload は useShopForm の formToPayload に移管。
+  // 個別 useState を ShopForm 形にまとめて変換関数に渡す薄い wrapper だけ残す。
+  // 88 useState 自体は historical reasons でここに残してあるが、ロジックは
+  // hook 内で Unit テストできる純粋関数になった。
+  const buildPayload = useCallback(() => {
+    const form: ShopForm = {
+      shopName, area, address, lat, lng, station, category,
+      openingTime, closingTime, holiday, phone, website,
+      videos, staffPhotos,
+      minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+      guaranteePeriod, guaranteeDetail, normaInfo,
+      avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial,
+      payrollSystemType, payrollSystemDescription,
+      tags, description, featureText, expLevel, atmosphere,
+      castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
+      dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
+      documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+      transferDescription, transferKm, transferZones, relatedStoreIds,
+      champagneDescription, champagnePrices,
+      dressCodeDescription, dressCodeOk, dressCodeNg,
+      setFeeList, setFeeNotes, rectaEpisodes, qaItems,
+      staffName, staffRole, staffComment, supportItems,
+    };
+    return formToPayload(form, { storeImages: [], publishStatus });
+  }, [
+    shopName, area, address, lat, lng, station, category,
+    openingTime, closingTime, holiday, phone, website,
+    videos, staffPhotos,
+    minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+    guaranteePeriod, guaranteeDetail, normaInfo,
+    avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial,
+    payrollSystemType, payrollSystemDescription,
+    tags, description, featureText, expLevel, atmosphere,
+    castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
+    dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
+    documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+    transferDescription, transferKm, transferZones, relatedStoreIds,
+    champagneDescription, champagnePrices,
+    dressCodeDescription, dressCodeOk, dressCodeNg,
+    setFeeList, setFeeNotes, rectaEpisodes, qaItems,
+    staffName, staffRole, staffComment, supportItems,
+    publishStatus,
+  ]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
