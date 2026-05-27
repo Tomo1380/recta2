@@ -256,14 +256,28 @@ class PublicStoreController extends Controller
         // on the top page. Only published reviews from published stores.
         $recentReviews = Review::with([
                 'user:id,line_display_name,line_picture_url,use_line_avatar,nickname',
-                'store:id,name,area,category',
+                // images はトップの「新着クチコミ」カードでサムネ表示用に必要。
+                'store:id,name,area,category,images',
             ])
             ->where('reviews.status', 'published')
             ->whereHas('store', fn ($q) => $q->where('publish_status', 'published'))
             ->orderByDesc('created_at')
             ->limit(8)
             ->get()
-            ->map(fn ($r) => [
+            ->map(function ($r) {
+                // images は string[] か [{url, order}] の両方が来うる (旧/新)。
+                // 1 枚目を URL 文字列で取り出す。
+                $imageUrl = null;
+                $images = is_array($r->store?->images) ? $r->store->images : [];
+                if (!empty($images)) {
+                    $first = $images[0];
+                    if (is_string($first)) {
+                        $imageUrl = $first;
+                    } elseif (is_array($first)) {
+                        $imageUrl = $first['url'] ?? null;
+                    }
+                }
+                return [
                 'id' => $r->id,
                 'rating' => $r->rating,
                 'body' => $r->body,
@@ -275,6 +289,7 @@ class PublicStoreController extends Controller
                     'name' => $r->store->name,
                     'area' => $r->store->area,
                     'category' => $r->store->category,
+                    'image_url' => $imageUrl,
                 ] : null,
                 'user' => $r->user ? [
                     'line_display_name' => $r->user->line_display_name,
@@ -282,7 +297,8 @@ class PublicStoreController extends Controller
                     'use_line_avatar' => (bool) $r->user->use_line_avatar,
                     'nickname' => $r->user->nickname,
                 ] : null,
-            ])
+                ];
+            })
             ->values();
 
         return response()->json([
