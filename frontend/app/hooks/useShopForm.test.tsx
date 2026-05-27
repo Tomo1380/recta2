@@ -92,14 +92,25 @@ describe("storeToForm", () => {
     expect(form.videos?.[0].video_url).toBe("https://a.example.com/v.mp4");
   });
 
-  it("strips non-digits from trial_avg_hourly (BUG-013)", () => {
+  it("strips non-digits from trial hourly min/max (BUG-013)", () => {
+    const store = {
+      trial_hourly_min: "5,000円",
+      trial_hourly_max: "6,500円",
+    } as unknown as Store;
+    const form = storeToForm(store);
+    expect(form.trialMinWage).toBe("5000");
+    expect(form.trialMaxWage).toBe("6500");
+  });
+
+  it("falls back to legacy trial_avg_hourly/trial_hourly when new keys are missing", () => {
     const store = {
       trial_avg_hourly: "5,000円",
       trial_hourly: "3,500円",
     } as unknown as Store;
     const form = storeToForm(store);
-    expect(form.avgWage).toBe("5000");
-    expect(form.trialWage).toBe("3500");
+    // 旧 avg_hourly → 最低額、旧 trial_hourly → 最高額 にマップ
+    expect(form.trialMinWage).toBe("5000");
+    expect(form.trialMaxWage).toBe("3500");
   });
 
   it("preserves dress_code_detail object structure", () => {

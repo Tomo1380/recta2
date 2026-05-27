@@ -56,12 +56,14 @@ import { pushViewedStore } from "~/lib/viewed-stores";
 
 interface BackItem {
   label: string;
-  amount: number;
+  // バックは「500円」「10%」「5,000〜10,000円」のように単位込みで運営が
+  // 入力するため文字列で扱う。表示はそのまま render。
+  amount: string | number;
 }
 
 interface FeeItem {
   label: string;
-  amount: number;
+  amount: string | number;
 }
 
 interface StoreImage {
@@ -241,9 +243,11 @@ export interface StoreDetailStore {
   shift_info: string | null;
   phone: string;
   website_url: string;
-  hourly_min: number;
-  hourly_max: number;
-  daily_estimate: number;
+  hourly_min: number | null;
+  hourly_max: number | null;
+  /** 日給目安。Resource は文字列 (例: "30,000円〜60,000円") を返す想定だが、
+      過去データは number のこともある。表示側で両対応する。 */
+  daily_estimate: number | string | null;
   back_items: BackItem[];
   fee_items: FeeItem[];
   salary_notes: string;
@@ -253,8 +257,14 @@ export interface StoreDetailStore {
   unit_wage_type: string | null;
   payroll_system_type: string | null;
   payroll_system_description: string | null;
-  trial_avg_hourly: number;
-  trial_hourly: number;
+  /** 体入時給（最低額） */
+  trial_hourly_min: number | string | null;
+  /** 体入時給（最高額） */
+  trial_hourly_max: number | string | null;
+  /** @deprecated 旧キー — フォールバックのため残置 */
+  trial_avg_hourly?: number | string | null;
+  /** @deprecated 旧キー — フォールバックのため残置 */
+  trial_hourly?: number | string | null;
   interview_hours: string;
   interview_start: string | null;
   interview_end: string | null;
@@ -312,6 +322,37 @@ interface StoreDetailPageProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * 給与レンジを「¥1,000〜¥2,000」「¥1,000〜」「〜¥2,000」のいずれかで
+ * 整形する。片方しか入力されていないと「特に決まってない」ことを
+ * 明示するため、もう片方を空白にする (¥0 とは表示しない)。
+ * 両方空なら null を返す (呼び出し側で EmptyValue にフォールバック)。
+ */
+function formatWageRange(
+  min: number | string | null | undefined,
+  max: number | string | null | undefined,
+): string | null {
+  const minStr = toAmountString(min);
+  const maxStr = toAmountString(max);
+  if (!minStr && !maxStr) return null;
+  if (minStr && maxStr) {
+    if (minStr === maxStr) return formatCurrency(minStr);
+    return `${formatCurrency(minStr)}〜${formatCurrency(maxStr)}`;
+  }
+  if (minStr) return `${formatCurrency(minStr)}〜`;
+  return `〜${formatCurrency(maxStr!)}`;
+}
+
+function toAmountString(v: number | string | null | undefined): string | null {
+  if (v == null) return null;
+  if (typeof v === "number") return v > 0 ? String(v) : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  // 数字のみ "0" は未入力扱い
+  if (/^0+$/.test(s)) return null;
+  return s;
+}
 
 function formatCurrency(amount: number | string): string {
   // 数値型なら ¥カンマ区切り。
@@ -486,8 +527,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       area: s.area,
       category: s.category,
       image_url: firstImage,
-      hourly_min: s.hourly_min,
-      hourly_max: s.hourly_max,
+      hourly_min: s.hourly_min ?? undefined,
+      hourly_max: s.hourly_max ?? undefined,
     });
   }, [data?.store, previewData]);
 
@@ -579,7 +620,21 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 className="mt-0.5 text-[14px] font-bold tabular-nums"
                 style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
               >
-                ¥{(Number(store.trial_hourly ?? store.hourly_min ?? 0) || 0).toLocaleString()}
+                {(() => {
+                  // 上部クイックステータスは「1 行で 1 値」のレイアウト。
+                  // レンジを表示すると桁が崩れるので、min を優先 (なければ
+                  // max → 通常時給の min) で 1 値だけ表示する。0/未入力は
+                  // 「—」で空欄を明示。
+                  const candidate =
+                    store.trial_hourly_min ??
+                    store.trial_hourly_max ??
+                    store.trial_avg_hourly ??
+                    store.trial_hourly ??
+                    store.hourly_min ??
+                    null;
+                  const num = Number(candidate);
+                  return num > 0 ? `¥${num.toLocaleString()}` : "—";
+                })()}
               </div>
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
@@ -590,7 +645,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 className="mt-0.5 text-[14px] font-bold tabular-nums"
                 style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
               >
-                ¥{(store.hourly_max ?? 0).toLocaleString()}
+                {store.hourly_max && store.hourly_max > 0
+                  ? `¥${store.hourly_max.toLocaleString()}`
+                  : "—"}
               </div>
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
@@ -628,13 +685,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               area: store.area,
               category: store.category,
               nearest_station: store.nearest_station,
-              hourly_min: store.hourly_min,
-              hourly_max: store.hourly_max,
+              hourly_min: store.hourly_min ?? undefined,
+              hourly_max: store.hourly_max ?? undefined,
               feature_tags: store.feature_tags,
               description: store.description,
               business_hours: store.business_hours,
               same_day_trial: store.same_day_trial,
-              trial_hourly: store.trial_hourly,
+              trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
             }}
           />
 
@@ -673,17 +730,20 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               {/* 数値がない店舗で「¥0」を出すと「タダ働き？」と読まれる
                   ので、未設定は「—」（薄いダッシュ）にして空欄であることを
-                  はっきり示す。 */}
-              {store.trial_avg_hourly ? (
-                <InfoRow label="平均時給" value={formatCurrency(store.trial_avg_hourly)} />
-              ) : (
-                <InfoRow label="平均時給" value={<EmptyValue />} />
-              )}
-              {store.trial_hourly ? (
-                <InfoRow label="体験時給" value={formatCurrency(store.trial_hourly)} />
-              ) : (
-                <InfoRow label="体験時給" value={<EmptyValue />} />
-              )}
+                  はっきり示す。最低/最高どちらかしか入っていない場合は
+                  「¥4,500〜」「〜¥6,000」のような片側表記で「上限/下限が
+                  特に決まってない」ことを伝える。 */}
+              {(() => {
+                const min = store.trial_hourly_min ?? store.trial_avg_hourly ?? null;
+                const max = store.trial_hourly_max ?? store.trial_hourly ?? null;
+                const display = formatWageRange(min, max);
+                return (
+                  <InfoRow
+                    label="体験時給"
+                    value={display ?? <EmptyValue />}
+                  />
+                );
+              })()}
               <InfoRow
                 label="面接可能時間"
                 value={
@@ -834,8 +894,25 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             title="給与・待遇"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              <InfoRow label="時給" value={`${formatCurrency(store.hourly_min ?? 0)}〜${formatCurrency(store.hourly_max ?? 0)}`} />
-              <InfoRow label="日給目安" value={formatCurrency(store.daily_estimate ?? 0)} />
+              {(() => {
+                const range = formatWageRange(store.hourly_min, store.hourly_max);
+                return <InfoRow label="時給" value={range ?? <EmptyValue />} />;
+              })()}
+              {/* 日給目安は文字列 (例: "30,000円〜60,000円") か数値か未入力。
+                  formatCurrency が range 文字列も解釈する。0/未入力は「—」。 */}
+              {(() => {
+                const raw = store.daily_estimate;
+                const isEmpty =
+                  raw == null ||
+                  (typeof raw === "string" && raw.trim() === "") ||
+                  (typeof raw === "number" && raw <= 0);
+                return (
+                  <InfoRow
+                    label="日給目安"
+                    value={isEmpty ? <EmptyValue /> : formatCurrency(raw)}
+                  />
+                );
+              })()}
               {(store.back_items ?? []).length > 0 && (
                 <InfoRow
                   label="バック"
@@ -1083,8 +1160,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           <SalarySimulatorSection
             backItems={store.back_items}
-            hourlyMin={store.hourly_min}
-            hourlyMax={store.hourly_max}
+            hourlyMin={store.hourly_min ?? undefined}
+            hourlyMax={store.hourly_max ?? undefined}
           />
 
           {/* ============================================================ */}
@@ -2982,11 +3059,20 @@ function SalarySimulatorSection({
 
   // back_rate: infer from store back_items if any are expressed as percentage
   // values (≤ 100), otherwise a sensible 30%.
+  // amount は string (例: "10%") か number ("500") のどちらもあり得る。
   const inferredBackRate = (() => {
-    const sample = (backItems ?? []).find(
-      (b) => typeof b.amount === "number" && b.amount > 0 && b.amount <= 100,
-    );
-    if (sample) return sample.amount / 100;
+    for (const b of backItems ?? []) {
+      const raw = typeof b.amount === "number" ? String(b.amount) : b.amount;
+      // "10%" "15 %" のようなパターンは％として採用
+      const pct = /^\s*(\d+(?:\.\d+)?)\s*%\s*$/.exec(raw ?? "");
+      if (pct) {
+        const n = Number(pct[1]);
+        if (n > 0 && n <= 100) return n / 100;
+      }
+      // 数値のみで 0 < n ≤ 100 のときも %（旧データ互換）として扱う
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0 && n <= 100) return n / 100;
+    }
     return 0.3;
   })();
   const nominationUnit = 1500;
@@ -3425,7 +3511,7 @@ function RelatedStoresSection({
                   className="mt-0.5 text-[10px]"
                   style={{ color: GOLD_HEX, fontWeight: 600 }}
                 >
-                  時給 ¥{(s.hourly_min ?? 0).toLocaleString()}〜¥{(s.hourly_max ?? 0).toLocaleString()}
+                  時給 {formatWageRange(s.hourly_min, s.hourly_max) ?? "—"}
                 </p>
               )}
             </div>

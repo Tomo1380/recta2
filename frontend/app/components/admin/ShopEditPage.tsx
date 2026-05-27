@@ -660,8 +660,8 @@ export function ShopEditPage() {
   const [guaranteePeriod, setGuaranteePeriod] = useState("");
   const [guaranteeDetail, setGuaranteeDetail] = useState("");
   const [normaInfo, setNormaInfo] = useState("");
-  const [avgWage, setAvgWage] = useState("");
-  const [trialWage, setTrialWage] = useState("");
+  const [trialMinWage, setTrialMinWage] = useState("");
+  const [trialMaxWage, setTrialMaxWage] = useState("");
   const [interviewStart, setInterviewStart] = useState("");
   const [interviewEnd, setInterviewEnd] = useState("");
   const [sameDayTrial, setSameDayTrial] = useState("可");
@@ -797,8 +797,8 @@ export function ShopEditPage() {
     if (f.guaranteePeriod !== undefined) setGuaranteePeriod(f.guaranteePeriod);
     if (f.guaranteeDetail !== undefined) setGuaranteeDetail(f.guaranteeDetail);
     if (f.normaInfo !== undefined) setNormaInfo(f.normaInfo);
-    if (f.avgWage !== undefined) setAvgWage(f.avgWage);
-    if (f.trialWage !== undefined) setTrialWage(f.trialWage);
+    if (f.trialMinWage !== undefined) setTrialMinWage(f.trialMinWage);
+    if (f.trialMaxWage !== undefined) setTrialMaxWage(f.trialMaxWage);
     if (f.interviewStart !== undefined) setInterviewStart(f.interviewStart);
     if (f.interviewEnd !== undefined) setInterviewEnd(f.interviewEnd);
     if (f.sameDayTrial !== undefined) setSameDayTrial(f.sameDayTrial);
@@ -923,7 +923,7 @@ export function ShopEditPage() {
       videos, staffPhotos,
       minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
       guaranteePeriod, guaranteeDetail, normaInfo,
-      avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial,
+      trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
       payrollSystemType, payrollSystemDescription,
       tags, description, featureText, expLevel, atmosphere,
       castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
@@ -942,7 +942,7 @@ export function ShopEditPage() {
     videos, staffPhotos,
     minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
     guaranteePeriod, guaranteeDetail, normaInfo,
-    avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial,
+    trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
     payrollSystemType, payrollSystemDescription,
     tags, description, featureText, expLevel, atmosphere,
     castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
@@ -1246,7 +1246,7 @@ export function ShopEditPage() {
               items={backItems}
               setItems={setBackItems}
               labelPlaceholder="バック名"
-              valuePlaceholder="金額"
+              valuePlaceholder="例: 1,000円 / 10%"
             />
           </Field>
           <Field
@@ -1320,25 +1320,25 @@ export function ShopEditPage() {
 
       <SectionCard title="体入（体験入店）情報" icon={Sparkles}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* BUG-013: 平均/体入時給は単位なしの数値だけ受け付ける。
+          {/* BUG-013: 体入時給は単位なしの数値だけ受け付ける。
               表示側 (StoreDetailPage) は数値前提で `.toLocaleString()` を呼ぶ
               ため、`"5,000円"` のような文字列が入ると表示が崩れる。 */}
-          <Field label="平均時給（円）">
+          <Field label="体入時給（最低額・円）">
             <TextInput
               type="number"
               inputMode="numeric"
-              value={avgWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAvgWage(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="例: 5000"
+              value={trialMinWage}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMinWage(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="例: 4500"
             />
           </Field>
-          <Field label="体入時給（円）">
+          <Field label="体入時給（最高額・円）">
             <TextInput
               type="number"
               inputMode="numeric"
-              value={trialWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialWage(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="例: 4500"
+              value={trialMaxWage}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMaxWage(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="例: 6000"
             />
           </Field>
           <Field label="面接可能時間（開始）">
@@ -2437,17 +2437,21 @@ export function ShopEditPage() {
                   shift_info: shiftInfo || null,
                   phone: phone,
                   website_url: website,
-                  hourly_min: Number(minWage) || 0,
-                  hourly_max: Number(maxWage) || 0,
-                  daily_estimate: Number(dailyPay) || 0,
-                  back_items: backItems.map((b) => ({ label: b.label, amount: Number(b.value) || 0 })),
-                  fee_items: feeItems.map((f) => ({ label: f.label, amount: Number(f.value) || 0 })),
+                  hourly_min: minWage ? Number(minWage) : null,
+                  hourly_max: maxWage ? Number(maxWage) : null,
+                  daily_estimate: dailyPay || null,
+                  back_items: backItems
+                    .filter((b) => b.label)
+                    .map((b) => ({ label: b.label, amount: b.value })),
+                  fee_items: feeItems
+                    .filter((f) => f.label)
+                    .map((f) => ({ label: f.label, amount: f.value })),
                   salary_notes: salaryNote,
                   guarantee_period: guaranteePeriod,
                   guarantee_details: guaranteeDetail,
                   norma_info: normaInfo,
-                  trial_avg_hourly: Number(avgWage) || 0,
-                  trial_hourly: Number(trialWage) || 0,
+                  trial_hourly_min: trialMinWage || null,
+                  trial_hourly_max: trialMaxWage || null,
                   interview_hours: interviewStart && interviewEnd ? `${interviewStart}〜${interviewEnd}` : "",
                   interview_start: interviewStart || null,
                   interview_end: interviewEnd || null,

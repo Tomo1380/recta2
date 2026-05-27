@@ -233,16 +233,19 @@ function EditorialStoreCard({
             </p>
           )}
 
-          {/* Hourly */}
+          {/* Hourly — 片方しか無いとき "¥0 〜" にしないように、欠けてる側は
+              空白にしてレンジ「〜¥6,000」「¥4,000〜」を表現する。 */}
           {(store.hourly_min || store.hourly_max) && (
             <div className="mt-1 flex items-baseline gap-1.5">
               <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>時給</span>
-              <span
-                className="text-[14px] font-bold tabular-nums leading-none"
-                style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
-              >
-                ¥{(store.hourly_min ?? 0).toLocaleString()}
-              </span>
+              {store.hourly_min ? (
+                <span
+                  className="text-[14px] font-bold tabular-nums leading-none"
+                  style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
+                >
+                  ¥{store.hourly_min.toLocaleString()}
+                </span>
+              ) : null}
               {store.hourly_max && store.hourly_max !== store.hourly_min && (
                 <>
                   <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.35)" }}>〜</span>
@@ -253,6 +256,9 @@ function EditorialStoreCard({
                     ¥{store.hourly_max.toLocaleString()}
                   </span>
                 </>
+              )}
+              {store.hourly_min && !store.hourly_max && (
+                <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.35)" }}>〜</span>
               )}
             </div>
           )}

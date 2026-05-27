@@ -59,8 +59,14 @@ export interface Store {
   unit_wage_type: string | null;
   payroll_system_type: string | null;
   payroll_system_description: string | null;
-  trial_avg_hourly: string | null;
-  trial_hourly: string | null;
+  /** 体入時給（最低額） */
+  trial_hourly_min: string | null;
+  /** 体入時給（最高額） */
+  trial_hourly_max: string | null;
+  /** @deprecated 旧キー (avg_hourly) — フォールバックのため一時的に残置 */
+  trial_avg_hourly?: string | null;
+  /** @deprecated 旧キー (hourly 単一値) — フォールバックのため一時的に残置 */
+  trial_hourly?: string | null;
   // 面接可能時間（文字列は後方互換、interview_start/interview_endが正）
   interview_hours: string | null;
   interview_start: string | null; // 例: "14:00"

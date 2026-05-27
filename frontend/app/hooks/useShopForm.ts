@@ -79,8 +79,10 @@ export interface ShopForm {
   guaranteePeriod: string;
   guaranteeDetail: string;
   normaInfo: string;
-  avgWage: string;
-  trialWage: string;
+  /** 体入時給（最低額） */
+  trialMinWage: string;
+  /** 体入時給（最高額） */
+  trialMaxWage: string;
   interviewStart: string;
   interviewEnd: string;
   sameDayTrial: string;
@@ -146,7 +148,7 @@ export const INITIAL_FORM: ShopForm = {
   minWage: "", maxWage: "", dailyPay: "",
   backItems: [], feeItems: [], salaryNote: "",
   guaranteePeriod: "", guaranteeDetail: "", normaInfo: "",
-  avgWage: "", trialWage: "",
+  trialMinWage: "", trialMaxWage: "",
   interviewStart: "", interviewEnd: "", sameDayTrial: "可",
   payrollSystemType: "", payrollSystemDescription: "",
   tags: [], description: "", featureText: "",
@@ -373,8 +375,10 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     guaranteePeriod: store.guarantee_period ?? "",
     guaranteeDetail: store.guarantee_details ?? "",
     normaInfo: store.norma_info ?? "",
-    avgWage: stripUnit(store.trial_avg_hourly),
-    trialWage: stripUnit(store.trial_hourly),
+    // 旧データ互換: 旧キー (trial_avg_hourly = 平均 / trial_hourly = 体入) は
+    // それぞれ最低/最高にマップする (運営の体感に近い)。新キーがあれば優先。
+    trialMinWage: stripUnit(store.trial_hourly_min ?? store.trial_avg_hourly),
+    trialMaxWage: stripUnit(store.trial_hourly_max ?? store.trial_hourly),
     interviewStart: store.interview_start ?? "",
     interviewEnd: store.interview_end ?? "",
     sameDayTrial: store.same_day_trial ? "可" : "不可",
@@ -491,7 +495,7 @@ export function formToPayload(
       })),
     hourly_min: form.minWage ? Number(form.minWage) : null,
     hourly_max: form.maxWage ? Number(form.maxWage) : null,
-    daily_estimate: form.dailyPay,
+    daily_estimate: form.dailyPay || null,
     back_items: form.backItems
       .filter((i) => i.label)
       .map((i) => ({ label: i.label, amount: i.value })),
@@ -502,8 +506,8 @@ export function formToPayload(
     guarantee_period: form.guaranteePeriod,
     guarantee_details: form.guaranteeDetail,
     norma_info: form.normaInfo,
-    trial_avg_hourly: form.avgWage,
-    trial_hourly: form.trialWage,
+    trial_hourly_min: form.trialMinWage || null,
+    trial_hourly_max: form.trialMaxWage || null,
     interview_hours:
       form.interviewStart && form.interviewEnd
         ? `${form.interviewStart}〜${form.interviewEnd}`

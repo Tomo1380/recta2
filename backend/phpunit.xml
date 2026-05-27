@@ -28,8 +28,11 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
-        <env name="MEDIA_DISK" value="public"/>
-        <env name="AWS_MEDIA_PREFIX" value=""/>
+        <!-- force="true" にしないと container の AWS_MEDIA_PREFIX=dev/ が
+             残ってテスト URL に dev/ prefix が混ざる。MediaStorage が env()
+             を直接読むため特に重要。 -->
+        <env name="MEDIA_DISK" value="public" force="true"/>
+        <env name="AWS_MEDIA_PREFIX" value="" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

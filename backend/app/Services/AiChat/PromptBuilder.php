@@ -290,7 +290,13 @@ class PromptBuilder
         $guaranteePeriod = $guarantee['period'] ?? null;
         $guaranteeDetails = $guarantee['details'] ?? '';
         $sameDayTrial = (bool) ($guarantee['same_day_trial'] ?? false);
-        $trialHourly = $trial['hourly'] ?? '';
+        // 体入時給は最低/最高の2枠。旧データ (hourly 単一) もフォールバック。
+        // プロンプトには 1 値だけ載せれば十分なので最低額を優先。
+        $trialHourly = $trial['hourly_min']
+            ?? $trial['avg_hourly']
+            ?? $trial['hourly_max']
+            ?? $trial['hourly']
+            ?? '';
 
         $tags = implode(', ', $store->feature_tags ?? []);
         $backs = collect($compensation['back'] ?? [])

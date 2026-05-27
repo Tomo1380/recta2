@@ -7,6 +7,7 @@ use App\Services\Store\StoreImageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -19,7 +20,13 @@ class StoreImageServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Storage::fake('local');
+        // MediaStorage は config('filesystems.media_disk') / .media_prefix を読む。
+        // container env_file (AWS_MEDIA_PREFIX=dev/) が残っていると URL に
+        // dev/ prefix が混ざってアサート失敗する。テストでは disk を public
+        // に fake し、prefix も空に上書きする。
+        Config::set('filesystems.media_disk', 'public');
+        Config::set('filesystems.media_prefix', '');
+        Storage::fake('public');
         $this->service = new StoreImageService();
     }
 

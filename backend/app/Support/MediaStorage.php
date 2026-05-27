@@ -102,7 +102,10 @@ class MediaStorage
 
     private static function prefix(): string
     {
-        $p = (string) env('AWS_MEDIA_PREFIX', '');
+        // 旧実装は env() 直読みだったが、container の env_file が常に効いて
+        // しまうと phpunit の <env> override が効かない。config 経由にして
+        // 「config:cache 後 / phpunit env」のどちらも一貫させる。
+        $p = (string) config('filesystems.media_prefix', '');
         // 末尾スラッシュは必ず付ける (空文字なら付けない)
         if ($p === '' || str_ends_with($p, '/')) {
             return $p;

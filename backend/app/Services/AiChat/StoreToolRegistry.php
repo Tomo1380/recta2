@@ -259,8 +259,8 @@ class StoreToolRegistry
             'guarantee_period' => $guarantee['period'] ?? null,
             'guarantee_details' => $guarantee['details'] ?? null,
             'norma_info' => $guarantee['norma'] ?? null,
-            'trial_avg_hourly' => $trial['avg_hourly'] ?? null,
-            'trial_hourly' => $trial['hourly'] ?? null,
+            'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+            'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
             'same_day_trial' => (bool) ($guarantee['same_day_trial'] ?? false),
             'interview_hours' => (isset($interview['start']) || isset($interview['end']))
                 ? (($interview['start'] ?? '') . '〜' . ($interview['end'] ?? ''))
@@ -440,7 +440,8 @@ class StoreToolRegistry
             'hourly_max' => $regular['max'] ?? null,
             'daily_estimate' => $wage['daily_estimate'] ?? null,
             'same_day_trial' => (bool) ($guarantee['same_day_trial'] ?? false),
-            'trial_hourly' => $trial['hourly'] ?? null,
+            'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+            'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
             'guarantee_period' => $guarantee['period'] ?? null,
             'feature_tags' => $s->feature_tags ?? [],
             'business_hours' => $schedule['hours_text'] ?? null,

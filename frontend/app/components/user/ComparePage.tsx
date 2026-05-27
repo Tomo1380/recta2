@@ -44,8 +44,12 @@ interface ComparableStore {
   hourly_min?: number;
   hourly_max?: number;
   daily_estimate?: number;
-  trial_hourly?: number;
-  trial_avg_hourly?: number;
+  trial_hourly_min?: number | string | null;
+  trial_hourly_max?: number | string | null;
+  /** @deprecated 旧キー (フォールバック用) */
+  trial_hourly?: number | string | null;
+  /** @deprecated 旧キー (フォールバック用) */
+  trial_avg_hourly?: number | string | null;
   same_day_trial?: boolean;
   back_items?: BackItem[];
   norma_info?: string;
@@ -675,9 +679,21 @@ export default function ComparePage({ ids }: ComparePageProps) {
           bestAt: bestIndex(num((s) => s.daily_estimate)),
         },
         {
+          // 比較表は 1 値のみ表示できるので、最低額 (新キー or 旧 avg_hourly)
+          // を優先。空ならフォールバック (旧 trial_hourly → 最高額)。
           label: "体験時給",
-          values: valid.map((s) => formatYen(s.trial_hourly)),
-          bestAt: bestIndex(num((s) => s.trial_hourly)),
+          values: valid.map((s) => {
+            const v = s.trial_hourly_min ?? s.trial_avg_hourly ?? s.trial_hourly_max ?? s.trial_hourly;
+            const n = v != null && v !== "" ? Number(v) : undefined;
+            return formatYen(Number.isFinite(n) ? n : undefined);
+          }),
+          bestAt: bestIndex(
+            num((s) => {
+              const v = s.trial_hourly_min ?? s.trial_avg_hourly ?? s.trial_hourly_max ?? s.trial_hourly;
+              const n = v != null && v !== "" ? Number(v) : undefined;
+              return Number.isFinite(n) ? n : undefined;
+            }),
+          ),
         },
         {
           label: "バック合計",

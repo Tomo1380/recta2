@@ -56,8 +56,11 @@ class StoreResource extends JsonResource
             'hourly_max'      => isset($regular['max']) ? (int) $regular['max'] : null,
             'unit_wage_type'  => self::wageUnitToLabel($regular['unit'] ?? null),
             'daily_estimate'  => $wage['daily_estimate'] ?? null,
-            'trial_hourly'    => $trial['hourly']     ?? null,
-            'trial_avg_hourly'=> $trial['avg_hourly'] ?? null,
+            // 体入時給は最低/最高の2枠で公開。旧データ (avg_hourly=平均 /
+            // hourly=単一値) は最低=avg, 最高=hourly にフォールバックして
+            // 既存データを表示できるようにする (移行 migration なしの想定)。
+            'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+            'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly']     ?? null,
             'payroll_system_type'        => $payroll['type']        ?? null,
             'payroll_system_description' => $payroll['description'] ?? null,
 

@@ -305,7 +305,8 @@ class StoreController extends Controller
             'hourly_min', 'hourly_max', 'daily_estimate',
             'back_items', 'fee_items', 'salary_notes',
             'guarantee_period', 'guarantee_details', 'norma_info', 'same_day_trial',
-            'trial_avg_hourly', 'trial_hourly',
+            'trial_avg_hourly', 'trial_hourly', // 旧キー (deprecated)
+            'trial_hourly_min', 'trial_hourly_max',
             'payroll_system_type', 'payroll_system_description',
             'interview_hours', 'interview_start', 'interview_end',
             'interview_info',
@@ -334,8 +335,12 @@ class StoreController extends Controller
             'guarantee_details' => 'nullable|string',
             'norma_info' => 'nullable|string',
             'same_day_trial' => 'nullable|boolean',
+            // 旧キー (deprecated, 互換受け入れのみ)
             'trial_avg_hourly' => 'nullable|string|max:255',
             'trial_hourly' => 'nullable|string|max:255',
+            // 新キー (体入時給の最低/最高)
+            'trial_hourly_min' => 'nullable|string|max:255',
+            'trial_hourly_max' => 'nullable|string|max:255',
             'payroll_system_type' => 'nullable|string|max:100',
             'payroll_system_description' => 'nullable|string',
             'interview_hours' => 'nullable|string|max:255',
@@ -380,8 +385,16 @@ class StoreController extends Controller
         if (!empty($regular)) $wage['regular'] = $regular;
 
         $trial = $wage['trial'] ?? [];
-        if (array_key_exists('trial_hourly', $legacy)) $trial['hourly'] = $legacy['trial_hourly'];
-        if (array_key_exists('trial_avg_hourly', $legacy)) $trial['avg_hourly'] = $legacy['trial_avg_hourly'];
+        // 新キー優先で書き込み。旧キーが来た場合は最低=avg, 最高=hourly に
+        // フォールバックして保存する (フロント旧版互換)。
+        if (array_key_exists('trial_hourly_min', $legacy)) $trial['hourly_min'] = $legacy['trial_hourly_min'];
+        if (array_key_exists('trial_hourly_max', $legacy)) $trial['hourly_max'] = $legacy['trial_hourly_max'];
+        if (!array_key_exists('trial_hourly_min', $legacy) && array_key_exists('trial_avg_hourly', $legacy)) {
+            $trial['hourly_min'] = $legacy['trial_avg_hourly'];
+        }
+        if (!array_key_exists('trial_hourly_max', $legacy) && array_key_exists('trial_hourly', $legacy)) {
+            $trial['hourly_max'] = $legacy['trial_hourly'];
+        }
         if (!empty($trial)) $wage['trial'] = $trial;
 
         $payroll = $wage['payroll'] ?? [];
