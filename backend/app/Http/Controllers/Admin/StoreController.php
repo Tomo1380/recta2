@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\StoreResource;
 use App\Models\Store;
 use App\Services\GeocodingService;
-use App\Support\StoreApiTransformer;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,16 +43,7 @@ class StoreController extends Controller
             ->orderBy('updated_at', 'desc')
             ->paginate($request->input('per_page', 20));
 
-        // Transform each store to include backward-compatible flattened fields.
-        // 管理一覧 (ShopsPage) のテーブルが評価列を出せるよう average_rating も付ける。
-        $stores->getCollection()->transform(function ($store) {
-            $arr = StoreApiTransformer::toAdminArray($store);
-            $arr['average_rating'] = round($store->averageRating(), 1);
-            $arr['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
-            return $arr;
-        });
-
-        return response()->json($stores);
+        return response()->json(PaginatorWithResource::map($stores, StoreResource::class));
     }
 
     public function show(Store $store): JsonResponse
@@ -62,7 +54,7 @@ class StoreController extends Controller
             ->load(['videos', 'staffPhotos'])
             ->loadCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
 
-        return response()->json(StoreApiTransformer::toAdminArray($store));
+        return response()->json((new StoreResource($store))->resolve());
     }
 
     private function storeValidationRules(bool $isUpdate = false): array
@@ -183,7 +175,7 @@ class StoreController extends Controller
             return $store;
         });
 
-        return response()->json(StoreApiTransformer::toAdminArray($store->load(['videos', 'staffPhotos'])), 201);
+        return response()->json((new StoreResource($store->load(['videos', 'staffPhotos'])))->resolve(), 201);
     }
 
     public function update(Request $request, Store $store): JsonResponse
@@ -228,7 +220,7 @@ class StoreController extends Controller
             }
         });
 
-        return response()->json(StoreApiTransformer::toAdminArray($store->fresh()->load(['videos', 'staffPhotos'])));
+        return response()->json((new StoreResource($store->fresh()->load(['videos', 'staffPhotos'])))->resolve());
     }
 
     /**

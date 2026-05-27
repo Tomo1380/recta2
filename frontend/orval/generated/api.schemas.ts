@@ -365,79 +365,6 @@ export interface SendUserLineMessageRequest {
   message: string;
 }
 
-export interface Store {
-  id: number;
-  name: string;
-  area: string;
-  /** @nullable */
-  address: string | null;
-  /** @nullable */
-  lat: number | null;
-  /** @nullable */
-  lng: number | null;
-  /** @nullable */
-  nearest_station: string | null;
-  category: string;
-  /** @nullable */
-  phone: string | null;
-  /** @nullable */
-  website_url: string | null;
-  /** @nullable */
-  schedule: unknown[] | null;
-  /** @nullable */
-  wage: unknown[] | null;
-  /** @nullable */
-  compensation: unknown[] | null;
-  /** @nullable */
-  guarantee: unknown[] | null;
-  /** @nullable */
-  interview: unknown[] | null;
-  /** @nullable */
-  feature_tags: unknown[] | null;
-  /** @nullable */
-  description: string | null;
-  /** @nullable */
-  features_text: string | null;
-  /** @nullable */
-  images: unknown[] | null;
-  /** @nullable */
-  analysis: unknown[] | null;
-  /** @nullable */
-  required_documents: unknown[] | null;
-  /** @nullable */
-  recent_hires: unknown[] | null;
-  /** @nullable */
-  recent_hires_summary: string | null;
-  /** @nullable */
-  qa: unknown[] | null;
-  /** @nullable */
-  staff_comment: unknown[] | null;
-  /** @nullable */
-  champagne_prices: unknown[] | null;
-  /** @nullable */
-  champagne_description: string | null;
-  /** @nullable */
-  transfer_description: string | null;
-  /** @nullable */
-  transfer_km: string | null;
-  /** @nullable */
-  transfer_zones: unknown[] | null;
-  /** @nullable */
-  dress_code: unknown[] | null;
-  /** @nullable */
-  set_fee: unknown[] | null;
-  /** @nullable */
-  recta_episodes: unknown[] | null;
-  /** @nullable */
-  related_store_ids: unknown[] | null;
-  experience_guaranteed: boolean;
-  publish_status: string;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
-}
-
 export type StoreAdminUserRequestRole = typeof StoreAdminUserRequestRole[keyof typeof StoreAdminUserRequestRole];
 
 
@@ -1701,60 +1628,11 @@ sort?: string;
 per_page?: string;
 };
 
-export type PublicStoreIndex200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
-export type PublicStoreIndex200 = {
-  /** @minimum 1 */
-  current_page: number;
-  data: Store[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
-  last_page: number;
-  /** Generated paginator links. */
-  links: PublicStoreIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
-  per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
-  total: number;
-};
+export type PublicStoreIndex200 = { [key: string]: unknown };
 
 export type PublicStoreShow200 = {
   store: unknown[];
-  related: unknown[][];
+  related: unknown[];
 };
 
 export type RelocateVoiceReorder200 = {
@@ -1791,56 +1669,7 @@ export type StoresIndexParams = {
 per_page?: string;
 };
 
-export type StoresIndex200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
-export type StoresIndex200 = {
-  /** @minimum 1 */
-  current_page: number;
-  data: Store[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
-  last_page: number;
-  /** Generated paginator links. */
-  links: StoresIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
-  per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
-  total: number;
-};
+export type StoresIndex200 = { [key: string]: unknown };
 
 /**
  * @nullable

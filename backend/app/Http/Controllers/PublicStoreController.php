@@ -11,7 +11,7 @@ use App\Models\Review;
 use App\Models\SiteSetting;
 use App\Http\Resources\AreaResource;
 use App\Http\Resources\CategoryResource;
-use App\Support\StoreApiTransformer;
+use App\Http\Resources\StoreResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -104,17 +104,10 @@ class PublicStoreController extends Controller
                 $query->orderByDesc('created_at');
         }
 
-        $stores = $query->paginate($request->input('per_page', 20));
+        $stores = $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
+            ->paginate($request->input('per_page', 20));
 
-        // Transform: flatten JSONB into legacy fields for frontend compat + add average_rating
-        $stores->getCollection()->transform(function ($store) {
-            $arr = StoreApiTransformer::toPublicArray($store);
-            $arr['average_rating'] = round($store->averageRating(), 1);
-            $arr['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
-            return $arr;
-        });
-
-        return response()->json($stores);
+        return response()->json(\App\Support\PaginatorWithResource::map($stores, StoreResource::class));
     }
 
     /**
@@ -136,14 +129,10 @@ class PublicStoreController extends Controller
               ->limit(10);
         }]);
 
-        // Load ordered videos so the transformer can project them into the
-        // public payload as `videos: [...]`.
+        // videos / staffPhotos を eager load → Resource が projectVideos/projectStaffPhotos で取り出す
         $store->load(['videos', 'staffPhotos']);
 
-        $storePayload = StoreApiTransformer::toPublicArray($store);
-        $storePayload['average_rating'] = round($store->averageRating(), 1);
-        $storePayload['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
-        $storePayload['reviews'] = $store->reviews; // already loaded
+        $storePayload = (new StoreResource($store))->resolve();
 
         // Related stores (same area, same category)
         $related = Store::where('publish_status', 'published')
@@ -156,16 +145,9 @@ class PublicStoreController extends Controller
             ->limit(6)
             ->get();
 
-        $relatedPayload = $related->map(function ($s) {
-            $arr = StoreApiTransformer::toPublicArray($s);
-            $arr['average_rating'] = round($s->averageRating(), 1);
-            $arr['reviews_count'] = $s->reviews_count ?? $s->reviewCount();
-            return $arr;
-        })->values();
-
         return response()->json([
             'store' => $storePayload,
-            'related' => $relatedPayload,
+            'related' => StoreResource::collection($related)->resolve(),
         ]);
     }
 
@@ -214,14 +196,14 @@ class PublicStoreController extends Controller
             ->filter(fn($p) => $p->store && $p->store->publish_status === 'published')
             ->map(function ($pickup) {
                 $store = $pickup->store;
-                $compat = StoreApiTransformer::toPublicArray($store);
+                $full = (new StoreResource($store))->resolve();
                 return [
                     'id' => $store->id,
                     'name' => $store->name,
                     'area' => $store->area,
                     'category' => $store->category,
-                    'hourly_min' => $compat['hourly_min'] ?? null,
-                    'hourly_max' => $compat['hourly_max'] ?? null,
+                    'hourly_min' => $full['hourly_min'] ?? null,
+                    'hourly_max' => $full['hourly_max'] ?? null,
                     'feature_tags' => $store->feature_tags,
                     'images' => $store->images,
                     'is_pr' => $pickup->is_pr,
