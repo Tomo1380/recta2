@@ -48,6 +48,7 @@ import CompareToggle from "~/components/user/shared/CompareToggle";
 import StoreMap from "~/components/shared/StoreMap";
 import LuxeCard from "~/components/user/shared/LuxeCard";
 import { pushViewedStore } from "~/lib/viewed-stores";
+import { useUserAuth } from "~/lib/user-auth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -3759,9 +3760,13 @@ function ReviewsSection({
   reviews: Review[];
   reviewsCount: number;
 }) {
-  const visible = reviews.slice(0, 3);
-  const hidden = reviews.slice(3);
-  const hasHidden = hidden.length > 0 || reviewsCount > visible.length;
+  // 口コミ投稿と同じ判定 (LINE ログイン済みか) を使う。
+  // 未ログイン: 3件 + blur ゲート / ログイン済み: 全件表示。
+  const { isAuthenticated } = useUserAuth();
+  const visible = isAuthenticated ? reviews : reviews.slice(0, 3);
+  const hidden = isAuthenticated ? [] : reviews.slice(3);
+  // ログイン済みなら「続きはログインで全件公開」CTA は出さない。
+  const hasHidden = !isAuthenticated && (hidden.length > 0 || reviewsCount > visible.length);
 
   // Compute summary stats from visible reviews (or fallbacks if none)
   const ratings = reviews.map((r) => r.rating ?? 0).filter((n) => n > 0);
