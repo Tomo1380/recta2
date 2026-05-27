@@ -817,6 +817,10 @@ export interface UserResource {
   reviews?: UserResourceReviewsItem[];
   /** @nullable */
   line_friend?: UserResourceLineFriend;
+  /** フロント (UsersPage の友だちバッジ) はトップレベルの is_line_friend を見るので
+   * boolean を別に立てる (BUG-E04)。lineFriend が eager load されていれば
+   * モデルの appends でも取れるが、Resource で明示する方が契約として安全。 */
+  is_line_friend: boolean;
 }
 
 export type ModelNotFoundExceptionResponse = {
@@ -1596,6 +1600,12 @@ export type PublicStoreHome200 = {
 };
 
 export type PublicStoreIndexParams = {
+/**
+ * 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+ *  が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
+ *  絞り込み。リボンを出している条件 (guarantee.same_day_trial=true)
+ *  と一致させる。
+ */
 sort?: string;
 per_page?: string;
 };
