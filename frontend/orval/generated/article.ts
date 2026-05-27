@@ -7,11 +7,11 @@
 import type {
   ArticleResource,
   ArticleUploadThumbnail200,
-  ArticleUploadThumbnailBody,
   ArticlesIndex200,
   ArticlesIndexParams,
   StoreArticleRequest,
-  UpdateArticleRequest
+  UpdateArticleRequest,
+  UploadArticleThumbnailRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -67,9 +67,9 @@ import { rectaMutator } from '../mutators/auth';
     }
   export const articleUploadThumbnail = (
     article: number,
-    articleUploadThumbnailBody: ArticleUploadThumbnailBody,
+    uploadArticleThumbnailRequest: UploadArticleThumbnailRequest,
  ) => {const formData = new FormData();
-formData.append(`image`, articleUploadThumbnailBody.image);
+formData.append(`image`, uploadArticleThumbnailRequest.image);
 
       return rectaMutator<ArticleUploadThumbnail200>(
       {url: `/admin/articles/${article}/thumbnail`, method: 'POST',

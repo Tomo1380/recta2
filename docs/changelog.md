@@ -12,6 +12,44 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
 
 ## Unreleased
 
+### 改善 (内部リファクタリング、ユーザー向け挙動変更なし)
+- **負債解消スプリント** `refactor/debt-cleanup` ブランチで AI 主導で書かれた
+  fat ファイルの整理を実施。ユーザーから見える挙動は不変。
+  - Backend: 164 → 204 テスト (+40 unit tests)、758 → 844 assertions
+  - Frontend: 0 → 49 テスト (vitest 新規導入)
+  - Phase 0: テストセーフティネット構築 (snapshot + AiChat Http::fake)
+  - Phase 1: API 契約標準化
+    - PaginatorWithResource 全面化 (PublicArticle ラップ解消)
+    - エラー shape 統一 ({error} → {message}: AiChat / LineWebhook /
+      UserController / LineFriendController)
+    - インラインバリデーション → FormRequest (13 個追加)
+    - `App\Support\StoreApiTransformer` (270行) 削除 → `StoreResource` 新設
+      (ADR 0003 を superseded 化)
+    - フロント手書き型 (User / AdminUser / AiChatSetting) を
+      orval-generated 型 alias に置換
+  - Phase 2: Backend Service 層導入 (ADR 0004 新規)
+    - AiChatController: 1963 → 1045 行 (-918 行)
+      → StoreToolRegistry, GeminiClient, UsageLimitGuard, PromptBuilder
+    - Admin/StoreController: 551 → 429 行 (-122 行)
+      → StoreImageService
+  - Phase 3: Frontend hook 抽出 (ADR 0005 新規)
+    - ShopEditPage: 3314 → 3067 行 (-247 行)
+      → useShopImages, useStepProgression, useShopForm + 純粋関数
+        (storeToForm / formToPayload) で Unit テスト可能化
+  - Phase 4: 仕上げ
+    - デッドコード削除 (6 ファイル / 1243 行 / radix 2 依存)
+    - ShopEditPage の any: 70 → 0
+    - Seeder 整理:
+      - ReviewSeeder / ContentSeeder の hard-coded id を動的取得に修正
+        (`auto-increment` リセット後の FK violation を解消)
+      - RenderSeeder → ProductionSeeder にリネーム (Render.com 不使用)。
+        本番初回投入用: 管理者 + マスター + 設定 + AI 教材のみ、
+        店舗/ユーザー/口コミは入れない設計に変更。冪等。
+      - TestQaSeeder 削除 (DatabaseSeeder の真部分集合だったので統合)。
+        QA も `migrate:fresh --seed` を使う。完全空 DB が必要なら
+        `migrate:fresh` 単独で代用。
+- 詳細は ADR 0003/0004/0005 と各 `refactor-phase-N` tag 参照。
+
 ### 修正
 - QA monkey-test 1巡目の本物バグ 8 件を解消（27 報告中 19 件は誤検知）
   - 体験入店情報の `¥0` fallback → `—` プレースホルダ

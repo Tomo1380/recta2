@@ -85,7 +85,7 @@ class LineFriendController extends Controller
     /**
      * Send a push message to a specific user.
      *
-     * @response array{success: bool}
+     * @response array{message: string}
      */
     public function push(SendLinePushRequest $request): JsonResponse
     {
@@ -97,7 +97,7 @@ class LineFriendController extends Controller
 
         if (!$result['success']) {
             return response()->json([
-                'error' => 'メッセージの送信に失敗しました',
+                'message' => 'メッセージの送信に失敗しました',
                 'details' => $result['body'],
             ], 422);
         }
@@ -111,13 +111,13 @@ class LineFriendController extends Controller
             'content' => $messageText,
         ]);
 
-        return response()->json(['success' => true]);
+        return response()->json(['message' => '送信しました']);
     }
 
     /**
      * Broadcast message to all friends.
      *
-     * @response array{success: bool}
+     * @response array{message: string}
      */
     public function broadcast(SendLineBroadcastRequest $request): JsonResponse
     {
@@ -128,7 +128,7 @@ class LineFriendController extends Controller
 
         if (!$result['success']) {
             return response()->json([
-                'error' => 'ブロードキャストの送信に失敗しました',
+                'message' => 'ブロードキャストの送信に失敗しました',
                 'details' => $result['body'],
             ], 422);
         }
@@ -141,6 +141,6 @@ class LineFriendController extends Controller
             'content' => $messageText,
         ]);
 
-        return response()->json(['success' => true]);
+        return response()->json(['message' => '配信しました']);
     }
 }

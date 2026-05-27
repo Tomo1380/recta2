@@ -11,6 +11,13 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+/**
+ * Note: このコントローラの {success, message} 形式は Phase 2-2 で
+ * FineTuningService に切り出すタイミングで Laravel 標準の例外フローと
+ * {message, errors?} 形式に統一する予定。今は触らない。
+ * (フロント側 FineTuningQaPage で `if (!res.success)` を見ている箇所が
+ *  あるため、片側だけ shape 変更すると壊れる)
+ */
 class FineTuningController extends Controller
 {
     /**

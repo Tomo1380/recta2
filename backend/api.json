@@ -561,35 +561,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "enabled": {
-                                        "type": "boolean"
-                                    },
-                                    "system_prompt": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "tone": {
-                                        "type": "string",
-                                        "enum": [
-                                            "casual",
-                                            "formal",
-                                            "friendly"
-                                        ]
-                                    },
-                                    "suggest_buttons": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateAiChatSettingRequest"
                             }
                         }
                     }
@@ -605,14 +577,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -720,29 +692,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "user_daily_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "user_monthly_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "ip_daily_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "global_daily_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "limit_reached_message": {
-                                        "type": "string",
-                                        "maxLength": 500
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateAiChatLimitsRequest"
                             }
                         }
                     }
@@ -758,11 +708,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1154,18 +1104,7 @@
                     "content": {
                         "multipart/form-data": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "image": {
-                                        "type": "string",
-                                        "format": "binary",
-                                        "contentMediaType": "application/octet-stream",
-                                        "maxLength": 5120
-                                    }
-                                },
-                                "required": [
-                                    "image"
-                                ]
+                                "$ref": "#/components/schemas/UploadCategoryImageRequest"
                             }
                         }
                     }
@@ -1181,14 +1120,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1421,18 +1360,7 @@
                     "content": {
                         "multipart/form-data": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "image": {
-                                        "type": "string",
-                                        "format": "binary",
-                                        "contentMediaType": "application/octet-stream",
-                                        "maxLength": 5120
-                                    }
-                                },
-                                "required": [
-                                    "image"
-                                ]
+                                "$ref": "#/components/schemas/UploadArticleThumbnailRequest"
                             }
                         }
                     }
@@ -1460,14 +1388,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1483,20 +1411,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email"
-                                    },
-                                    "password": {
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "email",
-                                    "password"
-                                ]
+                                "$ref": "#/components/schemas/AdminLoginRequest"
                             }
                         }
                     }
@@ -3467,6 +3382,16 @@
                 "tags": [
                     "FineTuningQa"
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreFineTuningQaRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "201": {
                         "description": "",
@@ -3480,6 +3405,9 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -3536,6 +3464,15 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateFineTuningQaRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "",
@@ -3559,6 +3496,9 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -3643,38 +3583,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "category": {
-                                        "type": "string",
-                                        "maxLength": 50
-                                    },
-                                    "title": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "content": {
-                                        "type": "string",
-                                        "maxLength": 5000
-                                    },
-                                    "is_active": {
-                                        "type": "boolean"
-                                    },
-                                    "keywords": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "maxLength": 50
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "category",
-                                    "title",
-                                    "content",
-                                    "keywords"
-                                ]
+                                "$ref": "#/components/schemas/StoreIndustryKnowledgeRequest"
                             }
                         }
                     }
@@ -3690,11 +3599,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -3720,35 +3629,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "category": {
-                                        "type": "string",
-                                        "maxLength": 50
-                                    },
-                                    "title": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "content": {
-                                        "type": "string",
-                                        "maxLength": 5000
-                                    },
-                                    "is_active": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    },
-                                    "keywords": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "maxLength": 50
-                                        },
-                                        "minItems": 1
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateIndustryKnowledgeRequest"
                             }
                         }
                     }
@@ -3764,14 +3645,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -3815,19 +3696,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -3852,11 +3721,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -3959,12 +3828,12 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "success": {
-                                            "type": "boolean"
+                                        "message": {
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
-                                        "success"
+                                        "message"
                                     ]
                                 }
                             }
@@ -4027,13 +3896,13 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "error": {
+                                        "message": {
                                             "type": "string",
                                             "const": "Invalid signature"
                                         }
                                     },
                                     "required": [
-                                        "error"
+                                        "message"
                                     ]
                                 }
                             }
@@ -4045,6 +3914,7 @@
         "/columns": {
             "get": {
                 "operationId": "publicArticle.index",
+                "description": "Returns BFF view: paginator (flat) + categories chip list.",
                 "summary": "Public list of published articles, paginated",
                 "tags": [
                     "PublicArticle"
@@ -4582,6 +4452,7 @@
                     {
                         "name": "sort",
                         "in": "query",
+                        "description": "\u4f53\u9a13\u78ba\u7d04\u30d5\u30e9\u30b0\u3067\u306e\u7d5e\u308a\u8fbc\u307f\u3002\u30d5\u30ed\u30f3\u30c8\u306e\u300c\u4f53\u9a13\u78ba\u7d04\u300d\u30bf\u30d6 (BUG-E09)\n \u304c `sort=experience_guaranteed` \u3092\u6295\u3052\u308b\u304c\u3001\u3053\u308c\u306f\u4e26\u3073\u66ff\u3048\u3067\u306f\u306a\u304f\n \u7d5e\u308a\u8fbc\u307f\u3002\u30ea\u30dc\u30f3\u3092\u51fa\u3057\u3066\u3044\u308b\u6761\u4ef6 (guarantee.same_day_trial=true)\n \u3068\u4e00\u81f4\u3055\u305b\u308b\u3002",
                         "schema": {
                             "type": "string",
                             "default": "newest"
@@ -4602,120 +4473,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "current_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/Store"
-                                            }
-                                        },
-                                        "first_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "from": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "minimum": 1
-                                        },
-                                        "last_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "last_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "links": {
-                                            "type": "array",
-                                            "description": "Generated paginator links.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "url": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "label": {
-                                                        "type": "string"
-                                                    },
-                                                    "active": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "url",
-                                                    "label",
-                                                    "active"
-                                                ]
-                                            }
-                                        },
-                                        "next_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "path": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ],
-                                            "description": "Base path for paginator generated URLs."
-                                        },
-                                        "per_page": {
-                                            "type": "integer",
-                                            "description": "Number of items shown per page.",
-                                            "minimum": 0
-                                        },
-                                        "prev_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "to": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "description": "Number of the last item in the slice.",
-                                            "minimum": 1
-                                        },
-                                        "total": {
-                                            "type": "integer",
-                                            "description": "Total number of items being paginated.",
-                                            "minimum": 0
-                                        }
-                                    },
-                                    "required": [
-                                        "current_page",
-                                        "data",
-                                        "first_page_url",
-                                        "from",
-                                        "last_page_url",
-                                        "last_page",
-                                        "links",
-                                        "next_page_url",
-                                        "path",
-                                        "per_page",
-                                        "prev_page_url",
-                                        "to",
-                                        "total"
-                                    ]
+                                    "type": "object"
                                 }
                             }
                         }
@@ -4755,10 +4513,7 @@
                                         },
                                         "related": {
                                             "type": "array",
-                                            "items": {
-                                                "type": "array",
-                                                "items": {}
-                                            }
+                                            "items": {}
                                         }
                                     },
                                     "required": [
@@ -4858,31 +4613,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "area_from": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "area_to": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "body": {
-                                        "type": "string"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "display_order": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "area_from",
-                                    "area_to",
-                                    "body"
-                                ]
+                                "$ref": "#/components/schemas/StoreRelocateVoiceRequest"
                             }
                         }
                     }
@@ -4898,11 +4629,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -4928,26 +4659,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "area_from": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "area_to": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "body": {
-                                        "type": "string"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "display_order": {
-                                        "type": "integer"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateRelocateVoiceRequest"
                             }
                         }
                     }
@@ -4963,14 +4675,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -5014,19 +4726,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -5051,11 +4751,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -5350,120 +5050,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "current_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/Store"
-                                            }
-                                        },
-                                        "first_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "from": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "minimum": 1
-                                        },
-                                        "last_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "last_page": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                        },
-                                        "links": {
-                                            "type": "array",
-                                            "description": "Generated paginator links.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "url": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "label": {
-                                                        "type": "string"
-                                                    },
-                                                    "active": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "url",
-                                                    "label",
-                                                    "active"
-                                                ]
-                                            }
-                                        },
-                                        "next_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "path": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ],
-                                            "description": "Base path for paginator generated URLs."
-                                        },
-                                        "per_page": {
-                                            "type": "integer",
-                                            "description": "Number of items shown per page.",
-                                            "minimum": 0
-                                        },
-                                        "prev_page_url": {
-                                            "type": [
-                                                "string",
-                                                "null"
-                                            ]
-                                        },
-                                        "to": {
-                                            "type": [
-                                                "integer",
-                                                "null"
-                                            ],
-                                            "description": "Number of the last item in the slice.",
-                                            "minimum": 1
-                                        },
-                                        "total": {
-                                            "type": "integer",
-                                            "description": "Total number of items being paginated.",
-                                            "minimum": 0
-                                        }
-                                    },
-                                    "required": [
-                                        "current_page",
-                                        "data",
-                                        "first_page_url",
-                                        "from",
-                                        "last_page_url",
-                                        "last_page",
-                                        "links",
-                                        "next_page_url",
-                                        "path",
-                                        "per_page",
-                                        "prev_page_url",
-                                        "to",
-                                        "total"
-                                    ]
+                                    "type": "object"
                                 }
                             }
                         }
@@ -7006,12 +6593,12 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "success": {
-                                            "type": "boolean"
+                                        "message": {
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
-                                        "success"
+                                        "message"
                                     ]
                                 }
                             }
@@ -7161,16 +6748,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "nickname": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 50
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateProfileRequest"
                             }
                         }
                     }
@@ -7193,11 +6771,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7238,6 +6816,23 @@
     },
     "components": {
         "schemas": {
+            "AdminLoginRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "AdminLoginRequest"
+            },
             "AdminUser": {
                 "type": "object",
                 "properties": {
@@ -8400,282 +7995,6 @@
                 ],
                 "title": "SendUserLineMessageRequest"
             },
-            "Store": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "area": {
-                        "type": "string"
-                    },
-                    "address": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "lat": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "lng": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "nearest_station": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "category": {
-                        "type": "string"
-                    },
-                    "phone": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "website_url": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "schedule": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "wage": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "compensation": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "guarantee": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "interview": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "feature_tags": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "description": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "features_text": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "images": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "analysis": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "required_documents": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "recent_hires": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "recent_hires_summary": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "qa": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "staff_comment": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "champagne_prices": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "champagne_description": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "transfer_description": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "transfer_km": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "transfer_zones": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "dress_code": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "set_fee": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "recta_episodes": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "related_store_ids": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "experience_guaranteed": {
-                        "type": "boolean"
-                    },
-                    "publish_status": {
-                        "type": "string"
-                    },
-                    "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    }
-                },
-                "required": [
-                    "id",
-                    "name",
-                    "area",
-                    "address",
-                    "lat",
-                    "lng",
-                    "nearest_station",
-                    "category",
-                    "phone",
-                    "website_url",
-                    "schedule",
-                    "wage",
-                    "compensation",
-                    "guarantee",
-                    "interview",
-                    "feature_tags",
-                    "description",
-                    "features_text",
-                    "images",
-                    "analysis",
-                    "required_documents",
-                    "recent_hires",
-                    "recent_hires_summary",
-                    "qa",
-                    "staff_comment",
-                    "champagne_prices",
-                    "champagne_description",
-                    "transfer_description",
-                    "transfer_km",
-                    "transfer_zones",
-                    "dress_code",
-                    "set_fee",
-                    "recta_episodes",
-                    "related_store_ids",
-                    "experience_guaranteed",
-                    "publish_status",
-                    "created_at",
-                    "updated_at"
-                ],
-                "title": "Store"
-            },
             "StoreAdminUserRequest": {
                 "type": "object",
                 "properties": {
@@ -8876,6 +8195,92 @@
                 ],
                 "title": "StoreConsultationRequest"
             },
+            "StoreFineTuningQaRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50
+                    },
+                    "status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "active",
+                            "draft",
+                            "archived"
+                        ]
+                    },
+                    "tags": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        }
+                    }
+                },
+                "required": [
+                    "question",
+                    "answer"
+                ],
+                "title": "StoreFineTuningQaRequest"
+            },
+            "StoreIndustryKnowledgeRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "content": {
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "category",
+                    "title",
+                    "content",
+                    "keywords"
+                ],
+                "title": "StoreIndustryKnowledgeRequest"
+            },
             "StorePickupShopRequest": {
                 "type": "object",
                 "properties": {
@@ -8896,6 +8301,34 @@
                     "store_id"
                 ],
                 "title": "StorePickupShopRequest"
+            },
+            "StoreRelocateVoiceRequest": {
+                "type": "object",
+                "properties": {
+                    "area_from": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "area_to": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "display_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "area_from",
+                    "area_to",
+                    "body"
+                ],
+                "title": "StoreRelocateVoiceRequest"
             },
             "StoreReviewRequest": {
                 "type": "object",
@@ -8950,6 +8383,64 @@
                     }
                 },
                 "title": "UpdateAdminUserRequest"
+            },
+            "UpdateAiChatLimitsRequest": {
+                "type": "object",
+                "properties": {
+                    "user_daily_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "user_monthly_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "ip_daily_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "global_daily_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "limit_reached_message": {
+                        "type": "string",
+                        "maxLength": 500
+                    }
+                },
+                "title": "UpdateAiChatLimitsRequest"
+            },
+            "UpdateAiChatSettingRequest": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "system_prompt": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "casual",
+                            "formal",
+                            "friendly"
+                        ]
+                    },
+                    "suggest_buttons": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "title": "UpdateAiChatSettingRequest"
             },
             "UpdateAreaRequest": {
                 "type": "object",
@@ -9137,6 +8628,85 @@
                 },
                 "title": "UpdateConsultationRequest"
             },
+            "UpdateFineTuningQaRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50
+                    },
+                    "status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "active",
+                            "draft",
+                            "archived"
+                        ]
+                    },
+                    "tags": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        }
+                    }
+                },
+                "title": "UpdateFineTuningQaRequest"
+            },
+            "UpdateIndustryKnowledgeRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "content": {
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        },
+                        "minItems": 1
+                    }
+                },
+                "title": "UpdateIndustryKnowledgeRequest"
+            },
             "UpdatePickupShopRequest": {
                 "type": "object",
                 "properties": {
@@ -9154,6 +8724,42 @@
                     }
                 },
                 "title": "UpdatePickupShopRequest"
+            },
+            "UpdateProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "nickname": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50
+                    }
+                },
+                "title": "UpdateProfileRequest"
+            },
+            "UpdateRelocateVoiceRequest": {
+                "type": "object",
+                "properties": {
+                    "area_from": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "area_to": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "display_order": {
+                        "type": "integer"
+                    }
+                },
+                "title": "UpdateRelocateVoiceRequest"
             },
             "UpdateReviewStatusRequest": {
                 "type": "object",
@@ -9200,6 +8806,36 @@
                     "status"
                 ],
                 "title": "UpdateUserStatusRequest"
+            },
+            "UploadArticleThumbnailRequest": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "maxLength": 5120
+                    }
+                },
+                "required": [
+                    "image"
+                ],
+                "title": "UploadArticleThumbnailRequest"
+            },
+            "UploadCategoryImageRequest": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "maxLength": 5120
+                    }
+                },
+                "required": [
+                    "image"
+                ],
+                "title": "UploadCategoryImageRequest"
             },
             "User": {
                 "type": "object",
@@ -9487,6 +9123,10 @@
                             "followed_at",
                             "unfollowed_at"
                         ]
+                    },
+                    "is_line_friend": {
+                        "type": "boolean",
+                        "description": "\u30d5\u30ed\u30f3\u30c8 (UsersPage \u306e\u53cb\u3060\u3061\u30d0\u30c3\u30b8) \u306f\u30c8\u30c3\u30d7\u30ec\u30d9\u30eb\u306e is_line_friend \u3092\u898b\u308b\u306e\u3067\nboolean \u3092\u5225\u306b\u7acb\u3066\u308b (BUG-E04)\u3002lineFriend \u304c eager load \u3055\u308c\u3066\u3044\u308c\u3070\n\u30e2\u30c7\u30eb\u306e appends \u3067\u3082\u53d6\u308c\u308b\u304c\u3001Resource \u3067\u660e\u793a\u3059\u308b\u65b9\u304c\u5951\u7d04\u3068\u3057\u3066\u5b89\u5168\u3002"
                     }
                 },
                 "required": [
@@ -9506,7 +9146,8 @@
                     "last_login_at",
                     "created_at",
                     "updated_at",
-                    "reviews_count"
+                    "reviews_count",
+                    "is_line_friend"
                 ],
                 "title": "UserResource"
             }

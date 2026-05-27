@@ -131,6 +131,32 @@ recta2/
 - 認証: JWT
 - DB: マイグレーションで管理、JSONB活用
 
+## DB Seeder の使い分け
+
+2 種類の seeder profile を用意している。用途で使い分ける。
+
+| 用途 | コマンド | 中身 |
+|---|---|---|
+| **開発・QA・ローカル動作確認** | `php artisan migrate:fresh --seed` | DatabaseSeeder: stores 80 / users 11 / reviews 117 / pickup 10 / ai_chat_logs 80 / fine_tuning_qa 1000 等、全テーブル投入。完全に空の DB から QA したい場合は `migrate:fresh` (seed なし) で OK |
+| **本番初回投入** | `php artisan db:seed --class=ProductionSeeder` | 管理者 + マスター + 設定 + AI 教材のみ。店舗/口コミ/ユーザーは入れない (運営が手動投入 or LINE 経由で自然蓄積)。**冪等** (既存データがあるテーブルはスキップ、再実行 OK) |
+
+Seeder を書くときの注意:
+- **id を hard-code しない**。`auto-increment` がリセットされると id 範囲が変わるので、`User::pluck('id')->random()` のように動的に拾う。
+- ReviewSeeder / ContentSeeder が旧来 `user_id=1〜10` や `store_id=1〜20` を hard-code していて、`migrate:fresh` 以外では FK violation を起こす不具合があった (Phase 4 で修正済み)。
+
+### デプロイ時の seed 自動化
+
+`scripts/deploy/deploy.sh` は GitHub Actions (push to `main`) 経由で
+毎回 `php artisan migrate --force` を自動実行する。**seed は自動では走らない**。
+
+初回投入 or 再投入したいときは marker file を repo に置いて push する:
+- `scripts/deploy/.run-seed-once` → 次回 deploy で `db:seed --class=ProductionSeeder` (冪等) を実行
+- `scripts/deploy/.run-fresh-seed-once` → 次回 deploy で `migrate:fresh --seeder=ProductionSeeder` を実行 (**破壊的、本番 DB 全消し**)
+
+両方とも **必ず ProductionSeeder を使う**設計 (DatabaseSeeder は Faker dummy
+店舗 80 件を入れてしまうので本番では絶対に使わない)。実行後は marker file
+を別 commit で削除すること (残すと毎 deploy で再実行される)。
+
 ## アーキテクチャ原則（必ず守る）
 
 新しい endpoint / 画面を作る前にこのセクションと
@@ -161,10 +187,31 @@ recta2/
 ### Resource は契約の明示化
 - response のシリアライズ形を Resource にまとめる。
   関係込みは `whenLoaded` を使う。
-- ただし「契約を変えるのが怖いだけ」「JSONB ネストが広い」
-  「StoreApiTransformer のような flat 互換層が既にある」場合は
-  無理に Resource 化しない。判断基準は
-  [docs/architecture/api-design.md](docs/architecture/api-design.md) 参照。
+- 旧 `StoreApiTransformer` (flat 互換層) は Phase 1-5 で削除済み。
+  `StoreResource` が同じ flat shape を返す。ADR 0003 参照。
+
+### Service 層に分けるべきもの
+- Controller は HTTP 層 (validation / Resource / 認可) だけ持つ薄い
+  ラッパーにし、ビジネスロジックは `app/Services/` 配下の Service クラスに
+  集約する。
+- 既存例:
+  - `App\Services\AiChat\{StoreToolRegistry, GeminiClient, PromptBuilder, UsageLimitGuard}`
+  - `App\Services\Store\StoreImageService`
+- 判断基準: 同じロジックを別 endpoint で重複させそうになったら Service
+  化する。1 endpoint しか使わないなら controller 内 private で OK。
+- 詳細は ADR 0004 参照。
+
+### フロントの form ロジックは hook + 純粋関数に切り出す
+- 大きなフォーム (ShopEditPage 等) の populate / payload 変換ロジックは
+  component 内に inline で書かず、`frontend/app/hooks/` 配下に純粋関数 +
+  hook として切り出す。
+- 既存例:
+  - `useShopImages` (画像 upload/delete)
+  - `useStepProgression` (多ステップ form の進捗管理)
+  - `useShopForm` + `storeToForm` / `formToPayload` (Store ⇔ form 変換)
+- 純粋関数は vitest で Unit テストする (BUG-013 などの過去事故が
+  テストとして保存される)。
+- 詳細は ADR 0005 参照。
 
 ## 参考プロジェクト
 

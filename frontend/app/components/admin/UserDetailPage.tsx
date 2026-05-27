@@ -276,8 +276,9 @@ export function UserDetailPage() {
       setMessageText("");
       setTimeout(() => setSendSuccess(false), 3000);
     } catch (err: unknown) {
-      const errorObj = err as { error?: string };
-      setSendError(errorObj?.error || "メッセージの送信に失敗しました");
+      // ApiError (lib/api.ts) は data.message を読む形に統一済み
+      const apiErr = err as { data?: { message?: string }; message?: string };
+      setSendError(apiErr?.data?.message ?? apiErr?.message ?? "メッセージの送信に失敗しました");
     } finally {
       setSending(false);
     }

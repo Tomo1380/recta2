@@ -4,6 +4,11 @@
  * Recta2
  * OpenAPI spec version: 0.0.1
  */
+export interface AdminLoginRequest {
+  email: string;
+  password: string;
+}
+
 export interface AdminUser {
   id: number;
   name: string;
@@ -360,79 +365,6 @@ export interface SendUserLineMessageRequest {
   message: string;
 }
 
-export interface Store {
-  id: number;
-  name: string;
-  area: string;
-  /** @nullable */
-  address: string | null;
-  /** @nullable */
-  lat: number | null;
-  /** @nullable */
-  lng: number | null;
-  /** @nullable */
-  nearest_station: string | null;
-  category: string;
-  /** @nullable */
-  phone: string | null;
-  /** @nullable */
-  website_url: string | null;
-  /** @nullable */
-  schedule: unknown[] | null;
-  /** @nullable */
-  wage: unknown[] | null;
-  /** @nullable */
-  compensation: unknown[] | null;
-  /** @nullable */
-  guarantee: unknown[] | null;
-  /** @nullable */
-  interview: unknown[] | null;
-  /** @nullable */
-  feature_tags: unknown[] | null;
-  /** @nullable */
-  description: string | null;
-  /** @nullable */
-  features_text: string | null;
-  /** @nullable */
-  images: unknown[] | null;
-  /** @nullable */
-  analysis: unknown[] | null;
-  /** @nullable */
-  required_documents: unknown[] | null;
-  /** @nullable */
-  recent_hires: unknown[] | null;
-  /** @nullable */
-  recent_hires_summary: string | null;
-  /** @nullable */
-  qa: unknown[] | null;
-  /** @nullable */
-  staff_comment: unknown[] | null;
-  /** @nullable */
-  champagne_prices: unknown[] | null;
-  /** @nullable */
-  champagne_description: string | null;
-  /** @nullable */
-  transfer_description: string | null;
-  /** @nullable */
-  transfer_km: string | null;
-  /** @nullable */
-  transfer_zones: unknown[] | null;
-  /** @nullable */
-  dress_code: unknown[] | null;
-  /** @nullable */
-  set_fee: unknown[] | null;
-  /** @nullable */
-  recta_episodes: unknown[] | null;
-  /** @nullable */
-  related_store_ids: unknown[] | null;
-  experience_guaranteed: boolean;
-  publish_status: string;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
-}
-
 export type StoreAdminUserRequestRole = typeof StoreAdminUserRequestRole[keyof typeof StoreAdminUserRequestRole];
 
 
@@ -534,11 +466,70 @@ export interface StoreConsultationRequest {
   sort_order?: number;
 }
 
+/**
+ * @nullable
+ */
+export type StoreFineTuningQaRequestStatus = typeof StoreFineTuningQaRequestStatus[keyof typeof StoreFineTuningQaRequestStatus] | null;
+
+
+export const StoreFineTuningQaRequestStatus = {
+  active: 'active',
+  draft: 'draft',
+  archived: 'archived',
+} as const;
+
+export interface StoreFineTuningQaRequest {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  category?: string | null;
+  question: string;
+  answer: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  source?: string | null;
+  /** @nullable */
+  status?: StoreFineTuningQaRequestStatus;
+  /**
+     * @nullable
+     * @items.maxLength 50
+     */
+  tags?: string[] | null;
+}
+
+export interface StoreIndustryKnowledgeRequest {
+  /** @maxLength 50 */
+  category: string;
+  /** @maxLength 200 */
+  title: string;
+  /** @maxLength 5000 */
+  content: string;
+  is_active?: boolean;
+  /**
+     * @minItems 1
+     * @items.maxLength 50
+     */
+  keywords: string[];
+}
+
 export interface StorePickupShopRequest {
   store_id: number;
   sort_order?: number;
   is_pr?: boolean;
   visible?: boolean;
+}
+
+export interface StoreRelocateVoiceRequest {
+  /** @maxLength 255 */
+  area_from: string;
+  /** @maxLength 255 */
+  area_to: string;
+  body: string;
+  visible?: boolean;
+  display_order?: number;
 }
 
 export interface StoreReviewRequest {
@@ -578,6 +569,37 @@ export interface UpdateAdminUserRequest {
   email?: string;
   role?: UpdateAdminUserRequestRole;
   status?: UpdateAdminUserRequestStatus;
+}
+
+export interface UpdateAiChatLimitsRequest {
+  /** @minimum 1 */
+  user_daily_limit?: number;
+  /** @minimum 1 */
+  user_monthly_limit?: number;
+  /** @minimum 1 */
+  ip_daily_limit?: number;
+  /** @minimum 1 */
+  global_daily_limit?: number;
+  /** @maxLength 500 */
+  limit_reached_message?: string;
+}
+
+export type UpdateAiChatSettingRequestTone = typeof UpdateAiChatSettingRequestTone[keyof typeof UpdateAiChatSettingRequestTone];
+
+
+export const UpdateAiChatSettingRequestTone = {
+  casual: 'casual',
+  formal: 'formal',
+  friendly: 'friendly',
+} as const;
+
+export interface UpdateAiChatSettingRequest {
+  enabled?: boolean;
+  /** @nullable */
+  system_prompt?: string | null;
+  tone?: UpdateAiChatSettingRequestTone;
+  /** @nullable */
+  suggest_buttons?: string[] | null;
 }
 
 export interface UpdateAreaRequest {
@@ -675,11 +697,79 @@ export interface UpdateConsultationRequest {
   sort_order?: number;
 }
 
+/**
+ * @nullable
+ */
+export type UpdateFineTuningQaRequestStatus = typeof UpdateFineTuningQaRequestStatus[keyof typeof UpdateFineTuningQaRequestStatus] | null;
+
+
+export const UpdateFineTuningQaRequestStatus = {
+  active: 'active',
+  draft: 'draft',
+  archived: 'archived',
+} as const;
+
+export interface UpdateFineTuningQaRequest {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  category?: string | null;
+  question?: string;
+  answer?: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  source?: string | null;
+  /** @nullable */
+  status?: UpdateFineTuningQaRequestStatus;
+  /**
+     * @nullable
+     * @items.maxLength 50
+     */
+  tags?: string[] | null;
+}
+
+export interface UpdateIndustryKnowledgeRequest {
+  /** @maxLength 50 */
+  category?: string;
+  /** @maxLength 200 */
+  title?: string;
+  /** @maxLength 5000 */
+  content?: string;
+  is_active?: boolean;
+  sort_order?: number;
+  /**
+     * @minItems 1
+     * @items.maxLength 50
+     */
+  keywords?: string[];
+}
+
 export interface UpdatePickupShopRequest {
   store_id?: number;
   sort_order?: number;
   is_pr?: boolean;
   visible?: boolean;
+}
+
+export interface UpdateProfileRequest {
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  nickname?: string | null;
+}
+
+export interface UpdateRelocateVoiceRequest {
+  /** @maxLength 255 */
+  area_from?: string;
+  /** @maxLength 255 */
+  area_to?: string;
+  body?: string;
+  visible?: boolean;
+  display_order?: number;
 }
 
 export type UpdateReviewStatusRequestStatus = typeof UpdateReviewStatusRequestStatus[keyof typeof UpdateReviewStatusRequestStatus];
@@ -713,6 +803,16 @@ export const UpdateUserStatusRequestStatus = {
 
 export interface UpdateUserStatusRequest {
   status: UpdateUserStatusRequestStatus;
+}
+
+export interface UploadArticleThumbnailRequest {
+  /** @maxLength 5120 */
+  image: Blob;
+}
+
+export interface UploadCategoryImageRequest {
+  /** @maxLength 5120 */
+  image: Blob;
 }
 
 export interface User {
@@ -817,6 +917,10 @@ export interface UserResource {
   reviews?: UserResourceReviewsItem[];
   /** @nullable */
   line_friend?: UserResourceLineFriend;
+  /** フロント (UsersPage の友だちバッジ) はトップレベルの is_line_friend を見るので
+   * boolean を別に立てる (BUG-E04)。lineFriend が eager load されていれば
+   * モデルの appends でも取れるが、Resource で明示する方が契約として安全。 */
+  is_line_friend: boolean;
 }
 
 export type ModelNotFoundExceptionResponse = {
@@ -959,24 +1063,6 @@ export type AiChatChatStreamBody = {
   user_area?: string | null;
 };
 
-export type AiChatSettingUpdateBodyTone = typeof AiChatSettingUpdateBodyTone[keyof typeof AiChatSettingUpdateBodyTone];
-
-
-export const AiChatSettingUpdateBodyTone = {
-  casual: 'casual',
-  formal: 'formal',
-  friendly: 'friendly',
-} as const;
-
-export type AiChatSettingUpdateBody = {
-  enabled?: boolean;
-  /** @nullable */
-  system_prompt?: string | null;
-  tone?: AiChatSettingUpdateBodyTone;
-  /** @nullable */
-  suggest_buttons?: string[] | null;
-};
-
 export type AiChatSettingStatsParams = {
 days?: string;
 };
@@ -991,30 +1077,12 @@ export type AiChatSettingStats200 = {
   mode_daily_stats: AiChatLog[];
 };
 
-export type AiChatSettingUpdateLimitsBody = {
-  /** @minimum 1 */
-  user_daily_limit?: number;
-  /** @minimum 1 */
-  user_monthly_limit?: number;
-  /** @minimum 1 */
-  ip_daily_limit?: number;
-  /** @minimum 1 */
-  global_daily_limit?: number;
-  /** @maxLength 500 */
-  limit_reached_message?: string;
-};
-
 export type AreaCategoryReorderAreas200 = {
   message: 'OK';
 };
 
 export type AreaCategoryReorderCategories200 = {
   message: 'OK';
-};
-
-export type AreaCategoryUploadCategoryImageBody = {
-  /** @maxLength 5120 */
-  image: Blob;
 };
 
 export type ArticlesIndexParams = {
@@ -1029,19 +1097,9 @@ export type ArticlesIndex200 = {
   total: number;
 };
 
-export type ArticleUploadThumbnailBody = {
-  /** @maxLength 5120 */
-  image: Blob;
-};
-
 export type ArticleUploadThumbnail200 = {
   thumbnail_url: string;
   article: ArticleResource;
-};
-
-export type AuthLoginBody = {
-  email: string;
-  password: string;
 };
 
 export type AuthLogin200 = {
@@ -1423,42 +1481,6 @@ export type FineTuningQaDestroy200 = {
   message: 'archived';
 };
 
-export type IndustryKnowledgeStoreBody = {
-  /** @maxLength 50 */
-  category: string;
-  /** @maxLength 200 */
-  title: string;
-  /** @maxLength 5000 */
-  content: string;
-  is_active?: boolean;
-  /**
-     * @minItems 1
-     * @items.maxLength 50
-     */
-  keywords: string[];
-};
-
-export type IndustryKnowledgeUpdateBody = {
-  /** @maxLength 50 */
-  category?: string;
-  /** @maxLength 200 */
-  title?: string;
-  /** @maxLength 5000 */
-  content?: string;
-  is_active?: boolean;
-  sort_order?: number;
-  /**
-     * @minItems 1
-     * @items.maxLength 50
-     */
-  keywords?: string[];
-};
-
-export type IndustryKnowledgeReorderBody = {
-  /** @minItems 1 */
-  ids: number[];
-};
-
 export type IndustryKnowledgeReorder200 = {
   message: 'OK';
 };
@@ -1478,7 +1500,7 @@ state: string;
 };
 
 export type LineFriendBroadcast200 = {
-  success: boolean;
+  message: string;
 };
 
 export type LineWebhookHandleBody = {
@@ -1490,7 +1512,7 @@ export type LineWebhookHandle200 = {
 };
 
 export type LineWebhookHandle403 = {
-  error: 'Invalid signature';
+  message: 'Invalid signature';
 };
 
 export type PublicArticleIndexParams = {
@@ -1596,89 +1618,21 @@ export type PublicStoreHome200 = {
 };
 
 export type PublicStoreIndexParams = {
+/**
+ * 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+ *  が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
+ *  絞り込み。リボンを出している条件 (guarantee.same_day_trial=true)
+ *  と一致させる。
+ */
 sort?: string;
 per_page?: string;
 };
 
-export type PublicStoreIndex200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
-export type PublicStoreIndex200 = {
-  /** @minimum 1 */
-  current_page: number;
-  data: Store[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
-  last_page: number;
-  /** Generated paginator links. */
-  links: PublicStoreIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
-  per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
-  total: number;
-};
+export type PublicStoreIndex200 = { [key: string]: unknown };
 
 export type PublicStoreShow200 = {
   store: unknown[];
-  related: unknown[][];
-};
-
-export type RelocateVoiceStoreBody = {
-  /** @maxLength 255 */
-  area_from: string;
-  /** @maxLength 255 */
-  area_to: string;
-  body: string;
-  visible?: boolean;
-  display_order?: number;
-};
-
-export type RelocateVoiceUpdateBody = {
-  /** @maxLength 255 */
-  area_from?: string;
-  /** @maxLength 255 */
-  area_to?: string;
-  body?: string;
-  visible?: boolean;
-  display_order?: number;
-};
-
-export type RelocateVoiceReorderBody = {
-  /** @minItems 1 */
-  ids: number[];
+  related: unknown[];
 };
 
 export type RelocateVoiceReorder200 = {
@@ -1715,56 +1669,7 @@ export type StoresIndexParams = {
 per_page?: string;
 };
 
-export type StoresIndex200LinksItem = {
-  /** @nullable */
-  url: string | null;
-  label: string;
-  active: boolean;
-};
-
-export type StoresIndex200 = {
-  /** @minimum 1 */
-  current_page: number;
-  data: Store[];
-  /** @nullable */
-  first_page_url: string | null;
-  /**
-     * @minimum 1
-     * @nullable
-     */
-  from: number | null;
-  /** @nullable */
-  last_page_url: string | null;
-  /** @minimum 1 */
-  last_page: number;
-  /** Generated paginator links. */
-  links: StoresIndex200LinksItem[];
-  /** @nullable */
-  next_page_url: string | null;
-  /**
-     * Base path for paginator generated URLs.
-     * @nullable
-     */
-  path: string | null;
-  /**
-     * Number of items shown per page.
-     * @minimum 0
-     */
-  per_page: number;
-  /** @nullable */
-  prev_page_url: string | null;
-  /**
-     * Number of the last item in the slice.
-     * @minimum 1
-     * @nullable
-     */
-  to: number | null;
-  /**
-     * Total number of items being paginated.
-     * @minimum 0
-     */
-  total: number;
-};
+export type StoresIndex200 = { [key: string]: unknown };
 
 /**
  * @nullable
@@ -2288,7 +2193,7 @@ export type UserShow200 = {
 };
 
 export type UserSendLineMessage200 = {
-  success: boolean;
+  message: string;
 };
 
 export type UserMessagesParams = {
@@ -2315,14 +2220,6 @@ export type UserMessages200 = {
   /** @nullable */
   friend: UserMessages200Friend;
   messages: UserMessages200Messages;
-};
-
-export type UserProfileUpdateBody = {
-  /**
-     * @maxLength 50
-     * @nullable
-     */
-  nickname?: string | null;
 };
 
 export type UserProfileLogout200 = {

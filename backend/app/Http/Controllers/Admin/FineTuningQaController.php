@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreFineTuningQaRequest;
+use App\Http\Requests\Admin\UpdateFineTuningQaRequest;
 use App\Models\FineTuningQa;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,9 +92,9 @@ class FineTuningQaController extends Controller
         return response()->json($qa);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreFineTuningQaRequest $request): JsonResponse
     {
-        $data = $this->validateData($request);
+        $data = $request->validated();
         $data['source'] = $data['source'] ?? 'manual';
         $data['status'] = $data['status'] ?? FineTuningQa::STATUS_ACTIVE;
 
@@ -101,10 +103,9 @@ class FineTuningQaController extends Controller
         return response()->json($qa, 201);
     }
 
-    public function update(Request $request, FineTuningQa $qa): JsonResponse
+    public function update(UpdateFineTuningQaRequest $request, FineTuningQa $qa): JsonResponse
     {
-        $data = $this->validateData($request, isUpdate: true);
-        $qa->update($data);
+        $qa->update($request->validated());
 
         return response()->json($qa->fresh());
     }
@@ -164,18 +165,4 @@ class FineTuningQaController extends Controller
         }, 200, $headers);
     }
 
-    private function validateData(Request $request, bool $isUpdate = false): array
-    {
-        $required = $isUpdate ? 'sometimes|' : '';
-
-        return $request->validate([
-            'category' => 'nullable|string|max:100',
-            'question' => $required . 'required|string',
-            'answer' => $required . 'required|string',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
-            'source' => 'nullable|string|max:50',
-            'status' => 'nullable|in:active,draft,archived',
-        ]);
-    }
 }

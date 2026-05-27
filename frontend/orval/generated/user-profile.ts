@@ -5,9 +5,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
+  UpdateProfileRequest,
   User,
-  UserProfileLogout200,
-  UserProfileUpdateBody
+  UserProfileLogout200
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -30,12 +30,12 @@ export const userProfileMe = (
  * @summary プロフィール更新
  */
 export const userProfileUpdate = (
-    userProfileUpdateBody?: UserProfileUpdateBody,
+    updateProfileRequest?: UpdateProfileRequest,
  ) => {
       return rectaMutator<User | null>(
       {url: `/user/profile`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: userProfileUpdateBody
+      data: updateProfileRequest
     },
       );
     }

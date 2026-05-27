@@ -14,28 +14,10 @@ export interface Paginated<T> {
   total: number;
 }
 
-export interface User {
-  id: number;
-  line_user_id: string | null;
-  line_display_name: string | null;
-  line_picture_url: string | null;
-  use_line_avatar: boolean;
-  nickname: string | null;
-  age: number | null;
-  preferred_area: string | null;
-  preferred_category: string | null;
-  experience: string | null;
-  bio: string | null;
-  admin_notes: string | null;
-  status: "active" | "suspended";
-  last_login_at: string | null;
-  created_at: string;
-  updated_at: string;
-  reviews_count?: number;
-  reviews?: Review[];
-  is_line_friend: boolean;
-  line_friend?: LineFriend | null;
-}
+// User は orval-generated 型 (UserResource) を alias。
+// Phase 1-6 で手書き interface から移行。
+import type { UserResource as GeneratedUserResource } from "../../orval/generated/api.schemas";
+export type User = GeneratedUserResource;
 
 export interface UserIndexResponse {
   users: Paginated<User>;
@@ -131,27 +113,15 @@ export interface Store {
 import type { ReviewResource } from "../../orval/generated/api.schemas";
 export type Review = ReviewResource;
 
-export interface AiChatSetting {
-  id: number;
-  page_type: "top" | "list" | "detail";
-  enabled: boolean;
-  system_prompt: string;
-  tone: "casual" | "formal" | "friendly";
-  suggest_buttons: string[] | null;
-  created_at: string;
-  updated_at: string;
-}
+// AiChatSetting は orval-generated 型を alias。
+// Phase 1-6 で手書き interface から移行。
+import type { AiChatSetting as GeneratedAiChatSetting } from "../../orval/generated/api.schemas";
+export type AiChatSetting = GeneratedAiChatSetting;
 
-export interface AdminUser {
-  id: number;
-  name: string;
-  email: string;
-  role: "super_admin" | "admin";
-  status: "active" | "inactive";
-  last_login_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// AdminUser は orval-generated 型 (AdminUserResource) を alias。
+// Phase 1-6 で手書き interface から移行。
+import type { AdminUserResource as GeneratedAdminUserResource } from "../../orval/generated/api.schemas";
+export type AdminUser = GeneratedAdminUserResource;
 
 export interface DashboardKpiWithDelta {
   value: number;

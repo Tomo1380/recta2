@@ -1,7 +1,15 @@
 # 0003. Deferred Resource-ification of Dashboard and Store
 
-- Status: accepted
+- Status: superseded (Phase 1-5, 2026-05-27)
 - Date: 2026-05-26
+- Superseded by: refactor/debt-cleanup ブランチの Phase 1-5
+
+> **Update (2026-05-27)**: 本 ADR の Wave 7 (Store) は refactor/debt-cleanup
+> ブランチの Phase 1-5 で解消された。`StoreApiTransformer` を削除し、
+> `StoreResource` に flat shape 生成ロジックを移管。フロント互換性は
+> 既存 Feature テスト 164 件で担保。Wave 6 (Dashboard) は現状の独自
+> shape (`kpis/chat_trend/...`) で安定しており、AdminDashboardTest で
+> snapshot 化済みのため Phase 2/3 以降に持ち越し。
 
 ## Context
 

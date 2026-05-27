@@ -333,10 +333,10 @@ export function AIChatSettingsPage() {
         newConfigs[key] = {
           id: s.id,
           enabled: s.enabled,
-          prompt: s.system_prompt,
-          tone: TONE_TO_LABEL[s.tone] ?? "フレンドリー",
+          prompt: s.system_prompt ?? "",
+          tone: TONE_TO_LABEL[s.tone as keyof typeof TONE_TO_LABEL] ?? "フレンドリー",
         };
-        newButtons[key] = s.suggest_buttons ?? [];
+        newButtons[key] = (s.suggest_buttons ?? []) as string[];
       }
 
       setPromptConfigs(newConfigs);

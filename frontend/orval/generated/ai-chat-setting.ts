@@ -9,8 +9,8 @@ import type {
   AiChatSetting,
   AiChatSettingStats200,
   AiChatSettingStatsParams,
-  AiChatSettingUpdateBody,
-  AiChatSettingUpdateLimitsBody
+  UpdateAiChatLimitsRequest,
+  UpdateAiChatSettingRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -28,12 +28,12 @@ import { rectaMutator } from '../mutators/auth';
     }
   export const aiChatSettingUpdate = (
     aiChatSetting: number,
-    aiChatSettingUpdateBody?: AiChatSettingUpdateBody,
+    updateAiChatSettingRequest?: UpdateAiChatSettingRequest,
  ) => {
       return rectaMutator<AiChatSetting>(
       {url: `/admin/ai-chat/settings/${aiChatSetting}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: aiChatSettingUpdateBody
+      data: updateAiChatSettingRequest
     },
       );
     }
@@ -55,12 +55,12 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const aiChatSettingUpdateLimits = (
-    aiChatSettingUpdateLimitsBody?: AiChatSettingUpdateLimitsBody,
+    updateAiChatLimitsRequest?: UpdateAiChatLimitsRequest,
  ) => {
       return rectaMutator<AiChatLimit>(
       {url: `/admin/ai-chat/limits`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: aiChatSettingUpdateLimitsBody
+      data: updateAiChatLimitsRequest
     },
       );
     }

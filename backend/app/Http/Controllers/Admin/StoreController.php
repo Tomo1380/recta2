@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\UploadStoreImageRequest;
+use App\Http\Resources\StoreResource;
 use App\Models\Store;
 use App\Services\GeocodingService;
-use App\Support\StoreApiTransformer;
+use App\Services\Store\StoreImageService;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +17,10 @@ use Illuminate\Support\Str;
 
 class StoreController extends Controller
 {
+    public function __construct(
+        private StoreImageService $images,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $query = Store::query();
@@ -42,16 +49,7 @@ class StoreController extends Controller
             ->orderBy('updated_at', 'desc')
             ->paginate($request->input('per_page', 20));
 
-        // Transform each store to include backward-compatible flattened fields.
-        // 管理一覧 (ShopsPage) のテーブルが評価列を出せるよう average_rating も付ける。
-        $stores->getCollection()->transform(function ($store) {
-            $arr = StoreApiTransformer::toAdminArray($store);
-            $arr['average_rating'] = round($store->averageRating(), 1);
-            $arr['reviews_count'] = $store->reviews_count ?? $store->reviewCount();
-            return $arr;
-        });
-
-        return response()->json($stores);
+        return response()->json(PaginatorWithResource::map($stores, StoreResource::class));
     }
 
     public function show(Store $store): JsonResponse
@@ -62,7 +60,7 @@ class StoreController extends Controller
             ->load(['videos', 'staffPhotos'])
             ->loadCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
 
-        return response()->json(StoreApiTransformer::toAdminArray($store));
+        return response()->json((new StoreResource($store))->resolve());
     }
 
     private function storeValidationRules(bool $isUpdate = false): array
@@ -162,7 +160,7 @@ class StoreController extends Controller
         // 旧 admin UI / API 直叩きが legacy `video_url` 単一フィールドを送る互換シナリオ。
         // `videos` が未指定でも `video_url` があれば 1 本の動画として bridge する。
         // （Sprint 3-A 以降のフロントは `videos[]` で送るので、新規呼び出しでは経由しない）
-        $this->bridgeLegacyVideoUrl($request);
+        $this->images->bridgeLegacyVideoUrl($request);
 
         $request->validate($this->storeValidationRules());
 
@@ -174,22 +172,22 @@ class StoreController extends Controller
             $store = Store::create($data);
 
             if ($request->has('videos')) {
-                $this->syncVideos($store, $request->input('videos', []));
+                $this->images->syncVideos($store, $request->input('videos', []));
             }
             if ($request->has('staff_photos')) {
-                $this->syncStaffPhotos($store, $request->input('staff_photos', []));
+                $this->images->syncStaffPhotos($store, $request->input('staff_photos', []));
             }
 
             return $store;
         });
 
-        return response()->json(StoreApiTransformer::toAdminArray($store->load(['videos', 'staffPhotos'])), 201);
+        return response()->json((new StoreResource($store->load(['videos', 'staffPhotos'])))->resolve(), 201);
     }
 
     public function update(Request $request, Store $store): JsonResponse
     {
         // Legacy `video_url` 互換は store() と同じく入口で bridge する。
-        $this->bridgeLegacyVideoUrl($request);
+        $this->images->bridgeLegacyVideoUrl($request);
 
         // Allow either new JSONB fields or legacy flat fields (for transitional admin UI compat)
         $rules = $this->storeValidationRules(isUpdate: true);
@@ -221,96 +219,14 @@ class StoreController extends Controller
             $store->update($data);
 
             if ($request->has('videos')) {
-                $this->syncVideos($store, $request->input('videos', []));
+                $this->images->syncVideos($store, $request->input('videos', []));
             }
             if ($request->has('staff_photos')) {
-                $this->syncStaffPhotos($store, $request->input('staff_photos', []));
+                $this->images->syncStaffPhotos($store, $request->input('staff_photos', []));
             }
         });
 
-        return response()->json(StoreApiTransformer::toAdminArray($store->fresh()->load(['videos', 'staffPhotos'])));
-    }
-
-    /**
-     * 受け取った videos 配列で store_videos を全置換する。
-     *
-     * 既存実装の `images` カラムと同じく、管理画面では並び順込みでフルリストを
-     * 送るシンプルな同期方式を採る（差分計算より UI が分かりやすい）。
-     *
-     * @param  array<int, array{video_url:string,label?:?string,description?:?string,poster_url?:?string}>  $videos
-     */
-    private function syncVideos(Store $store, array $videos): void
-    {
-        $store->videos()->delete();
-
-        $records = [];
-        foreach (array_values($videos) as $i => $row) {
-            if (!isset($row['video_url']) || $row['video_url'] === '') {
-                continue;
-            }
-            $records[] = [
-                'video_url' => (string) $row['video_url'],
-                'label' => $row['label'] ?? null,
-                'description' => $row['description'] ?? null,
-                'poster_url' => $row['poster_url'] ?? null,
-                'display_order' => $i,
-            ];
-        }
-        if (!empty($records)) {
-            $store->videos()->createMany($records);
-        }
-    }
-
-    /**
-     * 旧 admin UI / API 直叩き互換: `video_url` が単独で送られて `videos`
-     * が無い場合のみ、`videos: [{ video_url, label: '店舗紹介動画' }]` に
-     * リライトする。`videos` が明示的に送られていればそちらを優先（破壊しない）。
-     *
-     * 新フロントは `videos[]` のみ送るのでこの分岐は経由しない。
-     */
-    private function bridgeLegacyVideoUrl(Request $request): void
-    {
-        if ($request->has('videos')) {
-            return; // 既に新形式
-        }
-        $legacy = $request->input('video_url');
-        if (!is_string($legacy) || $legacy === '') {
-            return;
-        }
-        $request->merge([
-            'videos' => [[
-                'video_url' => $legacy,
-                'label' => '店舗紹介動画',
-            ]],
-        ]);
-    }
-
-    /**
-     * 受け取った staff_photos 配列で store_staff_photos を全置換する。
-     * 同期方式は syncVideos と同じ（差分計算より UI が分かりやすい全置換）。
-     *
-     * @param  array<int, array{image_url:string,caption?:?string,instagram_url?:?string,staff_type?:?string}>  $photos
-     */
-    private function syncStaffPhotos(Store $store, array $photos): void
-    {
-        $store->staffPhotos()->delete();
-
-        $records = [];
-        foreach (array_values($photos) as $i => $row) {
-            if (!isset($row['image_url']) || $row['image_url'] === '') {
-                continue;
-            }
-            $records[] = [
-                'image_url' => (string) $row['image_url'],
-                'caption' => $row['caption'] ?? null,
-                'instagram_url' => $row['instagram_url'] ?? null,
-                'staff_type' => $row['staff_type'] ?? null,
-                'display_order' => $i,
-            ];
-        }
-        if (!empty($records)) {
-            $store->staffPhotos()->createMany($records);
-        }
+        return response()->json((new StoreResource($store->fresh()->load(['videos', 'staffPhotos'])))->resolve());
     }
 
     /**
@@ -355,61 +271,23 @@ class StoreController extends Controller
         return response()->json(null, 204);
     }
 
-    /**
-     * Upload an image for a store.
-     * Accepts multipart form data with an 'image' file field.
-     * Stores to storage/app/public/stores/ and returns the URL.
-     */
-    public function uploadImage(Request $request, Store $store): JsonResponse
+    public function uploadImage(UploadStoreImageRequest $request, Store $store): JsonResponse
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
-        ]);
-
-        $file = $request->file('image');
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-        $file->storeAs('public/stores', $filename);
-
-        $url = '/storage/stores/' . $filename;
-
-        // Append to the store's images array
-        $images = $store->images ?? [];
-        $images[] = $url;
-        $store->update(['images' => $images]);
-
-        return response()->json([
-            'url' => $url,
-            'images' => $images,
-        ], 201);
+        return response()->json(
+            $this->images->uploadImage($store, $request->file('image')),
+            201,
+        );
     }
 
-    /**
-     * Delete an image from a store by index.
-     */
     public function deleteImage(Store $store, int $index): JsonResponse
     {
-        $images = $store->images ?? [];
+        $result = $this->images->deleteImage($store, $index);
 
-        if ($index < 0 || $index >= count($images)) {
+        if ($result === null) {
             return response()->json(['message' => 'Image not found'], 404);
         }
 
-        $imageUrl = $images[$index];
-        $url = is_array($imageUrl) ? ($imageUrl['url'] ?? null) : $imageUrl;
-
-        if ($url) {
-            // Delete from storage
-            $path = str_replace('/storage/', 'public/', $url);
-            Storage::delete($path);
-        }
-
-        // Remove from array
-        array_splice($images, $index, 1);
-        $store->update(['images' => array_values($images)]);
-
-        return response()->json([
-            'images' => array_values($images),
-        ]);
+        return response()->json($result);
     }
 
     // -----------------------------------------------------------------------

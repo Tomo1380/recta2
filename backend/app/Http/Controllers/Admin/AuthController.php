@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AdminLoginRequest;
 use App\Models\AdminUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,16 +11,13 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function login(Request $request): JsonResponse
+    public function login(AdminLoginRequest $request): JsonResponse
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        $credentials = $request->validated();
 
-        $admin = AdminUser::where('email', $request->email)->first();
+        $admin = AdminUser::where('email', $credentials['email'])->first();
 
-        if (!$admin || !Hash::check($request->password, $admin->password)) {
+        if (!$admin || !Hash::check($credentials['password'], $admin->password)) {
             return response()->json(['message' => 'メールアドレスまたはパスワードが正しくありません。'], 401);
         }
 

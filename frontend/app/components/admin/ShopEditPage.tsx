@@ -1,6 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
+import { useShopImages } from "~/hooks/useShopImages";
+import { useStepProgression } from "~/hooks/useStepProgression";
+import { formToPayload, storeToForm, type ShopForm } from "~/hooks/useShopForm";
 import type { Store } from "~/lib/types";
 import {
   ArrowLeft,
@@ -50,9 +53,9 @@ interface StepConfig {
   id: string;
   title: string;
   subtitle: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   gradient: string;
-  sections: { id: string; title: string; icon: any; required?: boolean }[];
+  sections: { id: string; title: string; icon: React.ComponentType<{ className?: string }>; required?: boolean }[];
 }
 
 const steps: StepConfig[] = [
@@ -168,10 +171,18 @@ function TextInput({
   value = "",
   onChange,
   type = "text",
-}: any) {
+  inputMode,
+}: {
+  placeholder?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+}) {
   return (
     <input
       type={type}
+      inputMode={inputMode}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
@@ -185,7 +196,12 @@ function TextArea({
   value = "",
   onChange,
   rows = 3,
-}: any) {
+}: {
+  placeholder?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+}) {
   return (
     <textarea
       value={value}
@@ -197,7 +213,17 @@ function TextArea({
   );
 }
 
-function SelectInput({ options, value, onChange, placeholder }: any) {
+function SelectInput({
+  options,
+  value,
+  onChange,
+  placeholder,
+}: {
+  options: string[];
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  placeholder?: string;
+}) {
   return (
     <select
       value={value}
@@ -321,7 +347,14 @@ function SliderField({
   leftLabel,
   rightLabel,
   required,
-}: any) {
+}: {
+  label: string;
+  value: number;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  leftLabel: string;
+  rightLabel: string;
+  required?: boolean;
+}) {
   return (
     <div>
       <label className="block text-sm mb-2 text-foreground">
@@ -426,7 +459,7 @@ function SectionCard({
   children,
 }: {
   title: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   required?: boolean;
   children: React.ReactNode;
 }) {
@@ -522,9 +555,11 @@ export function ShopEditPage() {
   // so id will be undefined. Treat both "new" string and missing param as
   // "new shop" mode.
   const isNew = id === "new" || id === undefined;
-  const [currentStep, setCurrentStep] = useState(0);
+  // ステップ管理 (currentStep / completedSteps / next/prev/goTo / 進捗計算) は
+  // useStepProgression に集約 (Phase 3-1)。stepCount は 5 固定 (下の steps 配列と整合)。
+  const stepFlow = useStepProgression(5);
+  const { currentStep, completedSteps } = stepFlow;
   const [showCopyModal, setShowCopyModal] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
 
   // --- State ---
@@ -656,8 +691,17 @@ export function ShopEditPage() {
   const [supportItems, setSupportItems] = useState<string[]>([]);
 
   const [publishStatus, setPublishStatus] = useState<"published" | "unpublished" | "draft">("draft");
-  const [storeImages, setStoreImages] = useState<string[]>([]);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  // 画像アップロード/削除の state とハンドラは useShopImages フックに集約。
+  // setStoreImages は populate (既存店舗 GET 後の反映) と save 後の reset で
+  // 使うので、フックから返ってきた setter を引き続きそのまま使う。
+  const {
+    images: storeImages,
+    setImages: setStoreImages,
+    upload: uploadShopImages,
+    remove: removeShopImage,
+    uploading: uploadingImage,
+    error: shopImageError,
+  } = useShopImages(isNew ? null : (id ?? null));
 
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
   // エリア/業種カテゴリのマスタ。マスタテーブルと options が乖離するとSelectの復元が壊れる
@@ -669,212 +713,88 @@ export function ShopEditPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Phase 3-2: 旧 200 行の populateFromStore は useShopForm の storeToForm に移管。
+  // 結果の Partial<ShopForm> を個別 setter にディスパッチする薄い wrapper だけ残す。
+  // 88 useState 自体は historical reasons でここに残してあるが、変換ロジックは
+  // hook 内で Unit テストできる純粋関数になった。
   const populateFromStore = useCallback((store: Store) => {
-    setShopName(store.name || "");
-    setArea(store.area || "");
-    setAddress(store.address || "");
-    setLat(typeof (store as any).lat === "number" ? (store as any).lat : (store as any).lat ? Number((store as any).lat) : null);
-    setLng(typeof (store as any).lng === "number" ? (store as any).lng : (store as any).lng ? Number((store as any).lng) : null);
-    setStation(store.nearest_station || "");
-    setCategory(store.category || "");
-    setOpeningTime(store.opening_time || "");
-    setClosingTime(store.closing_time || "");
-    setHoliday(store.holidays || "");
-    setPhone(store.phone || "");
-    setWebsite(store.website_url || "");
-    // Prefer the new ordered videos[]; fall back to the legacy single video_url
-    // so stores that haven't been re-saved since the migration still render.
-    if (store.videos && store.videos.length > 0) {
-      setVideos(
-        store.videos.map((v) => ({
-          video_url: v.video_url,
-          label: v.label ?? "",
-          description: v.description ?? "",
-        })),
-      );
-    } else if (store.video_url) {
-      setVideos([{ video_url: store.video_url, label: "店舗紹介動画", description: "" }]);
-    } else {
-      setVideos([]);
-    }
-
-    setStaffPhotos(
-      (store.staff_photos ?? []).map((p) => ({
-        image_url: p.image_url,
-        caption: p.caption ?? "",
-        instagram_url: p.instagram_url ?? "",
-        staff_type: p.staff_type ?? "",
-      })),
-    );
-    setMinWage(store.hourly_min?.toString() || "");
-    setMaxWage(store.hourly_max?.toString() || "");
-    setDailyPay(store.daily_estimate || "");
-    setBackItems((store.back_items || []).map(i => ({ label: i.label, value: i.amount })));
-    setFeeItems((store.fee_items || []).map(i => ({ label: i.label, value: i.amount })));
-    setSalaryNote(store.salary_notes || "");
-    setGuaranteePeriod(store.guarantee_period || "");
-    setGuaranteeDetail(store.guarantee_details || "");
-    setNormaInfo(store.norma_info || "");
-    // BUG-013: 既存DBに `"5,000円"` のような単位込み文字列が残っていても、
-    // input type=number に流すと無効値で空欄化するため、数字以外を剥がして拾う。
-    const stripUnit = (v: unknown) =>
-      v == null ? "" : String(v).replace(/[^\d]/g, "");
-    setAvgWage(stripUnit(store.trial_avg_hourly));
-    setTrialWage(stripUnit(store.trial_hourly));
-    setInterviewStart(store.interview_start || "");
-    setInterviewEnd(store.interview_end || "");
-    setSameDayTrial(store.same_day_trial ? "可" : "不可");
-    setTags(store.feature_tags || []);
-    setDescription(store.description || "");
-    setFeatureText(store.features_text || "");
-    const reqDocs = store.required_documents as any;
-    if (reqDocs && !Array.isArray(reqDocs)) {
-      setDocuments(reqDocs.documents || []);
-      setDocNote(reqDocs.notes || "");
-    } else {
-      setDocuments(reqDocs || []);
-    }
-    setQaItems((store.qa || []).map(q => ({ label: q.question, value: q.answer })));
-
-    // Analysis data
-    const analysis = store.analysis as any;
-    if (analysis) {
-      setExpLevel(analysis.experience_level ?? analysis.exp_level ?? 50);
-      setAtmosphere(analysis.atmosphere ?? 50);
-      const castStyle = analysis.cast_style || {};
-      // 値が無い (DB JSONB に未保存) なら空文字。デフォルト 30/40/15/15 を
-      // 立てると未編集の店舗が一律で「綺麗系30 可愛い系40...」に揃って嘘の分析になる。
-      setCastBijin((castStyle.beauty ?? analysis.cast_bijin)?.toString() ?? "");
-      setCastKawaii((castStyle.cute ?? analysis.cast_kawaii)?.toString() ?? "");
-      setCastGlamour((castStyle.glamour ?? analysis.cast_glamour)?.toString() ?? "");
-      setCastNatural((castStyle.natural ?? analysis.cast_natural)?.toString() ?? "");
-      setClientAge((analysis.customer_age || analysis.client_age || []).map((c: any) => ({ label: c.label, value: c.ratio?.toString() ?? c.value ?? "" })));
-      setDrinkStyle(analysis.drinking_style ?? analysis.drink_style ?? 50);
-    }
-
-    // Interview info
-    const interview = store.interview_info as any;
-    if (interview) {
-      setDressAdvice(interview.dress_advice || "");
-      setDressTips(interview.tips || interview.dress_tips || []);
-      setDressCode(interview.dress_code || "");
-      setHiringCriteria(interview.criteria || interview.hiring_criteria || "");
-      setInterviewDialog((interview.dialog || []).map((d: any) => ({ label: d.text ?? d.label ?? "", value: d.speaker ?? d.value ?? "" })));
-    }
-
-    // shift_info（独立フィールド、scheduleオブジェクトからも互換読み込み）
-    setShiftInfo(store.shift_info || (store.schedule as any)?.shift_info || "");
-
-    // Recent hires
-    if (store.recent_hires) {
-      setHiringEntries((store.recent_hires as any[]).map(h => ({
-        month: h.month || "",
-        count: h.count?.toString() || "",
-        examples: h.examples || [],
-      })));
-    }
-    // BUG-Live-06: 「直近の合計テキスト」(recent_hires_summary) を populate
-    // から拾い漏れていたため、編集画面を開くと空欄になり、未編集のまま保存
-    // すると DB の値が空文字で上書きされる事故が起きていた。
-    setHiringTotal((store as any).recent_hires_summary || "");
-
-    // Staff comment
-    const staffData = store.staff_comment as any;
-    if (staffData && typeof staffData === 'object') {
-      setStaffName(staffData.name || "");
-      setStaffRole(staffData.role || "");
-      setStaffComment(staffData.comment || "");
-      setSupportItems(staffData.supports || staffData.support_items || []);
-    } else if (typeof staffData === 'string') {
-      setStaffComment(staffData);
-    }
-
-    // New schema fields
-    setTransferDescription((store as any).transfer_description || "");
-    setTransferKm((store as any).transfer_km || "");
-    const tz: any[] = (store as any).transfer_zones || [];
-    setTransferZones(
-      Array.isArray(tz)
-        ? tz.map((z: any) => ({
-            label: z?.label ?? "",
-            radius_km: z?.radius_km != null ? String(z.radius_km) : "",
-            fee: z?.fee != null ? String(z.fee) : "",
-            color: z?.color ?? "",
-          }))
-        : []
-    );
-    const rs: any[] = (store as any).related_store_ids || [];
-    setRelatedStoreIds(Array.isArray(rs) ? rs.filter((n: any) => Number.isFinite(Number(n))).map((n: any) => Number(n)) : []);
-    setPayrollSystemType((store as any).payroll_system_type || "");
-    setPayrollSystemDescription((store as any).payroll_system_description || "");
-    setChampagneDescription((store as any).champagne_description || "");
-
-    // FB-driven detail features (Part B)
-    const cp = (store as any).champagne_prices || {};
-    setChampagnePrices({
-      tequila: {
-        amount: cp.tequila?.amount != null ? String(cp.tequila.amount) : "",
-        note: cp.tequila?.note ?? "",
-      },
-      belle_epoque: {
-        amount: cp.belle_epoque?.amount != null ? String(cp.belle_epoque.amount) : "",
-        note: cp.belle_epoque?.note ?? "",
-      },
-      armand: {
-        amount: cp.armand?.amount != null ? String(cp.armand.amount) : "",
-        note: cp.armand?.note ?? "",
-      },
-      lavay: {
-        amount: cp.lavay?.amount != null ? String(cp.lavay.amount) : "",
-        note: cp.lavay?.note ?? "",
-      },
-    });
-
-    const dressDetail = (store as any).dress_code_detail
-      ?? (typeof (store as any).dress_code === "object" ? (store as any).dress_code : null);
-    if (dressDetail && typeof dressDetail === "object") {
-      setDressCodeDescription(dressDetail.description ?? "");
-      setDressCodeOk(
-        (dressDetail.ok_examples ?? []).map((e: any) => ({
-          note: e?.note ?? "",
-          image_url: e?.image_url ?? "",
-        })),
-      );
-      setDressCodeNg(
-        (dressDetail.ng_examples ?? []).map((e: any) => ({
-          note: e?.note ?? "",
-          image_url: e?.image_url ?? "",
-        })),
-      );
-    } else {
-      setDressCodeDescription("");
-      setDressCodeOk([]);
-      setDressCodeNg([]);
-    }
-
-    const sf = (store as any).set_fee || {};
-    setSetFeeList(
-      (sf.items ?? []).map((it: any) => ({
-        label: it?.label ?? "",
-        amount: it?.amount != null ? String(it.amount) : "",
-        note: it?.note ?? "",
-      })),
-    );
-    setSetFeeNotes(sf.notes ?? "");
-
-    setRectaEpisodes(
-      ((store as any).recta_episodes ?? []).map((ep: any) => ({
-        name: ep?.name ?? "",
-        comment: ep?.comment ?? "",
-        instagram_url: ep?.instagram_url ?? "",
-        photo_url: ep?.photo_url ?? "",
-      })),
-    );
-
-    // Publish status & images
+    const f = storeToForm(store);
+    if (f.shopName !== undefined) setShopName(f.shopName);
+    if (f.area !== undefined) setArea(f.area);
+    if (f.address !== undefined) setAddress(f.address);
+    if (f.lat !== undefined) setLat(f.lat);
+    if (f.lng !== undefined) setLng(f.lng);
+    if (f.station !== undefined) setStation(f.station);
+    if (f.category !== undefined) setCategory(f.category);
+    if (f.openingTime !== undefined) setOpeningTime(f.openingTime);
+    if (f.closingTime !== undefined) setClosingTime(f.closingTime);
+    if (f.holiday !== undefined) setHoliday(f.holiday);
+    if (f.phone !== undefined) setPhone(f.phone);
+    if (f.website !== undefined) setWebsite(f.website);
+    if (f.videos !== undefined) setVideos(f.videos);
+    if (f.staffPhotos !== undefined) setStaffPhotos(f.staffPhotos);
+    if (f.minWage !== undefined) setMinWage(f.minWage);
+    if (f.maxWage !== undefined) setMaxWage(f.maxWage);
+    if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
+    if (f.backItems !== undefined) setBackItems(f.backItems);
+    if (f.feeItems !== undefined) setFeeItems(f.feeItems);
+    if (f.salaryNote !== undefined) setSalaryNote(f.salaryNote);
+    if (f.guaranteePeriod !== undefined) setGuaranteePeriod(f.guaranteePeriod);
+    if (f.guaranteeDetail !== undefined) setGuaranteeDetail(f.guaranteeDetail);
+    if (f.normaInfo !== undefined) setNormaInfo(f.normaInfo);
+    if (f.avgWage !== undefined) setAvgWage(f.avgWage);
+    if (f.trialWage !== undefined) setTrialWage(f.trialWage);
+    if (f.interviewStart !== undefined) setInterviewStart(f.interviewStart);
+    if (f.interviewEnd !== undefined) setInterviewEnd(f.interviewEnd);
+    if (f.sameDayTrial !== undefined) setSameDayTrial(f.sameDayTrial);
+    if (f.payrollSystemType !== undefined) setPayrollSystemType(f.payrollSystemType);
+    if (f.payrollSystemDescription !== undefined) setPayrollSystemDescription(f.payrollSystemDescription);
+    if (f.tags !== undefined) setTags(f.tags);
+    if (f.description !== undefined) setDescription(f.description);
+    if (f.featureText !== undefined) setFeatureText(f.featureText);
+    if (f.expLevel !== undefined) setExpLevel(f.expLevel);
+    if (f.atmosphere !== undefined) setAtmosphere(f.atmosphere);
+    if (f.castBijin !== undefined) setCastBijin(f.castBijin);
+    if (f.castKawaii !== undefined) setCastKawaii(f.castKawaii);
+    if (f.castGlamour !== undefined) setCastGlamour(f.castGlamour);
+    if (f.castNatural !== undefined) setCastNatural(f.castNatural);
+    if (f.clientAge !== undefined) setClientAge(f.clientAge);
+    if (f.drinkStyle !== undefined) setDrinkStyle(f.drinkStyle);
+    if (f.dressAdvice !== undefined) setDressAdvice(f.dressAdvice);
+    if (f.dressTips !== undefined) setDressTips(f.dressTips);
+    if (f.dressCode !== undefined) setDressCode(f.dressCode);
+    if (f.hiringCriteria !== undefined) setHiringCriteria(f.hiringCriteria);
+    if (f.interviewDialog !== undefined) setInterviewDialog(f.interviewDialog);
+    if (f.documents !== undefined) setDocuments(f.documents);
+    if (f.docNote !== undefined) setDocNote(f.docNote);
+    if (f.shiftInfo !== undefined) setShiftInfo(f.shiftInfo);
+    if (f.hiringEntries !== undefined) setHiringEntries(f.hiringEntries);
+    if (f.hiringTotal !== undefined) setHiringTotal(f.hiringTotal);
+    if (f.transferDescription !== undefined) setTransferDescription(f.transferDescription);
+    if (f.transferKm !== undefined) setTransferKm(f.transferKm);
+    if (f.transferZones !== undefined) setTransferZones(f.transferZones);
+    if (f.relatedStoreIds !== undefined) setRelatedStoreIds(f.relatedStoreIds);
+    if (f.champagneDescription !== undefined) setChampagneDescription(f.champagneDescription);
+    if (f.champagnePrices !== undefined) setChampagnePrices(f.champagnePrices);
+    if (f.dressCodeDescription !== undefined) setDressCodeDescription(f.dressCodeDescription);
+    if (f.dressCodeOk !== undefined) setDressCodeOk(f.dressCodeOk);
+    if (f.dressCodeNg !== undefined) setDressCodeNg(f.dressCodeNg);
+    if (f.setFeeList !== undefined) setSetFeeList(f.setFeeList);
+    if (f.setFeeNotes !== undefined) setSetFeeNotes(f.setFeeNotes);
+    if (f.rectaEpisodes !== undefined) setRectaEpisodes(f.rectaEpisodes);
+    if (f.qaItems !== undefined) setQaItems(f.qaItems);
+    if (f.staffName !== undefined) setStaffName(f.staffName);
+    if (f.staffRole !== undefined) setStaffRole(f.staffRole);
+    if (f.staffComment !== undefined) setStaffComment(f.staffComment);
+    if (f.supportItems !== undefined) setSupportItems(f.supportItems);
+    // publish_status と images は ShopForm 範囲外
     setPublishStatus(store.publish_status || "draft");
-    setStoreImages((store.images || []).map((img: any) => typeof img === 'string' ? img : img.url));
-  }, []);
+    setStoreImages(
+      ((store.images as unknown[]) || []).map((img) =>
+        typeof img === "string" ? img : (img as { url: string }).url,
+      ),
+    );
+  }, [setStoreImages]);
 
   const [notFound, setNotFound] = useState(false);
   useEffect(() => {
@@ -900,11 +820,11 @@ export function ShopEditPage() {
       fetch("/api/areas").then((r) => r.ok ? r.json() : []),
       fetch("/api/categories").then((r) => r.ok ? r.json() : []),
     ])
-      .then(([areas, categories]: [any, any]) => {
-        const areaList = Array.isArray(areas) ? areas : (areas?.data ?? []);
-        const catList = Array.isArray(categories) ? categories : (categories?.data ?? []);
-        setAreaOptions(areaList.map((a: any) => a.name).filter(Boolean));
-        setCategoryOptions(catList.map((c: any) => c.name).filter(Boolean));
+      .then(([areas, categories]: [unknown, unknown]) => {
+        const areaList = (Array.isArray(areas) ? areas : (areas as { data?: unknown[] })?.data ?? []) as { name: string }[];
+        const catList = (Array.isArray(categories) ? categories : (categories as { data?: unknown[] })?.data ?? []) as { name: string }[];
+        setAreaOptions(areaList.map((a) => a.name).filter(Boolean));
+        setCategoryOptions(catList.map((c) => c.name).filter(Boolean));
       })
       .catch(() => {
         /* マスタが取れなくても画面は止めない。Select は空になり、保存できない状態で気付ける。 */
@@ -934,162 +854,49 @@ export function ShopEditPage() {
     });
   }, [showCopyModal]);
 
-  const buildPayload = useCallback(() => ({
-    name: shopName,
-    area,
-    address,
-    lat,
-    lng,
-    nearest_station: station,
-    category,
-    business_hours: openingTime && closingTime ? `${openingTime}〜${closingTime}` : null,
-    opening_time: openingTime || null,
-    closing_time: closingTime || null,
-    holidays: holiday,
-    phone,
-    website_url: website,
-    // store_videos に同期される。空URLや空欄行は controller 側で drop される。
-    videos: videos
-      .filter((v) => v.video_url.trim() !== "")
-      .map((v) => ({
-        video_url: v.video_url.trim(),
-        label: v.label.trim() || null,
-        description: v.description.trim() || null,
-      })),
-    // store_staff_photos に同期される。
-    staff_photos: staffPhotos
-      .filter((p) => p.image_url.trim() !== "")
-      .map((p) => ({
-        image_url: p.image_url.trim(),
-        caption: p.caption.trim() || null,
-        instagram_url: p.instagram_url.trim() || null,
-        staff_type: p.staff_type.trim() || null,
-      })),
-    hourly_min: minWage ? Number(minWage) : null,
-    hourly_max: maxWage ? Number(maxWage) : null,
-    daily_estimate: dailyPay,
-    back_items: backItems.filter(i => i.label).map(i => ({ label: i.label, amount: i.value })),
-    fee_items: feeItems.filter(i => i.label).map(i => ({ label: i.label, amount: i.value })),
-    salary_notes: salaryNote,
-    guarantee_period: guaranteePeriod,
-    guarantee_details: guaranteeDetail,
-    norma_info: normaInfo,
-    trial_avg_hourly: avgWage,
-    trial_hourly: trialWage,
-    interview_hours: interviewStart && interviewEnd ? `${interviewStart}〜${interviewEnd}` : null,
-    interview_start: interviewStart || null,
-    interview_end: interviewEnd || null,
-    same_day_trial: sameDayTrial === "可",
-    feature_tags: tags,
-    description,
-    features_text: featureText,
-    required_documents: { documents: documents.filter(Boolean), notes: docNote },
-    qa: qaItems.filter(i => i.label).map(i => ({ question: i.label, answer: i.value })),
-    analysis: {
-      experience_level: expLevel,
-      atmosphere,
-      cast_style: {
-        beauty: Number(castBijin) || 0,
-        cute: Number(castKawaii) || 0,
-        glamour: Number(castGlamour) || 0,
-        natural: Number(castNatural) || 0,
-      },
-      customer_age: clientAge.filter(c => c.label).map(c => ({ label: c.label, ratio: Number(c.value) || 0 })),
-      drinking_style: drinkStyle,
-    },
-    interview_info: {
-      dress_advice: dressAdvice,
-      tips: dressTips.filter(Boolean),
-      dress_code: dressCode,
-      criteria: hiringCriteria,
-      dialog: interviewDialog.filter(i => i.label).map(i => ({ text: i.label, speaker: i.value })),
-    },
-    schedule: shiftInfo ? { shift_info: shiftInfo } : null,
-    recent_hires: hiringEntries.map(h => ({
-      month: h.month,
-      count: Number(h.count) || 0,
-      examples: h.examples,
-    })),
-    recent_hires_summary: hiringTotal,
-    staff_comment: {
-      name: staffName,
-      role: staffRole,
-      comment: staffComment,
-      supports: supportItems.filter(Boolean),
-    },
-    transfer_description: transferDescription,
-    transfer_km: transferKm,
-    transfer_zones: transferZones
-      .filter((z) => z.label.trim() || z.radius_km.trim() || z.fee.trim())
-      .map((z) => ({
-        label: z.label.trim() || null,
-        // 数値で送る方が API/UI ともに扱いやすい。空欄は null。
-        radius_km: z.radius_km.trim() ? (Number(z.radius_km) || z.radius_km.trim()) : null,
-        fee: z.fee.trim() ? (Number(z.fee.replace(/[^\d.-]/g, "")) || z.fee.trim()) : null,
-        color: z.color.trim() || null,
-      })),
-    related_store_ids: relatedStoreIds.length > 0 ? relatedStoreIds : null,
-    payroll_system_type: payrollSystemType || null,
-    payroll_system_description: payrollSystemDescription,
-    champagne_description: champagneDescription,
-    // Part B: FB-driven detail-page features
-    champagne_prices: (() => {
-      const out: Record<string, { amount: number; note?: string }> = {};
-      (Object.keys(champagnePrices) as Array<keyof typeof champagnePrices>).forEach((k) => {
-        const item = champagnePrices[k];
-        const trimmedAmount = item.amount.trim();
-        if (!trimmedAmount && !item.note.trim()) return;
-        const num = Number(trimmedAmount.replace(/[^\d.-]/g, ""));
-        if (!Number.isFinite(num) && !item.note.trim()) return;
-        out[k as string] = {
-          amount: Number.isFinite(num) ? num : 0,
-          ...(item.note.trim() ? { note: item.note.trim() } : {}),
-        };
-      });
-      return Object.keys(out).length > 0 ? out : null;
-    })(),
-    dress_code: (dressCodeDescription.trim() || dressCodeOk.length > 0 || dressCodeNg.length > 0)
-      ? {
-          description: dressCodeDescription.trim() || undefined,
-          ok_examples: dressCodeOk
-            .filter((e) => e.note.trim() || e.image_url.trim())
-            .map((e) => ({
-              note: e.note.trim() || undefined,
-              image_url: e.image_url.trim() || undefined,
-            })),
-          ng_examples: dressCodeNg
-            .filter((e) => e.note.trim() || e.image_url.trim())
-            .map((e) => ({
-              note: e.note.trim() || undefined,
-              image_url: e.image_url.trim() || undefined,
-            })),
-        }
-      : null,
-    set_fee: (setFeeList.some((it) => it.label.trim() || it.amount.trim()) || setFeeNotes.trim())
-      ? {
-          items: setFeeList
-            .filter((it) => it.label.trim() || it.amount.trim())
-            .map((it) => {
-              const num = Number(it.amount.replace(/[^\d.-]/g, ""));
-              return {
-                label: it.label.trim(),
-                amount: Number.isFinite(num) ? num : it.amount.trim(),
-                ...(it.note.trim() ? { note: it.note.trim() } : {}),
-              };
-            }),
-          ...(setFeeNotes.trim() ? { notes: setFeeNotes.trim() } : {}),
-        }
-      : null,
-    recta_episodes: rectaEpisodes
-      .filter((ep) => ep.name.trim())
-      .map((ep) => ({
-        name: ep.name.trim(),
-        ...(ep.comment.trim() ? { comment: ep.comment.trim() } : {}),
-        ...(ep.instagram_url.trim() ? { instagram_url: ep.instagram_url.trim() } : {}),
-        ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
-      })),
-    publish_status: publishStatus,
-  }), [shopName, area, address, lat, lng, station, category, openingTime, closingTime, holiday, shiftInfo, phone, website, videos, staffPhotos, minWage, maxWage, dailyPay, backItems, feeItems, salaryNote, guaranteePeriod, guaranteeDetail, normaInfo, avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial, tags, description, featureText, documents, docNote, qaItems, expLevel, atmosphere, castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle, dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog, hiringEntries, hiringTotal, staffName, staffRole, staffComment, supportItems, transferDescription, transferKm, transferZones, relatedStoreIds, payrollSystemType, payrollSystemDescription, champagneDescription, champagnePrices, dressCodeDescription, dressCodeOk, dressCodeNg, setFeeList, setFeeNotes, rectaEpisodes, publishStatus]);
+  // Phase 3-2: 旧 240 行の buildPayload は useShopForm の formToPayload に移管。
+  // 個別 useState を ShopForm 形にまとめて変換関数に渡す薄い wrapper だけ残す。
+  // 88 useState 自体は historical reasons でここに残してあるが、ロジックは
+  // hook 内で Unit テストできる純粋関数になった。
+  const buildPayload = useCallback(() => {
+    const form: ShopForm = {
+      shopName, area, address, lat, lng, station, category,
+      openingTime, closingTime, holiday, phone, website,
+      videos, staffPhotos,
+      minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+      guaranteePeriod, guaranteeDetail, normaInfo,
+      avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial,
+      payrollSystemType, payrollSystemDescription,
+      tags, description, featureText, expLevel, atmosphere,
+      castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
+      dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
+      documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+      transferDescription, transferKm, transferZones, relatedStoreIds,
+      champagneDescription, champagnePrices,
+      dressCodeDescription, dressCodeOk, dressCodeNg,
+      setFeeList, setFeeNotes, rectaEpisodes, qaItems,
+      staffName, staffRole, staffComment, supportItems,
+    };
+    return formToPayload(form, { storeImages: [], publishStatus });
+  }, [
+    shopName, area, address, lat, lng, station, category,
+    openingTime, closingTime, holiday, phone, website,
+    videos, staffPhotos,
+    minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+    guaranteePeriod, guaranteeDetail, normaInfo,
+    avgWage, trialWage, interviewStart, interviewEnd, sameDayTrial,
+    payrollSystemType, payrollSystemDescription,
+    tags, description, featureText, expLevel, atmosphere,
+    castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
+    dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
+    documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+    transferDescription, transferKm, transferZones, relatedStoreIds,
+    champagneDescription, champagnePrices,
+    dressCodeDescription, dressCodeOk, dressCodeNg,
+    setFeeList, setFeeNotes, rectaEpisodes, qaItems,
+    staffName, staffRole, staffComment, supportItems,
+    publishStatus,
+  ]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1113,61 +920,32 @@ export function ShopEditPage() {
     }
   }, [isNew, id, buildPayload, navigate]);
 
-  const handleImageUpload = useCallback(async (files: FileList) => {
-    if (isNew || !id) {
-      setSaveError("画像をアップロードするには、まず店舗を保存してください。");
-      return;
-    }
-    setUploadingImage(true);
-    setSaveError(null);
-    try {
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append("image", file);
-        const res = await api.upload<{ url: string; images: string[] }>(
-          `/admin/stores/${id}/images`,
-          formData,
-        );
-        setStoreImages(res.images);
-      }
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "画像のアップロードに失敗しました");
-    } finally {
-      setUploadingImage(false);
-    }
-  }, [id, isNew]);
+  // 旧 handleImageUpload / handleImageDelete は useShopImages フックに移管 (Phase 3-1)。
+  // 呼び出し側は uploadShopImages / removeShopImage を使う。
+  // hook の error は別 state なので、save 結果欄に集約するため effect で saveError に流す。
+  useEffect(() => {
+    if (shopImageError) setSaveError(shopImageError);
+  }, [shopImageError]);
 
-  const handleImageDelete = useCallback(async (index: number) => {
-    if (!id) return;
-    try {
-      const res = await api.delete<{ images: string[] }>(
-        `/admin/stores/${id}/images/${index}`,
-      );
-      setStoreImages(res.images);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "画像の削除に失敗しました");
-    }
-  }, [id]);
-
+  // step ナビゲーションは useStepProgression に集約。ハンドラはスクロール処理だけ
+  // 上乗せして wrapping する (旧コードはスクロール込みだったので挙動互換のため)。
   const handleNext = useCallback(() => {
-    setCompletedSteps((prev) => new Set([...prev, currentStep]));
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [currentStep]);
+    stepFlow.next();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stepFlow]);
 
   const handlePrev = useCallback(() => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [currentStep]);
-
-  const handleStepClick = useCallback((index: number) => {
-    setCurrentStep(index);
+    stepFlow.prev();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [stepFlow]);
+
+  const handleStepClick = useCallback(
+    (index: number) => {
+      stepFlow.goTo(index);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [stepFlow],
+  );
 
   // BUG-010: 進捗バーは「『次へ』で踏んだ Step 数」だけで計算していたため、
   // データ入力済みの既存店舗を開いた直後は 0% で固定だった。
@@ -1184,12 +962,7 @@ export function ShopEditPage() {
     // Step5: その他
     !!(qaItems.length > 0 || staffComment || publishStatus === "published"),
   ];
-  // 「次へ」で完了マークされた Step も加味する（重複は Set でケア）。
-  const visitedSet = new Set([
-    ...Array.from(completedSteps),
-    ...stepFilled.map((f, i) => f ? i : -1).filter((i) => i >= 0),
-  ]);
-  const progress = Math.round((visitedSet.size / steps.length) * 100);
+  const { progress } = stepFlow.computeProgress(stepFilled);
 
   // --- Step Content Renderers ---
   const renderStep1 = () => (
@@ -1200,7 +973,7 @@ export function ShopEditPage() {
             <Field label="店舗名" required>
               <TextInput
                 value={shopName}
-                onChange={(e: any) => setShopName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setShopName(e.target.value)}
                 placeholder="例: CLUB LUNA"
               />
             </Field>
@@ -1208,7 +981,7 @@ export function ShopEditPage() {
           <Field label="エリア" required>
             <SelectInput
               value={area}
-              onChange={(e: any) => setArea(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setArea(e.target.value)}
               placeholder="エリアを選択"
               // 既存店舗の area がマスタに無い旧表記 ("新宿・歌舞伎町" 等) でも、
               // 現在値を options に合流させて value 復元を維持する。
@@ -1222,7 +995,7 @@ export function ShopEditPage() {
           <Field label="最寄り駅" required>
             <TextInput
               value={station}
-              onChange={(e: any) => setStation(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStation(e.target.value)}
               placeholder="例: 新宿駅"
             />
           </Field>
@@ -1230,7 +1003,7 @@ export function ShopEditPage() {
             <Field label="住所" required>
               <TextInput
                 value={address}
-                onChange={(e: any) => setAddress(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAddress(e.target.value)}
                 placeholder="例: 東京都新宿区歌舞伎町1-1-1"
               />
             </Field>
@@ -1286,7 +1059,7 @@ export function ShopEditPage() {
           <Field label="業種カテゴリ" required>
             <SelectInput
               value={category}
-              onChange={(e: any) => setCategory(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCategory(e.target.value)}
               placeholder="業種を選択"
               options={
                 category && !categoryOptions.includes(category)
@@ -1298,28 +1071,28 @@ export function ShopEditPage() {
           <Field label="営業時間（開始）">
             <TextInput
               value={openingTime}
-              onChange={(e: any) => setOpeningTime(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setOpeningTime(e.target.value)}
               placeholder="例: 20:00"
             />
           </Field>
           <Field label="営業時間（終了）">
             <TextInput
               value={closingTime}
-              onChange={(e: any) => setClosingTime(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setClosingTime(e.target.value)}
               placeholder="例: 1:00 / LAST"
             />
           </Field>
           <Field label="定休日">
             <TextInput
               value={holiday}
-              onChange={(e: any) => setHoliday(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setHoliday(e.target.value)}
               placeholder="例: 日曜日"
             />
           </Field>
           <Field label="電話番号">
             <TextInput
               value={phone}
-              onChange={(e: any) => setPhone(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPhone(e.target.value)}
               placeholder="例: 03-0000-0000"
             />
           </Field>
@@ -1327,7 +1100,7 @@ export function ShopEditPage() {
             <Field label="公式サイトURL">
               <TextInput
                 value={website}
-                onChange={(e: any) => setWebsite(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setWebsite(e.target.value)}
                 placeholder="https://"
               />
             </Field>
@@ -1352,7 +1125,7 @@ export function ShopEditPage() {
                       </span>
                     )}
                     <button
-                      onClick={() => handleImageDelete(idx)}
+                      onClick={() => removeShopImage(idx)}
                       className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -1362,7 +1135,7 @@ export function ShopEditPage() {
               </div>
             )}
             <ImageUploadZone
-              onUpload={handleImageUpload}
+              onUpload={uploadShopImages}
               uploading={uploadingImage}
               disabled={isNew}
             />
@@ -1387,7 +1160,7 @@ export function ShopEditPage() {
               <TextInput
                 type="number"
                 value={minWage}
-                onChange={(e: any) => setMinWage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMinWage(e.target.value)}
                 placeholder="4000"
               />
             </Field>
@@ -1395,14 +1168,14 @@ export function ShopEditPage() {
               <TextInput
                 type="number"
                 value={maxWage}
-                onChange={(e: any) => setMaxWage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMaxWage(e.target.value)}
                 placeholder="8000"
               />
             </Field>
             <Field label="日給目安">
               <TextInput
                 value={dailyPay}
-                onChange={(e: any) => setDailyPay(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPay(e.target.value)}
                 placeholder="例: 30000〜60000"
               />
             </Field>
@@ -1432,14 +1205,14 @@ export function ShopEditPage() {
           <Field label="給与補足">
             <TextArea
               value={salaryNote}
-              onChange={(e: any) => setSalaryNote(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSalaryNote(e.target.value)}
               placeholder="その他、給与に関する補足情報があれば入力してください"
             />
           </Field>
           <Field label="給与支払い方法">
             <SelectInput
               value={payrollSystemType}
-              onChange={(e: any) => setPayrollSystemType(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemType(e.target.value)}
               options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
               placeholder="選択してください"
             />
@@ -1447,7 +1220,7 @@ export function ShopEditPage() {
           <Field label="給与支払い補足">
             <TextArea
               value={payrollSystemDescription}
-              onChange={(e: any) => setPayrollSystemDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemDescription(e.target.value)}
               placeholder="給与支払いに関する補足（例: 日払い上限5万円まで等）"
               rows={2}
             />
@@ -1461,7 +1234,7 @@ export function ShopEditPage() {
             <Field label="保証期間">
               <TextInput
                 value={guaranteePeriod}
-                onChange={(e: any) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   setGuaranteePeriod(e.target.value)
                 }
                 placeholder="例: 3ヶ月"
@@ -1471,7 +1244,7 @@ export function ShopEditPage() {
           <Field label="保証詳細">
             <TextArea
               value={guaranteeDetail}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setGuaranteeDetail(e.target.value)
               }
               placeholder="保証の具体的な内容を入力してください"
@@ -1480,7 +1253,7 @@ export function ShopEditPage() {
           <Field label="ノルマ情報">
             <TextArea
               value={normaInfo}
-              onChange={(e: any) => setNormaInfo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setNormaInfo(e.target.value)}
               placeholder="ノルマの有無や内容を入力してください"
             />
           </Field>
@@ -1497,7 +1270,7 @@ export function ShopEditPage() {
               type="number"
               inputMode="numeric"
               value={avgWage}
-              onChange={(e: any) => setAvgWage(e.target.value.replace(/[^\d]/g, ""))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAvgWage(e.target.value.replace(/[^\d]/g, ""))}
               placeholder="例: 5000"
             />
           </Field>
@@ -1506,28 +1279,28 @@ export function ShopEditPage() {
               type="number"
               inputMode="numeric"
               value={trialWage}
-              onChange={(e: any) => setTrialWage(e.target.value.replace(/[^\d]/g, ""))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialWage(e.target.value.replace(/[^\d]/g, ""))}
               placeholder="例: 4500"
             />
           </Field>
           <Field label="面接可能時間（開始）">
             <TextInput
               value={interviewStart}
-              onChange={(e: any) => setInterviewStart(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewStart(e.target.value)}
               placeholder="例: 14:00"
             />
           </Field>
           <Field label="面接可能時間（終了）">
             <TextInput
               value={interviewEnd}
-              onChange={(e: any) => setInterviewEnd(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewEnd(e.target.value)}
               placeholder="例: 19:00"
             />
           </Field>
           <Field label="当日体入可否">
             <SelectInput
               value={sameDayTrial}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setSameDayTrial(e.target.value)
               }
               options={["可", "不可"]}
@@ -1585,7 +1358,7 @@ export function ShopEditPage() {
           <Field label="お店の特徴テキスト">
             <TextArea
               value={featureText}
-              onChange={(e: any) => setFeatureText(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFeatureText(e.target.value)}
               rows={3}
               placeholder="他店との差別化ポイントや特徴を入力してください"
             />
@@ -1598,14 +1371,14 @@ export function ShopEditPage() {
           <SliderField
             label="経験レベル"
             value={expLevel}
-            onChange={(e: any) => setExpLevel(Number(e.target.value))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExpLevel(Number(e.target.value))}
             leftLabel="初心者向け"
             rightLabel="経験者向け"
           />
           <SliderField
             label="雰囲気"
             value={atmosphere}
-            onChange={(e: any) =>
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setAtmosphere(Number(e.target.value))
             }
             leftLabel="落ち着き"
@@ -1622,14 +1395,14 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={castBijin}
-                  onChange={(e: any) => setCastBijin(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCastBijin(e.target.value)}
                 />
               </Field>
               <Field label="可愛い系">
                 <TextInput
                   type="number"
                   value={castKawaii}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastKawaii(e.target.value)
                   }
                 />
@@ -1638,7 +1411,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={castGlamour}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastGlamour(e.target.value)
                   }
                 />
@@ -1647,7 +1420,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={castNatural}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastNatural(e.target.value)
                   }
                 />
@@ -1665,7 +1438,7 @@ export function ShopEditPage() {
           <SliderField
             label="客層の飲み方"
             value={drinkStyle}
-            onChange={(e: any) =>
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setDrinkStyle(Number(e.target.value))
             }
             leftLabel="落ち着き"
@@ -1684,7 +1457,7 @@ export function ShopEditPage() {
           <Field label="面接時の服装アドバイス">
             <TextArea
               value={dressAdvice}
-              onChange={(e: any) => setDressAdvice(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressAdvice(e.target.value)}
               placeholder="面接時のおすすめの服装について入力してください"
             />
           </Field>
@@ -1698,14 +1471,14 @@ export function ShopEditPage() {
           <Field label="ドレスコード">
             <TextInput
               value={dressCode}
-              onChange={(e: any) => setDressCode(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCode(e.target.value)}
               placeholder="例: フリー / ドレス貸し出しあり"
             />
           </Field>
           <Field label="採用基準">
             <TextArea
               value={hiringCriteria}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setHiringCriteria(e.target.value)
               }
               placeholder="採用時に重視するポイントを入力してください"
@@ -1740,7 +1513,7 @@ export function ShopEditPage() {
           <Field label="補足メモ">
             <TextArea
               value={docNote}
-              onChange={(e: any) => setDocNote(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDocNote(e.target.value)}
               placeholder="書類に関する補足情報があれば入力してください"
             />
           </Field>
@@ -1753,7 +1526,7 @@ export function ShopEditPage() {
           <Field label="シフト情報">
             <TextArea
               value={shiftInfo}
-              onChange={(e: any) => setShiftInfo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setShiftInfo(e.target.value)}
               placeholder="例: 週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。"
             />
           </Field>
@@ -1773,7 +1546,7 @@ export function ShopEditPage() {
                     変えられず、過去月の実績を入力できなかった。 */}
                 <TextInput
                   value={entry.month}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const updated = [...hiringEntries];
                     updated[i] = { ...updated[i], month: e.target.value };
                     setHiringEntries(updated);
@@ -1795,7 +1568,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={entry.count}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const updated = [...hiringEntries];
                     updated[i] = {
                       ...updated[i],
@@ -1838,7 +1611,7 @@ export function ShopEditPage() {
           <Field label="直近の合計テキスト">
             <TextInput
               value={hiringTotal}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setHiringTotal(e.target.value)
               }
               placeholder="例: 直近5ヶ月で52名採用"
@@ -1856,7 +1629,7 @@ export function ShopEditPage() {
           <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
             <TextArea
               value={dressCodeDescription}
-              onChange={(e: any) => setDressCodeDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
               rows={3}
               placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
             />
@@ -1962,7 +1735,7 @@ export function ShopEditPage() {
           >
             <TextArea
               value={champagneDescription}
-              onChange={(e: any) => setChampagneDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setChampagneDescription(e.target.value)}
               rows={4}
               placeholder="例: ドンペリ 50,000円〜 / モエシャン 30,000円〜 など"
             />
@@ -1992,7 +1765,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={champagnePrices[key].amount}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setChampagnePrices({
                       ...champagnePrices,
                       [key]: { ...champagnePrices[key], amount: e.target.value },
@@ -2004,7 +1777,7 @@ export function ShopEditPage() {
               <div className="md:col-span-1">
                 <TextInput
                   value={champagnePrices[key].note}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setChampagnePrices({
                       ...champagnePrices,
                       [key]: { ...champagnePrices[key], note: e.target.value },
@@ -2081,7 +1854,7 @@ export function ShopEditPage() {
           <Field label="セット料金 補足">
             <TextArea
               value={setFeeNotes}
-              onChange={(e: any) => setSetFeeNotes(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSetFeeNotes(e.target.value)}
               rows={2}
               placeholder="例: 延長30分ごと+1,500円、税込表記"
             />
@@ -2112,7 +1885,7 @@ export function ShopEditPage() {
                 <Field label="名前">
                   <TextInput
                     value={ep.name}
-                    onChange={(e: any) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const next = [...rectaEpisodes];
                       next[i] = { ...next[i], name: e.target.value };
                       setRectaEpisodes(next);
@@ -2123,7 +1896,7 @@ export function ShopEditPage() {
                 <Field label="Instagram URL（任意）">
                   <TextInput
                     value={ep.instagram_url}
-                    onChange={(e: any) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const next = [...rectaEpisodes];
                       next[i] = { ...next[i], instagram_url: e.target.value };
                       setRectaEpisodes(next);
@@ -2135,7 +1908,7 @@ export function ShopEditPage() {
               <Field label="写真URL（任意）">
                 <TextInput
                   value={ep.photo_url}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const next = [...rectaEpisodes];
                     next[i] = { ...next[i], photo_url: e.target.value };
                     setRectaEpisodes(next);
@@ -2146,7 +1919,7 @@ export function ShopEditPage() {
               <Field label="エピソード">
                 <TextArea
                   value={ep.comment}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const next = [...rectaEpisodes];
                     next[i] = { ...next[i], comment: e.target.value };
                     setRectaEpisodes(next);
@@ -2179,7 +1952,7 @@ export function ShopEditPage() {
           >
             <TextArea
               value={transferDescription}
-              onChange={(e: any) => setTransferDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferDescription(e.target.value)}
               rows={3}
               placeholder="例: 営業終了後、自宅まで無料送迎あり"
             />
@@ -2187,7 +1960,7 @@ export function ShopEditPage() {
           <Field label="送り距離">
             <TextInput
               value={transferKm}
-              onChange={(e: any) => setTransferKm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferKm(e.target.value)}
               placeholder="例: 20km圏内"
             />
           </Field>
@@ -2339,14 +2112,14 @@ export function ShopEditPage() {
             <Field label="スタッフ名">
               <TextInput
                 value={staffName}
-                onChange={(e: any) => setStaffName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffName(e.target.value)}
                 placeholder="例: 田中"
               />
             </Field>
             <Field label="スタッフ役職">
               <TextInput
                 value={staffRole}
-                onChange={(e: any) => setStaffRole(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffRole(e.target.value)}
                 placeholder="例: 店長"
               />
             </Field>
@@ -2354,7 +2127,7 @@ export function ShopEditPage() {
           <Field label="コメント">
             <TextArea
               value={staffComment}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setStaffComment(e.target.value)
               }
               rows={4}
@@ -3117,7 +2890,7 @@ function VideoListEditor({
               </label>
               <TextInput
                 value={video.video_url}
-                onChange={(e: any) => update(i, { video_url: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { video_url: e.target.value })}
                 placeholder="例: https://youtube.com/watch?v=... または https://example.com/video.mp4"
               />
             </div>
@@ -3127,7 +2900,7 @@ function VideoListEditor({
               </label>
               <TextInput
                 value={video.label}
-                onChange={(e: any) => update(i, { label: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { label: e.target.value })}
                 placeholder="動画の見出しになります（空でも可）"
               />
             </div>
@@ -3137,7 +2910,7 @@ function VideoListEditor({
               </label>
               <TextArea
                 value={video.description}
-                onChange={(e: any) => update(i, { description: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { description: e.target.value })}
                 rows={2}
                 placeholder="動画の補足説明。改行は反映されます。"
               />
@@ -3272,7 +3045,7 @@ function StaffPhotosEditor({
               </label>
               <TextInput
                 value={photo.image_url}
-                onChange={(e: any) => update(i, { image_url: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { image_url: e.target.value })}
                 placeholder="例: https://example.com/photo.jpg または /storage/stores/xxx.jpg"
               />
             </div>
@@ -3283,7 +3056,7 @@ function StaffPhotosEditor({
                 </label>
                 <TextInput
                   value={photo.staff_type}
-                  onChange={(e: any) => update(i, { staff_type: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { staff_type: e.target.value })}
                   placeholder="任意"
                 />
               </div>
@@ -3293,7 +3066,7 @@ function StaffPhotosEditor({
                 </label>
                 <TextInput
                   value={photo.instagram_url}
-                  onChange={(e: any) => update(i, { instagram_url: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { instagram_url: e.target.value })}
                   placeholder="https://instagram.com/..."
                 />
               </div>
@@ -3304,7 +3077,7 @@ function StaffPhotosEditor({
               </label>
               <TextInput
                 value={photo.caption}
-                onChange={(e: any) => update(i, { caption: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { caption: e.target.value })}
                 placeholder="例: 在籍2年・お酒に強くなくてもOK"
               />
             </div>

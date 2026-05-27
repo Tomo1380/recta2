@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\ArticleResource;
 use App\Http\Resources\ArticleSummaryResource;
 use App\Models\Article;
+use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -13,6 +14,8 @@ class PublicArticleController extends Controller
 {
     /**
      * Public list of published articles, paginated.
+     *
+     * Returns BFF view: paginator (flat) + categories chip list.
      *
      * @response array{
      *   articles: array{
@@ -59,7 +62,7 @@ class PublicArticleController extends Controller
             ->pluck('category');
 
         return response()->json([
-            'articles' => ArticleSummaryResource::collection($articles)->response()->getData(true),
+            'articles' => PaginatorWithResource::map($articles, ArticleSummaryResource::class),
             'categories' => $categories,
         ]);
     }

@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
+  AdminLoginRequest,
   AuthLogin200,
-  AuthLoginBody,
   AuthLogout200,
   AuthMe200
 } from './api.schemas';
@@ -17,12 +17,12 @@ import { rectaMutator } from '../mutators/auth';
 
 
   export const authLogin = (
-    authLoginBody: AuthLoginBody,
+    adminLoginRequest: AdminLoginRequest,
  ) => {
       return rectaMutator<AuthLogin200>(
       {url: `/admin/login`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: authLoginBody
+      data: adminLoginRequest
     },
       );
     }
