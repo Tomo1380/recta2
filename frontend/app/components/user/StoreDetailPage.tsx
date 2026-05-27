@@ -1206,12 +1206,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           />
 
           {/* ============================================================ */}
-          {/* 11b. Champagne prices (4 fixed templates) */}
+          {/* 11b. Champagne prices + Set fee — お店の単価が分かる「価格表」系を
+                  隣接させる (運営要望)。 */}
           {/* ============================================================ */}
           <ChampagnePricesSection
             prices={store.champagne_prices}
             fallback={store.champagne_description}
           />
+          <SetFeeSection setFee={store.set_fee} />
 
           {/* ============================================================ */}
           {/* 11c. Recta-keiyū episodes (レクタ経由入店女性エピソード) */}
@@ -1234,11 +1236,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             hourlyMin={store.hourly_min ?? undefined}
             hourlyMax={store.hourly_max ?? undefined}
           />
-
-          {/* ============================================================ */}
-          {/* 11f. Set fee (セット料金) */}
-          {/* ============================================================ */}
-          <SetFeeSection setFee={store.set_fee} />
 
           {/* ============================================================ */}
           {/* 12. Q&A */}
