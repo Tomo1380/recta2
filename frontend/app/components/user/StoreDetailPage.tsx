@@ -1747,36 +1747,30 @@ function LuxeHero({
         </>
       )}
 
-      {/* 進捗バー (ヘアラインゴールド・現在位置だけ塗る)。ドットや枚数
-          カウンターを廃して、Stories / Reels 的に「時間軸で進んでる」感を出す。
-          短い線分が並ぶことで「全部で何枚あるか」も視覚的に伝わる。 */}
+      {/* 進捗バー (ヘアラインゴールド・現在位置を含む左までを塗る)。
+          ドットや枚数カウンターを廃して、Stories / Reels 的に
+          「時間軸で進んでる」感を出す。短い線分が並ぶことで「全部で何枚
+          あるか」も視覚的に伝わる。色だけで状態を表し、戻ったときに
+          ぐにゃっと width が animate しないように一発切替にしている
+          (内側塗り span を持たず、外側ボタンの背景色だけで塗る)。 */}
       {slides.length > 1 && (
         <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center gap-1 px-5">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => goTo(i)}
-              aria-label={`${i + 1}枚目に移動`}
-              className="h-[2px] flex-1 max-w-[40px] overflow-hidden transition-opacity"
-              style={{
-                backgroundColor: "rgba(255,255,255,0.25)",
-                cursor: "pointer",
-              }}
-            >
-              <span
-                aria-hidden
-                className="block h-full transition-all"
+          {slides.map((_, i) => {
+            const active = i <= index;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => goTo(i)}
+                aria-label={`${i + 1}枚目に移動`}
+                className="h-[2px] flex-1 max-w-[40px] rounded-full transition-colors duration-300"
                 style={{
-                  width: i < index ? "100%" : i === index ? "100%" : "0%",
-                  backgroundColor: "#D4AF37",
-                  // 現在進行中のセグメントだけ少しシマー (今後 progress
-                  // アニメーション化したくなったらここを線形 transition で 0→100% に)。
-                  opacity: i <= index ? 1 : 0,
+                  backgroundColor: active ? "#D4AF37" : "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
                 }}
               />
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
