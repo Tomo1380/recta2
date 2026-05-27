@@ -849,7 +849,10 @@ export function ShopEditPage() {
 
   useEffect(() => {
     if (!showCopyModal) return;
-    api.get<{data: Store[]}>("/admin/stores?per_page=20").then(res => {
+    // 複製候補は実用上 200 件あれば十分 (店舗数が増えてもモーダル内検索で
+    // たどれる)。per_page=20 だと最近 20 件しか見えず、古い店をベースに
+    // 複製したいケースで詰む。
+    api.get<{data: Store[]}>("/admin/stores?per_page=200").then(res => {
       setExistingShops(res.data.map(s => ({ id: s.id, name: s.name })));
     });
   }, [showCopyModal]);
@@ -2306,8 +2309,12 @@ export function ShopEditPage() {
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setShowCopyModal(false)}
           />
-          <div className="relative bg-white rounded-xl shadow-2xl border border-border w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
+          {/* mx-4: モバイル時の左右余白
+              max-h-[85vh]: ビューポート 85% を超えないように
+              flex flex-col + overflow on inner list: ヘッダー/説明文は固定、
+              店舗リスト部分だけ縦スクロール (店舗数が多くても画面外に行かない) */}
+          <div className="relative bg-white rounded-xl shadow-2xl border border-border w-full max-w-md mx-4 p-6 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between mb-5 shrink-0">
               <h3 className="text-base">既存店舗から複製</h3>
               <button
                 onClick={() => setShowCopyModal(false)}
@@ -2316,12 +2323,12 @@ export function ShopEditPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-4 shrink-0">
               既存の店舗データをベースに新しい店舗を作成できます。
               <br />
               複製後に各項目を編集してください。
             </p>
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-y-auto -mx-2 px-2">
               {existingShops.map((shop) => (
                 <button
                   key={shop.id}
@@ -2333,11 +2340,11 @@ export function ShopEditPage() {
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-accent hover:border-primary/30 transition text-left group"
                 >
-                  <div className="w-9 h-9 rounded-lg bg-primary/5 text-primary flex items-center justify-center text-xs">
+                  <div className="w-9 h-9 rounded-lg bg-primary/5 text-primary flex items-center justify-center text-xs shrink-0">
                     {shop.name[0]}
                   </div>
                   <span className="text-sm">{shop.name}</span>
-                  <Copy className="w-4 h-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition" />
+                  <Copy className="w-4 h-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition shrink-0" />
                 </button>
               ))}
             </div>
