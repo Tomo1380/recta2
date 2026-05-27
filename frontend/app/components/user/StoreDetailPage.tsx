@@ -1063,14 +1063,15 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 9. Interview Info */}
+          {/* 9. Interview Info (+ Required documents as sub-block) */}
           {/* ============================================================ */}
-          {store.interview_info && (
+          {(store.interview_info || store.required_documents) && (
             <SectionCard
               icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
               title="面接情報"
             >
               <div className="space-y-4">
+                {store.interview_info && (
                 <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
                   {store.interview_info.criteria && (
                     <InfoRow label="採用基準" value={store.interview_info.criteria} />
@@ -1082,14 +1083,15 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     <InfoRow label="アドバイス" value={store.interview_info.dress_advice} />
                   )}
                 </div>
+                )}
 
-                {(store.interview_info.tips ?? []).length > 0 && (
+                {(store.interview_info?.tips ?? []).length > 0 && (
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
                       面接のコツ
                     </h3>
                     <ul className="space-y-1.5">
-                      {(store.interview_info.tips ?? []).map((tip, i) => (
+                      {(store.interview_info?.tips ?? []).map((tip, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
                           <span
                             className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
@@ -1102,13 +1104,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                   </div>
                 )}
 
-                {(store.interview_info.dialog ?? []).length > 0 && (
+                {(store.interview_info?.dialog ?? []).length > 0 && (
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
                       面接の流れ
                     </h3>
                     <div className="space-y-2">
-                      {(store.interview_info.dialog ?? []).map((entry, i) => (
+                      {(store.interview_info?.dialog ?? []).map((entry, i) => (
                         <div
                           key={i}
                           className={`flex ${entry.speaker === "staff" ? "justify-start" : "justify-end"}`}
@@ -1139,12 +1141,49 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     </div>
                   </div>
                 )}
+
+                {/* 必要書類はかつて独立 SectionCard だったが、面接情報と
+                    文脈が近い (「面接の持ち物」) のでサブブロックとして
+                    同居させる。書類リスト or 補足メモのどちらかがあれば出す。 */}
+                {store.required_documents
+                  && ((store.required_documents.documents ?? []).length > 0
+                      || store.required_documents.notes) && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
+                      必要書類
+                    </h3>
+                    {(store.required_documents.documents ?? []).length > 0 && (
+                      <ul className="space-y-1.5">
+                        {(store.required_documents.documents ?? []).map((doc, i) => (
+                          <li key={i} className="flex items-baseline gap-2 text-sm">
+                            <span
+                              aria-hidden
+                              className="shrink-0 text-xs leading-none"
+                              style={{ color: "rgba(27,37,40,0.4)" }}
+                            >
+                              ・
+                            </span>
+                            <span>{doc}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {store.required_documents.notes && (
+                      <p
+                        className="rounded-[12px] px-3 py-2 text-sm"
+                        style={{ backgroundColor: "rgba(212,175,55,0.08)", color: "rgba(27,37,40,0.7)" }}
+                      >
+                        {store.required_documents.notes}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </SectionCard>
           )}
 
-          {/* LINE CTA #2 — only when followed by a "Required documents" section,
-              so the "面接前の不安" framing doesn't dangle without context. */}
+          {/* LINE CTA #2 — 面接情報の直後。「面接前の不安、LINEで」の文脈で
+              必要書類を含む面接ブロックの締めとして置く。 */}
           {store.required_documents && (
             <LineCtaCard
               variant="slim"
@@ -1153,45 +1192,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               ctaLabel="質問する"
               source="store-detail:docs-inline"
             />
-          )}
-
-          {/* ============================================================ */}
-          {/* 10. Required Documents */}
-          {/* ============================================================ */}
-          {store.required_documents && (
-            <SectionCard
-              icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
-              title="必要書類"
-            >
-              <div className="space-y-3">
-                {(store.required_documents.documents ?? []).length > 0 && (
-                  <ul className="space-y-1.5">
-                    {(store.required_documents.documents ?? []).map((doc, i) => (
-                      // 各書類の左に FileText アイコンを並べると複数あるとき
-                      // 視覚的にうるさい。シンプルな「・」bullet にする。
-                      <li key={i} className="flex items-baseline gap-2 text-sm">
-                        <span
-                          aria-hidden
-                          className="shrink-0 text-xs leading-none"
-                          style={{ color: "rgba(27,37,40,0.4)" }}
-                        >
-                          ・
-                        </span>
-                        <span>{doc}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {store.required_documents.notes && (
-                  <p
-                    className="rounded-[12px] px-3 py-2 text-sm"
-                    style={{ backgroundColor: "rgba(212,175,55,0.08)", color: "rgba(27,37,40,0.7)" }}
-                  >
-                    {store.required_documents.notes}
-                  </p>
-                )}
-              </div>
-            </SectionCard>
           )}
 
           {/* ============================================================ */}
