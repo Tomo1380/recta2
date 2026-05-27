@@ -929,23 +929,15 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               </div>
             )}
 
-            {/* Store data table — 時給/日給目安もここに同居させて「店舗情報」
-                1枚で全体像が見えるようにする。詳細 (バック / 保証 / ノルマ等)
-                は下の「給与・待遇」カードへ。 */}
+            {/* Store data table —「どこ → いくら → いつ」の動線に合わせて
+                場所・時給・営業 の 3 ブロックで並べる。詳細 (バック / 保証 /
+                ノルマ等) は下の「報酬・待遇」カードへ。 */}
             <div className="mt-4 divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+              {/* どこ */}
               <InfoRow label="業種" value={store.category} />
               <InfoRow label="エリア" value={store.area} />
               <InfoRow label="最寄り駅" value={store.nearest_station} />
-              <InfoRow
-                label="営業時間"
-                value={
-                  store.opening_time && store.closing_time
-                    ? `${store.opening_time}〜${store.closing_time}`
-                    : store.business_hours
-                }
-              />
-              {store.holidays && <InfoRow label="定休日" value={store.holidays} />}
-              {store.shift_info && <InfoRow label="シフト" value={store.shift_info} />}
+              {/* いくら */}
               {(() => {
                 const range = formatWageRange(store.hourly_min, store.hourly_max);
                 return range ? <InfoRow label="時給" value={range} /> : null;
@@ -960,6 +952,17 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                   <InfoRow label="日給目安" value={formatCurrency(raw)} />
                 );
               })()}
+              {/* いつ */}
+              <InfoRow
+                label="営業時間"
+                value={
+                  store.opening_time && store.closing_time
+                    ? `${store.opening_time}〜${store.closing_time}`
+                    : store.business_hours
+                }
+              />
+              {store.holidays && <InfoRow label="定休日" value={store.holidays} />}
+              {store.shift_info && <InfoRow label="シフト" value={store.shift_info} />}
             </div>
           </SectionCard>
 
@@ -968,7 +971,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           <SectionCard
             icon={<Award size={20} style={{ color: "#D4AF37" }} />}
-            title="給与・待遇"
+            title="報酬・待遇"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               {/* 時給/日給目安は「店舗情報」カードへ移動済み。ここはバック以下の

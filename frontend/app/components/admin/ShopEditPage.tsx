@@ -73,14 +73,14 @@ const steps: StepConfig[] = [
   },
   {
     id: "step2",
-    title: "給与・待遇",
-    subtitle: "給与体系と保証情報",
+    title: "報酬・待遇",
+    subtitle: "報酬の内訳と保証・体入情報",
     icon: DollarSign,
     gradient: "from-emerald-500 to-teal-500",
     sections: [
-      { id: "salary", title: "給与・待遇", icon: DollarSign, required: true },
-      { id: "guarantee", title: "保証・ノルマ", icon: Shield },
+      { id: "salary", title: "報酬・待遇", icon: DollarSign, required: true },
       { id: "trial", title: "体入情報", icon: Sparkles },
+      { id: "hiring", title: "直近の採用実績", icon: TrendingUp },
     ],
   },
   {
@@ -1046,7 +1046,7 @@ export function ShopEditPage() {
   const stepFilled: boolean[] = [
     // Step1: 基本情報
     !!(shopName && area && category && station && address),
-    // Step2: 給与・待遇
+    // Step2: 報酬・待遇
     !!(minWage && maxWage),
     // Step3: 特徴・分析
     !!(tags.length > 0 || featureText),
@@ -1200,7 +1200,7 @@ export function ShopEditPage() {
           </div>
           {/* 時給/日給目安/シフト は管理画面上「店舗情報」の一部として扱う。
               ユーザー画面の店舗情報カードにも同じ並びで出る。詳細な給与
-              (バック / 控除 / 保証 / ノルマ等) は STEP2「給与・待遇」へ。 */}
+              (バック / 控除 / 保証 / ノルマ等) は STEP2「報酬・待遇」へ。 */}
           <Field label="時給の最低額（円）" required>
             <TextInput
               type="number"
@@ -1295,7 +1295,7 @@ export function ShopEditPage() {
 
   const renderStep2 = () => (
     <div className="space-y-6">
-      <SectionCard title="給与・待遇" icon={DollarSign} required>
+      <SectionCard title="報酬・待遇" icon={DollarSign} required>
         <div className="space-y-5">
           {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここはバック・
               控除・備考・支払い方法・保証・ノルマ等の詳細を扱う。 */}
@@ -1344,7 +1344,7 @@ export function ShopEditPage() {
               rows={2}
             />
           </Field>
-          {/* 保証・ノルマはユーザー画面では給与・待遇カード内に同居するため、
+          {/* 保証・ノルマはユーザー画面では報酬・待遇カード内に同居するため、
               管理画面も同じセクション内にまとめる。 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
             <Field label="保証期間">
