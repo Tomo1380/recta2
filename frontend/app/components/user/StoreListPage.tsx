@@ -742,7 +742,7 @@ export default function StoreListPage() {
               className="text-[10px] font-light text-white/55"
               style={{ fontFamily: "'Outfit', sans-serif", letterSpacing: "0.14em" }}
             >
-              AIで探す、理想の一店
+              Rectaで探す、理想の一店
             </span>
           </div>
         </div>

@@ -1552,12 +1552,12 @@ function LuxeHero({
     else goPrev();
   };
 
-  // 「次に出る画像」サムネ用: index+1, index+2 を循環参照で取り出す。
-  // 2 枚しかない店舗では offset=2 が現在表示と同じになるので 1 枚だけ。
-  const nextSlides = hasSlides && slides.length > 1
-    ? (slides.length >= 3 ? [1, 2] : [1])
-        .map((offset) => ({ url: slides[(index + offset) % slides.length], offset }))
-    : [];
+  // 次に出る画像を右端に「peek」(覗かせ) 表示する用。映画的に「この向こうに
+  // まだある」を暗喩で伝えるパターン (Netflix / Stories / Smashing 推奨)。
+  // ミニサムネと枚数カウンターは廃止して、peek + 進捗バーに統一する。
+  const peekUrl = hasSlides && slides.length > 1
+    ? slides[(index + 1) % slides.length]
+    : null;
 
   return (
     <section
@@ -1620,7 +1620,36 @@ function LuxeHero({
         }}
       />
 
-      {/* Floating top — back + share */}
+      {/* Peek — 次画像を右端から 14px だけ覗かせる (Option B「シネマ peek」)。
+          「この向こうにもう一枚ある」のシグナルを暗喩で。peek にはうっすら
+          ダークグラデを乗せて、主役 (現在画像) との階層を保つ。タップで次へ。 */}
+      {peekUrl && (
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="次の写真"
+          className="absolute right-0 top-0 z-[5] h-full overflow-hidden"
+          style={{ width: 18, cursor: "pointer" }}
+        >
+          <img
+            src={peekUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            style={{ filter: "brightness(0.65) saturate(0.85)" }}
+          />
+          {/* 主役との境目を作る縦グラデ (左側だけ濃く) */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(90deg, rgba(8,6,16,0.7) 0%, rgba(8,6,16,0.15) 100%)",
+            }}
+          />
+        </button>
+      )}
+
+      {/* Floating top — 戻るボタンのみ (カウンター pill は廃止、進捗バーで代替) */}
       <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-3">
         <Link
           to="/stores"
@@ -1634,19 +1663,6 @@ function LuxeHero({
         >
           <ChevronLeft className="size-5" />
         </Link>
-        {slides.length > 1 && (
-          <div
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium text-white tabular-nums"
-            style={{
-              backgroundColor: "rgba(0,0,0,0.4)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              fontFamily: "'Outfit', sans-serif",
-            }}
-          >
-            {index + 1} / {slides.length}
-          </div>
-        )}
       </div>
 
       {/* Editorial overlay — bottom */}
@@ -1730,50 +1746,35 @@ function LuxeHero({
         </>
       )}
 
-      {/* 次に出る画像のミニサムネ (右下に縦並び 2 枚)。「次これ → その次これ」
-          を予告して、ユーザーに「もっと写真あるよ」を伝える。タップで該当
-          スライドへジャンプ。サムネは indicator バーの上に積む。 */}
-      {nextSlides.length > 0 && (
-        <div className="absolute bottom-5 right-2 z-10 flex flex-col gap-1.5">
-          {nextSlides.map(({ url, offset }) => (
-            <button
-              key={offset}
-              type="button"
-              onClick={() => goTo((index + offset) % slides.length)}
-              aria-label={`${((index + offset) % slides.length) + 1}枚目に移動`}
-              className="block overflow-hidden rounded-md transition-transform active:scale-95"
-              style={{
-                width: 44,
-                height: 44,
-                border: "1.5px solid rgba(255,255,255,0.6)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-              }}
-            >
-              <img
-                src={url}
-                alt=""
-                className="h-full w-full object-cover"
-                style={{ opacity: offset === 1 ? 0.95 : 0.7 }}
-              />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Indicator dots */}
+      {/* 進捗バー (ヘアラインゴールド・現在位置だけ塗る)。ドットや枚数
+          カウンターを廃して、Stories / Reels 的に「時間軸で進んでる」感を出す。
+          短い線分が並ぶことで「全部で何枚あるか」も視覚的に伝わる。 */}
       {slides.length > 1 && (
-        <div className="absolute inset-x-0 bottom-1 z-10 flex justify-center gap-1.5">
+        <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center gap-1 px-5">
           {slides.map((_, i) => (
             <button
               key={i}
-              onClick={() => setIndex(i)}
+              type="button"
+              onClick={() => goTo(i)}
               aria-label={`${i + 1}枚目に移動`}
-              className="h-[3px] rounded-full transition-all"
+              className="h-[2px] flex-1 max-w-[40px] overflow-hidden transition-opacity"
               style={{
-                width: i === index ? "20px" : "8px",
-                backgroundColor: i === index ? "#D4AF37" : "rgba(255,255,255,0.4)",
+                backgroundColor: "rgba(255,255,255,0.25)",
+                cursor: "pointer",
               }}
-            />
+            >
+              <span
+                aria-hidden
+                className="block h-full transition-all"
+                style={{
+                  width: i < index ? "100%" : i === index ? "100%" : "0%",
+                  backgroundColor: "#D4AF37",
+                  // 現在進行中のセグメントだけ少しシマー (今後 progress
+                  // アニメーション化したくなったらここを線形 transition で 0→100% に)。
+                  opacity: i <= index ? 1 : 0,
+                }}
+              />
+            </button>
           ))}
         </div>
       )}
