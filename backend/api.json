@@ -4045,6 +4045,7 @@
         "/columns": {
             "get": {
                 "operationId": "publicArticle.index",
+                "description": "Returns BFF view: paginator (flat) + categories chip list.",
                 "summary": "Public list of published articles, paginated",
                 "tags": [
                     "PublicArticle"

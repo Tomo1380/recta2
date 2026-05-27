@@ -7,12 +7,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Phase 0 snapshot: 公開コラム記事 API のレスポンス shape を固定する。
+ * 公開コラム記事 API のレスポンス shape をテスト。
  *
- * 注: 現状の PublicArticleController::index は `{articles: paginator, categories}`
- * という独自ラップ shape を返す（CLAUDE.md の flat shape 規約から逸脱）。
- * Phase 1-3 でこれを paginator flat shape に統一する際、本テストは
- * 意図的に書き換える対象になる。
+ * Phase 1-2 で PaginatorWithResource::map() に統一済み:
+ *   index → { articles: paginator_flat, categories: [...] }
+ *   show  → { article: ArticleResource, related: ArticleSummaryResource[] }
  */
 class PublicArticleTest extends TestCase
 {
@@ -44,31 +43,21 @@ class PublicArticleTest extends TestCase
 
         $response = $this->getJson('/api/columns');
 
-        // 現状の shape:
-        //   { articles: { data: [...], meta: {current_page, last_page, per_page, total, ...}, links: {...} },
-        //     categories: [...] }
-        // ※ResourceCollection::response()->getData(true) のラップが効いている。
-        // Phase 1 で flat shape (`{current_page, total, data}`) に揃える対象。
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'articles' => [
+                    'current_page', 'last_page', 'per_page', 'total',
                     'data' => [
                         '*' => [
                             'id', 'slug', 'title', 'excerpt',
                             'thumbnail_url', 'category', 'tags', 'published_at',
                         ],
                     ],
-                    'meta' => [
-                        'current_page', 'last_page', 'per_page', 'total',
-                    ],
-                    'links' => [
-                        'first', 'last', 'prev', 'next',
-                    ],
                 ],
                 'categories',
             ]);
 
-        $this->assertEquals(2, $response->json('articles.meta.total'));
+        $this->assertEquals(2, $response->json('articles.total'));
     }
 
     public function test_can_filter_articles_by_category(): void
@@ -82,7 +71,7 @@ class PublicArticleTest extends TestCase
         $data = $response->json('articles.data');
         $this->assertCount(1, $data);
         $this->assertEquals('体入', $data[0]['category']);
-        $this->assertEquals(1, $response->json('articles.meta.total'));
+        $this->assertEquals(1, $response->json('articles.total'));
     }
 
     public function test_can_show_article_by_slug(): void

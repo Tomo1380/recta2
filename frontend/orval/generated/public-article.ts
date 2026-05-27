@@ -16,6 +16,7 @@ import { rectaMutator } from '../mutators/auth';
 
 
   /**
+ * Returns BFF view: paginator (flat) + categories chip list.
  * @summary Public list of published articles, paginated
  */
 export const publicArticleIndex = (
