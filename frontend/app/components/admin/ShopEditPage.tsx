@@ -2705,6 +2705,21 @@ export function ShopEditPage() {
                   recruitment_standards: null,
                   transfer_description: transferDescription || null,
                   transfer_km: transferKm || null,
+                  // BUG-Live-11: プレビューで距離別足代マップが出なかったのは
+                  // ここで transfer_zones を previewData に乗せていなかったため。
+                  // 地図表示条件は (zones.length > 0 && lat && lng)。
+                  transfer_zones: transferZones
+                    .filter((z) => z.label.trim() || z.radius_km.trim() || z.fee.trim())
+                    .map((z) => ({
+                      label: z.label.trim() || null,
+                      radius_km: z.radius_km.trim()
+                        ? (Number(z.radius_km) || z.radius_km.trim())
+                        : null,
+                      fee: z.fee.trim()
+                        ? (Number(z.fee.replace(/[^\d.-]/g, "")) || z.fee.trim())
+                        : null,
+                      color: z.color.trim() || null,
+                    })),
                   unit_wage_type: null,
                   dress_code: dressCodeDescription || dressCodeOk.length > 0 || dressCodeNg.length > 0
                     ? {

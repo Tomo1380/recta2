@@ -120,18 +120,21 @@ class StoreController extends Controller
             // controller 側で順序・差分を解決して store_videos テーブルに反映する。
             //
             // URL は `url` validation ではなく regex で「http(s) もしくは内部 storage パス」
-            // のみ許容する。`url` だと `javascript:` や `data:` も通すブラウザがあるため。
+            // のみ許容する (`url` だと javascript: や data: も通すブラウザがあるため)。
+            // NOTE: Laravel は rule を文字列で書くと `|` で分割するので、regex の中に
+            // alternation の `|` を含めると pattern が壊れる ("No ending delimiter '#' found")。
+            // regex ルールは必ず array 形式で書く。
             'videos' => 'nullable|array',
-            'videos.*.video_url' => 'required_with:videos|string|max:500|regex:#^(https?://|/storage/)#',
+            'videos.*.video_url' => ['required_with:videos', 'string', 'max:500', 'regex:#^(https?://|/storage/)#'],
             'videos.*.label' => 'nullable|string|max:100',
             'videos.*.description' => 'nullable|string',
-            'videos.*.poster_url' => 'nullable|string|max:500|regex:#^(https?://|/storage/)#',
+            'videos.*.poster_url' => ['nullable', 'string', 'max:500', 'regex:#^(https?://|/storage/)#'],
 
             // store_staff_photos の同期。videos と同じ全置換方式。
             'staff_photos' => 'nullable|array',
-            'staff_photos.*.image_url' => 'required_with:staff_photos|string|max:500|regex:#^(https?://|/storage/)#',
+            'staff_photos.*.image_url' => ['required_with:staff_photos', 'string', 'max:500', 'regex:#^(https?://|/storage/)#'],
             'staff_photos.*.caption' => 'nullable|string|max:255',
-            'staff_photos.*.instagram_url' => 'nullable|string|max:500|regex:#^https?://(www\.)?instagram\.com/#i',
+            'staff_photos.*.instagram_url' => ['nullable', 'string', 'max:500', 'regex:#^https?://(www\.)?instagram\.com/#i'],
             'staff_photos.*.staff_type' => 'nullable|string|max:50',
         ];
     }
