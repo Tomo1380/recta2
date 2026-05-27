@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Consultation;
 use App\Models\PickupShop;
 use App\Models\SiteSetting;
+use App\Models\Store;
 use Illuminate\Database\Seeder;
 
 class ContentSeeder extends Seeder
@@ -20,22 +21,36 @@ class ContentSeeder extends Seeder
         Consultation::query()->delete();
         SiteSetting::query()->delete();
 
-        // Pickup shops - anchor stores + some generated ones for variety
-        $pickups = [
-            ['store_id' => 1, 'sort_order' => 0, 'is_pr' => true, 'visible' => true],   // Club Lumière (六本木)
-            ['store_id' => 2, 'sort_order' => 1, 'is_pr' => false, 'visible' => true],   // Lounge SEIREN (銀座)
-            ['store_id' => 3, 'sort_order' => 2, 'is_pr' => false, 'visible' => true],   // Girls Bar Honey (渋谷)
-            ['store_id' => 4, 'sort_order' => 3, 'is_pr' => true, 'visible' => true],    // Club GRANDEUR (新宿)
-            ['store_id' => 5, 'sort_order' => 4, 'is_pr' => false, 'visible' => true],   // Lounge Crescent (恵比寿)
-            ['store_id' => 6, 'sort_order' => 5, 'is_pr' => false, 'visible' => true],   // generated store
-            ['store_id' => 8, 'sort_order' => 6, 'is_pr' => true, 'visible' => true],    // generated store
-            ['store_id' => 12, 'sort_order' => 7, 'is_pr' => false, 'visible' => true],  // generated store
-            ['store_id' => 15, 'sort_order' => 8, 'is_pr' => false, 'visible' => false], // hidden
-            ['store_id' => 20, 'sort_order' => 9, 'is_pr' => false, 'visible' => false], // hidden
+        // Pickup shops - published stores の先頭から拾う。
+        // (旧コードは store_id = 1〜20 を hard-coded していたが、auto-increment
+        //  リセット後に id 範囲が変わると FK violation で落ちるため、
+        //  実在する store_id を動的に取る)
+        $storeIds = Store::where('publish_status', 'published')
+            ->orderBy('id')
+            ->limit(10)
+            ->pluck('id')
+            ->all();
+
+        $pickupVariations = [
+            ['is_pr' => true,  'visible' => true],
+            ['is_pr' => false, 'visible' => true],
+            ['is_pr' => false, 'visible' => true],
+            ['is_pr' => true,  'visible' => true],
+            ['is_pr' => false, 'visible' => true],
+            ['is_pr' => false, 'visible' => true],
+            ['is_pr' => true,  'visible' => true],
+            ['is_pr' => false, 'visible' => true],
+            ['is_pr' => false, 'visible' => false], // hidden
+            ['is_pr' => false, 'visible' => false], // hidden
         ];
 
-        foreach ($pickups as $pickup) {
-            PickupShop::create($pickup);
+        foreach ($storeIds as $i => $storeId) {
+            $variation = $pickupVariations[$i] ?? ['is_pr' => false, 'visible' => true];
+            PickupShop::create([
+                'store_id' => $storeId,
+                'sort_order' => $i,
+                ...$variation,
+            ]);
         }
 
         // Consultations - question + answer pairs surfaced on the top page

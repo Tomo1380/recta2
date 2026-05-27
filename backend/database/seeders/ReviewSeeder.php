@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Review;
 use App\Models\Store;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class ReviewSeeder extends Seeder
@@ -36,10 +37,20 @@ class ReviewSeeder extends Seeder
     public function run(): void
     {
         $stores = Store::where('publish_status', 'published')->get();
+        $userIds = User::pluck('id')->all();
 
-        // ID 1-5 (アンカー店舗) には必ず 3〜5 件のレビューを入れる。
+        if (empty($userIds) || $stores->isEmpty()) {
+            // 依存データが無ければスキップ (migrate:fresh 以外の単発実行で
+            // 順序が崩れていても落ちないようにする)
+            $this->command?->warn('ReviewSeeder: users or published stores are empty, skipping.');
+            return;
+        }
+
+        // 先頭 5 件のアンカー店舗には必ず 3〜5 件のレビューを入れる。
         // デモ環境でトップ・詳細画面の口コミセクションが必ず生きてる状態を維持。
-        $anchorIds = [1, 2, 3, 4, 5];
+        // (id ハードコードだと migrate:fresh のたびに id 範囲が変わって壊れる
+        //  ため、現在 published な店の先頭から拾う)
+        $anchorIds = $stores->take(5)->pluck('id')->all();
 
         foreach ($stores as $store) {
             $isAnchor = in_array($store->id, $anchorIds, true);
@@ -55,7 +66,7 @@ class ReviewSeeder extends Seeder
                 $body = $bodies[array_rand($bodies)];
 
                 Review::create([
-                    'user_id' => rand(1, 8),
+                    'user_id' => $userIds[array_rand($userIds)],
                     'store_id' => $store->id,
                     'rating' => $rating,
                     'body' => $body,
@@ -68,15 +79,20 @@ class ReviewSeeder extends Seeder
         }
 
         // A few unpublished/deleted reviews
-        $someStore = $stores->random();
         Review::create([
-            'user_id' => 5, 'store_id' => $someStore->id, 'rating' => 2,
-            'body' => 'スタッフの対応がイマイチだった。', 'status' => 'unpublished',
+            'user_id' => $userIds[array_rand($userIds)],
+            'store_id' => $stores->random()->id,
+            'rating' => 2,
+            'body' => 'スタッフの対応がイマイチだった。',
+            'status' => 'unpublished',
             'created_at' => $this->randomPastTimestamp(1, 30),
         ]);
         Review::create([
-            'user_id' => 5, 'store_id' => $stores->random()->id, 'rating' => 1,
-            'body' => '合わなかった。', 'status' => 'deleted',
+            'user_id' => $userIds[array_rand($userIds)],
+            'store_id' => $stores->random()->id,
+            'rating' => 1,
+            'body' => '合わなかった。',
+            'status' => 'deleted',
             'created_at' => $this->randomPastTimestamp(1, 30),
         ]);
     }

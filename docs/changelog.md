@@ -39,6 +39,12 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
   - Phase 4: 仕上げ
     - デッドコード削除 (6 ファイル / 1243 行 / radix 2 依存)
     - ShopEditPage の any: 70 → 0
+    - Seeder 整理:
+      - ReviewSeeder / ContentSeeder の hard-coded id を動的取得に修正
+        (`auto-increment` リセット後の FK violation を解消)
+      - RenderSeeder → ProductionSeeder にリネーム (Render.com 不使用)。
+        本番初回投入用: 管理者 + マスター + 設定 + AI 教材のみ、
+        店舗/ユーザー/口コミは入れない設計に変更。冪等。
 - 詳細は ADR 0003/0004/0005 と各 `refactor-phase-N` tag 参照。
 
 ### 修正

@@ -131,6 +131,20 @@ recta2/
 - 認証: JWT
 - DB: マイグレーションで管理、JSONB活用
 
+## DB Seeder の使い分け
+
+3 種類の seeder profile を用意している。用途で使い分ける。
+
+| 用途 | コマンド | 中身 |
+|---|---|---|
+| **開発用フル seed** (ローカル動作確認) | `php artisan migrate:fresh --seed` | DatabaseSeeder: stores 80 / users 11 / reviews 117 / pickup 10 / ai_chat_logs 80 / fine_tuning_qa 1000 等、全テーブル投入 |
+| **QA クリーン環境** | `php artisan migrate:fresh --seeder=TestQaSeeder` | 管理者 2 + マスター + LINE ユーザー 11 + 設定のみ。テスト中に手動で作るもの (店舗・口コミ・ログ) は入れない |
+| **本番初回投入** | `php artisan db:seed --class=ProductionSeeder` | 管理者 + マスター + 設定 + AI 教材のみ。店舗/口コミ/ユーザーは入れない (運営が手動投入 or LINE 経由で自然蓄積)。**冪等** (既存データがあるテーブルはスキップ、再実行 OK) |
+
+Seeder を書くときの注意:
+- **id を hard-code しない**。`auto-increment` がリセットされると id 範囲が変わるので、`User::pluck('id')->random()` のように動的に拾う。
+- ReviewSeeder / ContentSeeder が旧来 `user_id=1〜10` や `store_id=1〜20` を hard-code していて、`migrate:fresh` 以外では FK violation を起こす不具合があった (Phase 4 で修正済み)。
+
 ## アーキテクチャ原則（必ず守る）
 
 新しい endpoint / 画面を作る前にこのセクションと
