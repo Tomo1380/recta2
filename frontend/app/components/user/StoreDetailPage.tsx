@@ -345,22 +345,55 @@ function formatWageRange(
 }
 
 /**
- * クイックステータス用のコンパクトなレンジ表記。¥ 記号は省略してカンマ区切り
- * だけで返す ("8,000〜10,000" / "8,000〜" / "〜10,000" / "—")。両端が同じ値の
- * ときは 1 値だけ。formatWageRange より幅が狭い枠 (4 セル横並び) で使う用。
+ * クイックステータス 4 セル用の値レンダラ。レンジ (min ≠ max) なら 2 行に
+ * 縦積み、同値・片側のみ・両空はコンパクトに 1 行で出す。tabular-nums + Outfit
+ * フォントで桁揃え。
  */
-function formatQuickRange(
-  min: number | string | null | undefined,
-  max: number | string | null | undefined,
-): string {
-  const minStr = toAmountString(min);
-  const maxStr = toAmountString(max);
-  const fmt = (s: string) => Number(s).toLocaleString();
-  if (!minStr && !maxStr) return "—";
-  if (minStr && maxStr) {
-    return minStr === maxStr ? fmt(minStr) : `${fmt(minStr)}〜${fmt(maxStr)}`;
+function QuickRangeValue({
+  min,
+  max,
+  color,
+}: {
+  min: number | string | null | undefined;
+  max: number | string | null | undefined;
+  color: string;
+}) {
+  const minN = toAmountNumberSafe(min);
+  const maxN = toAmountNumberSafe(max);
+  const fmt = (n: number) => `¥${n.toLocaleString()}`;
+  const wrapper = "mt-0.5 font-bold tabular-nums leading-[1.15]";
+  const style = { color, fontFamily: "'Outfit', sans-serif" } as const;
+
+  if (minN == null && maxN == null) {
+    return <div className={`${wrapper} text-[14px]`} style={style}>—</div>;
   }
-  return minStr ? `${fmt(minStr)}〜` : `〜${fmt(maxStr!)}`;
+  if (minN != null && maxN != null && minN !== maxN) {
+    // 「¥8,000〜 / ¥10,000」を 2 行表示。font-size を少し落として縦に収める。
+    return (
+      <div className={`${wrapper} text-[12px]`} style={style}>
+        <div>{fmt(minN)}〜</div>
+        <div>{fmt(maxN)}</div>
+      </div>
+    );
+  }
+  // 同値 or 片側のみ
+  const single =
+    minN != null && maxN != null
+      ? fmt(minN)
+      : minN != null
+        ? `${fmt(minN)}〜`
+        : `〜${fmt(maxN!)}`;
+  return <div className={`${wrapper} text-[14px]`} style={style}>{single}</div>;
+}
+
+function toAmountNumberSafe(v: number | string | null | undefined): number | null {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return Number.isFinite(v) && v > 0 ? v : null;
+  // "5,000円" "¥5,000" 等の単位付き文字列にも対応
+  const cleaned = String(v).replace(/[^\d.]/g, "");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function toAmountString(v: number | string | null | undefined): string | null {
@@ -655,32 +688,28 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             }}
           >
             {/* 体験時給・時給は「最低〜最高」のレンジで表示。片方欠けてたら
-                「8,000〜」「〜10,000」のように見せる (空欄であることを明示)。
-                4 セル横並びに収めるため ¥ 記号は省き、フォントを 13px に。 */}
+                「¥8,000〜」「〜¥10,000」のように見せる (空欄であることを明示)。
+                4 セル横並びで桁が多いと 1 行に収まらないので、レンジは 2 行
+                ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。 */}
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 体験時給
               </div>
-              <div
-                className="mt-0.5 text-[13px] font-bold tabular-nums leading-tight"
-                style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
-              >
-                {formatQuickRange(
-                  store.trial_hourly_min ?? store.trial_avg_hourly,
-                  store.trial_hourly_max ?? store.trial_hourly,
-                )}
-              </div>
+              <QuickRangeValue
+                min={store.trial_hourly_min ?? store.trial_avg_hourly}
+                max={store.trial_hourly_max ?? store.trial_hourly}
+                color="#D4AF37"
+              />
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 時給
               </div>
-              <div
-                className="mt-0.5 text-[13px] font-bold tabular-nums leading-tight"
-                style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
-              >
-                {formatQuickRange(store.hourly_min, store.hourly_max)}
-              </div>
+              <QuickRangeValue
+                min={store.hourly_min}
+                max={store.hourly_max}
+                color="#1b2528"
+              />
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
