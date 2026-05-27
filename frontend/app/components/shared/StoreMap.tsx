@@ -60,10 +60,19 @@ export default function StoreMap({
     region: "JP",
   });
 
+  // radius_km は number か文字列 ("2", "2.5", "2.5km", "2km〜" 等) で来うる。
+  // 末尾の単位や前置記号を全部削ぎ落としてから Number 化する。
+  const parseRadius = (raw: unknown): number => {
+    if (raw == null) return NaN;
+    if (typeof raw === "number") return raw;
+    const m = String(raw).match(/-?\d+(?:\.\d+)?/);
+    return m ? Number(m[0]) : NaN;
+  };
+
   // Auto-fit zoom so the outermost circle fills the frame nicely.
   const zoom = useMemo(() => {
     const radii = (zones ?? [])
-      .map((z) => Number(z?.radius_km))
+      .map((z) => parseRadius(z?.radius_km))
       .filter((n) => Number.isFinite(n) && n > 0);
     if (radii.length === 0) return 15;
     const max = Math.max(...radii);
@@ -127,10 +136,11 @@ export default function StoreMap({
       >
         {/* Render outer zones first so smaller ones sit on top. */}
         {[...(zones ?? [])]
-          .filter((z) => Number(z?.radius_km) > 0)
-          .sort((a, b) => Number(b.radius_km) - Number(a.radius_km))
+          .map((z) => ({ ...z, _km: parseRadius(z?.radius_km) }))
+          .filter((z) => Number.isFinite(z._km) && z._km > 0)
+          .sort((a, b) => b._km - a._km)
           .map((zone, i) => {
-            const km = Number(zone.radius_km);
+            const km = zone._km;
             const color = zone.color || LUXE.gold;
             return (
               <CircleF
@@ -139,10 +149,10 @@ export default function StoreMap({
                 radius={km * 1000}
                 options={{
                   strokeColor: color,
-                  strokeOpacity: 0.85,
-                  strokeWeight: 1.5,
+                  strokeOpacity: 0.9,
+                  strokeWeight: 2,
                   fillColor: color,
-                  fillOpacity: 0.18,
+                  fillOpacity: 0.28,
                   clickable: false,
                 }}
               />

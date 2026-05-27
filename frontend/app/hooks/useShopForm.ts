@@ -132,6 +132,10 @@ export interface ShopForm {
   staffRole: string;
   staffComment: string;
   supportItems: string[];
+
+  // SEO
+  /** 検索結果用 meta description (120〜140 文字推奨)。空なら自動生成。 */
+  seoMetaDescription: string;
 }
 
 const EMPTY_CHAMPAGNE = (): Record<ChampagneKey, ChampagnePriceDraft> => ({
@@ -164,6 +168,7 @@ export const INITIAL_FORM: ShopForm = {
   setFeeList: [], setFeeNotes: "",
   rectaEpisodes: [], qaItems: [],
   staffName: "", staffRole: "", staffComment: "", supportItems: [],
+  seoMetaDescription: "",
 };
 
 type ShopFormAction =
@@ -241,6 +246,27 @@ type AnyStore = any;
 
 const stripUnit = (v: unknown): string =>
   v == null ? "" : String(v).replace(/[^\d]/g, "");
+
+/**
+ * 旧データの speaker ("staff" / "user") や、UI が「面接官 / 応募者」を直接
+ * 入れる新フォーマットを統一する。表示側 (StoreDetailPage) は staff/user
+ * での左右振り分けを期待するので、UI 表示は日本語ラベルで持つが、payload
+ * 化時に staff/user に正規化する。
+ */
+function normalizeSpeaker(v: unknown): string {
+  const s = String(v ?? "").trim();
+  if (s === "" ) return "";
+  if (s === "staff" || s === "面接官" || s === "スタッフ") return "面接官";
+  if (s === "user" || s === "応募者" || s === "ユーザー") return "応募者";
+  return s;
+}
+
+/** UI ラベル (面接官/応募者) → DB の speaker (staff/user) に変換。 */
+function speakerToDb(v: string): string {
+  if (v === "面接官" || v === "staff" || v === "スタッフ") return "staff";
+  if (v === "応募者" || v === "user" || v === "ユーザー") return "user";
+  return v;
+}
 
 export function storeToForm(rawStore: Store): Partial<ShopForm> {
   // 旧 populateFromStore と互換性を保つため Record<string, any> 扱い。
@@ -403,8 +429,10 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     dressCode: interview.dress_code ?? "",
     hiringCriteria: interview.criteria ?? interview.hiring_criteria ?? "",
     interviewDialog: (interview.dialog ?? []).map((d: AnyStore) => ({
-      label: d.text ?? d.label ?? "",
-      value: d.speaker ?? d.value ?? "",
+      // UI: label=話者 (面接官/応募者), value=セリフ。
+      // DB: { speaker, text }。互換のため旧 (label/value 逆向き) も拾う。
+      label: normalizeSpeaker(d.speaker ?? d.label ?? ""),
+      value: d.text ?? d.value ?? "",
     })),
     documents,
     docNote,
@@ -448,6 +476,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
       (staffObj as AnyStore | null)?.supports ??
       (staffObj as AnyStore | null)?.support_items ??
       [],
+    seoMetaDescription: store.seo_meta_description ?? "",
   };
 }
 
@@ -546,7 +575,9 @@ export function formToPayload(
       criteria: form.hiringCriteria,
       dialog: form.interviewDialog
         .filter((i) => i.label)
-        .map((i) => ({ text: i.label, speaker: i.value })),
+        // UI: label=話者 (面接官/応募者), value=セリフ
+        // DB: { speaker: "staff" | "user", text: string }
+        .map((i) => ({ text: i.value, speaker: speakerToDb(i.label) })),
     },
     schedule: form.shiftInfo ? { shift_info: form.shiftInfo } : null,
     recent_hires: form.hiringEntries.map((h) => ({
@@ -642,6 +673,7 @@ export function formToPayload(
           : {}),
         ...(ep.photo_url.trim() ? { photo_url: ep.photo_url.trim() } : {}),
       })),
+    seo_meta_description: form.seoMetaDescription.trim() || null,
     publish_status: publishStatus,
     // images はサーバ側で別エンドポイント (POST /admin/stores/:id/images) で
     // 管理しているため、buildPayload には含めない。storeImages は extras で

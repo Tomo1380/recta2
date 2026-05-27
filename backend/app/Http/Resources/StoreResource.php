@@ -90,6 +90,13 @@ class StoreResource extends JsonResource
             'videos' => $videos,
             'video_url' => $videos[0]['video_url'] ?? null,
             'staff_photos' => $staffPhotos,
+
+            // SEO: 運営入力があればそれを優先、なければ自動生成 (検索結果用
+            // description タグに直接入る想定)。フロント側で再生成しなくて
+            // 済むよう resolved 結果も meta フィールドとして同梱する。
+            //   - seo_meta_description: 運営入力の生値 (null 可)
+            //   - meta_description: 表示用 (常に文字列)
+            'meta_description' => self::resolveMetaDescription($this->resource, $regular, $trial),
         ];
 
         $merged = array_merge($base, $flat);
@@ -162,6 +169,59 @@ class StoreResource extends JsonResource
                 ->all();
         }
         return [];
+    }
+
+    /**
+     * 運営入力 (seo_meta_description) 優先。未入力なら
+     * 「【エリア】のカテゴリ・店名。時給◯◯円〜、体入可。features_text 先頭60字」
+     * の形で自動生成する。140 字以内を目安に丸める。
+     *
+     * @param  array<string, mixed>  $regular
+     * @param  array<string, mixed>  $trial
+     */
+    private static function resolveMetaDescription(Store $store, array $regular, array $trial): string
+    {
+        $manual = trim((string) ($store->seo_meta_description ?? ''));
+        if ($manual !== '') {
+            return mb_substr($manual, 0, 200);
+        }
+
+        $parts = [];
+        $area = trim((string) ($store->area ?? ''));
+        $category = trim((string) ($store->category ?? ''));
+        $name = trim((string) ($store->name ?? ''));
+        $head = '';
+        if ($area !== '' || $category !== '') {
+            $head .= ($area !== '' ? "【{$area}】" : '') . ($category !== '' ? "の{$category}" : '');
+        }
+        if ($name !== '') {
+            $head .= ($head !== '' ? '・' : '') . $name;
+        }
+        if ($head !== '') {
+            $parts[] = $head . '。';
+        }
+
+        $hourlyMin = $regular['min'] ?? null;
+        $hourlyMax = $regular['max'] ?? null;
+        if ($hourlyMin || $hourlyMax) {
+            $lo = $hourlyMin ? number_format((int) $hourlyMin) . '円' : '';
+            $hi = $hourlyMax ? number_format((int) $hourlyMax) . '円' : '';
+            $parts[] = '時給' . ($lo !== '' && $hi !== '' ? "{$lo}〜{$hi}" : $lo . $hi) . '。';
+        }
+
+        $trialHourly = $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null;
+        if ($trialHourly) {
+            $parts[] = '体入時給' . number_format((int) $trialHourly) . '円〜。';
+        }
+
+        $features = trim((string) ($store->features_text ?? $store->description ?? ''));
+        if ($features !== '') {
+            $clip = mb_substr($features, 0, 80);
+            $parts[] = preg_replace('/\s+/u', ' ', $clip);
+        }
+
+        $out = mb_substr(implode('', $parts), 0, 140);
+        return $out !== '' ? $out : ($name !== '' ? $name : 'recta');
     }
 
     private static function wageUnitToLabel(?string $unit): ?string

@@ -513,6 +513,29 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
     return () => window.cancelAnimationFrame(handle);
   }, [data?.store]);
 
+  // 店舗データが揃ったら <title> と <meta name="description"> を更新する。
+  // SSR loader 未整備なので CSR で document を直接書き換える妥協策。
+  // SEO 的には bot が JS 実行後の DOM を読む前提だが、運営入力 (meta_description)
+  // と自動生成フォールバックは Resource 側で組まれているのでそれを反映するだけ。
+  useEffect(() => {
+    if (previewData) return;
+    if (typeof document === "undefined") return;
+    const s = data?.store;
+    if (!s) return;
+    const title = `${s.name}${s.area ? `（${s.area}）` : ""} - Recta`;
+    document.title = title;
+    const desc = (s as { meta_description?: string }).meta_description ?? "";
+    if (desc) {
+      let tag = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+      if (!tag) {
+        tag = document.createElement("meta");
+        tag.setAttribute("name", "description");
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute("content", desc);
+    }
+  }, [data?.store, previewData]);
+
   // Persist this store to "recently viewed" history (skip preview mode)
   useEffect(() => {
     if (previewData) return;
@@ -868,7 +891,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               </div>
             )}
 
-            {/* Store data table */}
+            {/* Store data table — 時給/日給目安もここに同居させて「店舗情報」
+                1枚で全体像が見えるようにする。詳細 (バック / 保証 / ノルマ等)
+                は下の「給与・待遇」カードへ。 */}
             <div className="mt-4 divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <InfoRow label="業種" value={store.category} />
               <InfoRow label="エリア" value={store.area} />
@@ -883,6 +908,20 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               />
               {store.holidays && <InfoRow label="定休日" value={store.holidays} />}
               {store.shift_info && <InfoRow label="シフト" value={store.shift_info} />}
+              {(() => {
+                const range = formatWageRange(store.hourly_min, store.hourly_max);
+                return range ? <InfoRow label="時給" value={range} /> : null;
+              })()}
+              {(() => {
+                const raw = store.daily_estimate;
+                const isEmpty =
+                  raw == null ||
+                  (typeof raw === "string" && raw.trim() === "") ||
+                  (typeof raw === "number" && raw <= 0);
+                return isEmpty ? null : (
+                  <InfoRow label="日給目安" value={formatCurrency(raw)} />
+                );
+              })()}
             </div>
           </SectionCard>
 
@@ -894,25 +933,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             title="給与・待遇"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              {(() => {
-                const range = formatWageRange(store.hourly_min, store.hourly_max);
-                return <InfoRow label="時給" value={range ?? <EmptyValue />} />;
-              })()}
-              {/* 日給目安は文字列 (例: "30,000円〜60,000円") か数値か未入力。
-                  formatCurrency が range 文字列も解釈する。0/未入力は「—」。 */}
-              {(() => {
-                const raw = store.daily_estimate;
-                const isEmpty =
-                  raw == null ||
-                  (typeof raw === "string" && raw.trim() === "") ||
-                  (typeof raw === "number" && raw <= 0);
-                return (
-                  <InfoRow
-                    label="日給目安"
-                    value={isEmpty ? <EmptyValue /> : formatCurrency(raw)}
-                  />
-                );
-              })()}
+              {/* 時給/日給目安は「店舗情報」カードへ移動済み。ここはバック以下の
+                  詳細情報のみ。 */}
               {(store.back_items ?? []).length > 0 && (
                 <InfoRow
                   label="バック"
@@ -1104,9 +1126,17 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 {(store.required_documents.documents ?? []).length > 0 && (
                   <ul className="space-y-1.5">
                     {(store.required_documents.documents ?? []).map((doc, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <FileText size={14} className="shrink-0" style={{ color: "#D4AF37" }} />
-                        {doc}
+                      // 各書類の左に FileText アイコンを並べると複数あるとき
+                      // 視覚的にうるさい。シンプルな「・」bullet にする。
+                      <li key={i} className="flex items-baseline gap-2 text-sm">
+                        <span
+                          aria-hidden
+                          className="shrink-0 text-xs leading-none"
+                          style={{ color: "rgba(27,37,40,0.4)" }}
+                        >
+                          ・
+                        </span>
+                        <span>{doc}</span>
                       </li>
                     ))}
                   </ul>
@@ -1192,16 +1222,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             </SectionCard>
           )}
 
-          {/* ============================================================ */}
-          {/* 12a. Related stores (系列店) — moved here for SEO internal links */}
-          {/* ============================================================ */}
-          <RelatedStoresSection
-            title="系列店舗"
-            icon={<Building size={20} style={{ color: "#D4AF37" }} />}
-            stores={store.related_stores}
-            ids={store.related_store_ids}
-            currentId={store.id}
-          />
+          {/* セクション順: よくある質問 → 口コミ → スタッフコメント。
+              系列店舗は「あなたが見た記事 (RecentlyViewedStores)」の直上に
+              移動 (動線を「他店も見てね」で揃えるため)。 */}
 
           {/* ============================================================ */}
           {/* 12c. Reviews — first 3 visible, 4th+ blurred behind LINE login. */}
@@ -1351,6 +1374,17 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             description="体入予約・条件交渉までトークで完結"
             ctaLabel="LINE追加"
             source="store-detail:map-card"
+          />
+
+          {/* ============================================================ */}
+          {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}
+          {/* ============================================================ */}
+          <RelatedStoresSection
+            title="系列店舗"
+            icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+            stores={store.related_stores}
+            ids={store.related_store_ids}
+            currentId={store.id}
           />
 
           {/* ============================================================ */}
@@ -2302,20 +2336,28 @@ function EmptyValue() {
 
 
 function AnalysisSection({ analysis }: { analysis: Analysis }) {
-  const castTotal =
-    analysis.cast_style.beauty +
-    analysis.cast_style.cute +
-    analysis.cast_style.glamour +
-    analysis.cast_style.natural || 1;
-
+  // 各項目が 0 (未入力) のときは個別に非表示。全部 0 / 空ならセクション自体を
+  // 出さない (StoreDetailPage 側で `hasAnalysis` を計算して条件 render する)。
   const castSegments = [
     { label: "綺麗系", value: analysis.cast_style.beauty, color: "#D4AF37" },
     { label: "可愛い系", value: analysis.cast_style.cute, color: "rgba(200,96,128,1)" },
     { label: "派手系", value: analysis.cast_style.glamour, color: "#1b2528" },
     { label: "素人系", value: analysis.cast_style.natural, color: "rgba(200,96,128,0.5)" },
   ];
+  const castTotal = castSegments.reduce((sum, s) => sum + (Number(s.value) || 0), 0);
+  const hasCast = castTotal > 0;
+  const hasExperience = (Number(analysis.experience_level) || 0) > 0;
+  const hasAtmosphere = (Number(analysis.atmosphere) || 0) > 0;
+  const hasDrink = (Number(analysis.drinking_style) || 0) > 0;
+  const ageEntries = analysis.customer_age ?? [];
+  const hasAge = ageEntries.length > 0;
 
-  const maxAge = Math.max(...(analysis.customer_age ?? []).map((c) => c.ratio), 1);
+  const maxAge = Math.max(...ageEntries.map((c) => c.ratio), 1);
+
+  // 何もないなら null を返す。呼び出し側でも分岐するので二重防御。
+  if (!hasCast && !hasExperience && !hasAtmosphere && !hasDrink && !hasAge) {
+    return null;
+  }
 
   return (
     <SectionCard
@@ -2323,7 +2365,8 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
       title="お店の分析"
     >
       <div className="space-y-5">
-        {/* Experience level */}
+        {hasExperience && (
+          <>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium" style={{ color: "#1b2528" }}>経験レベル</span>
@@ -2340,10 +2383,14 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
             <span>経験者向け</span>
           </div>
         </div>
+          </>
+        )}
 
-        <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        {hasExperience && hasAtmosphere && (
+          <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        )}
 
-        {/* Atmosphere */}
+        {hasAtmosphere && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium" style={{ color: "#1b2528" }}>雰囲気</span>
@@ -2360,12 +2407,15 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
             <span>フォーマル</span>
           </div>
         </div>
+        )}
 
-        <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        {(hasExperience || hasAtmosphere) && hasCast && (
+          <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        )}
 
-        {/* Cast style — segmented stacked bar with in-bar labels for clarity. */}
+        {hasCast && (
         <div className="space-y-2">
-          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>在籍女性の系統</p>
+          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>キャストスタイル</p>
           <div className="flex h-9 w-full overflow-hidden rounded-md" style={{ boxShadow: "inset 0 0 0 1px rgba(27,37,40,0.06)" }}>
             {castSegments.map((seg) => {
               if (seg.value <= 0) return null;
@@ -2415,10 +2465,13 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
             })}
           </div>
         </div>
+        )}
 
-        <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        {(hasExperience || hasAtmosphere || hasCast) && hasDrink && (
+          <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        )}
 
-        {/* Drinking style */}
+        {hasDrink && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium" style={{ color: "#1b2528" }}>飲み度</span>
@@ -2435,15 +2488,17 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
             <span>飲める方が◎</span>
           </div>
         </div>
+        )}
 
-        <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        {(hasExperience || hasAtmosphere || hasCast || hasDrink) && hasAge && (
+          <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
+        )}
 
-        {/* Customer age bar chart */}
-        {(analysis.customer_age ?? []).length > 0 && (
+        {hasAge && (
           <div className="space-y-2">
             <p className="text-sm font-medium" style={{ color: "#1b2528" }}>客層年齢</p>
             <div className="space-y-2">
-              {(analysis.customer_age ?? []).map((age) => (
+              {ageEntries.map((age) => (
                 <div key={age.label} className="flex items-center gap-3">
                   <span className="w-14 shrink-0 text-xs text-right" style={{ color: "rgba(27,37,40,0.45)" }}>
                     {age.label}
@@ -2666,6 +2721,21 @@ function ChampagnePricesSection({
               </p>
             </div>
 
+            {/* 説明文 (運営入力) — 改行を反映。価格表とは別ブロックで上に。
+                両方入力されているケースで説明が抜けないよう、価格グリッドの
+                上に明示的なテキストブロックを置く。 */}
+            {fallback && (
+              <p
+                className="relative mb-5 whitespace-pre-line text-center text-sm leading-relaxed"
+                style={{
+                  color: "rgba(255,255,255,0.82)",
+                  fontFamily: "'Noto Sans JP', sans-serif",
+                }}
+              >
+                {fallback}
+              </p>
+            )}
+
             {/* Rows */}
             <ul className="relative space-y-0">
               {visible.map(({ tpl, item }, i) => {
@@ -2811,7 +2881,7 @@ function ChampagnePricesSection({
               </p>
             </div>
             <p
-              className="relative text-sm leading-relaxed text-center"
+              className="relative whitespace-pre-line text-sm leading-relaxed text-center"
               style={{ color: "rgba(255,255,255,0.8)", fontFamily: "'Noto Sans JP', sans-serif" }}
             >
               {fallback}

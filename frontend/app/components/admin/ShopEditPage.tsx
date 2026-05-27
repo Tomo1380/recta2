@@ -246,11 +246,17 @@ function DynamicPairList({
   setItems,
   labelPlaceholder = "ラベル",
   valuePlaceholder = "値",
+  labelOptions,
+  defaultLabel,
 }: {
   items: { label: string; value: string }[];
   setItems: (items: { label: string; value: string }[]) => void;
   labelPlaceholder?: string;
   valuePlaceholder?: string;
+  /** 指定するとラベル側が <select> になる。話者など固定候補の入力に使う。 */
+  labelOptions?: string[];
+  /** 「追加」時に初期セットされるラベル (主に labelOptions と組み合わせる)。 */
+  defaultLabel?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -259,16 +265,36 @@ function DynamicPairList({
           <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0">
             {i + 1}
           </div>
-          <input
-            value={item.label}
-            onChange={(e) => {
-              const newItems = [...items];
-              newItems[i] = { ...newItems[i], label: e.target.value };
-              setItems(newItems);
-            }}
-            placeholder={labelPlaceholder}
-            className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-          />
+          {labelOptions ? (
+            <select
+              value={item.label}
+              onChange={(e) => {
+                const newItems = [...items];
+                newItems[i] = { ...newItems[i], label: e.target.value };
+                setItems(newItems);
+              }}
+              className="w-32 shrink-0 px-3 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            >
+              {!labelOptions.includes(item.label) && item.label !== "" && (
+                <option value={item.label}>{item.label}</option>
+              )}
+              {item.label === "" && <option value="">{labelPlaceholder}</option>}
+              {labelOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={item.label}
+              onChange={(e) => {
+                const newItems = [...items];
+                newItems[i] = { ...newItems[i], label: e.target.value };
+                setItems(newItems);
+              }}
+              placeholder={labelPlaceholder}
+              className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+          )}
           <input
             value={item.value}
             onChange={(e) => {
@@ -288,7 +314,12 @@ function DynamicPairList({
         </div>
       ))}
       <button
-        onClick={() => setItems([...items, { label: "", value: "" }])}
+        onClick={() =>
+          setItems([
+            ...items,
+            { label: defaultLabel ?? (labelOptions?.[0] ?? ""), value: "" },
+          ])
+        }
         className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
       >
         <Plus className="w-3.5 h-3.5" /> 追加
@@ -744,6 +775,7 @@ export function ShopEditPage() {
   const [staffRole, setStaffRole] = useState("");
   const [staffComment, setStaffComment] = useState("");
   const [supportItems, setSupportItems] = useState<string[]>([]);
+  const [seoMetaDescription, setSeoMetaDescription] = useState("");
 
   const [publishStatus, setPublishStatus] = useState<"published" | "unpublished" | "draft">("draft");
   // 画像アップロード/削除の state とハンドラは useShopImages フックに集約。
@@ -842,6 +874,7 @@ export function ShopEditPage() {
     if (f.staffRole !== undefined) setStaffRole(f.staffRole);
     if (f.staffComment !== undefined) setStaffComment(f.staffComment);
     if (f.supportItems !== undefined) setSupportItems(f.supportItems);
+    if (f.seoMetaDescription !== undefined) setSeoMetaDescription(f.seoMetaDescription);
     // publish_status と images は ShopForm 範囲外
     setPublishStatus(store.publish_status || "draft");
     setStoreImages(
@@ -934,6 +967,7 @@ export function ShopEditPage() {
       dressCodeDescription, dressCodeOk, dressCodeNg,
       setFeeList, setFeeNotes, rectaEpisodes, qaItems,
       staffName, staffRole, staffComment, supportItems,
+      seoMetaDescription,
     };
     return formToPayload(form, { storeImages: [], publishStatus });
   }, [
@@ -953,6 +987,7 @@ export function ShopEditPage() {
     dressCodeDescription, dressCodeOk, dressCodeNg,
     setFeeList, setFeeNotes, rectaEpisodes, qaItems,
     staffName, staffRole, staffComment, supportItems,
+    seoMetaDescription,
     publishStatus,
   ]);
 
@@ -1163,6 +1198,55 @@ export function ShopEditPage() {
               />
             </Field>
           </div>
+          {/* 時給/日給目安/シフト は管理画面上「店舗情報」の一部として扱う。
+              ユーザー画面の店舗情報カードにも同じ並びで出る。詳細な給与
+              (バック / 控除 / 保証 / ノルマ等) は STEP2「給与・待遇」へ。 */}
+          <Field label="時給の最低額（円）" required>
+            <TextInput
+              type="number"
+              value={minWage}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMinWage(e.target.value)}
+              placeholder="4000"
+            />
+          </Field>
+          <Field label="時給の最高額（円）" required>
+            <TextInput
+              type="number"
+              value={maxWage}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMaxWage(e.target.value)}
+              placeholder="8000"
+            />
+          </Field>
+          <Field label="日給目安">
+            <TextInput
+              value={dailyPay}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPay(e.target.value)}
+              placeholder="例: 30000〜60000"
+            />
+          </Field>
+          <div className="md:col-span-2">
+            <Field label="シフト">
+              <TextArea
+                value={shiftInfo}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setShiftInfo(e.target.value)}
+                placeholder="例: 週1日からOK / 短期OK / 終電上がり相談可"
+                rows={2}
+              />
+            </Field>
+          </div>
+          <div className="md:col-span-2">
+            <Field
+              label="SEOメタディスクリプション"
+              hint="任意。検索結果の説明文に使われます（120〜140 文字推奨）。未入力なら自動生成。"
+            >
+              <TextArea
+                value={seoMetaDescription}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSeoMetaDescription(e.target.value)}
+                placeholder="例: 新宿歌舞伎町のキャバクラ◯◯。時給◯円〜、日払いOK。体入歓迎で未経験も安心。"
+                rows={2}
+              />
+            </Field>
+          </div>
         </div>
       </SectionCard>
 
@@ -1213,31 +1297,8 @@ export function ShopEditPage() {
     <div className="space-y-6">
       <SectionCard title="給与・待遇" icon={DollarSign} required>
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Field label="時給の最低額（円）" required>
-              <TextInput
-                type="number"
-                value={minWage}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMinWage(e.target.value)}
-                placeholder="4000"
-              />
-            </Field>
-            <Field label="時給の最高額（円）" required>
-              <TextInput
-                type="number"
-                value={maxWage}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMaxWage(e.target.value)}
-                placeholder="8000"
-              />
-            </Field>
-            <Field label="日給目安">
-              <TextInput
-                value={dailyPay}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPay(e.target.value)}
-                placeholder="例: 30000〜60000"
-              />
-            </Field>
-          </div>
+          {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここはバック・
+              控除・備考・支払い方法・保証・ノルマ等の詳細を扱う。 */}
           <Field
             label="バック項目"
             hint="指名バック・同伴バックなど、項目名と金額を入力してください"
@@ -1260,7 +1321,7 @@ export function ShopEditPage() {
               valuePlaceholder="金額"
             />
           </Field>
-          <Field label="給与補足">
+          <Field label="給与備考">
             <TextArea
               value={salaryNote}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSalaryNote(e.target.value)}
@@ -1283,12 +1344,9 @@ export function ShopEditPage() {
               rows={2}
             />
           </Field>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="保証・ノルマ" icon={Shield}>
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* 保証・ノルマはユーザー画面では給与・待遇カード内に同居するため、
+              管理画面も同じセクション内にまとめる。 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
             <Field label="保証期間">
               <TextInput
                 value={guaranteePeriod}
@@ -1362,6 +1420,95 @@ export function ShopEditPage() {
                 setSameDayTrial(e.target.value)
               }
               options={["可", "不可"]}
+            />
+          </Field>
+        </div>
+      </SectionCard>
+
+      {/* 直近の採用実績は体入と一緒に検討できるほうが運営フローに合うので、
+          STEP4 から STEP2 (体入) 直後に移動。 */}
+      <SectionCard title="直近の採用実績" icon={TrendingUp}>
+        <div className="space-y-5">
+          {hiringEntries.map((entry, i) => (
+            <div
+              key={i}
+              className="border border-border rounded-xl p-5 space-y-4 bg-muted/20"
+            >
+              <div className="flex items-center justify-between gap-2">
+                {/* BUG-Live-07: 月名を編集可能に。これまで <span> で固定表示
+                    だったため、「月を追加」で出る `"2026年3月"` を任意の月に
+                    変えられず、過去月の実績を入力できなかった。 */}
+                <TextInput
+                  value={entry.month}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                    const updated = [...hiringEntries];
+                    updated[i] = { ...updated[i], month: e.target.value };
+                    setHiringEntries(updated);
+                  }}
+                  placeholder="例: 2026年4月"
+                />
+                <button
+                  onClick={() =>
+                    setHiringEntries(
+                      hiringEntries.filter((_, idx) => idx !== i)
+                    )
+                  }
+                  className="text-muted-foreground hover:text-destructive transition shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <Field label="採用人数">
+                <TextInput
+                  type="number"
+                  value={entry.count}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                    const updated = [...hiringEntries];
+                    updated[i] = {
+                      ...updated[i],
+                      count: e.target.value,
+                    };
+                    setHiringEntries(updated);
+                  }}
+                  placeholder="人数を入力"
+                />
+              </Field>
+              <Field label="採用例">
+                <DynamicTextList
+                  items={entry.examples}
+                  setItems={(newExamples) => {
+                    const updated = [...hiringEntries];
+                    updated[i] = {
+                      ...updated[i],
+                      examples: newExamples,
+                    };
+                    setHiringEntries(updated);
+                  }}
+                  placeholder="例: 20歳 未経験 → 時給5,000円スタート"
+                />
+              </Field>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const now = new Date();
+              const defaultMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+              setHiringEntries([
+                ...hiringEntries,
+                { month: defaultMonth, count: "", examples: [] },
+              ]);
+            }}
+            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition"
+          >
+            <Plus className="w-3.5 h-3.5" /> 月を追加
+          </button>
+          <Field label="直近の合計テキスト">
+            <TextInput
+              value={hiringTotal}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                setHiringTotal(e.target.value)
+              }
+              placeholder="例: 直近5ヶ月で52名採用"
             />
           </Field>
         </div>
@@ -1544,13 +1691,15 @@ export function ShopEditPage() {
           </Field>
           <Field
             label="面接サポート対話"
-            hint="面接の流れを会話形式で入力してください"
+            hint="面接の流れを会話形式で。話者は「面接官 / 応募者」を選択。"
           >
             <DynamicPairList
               items={interviewDialog}
               setItems={setInterviewDialog}
-              labelPlaceholder="話者（スタッフ/ユーザー）"
-              valuePlaceholder="テキスト"
+              labelPlaceholder="話者"
+              valuePlaceholder="セリフ"
+              labelOptions={["面接官", "応募者"]}
+              defaultLabel="面接官"
             />
           </Field>
         </div>
@@ -1578,105 +1727,8 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="勤務スケジュール" icon={Calendar}>
-        <div className="space-y-5">
-          <p className="text-xs text-muted-foreground">営業時間・定休日はStep1「基本情報」で設定してください。</p>
-          <Field label="シフト情報">
-            <TextArea
-              value={shiftInfo}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setShiftInfo(e.target.value)}
-              placeholder="例: 週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。"
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="直近の採用実績" icon={TrendingUp}>
-        <div className="space-y-5">
-          {hiringEntries.map((entry, i) => (
-            <div
-              key={i}
-              className="border border-border rounded-xl p-5 space-y-4 bg-muted/20"
-            >
-              <div className="flex items-center justify-between gap-2">
-                {/* BUG-Live-07: 月名を編集可能に。これまで <span> で固定表示
-                    だったため、「月を追加」で出る `"2026年3月"` を任意の月に
-                    変えられず、過去月の実績を入力できなかった。 */}
-                <TextInput
-                  value={entry.month}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = { ...updated[i], month: e.target.value };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="例: 2026年4月"
-                />
-                <button
-                  onClick={() =>
-                    setHiringEntries(
-                      hiringEntries.filter((_, idx) => idx !== i)
-                    )
-                  }
-                  className="text-muted-foreground hover:text-destructive transition shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <Field label="採用人数">
-                <TextInput
-                  type="number"
-                  value={entry.count}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = {
-                      ...updated[i],
-                      count: e.target.value,
-                    };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="人数を入力"
-                />
-              </Field>
-              <Field label="採用例">
-                <DynamicTextList
-                  items={entry.examples}
-                  setItems={(newExamples) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = {
-                      ...updated[i],
-                      examples: newExamples,
-                    };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="例: 20歳 未経験 → 時給5,000円スタート"
-                />
-              </Field>
-            </div>
-          ))}
-          <button
-            onClick={() => {
-              const now = new Date();
-              const defaultMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-              setHiringEntries([
-                ...hiringEntries,
-                { month: defaultMonth, count: "", examples: [] },
-              ]);
-            }}
-            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition"
-          >
-            <Plus className="w-3.5 h-3.5" /> 月を追加
-          </button>
-          <Field label="直近の合計テキスト">
-            <TextInput
-              value={hiringTotal}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setHiringTotal(e.target.value)
-              }
-              placeholder="例: 直近5ヶ月で52名採用"
-            />
-          </Field>
-        </div>
-      </SectionCard>
+      {/* 勤務スケジュール (シフト) は STEP1「店舗基本情報」に移動済み。 */}
+      {/* 直近の採用実績は STEP2「体入（体験入店）情報」直後に移動済み。 */}
     </div>
   );
 
@@ -2501,9 +2553,17 @@ export function ShopEditPage() {
                         tips: dressTips,
                         dress_code: dressCode,
                         criteria: hiringCriteria,
+                        // UI: label="面接官"/"応募者", value=セリフ。
+                        // DB / StoreDetail 表示は speaker:"staff"|"user" で
+                        // 左右振り分けするので、ここで変換する。
                         dialog: interviewDialog.map((d) => ({
                           text: d.value,
-                          speaker: d.label,
+                          speaker:
+                            d.label === "面接官" || d.label === "staff"
+                              ? "staff"
+                              : d.label === "応募者" || d.label === "user"
+                                ? "user"
+                                : d.label,
                         })),
                       }
                     : null,
