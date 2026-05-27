@@ -98,6 +98,12 @@ Route::prefix('admin')->group(function () {
         Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
         Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);
 
+        // 汎用画像アップロード (StaffPhotosEditor / DressCode OK・NG / TipTap 本文 等)。
+        // 親モデルに紐付けず URL だけ返すので、フロントが form 側で URL を保持し、
+        // save 時に親モデルと一緒に保存する設計。
+        Route::post('/uploads/{kind}', [\App\Http\Controllers\Admin\MediaUploadController::class, 'store'])
+            ->where('kind', '[a-z0-9-]+');
+
         // 口コミ管理
         Route::get('/reviews', [ReviewController::class, 'index']);
         Route::get('/reviews/{review}', [ReviewController::class, 'show']);

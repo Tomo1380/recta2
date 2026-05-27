@@ -23,6 +23,16 @@ output "backup_bucket" {
   value       = aws_s3_bucket.backup.id
 }
 
+output "media_bucket" {
+  description = "S3 bucket for user/admin-uploaded media (store photos, article thumbnails, ...)"
+  value       = aws_s3_bucket.media.id
+}
+
+output "media_bucket_url" {
+  description = "Base URL for fetching media bucket objects"
+  value       = "https://${aws_s3_bucket.media.bucket_regional_domain_name}"
+}
+
 output "ssh_private_key_path" {
   description = "Local path to the generated SSH private key (for GitHub Actions secret)"
   value       = local_sensitive_file.private_key.filename

@@ -118,8 +118,7 @@ class ArticleController extends Controller
 
     public function uploadThumbnail(UploadArticleThumbnailRequest $request, Article $article): JsonResponse
     {
-        $path = $request->file('image')->store('articles/thumbnails', 'public');
-        $url = Storage::disk('public')->url($path);
+        $url = \App\Support\MediaStorage::upload($request->file('image'), 'articles/thumbnails');
 
         $article->update(['thumbnail_url' => $url]);
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
 import { useShopImages } from "~/hooks/useShopImages";
 import { useStepProgression } from "~/hooks/useStepProgression";
+import { useFileUpload } from "~/hooks/useFileUpload";
 import { formToPayload, storeToForm, type ShopForm } from "~/hooks/useShopForm";
 import type { Store } from "~/lib/types";
 import {
@@ -378,6 +379,60 @@ function SliderField({
           <span>{rightLabel}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * URL text input + 「画像を選択」ボタンの 2 つで構成された入力。
+ * S3 upload (kind ごと) と組み合わせて、選択した画像を upload し
+ * 返ってきた public URL を value に流す。
+ * StaffPhotosEditor / DressCode OK・NG など複数箇所で再利用。
+ */
+function ImageUrlInput({
+  value,
+  onChange,
+  kind,
+  placeholder = "https://example.com/image.jpg",
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  kind: string;
+  placeholder?: string;
+}) {
+  const { uploadFile, uploading, error } = useFileUpload(kind);
+  return (
+    <div>
+      <div className="flex gap-2 items-start">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/50"
+        />
+        <label
+          className="shrink-0 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-border bg-white text-[12px] cursor-pointer hover:bg-accent transition disabled:opacity-50 whitespace-nowrap"
+          aria-disabled={uploading}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          {uploading ? "..." : "画像を選択"}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const url = await uploadFile(file);
+                if (url) onChange(url);
+              }
+              e.target.value = ""; // 同じファイル再選択を許可
+            }}
+          />
+        </label>
+      </div>
+      {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
@@ -1655,15 +1710,15 @@ export function ShopEditPage() {
                       placeholder="例: 明るめのカラードレス"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
-                    <input
+                    <ImageUrlInput
                       value={item.image_url}
-                      onChange={(e) => {
-                        const next = [...dressCodeOk];
-                        next[i] = { ...next[i], image_url: e.target.value };
-                        setDressCodeOk(next);
+                      onChange={(next) => {
+                        const arr = [...dressCodeOk];
+                        arr[i] = { ...arr[i], image_url: next };
+                        setDressCodeOk(arr);
                       }}
-                      placeholder="画像URL（任意）"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      kind="dress-code"
+                      placeholder="画像URL（任意）または「画像を選択」"
                     />
                   </div>
                   <button
@@ -1700,15 +1755,15 @@ export function ShopEditPage() {
                       placeholder="例: 黒ドレス・ビジュー付き"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
-                    <input
+                    <ImageUrlInput
                       value={item.image_url}
-                      onChange={(e) => {
-                        const next = [...dressCodeNg];
-                        next[i] = { ...next[i], image_url: e.target.value };
-                        setDressCodeNg(next);
+                      onChange={(next) => {
+                        const arr = [...dressCodeNg];
+                        arr[i] = { ...arr[i], image_url: next };
+                        setDressCodeNg(arr);
                       }}
-                      placeholder="画像URL（任意）"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      kind="dress-code"
+                      placeholder="画像URL（任意）または「画像を選択」"
                     />
                   </div>
                   <button
@@ -2952,11 +3007,18 @@ function StaffPhotosEditor({
   photos: { image_url: string; caption: string; instagram_url: string; staff_type: string }[];
   onChange: (next: { image_url: string; caption: string; instagram_url: string; staff_type: string }[]) => void;
 }) {
+  const { uploadFile, uploading, error: uploadError } = useFileUpload("staff-photo");
+
   const update = (
     i: number,
     patch: Partial<{ image_url: string; caption: string; instagram_url: string; staff_type: string }>,
   ) => {
     onChange(photos.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  };
+
+  const handlePick = async (i: number, file: File) => {
+    const url = await uploadFile(file);
+    if (url) update(i, { image_url: url });
   };
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
@@ -3050,11 +3112,37 @@ function StaffPhotosEditor({
               <label className="block text-[11px] font-medium text-muted-foreground mb-1">
                 画像URL
               </label>
-              <TextInput
-                value={photo.image_url}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { image_url: e.target.value })}
-                placeholder="例: https://example.com/photo.jpg または /storage/stores/xxx.jpg"
-              />
+              <div className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <TextInput
+                    value={photo.image_url}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => update(i, { image_url: e.target.value })}
+                    placeholder="例: https://example.com/photo.jpg"
+                  />
+                </div>
+                {/* S3 upload (Phase: media S3): 選択 -> upload -> 返ってきた URL を field にセット */}
+                <label
+                  className="shrink-0 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-border bg-white text-[12px] cursor-pointer hover:bg-accent transition disabled:opacity-50"
+                  aria-disabled={uploading}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {uploading ? "アップ中..." : "画像を選択"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) await handlePick(i, file);
+                      e.target.value = ""; // 同じファイル再選択を許可
+                    }}
+                  />
+                </label>
+              </div>
+              {uploadError && (
+                <p className="text-[11px] text-red-500 mt-1">{uploadError}</p>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>

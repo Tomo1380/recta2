@@ -71,12 +71,11 @@ class AreaCategoryController extends Controller
     }
 
     /**
-     * Upload an image for a category. Stored on the public disk.
+     * Upload an image for a category. Stored on S3 (media bucket).
      */
     public function uploadCategoryImage(UploadCategoryImageRequest $request, Category $category): CategoryResource
     {
-        $path = $request->file('image')->store('categories', 'public');
-        $url = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+        $url = \App\Support\MediaStorage::upload($request->file('image'), 'categories');
 
         $category->update(['image_url' => $url]);
 

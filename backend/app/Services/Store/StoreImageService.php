@@ -3,10 +3,9 @@
 namespace App\Services\Store;
 
 use App\Models\Store;
+use App\Support\MediaStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 /**
  * Store の画像 / 動画 / スタッフ写真の同期と単発アップロードを集約。
@@ -29,10 +28,9 @@ class StoreImageService
      */
     public function uploadImage(Store $store, UploadedFile $file): array
     {
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-        $file->storeAs('public/stores', $filename);
-
-        $url = '/storage/stores/' . $filename;
+        // S3 (`recta2-media-*`) に dev/ または prod/ prefix で upload。
+        // public read のため URL をそのまま images JSONB に保存する。
+        $url = MediaStorage::upload($file, 'stores');
 
         $images = $store->images ?? [];
         $images[] = $url;
@@ -60,10 +58,9 @@ class StoreImageService
         $imageUrl = $images[$index];
         $url = is_array($imageUrl) ? ($imageUrl['url'] ?? null) : $imageUrl;
 
-        if ($url) {
-            $path = str_replace('/storage/', 'public/', $url);
-            Storage::delete($path);
-        }
+        // 自分の S3 bucket + prefix 配下の URL のみ実ファイルを消す。
+        // 外部 URL (unsplash 等) や別環境 prefix は触らない。
+        MediaStorage::deleteByUrl(is_string($url) ? $url : null);
 
         array_splice($images, $index, 1);
         $store->update(['images' => array_values($images)]);

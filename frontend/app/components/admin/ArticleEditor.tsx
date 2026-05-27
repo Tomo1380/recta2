@@ -3,7 +3,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Youtube from "@tiptap/extension-youtube";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Bold,
   Italic,
@@ -17,12 +17,14 @@ import {
   Link2,
   Link2Off,
   Image as ImageIcon,
+  Upload as UploadIcon,
   Youtube as YoutubeIcon,
   Music2,
   Undo,
   Redo,
   Code,
 } from "lucide-react";
+import { useFileUpload } from "~/hooks/useFileUpload";
 
 interface Props {
   /** TipTap JSON document */
@@ -83,6 +85,17 @@ function ToolbarButton({
 }
 
 function Toolbar({ editor }: { editor: Editor }) {
+  const { uploadFile, uploading, error: uploadError } = useFileUpload("article-body");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadPick = useCallback(
+    async (file: File) => {
+      const url = await uploadFile(file);
+      if (url) editor.chain().focus().setImage({ src: url, alt: "" }).run();
+    },
+    [editor, uploadFile],
+  );
+
   const promptForLink = useCallback(() => {
     const previous = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("リンクURLを入力", previous ?? "https://");
@@ -213,9 +226,27 @@ function Toolbar({ editor }: { editor: Editor }) {
       >
         <Link2Off className="w-4 h-4" />
       </ToolbarButton>
-      <ToolbarButton title="画像挿入" onClick={insertImage}>
+      <ToolbarButton title="画像URLを貼り付け" onClick={insertImage}>
         <ImageIcon className="w-4 h-4" />
       </ToolbarButton>
+      <ToolbarButton
+        title={uploading ? "アップロード中..." : "画像をアップロード (S3)"}
+        disabled={uploading}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <UploadIcon className="w-4 h-4" />
+      </ToolbarButton>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (file) await handleUploadPick(file);
+          e.target.value = ""; // 同じファイル再選択を許可
+        }}
+      />
       <ToolbarButton title="YouTube埋め込み" onClick={insertYoutube}>
         <YoutubeIcon className="w-4 h-4" />
       </ToolbarButton>
