@@ -93,12 +93,15 @@ class PublicStoreController extends Controller
             case 'popular':
                 // フロントのタブラベルは「評価順」。平均評価の高い順に並べ、
                 // 同率は口コミ数の多い順。レビューが無い店舗は最下段へ送る。
-                $driver = $query->getConnection()->getDriverName();
-                $avgSql = $driver === 'pgsql'
-                    ? "(select avg(rating) from reviews where reviews.store_id = stores.id and reviews.status = 'published')"
-                    : "(select avg(rating) from reviews where reviews.store_id = stores.id and reviews.status = 'published')";
+                // NOTE: withCount('reviews') が `reviews_count` を sub-select で
+                // 作るので、orderByDesc('reviews_count') を素で書くと Laravel が
+                // また同名の sub-select を追加して PostgreSQL が
+                // "ORDER BY reviews_count is ambiguous" を返す。order の式も
+                // raw で同じ sub-select を直接書いて衝突を避ける。
+                $avgSql = "(select avg(rating) from reviews where reviews.store_id = stores.id and reviews.status = 'published')";
+                $countSql = "(select count(*) from reviews where reviews.store_id = stores.id and reviews.status = 'published')";
                 $query->orderByRaw("$avgSql desc nulls last")
-                      ->orderByDesc('reviews_count');
+                      ->orderByRaw("$countSql desc");
                 break;
             default: // newest
                 $query->orderByDesc('created_at');
