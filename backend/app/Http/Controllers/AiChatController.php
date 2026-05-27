@@ -10,7 +10,9 @@ use App\Models\Article;
 use App\Models\Category;
 use App\Models\IndustryKnowledge;
 use App\Models\Store;
+use App\Services\AiChat\GeminiClient;
 use App\Services\AiChat\StoreToolRegistry;
+use App\Services\AiChat\UsageLimitGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -21,6 +23,8 @@ class AiChatController extends Controller
 {
     public function __construct(
         private StoreToolRegistry $tools,
+        private GeminiClient $gemini,
+        private UsageLimitGuard $usageLimits,
     ) {}
 
 
@@ -77,9 +81,9 @@ class AiChatController extends Controller
         $user = auth('sanctum')->user();
 
         // --- Usage limit checks ---
-        $limitCheck = $this->checkUsageLimits($user, $ip);
+        $limitCheck = $this->usageLimits->check($user, $ip);
         if ($limitCheck) {
-            return $limitCheck;
+            return response()->json($limitCheck, 429);
         }
 
         // Get system prompt
@@ -126,62 +130,6 @@ class AiChatController extends Controller
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Usage limit enforcement
-    // -----------------------------------------------------------------------
-
-    private function checkUsageLimits(?object $user, string $ip): ?JsonResponse
-    {
-        $limits = AiChatLimit::current();
-        $today = now()->toDateString();
-        $monthStart = now()->startOfMonth();
-
-        // 1. Global daily limit
-        $globalToday = AiChatLog::whereDate('created_at', $today)->count();
-        if ($globalToday >= $limits->global_daily_limit) {
-            return response()->json([
-                'message' => $limits->limit_reached_message,
-                'limit_type' => 'global_daily',
-            ], 429);
-        }
-
-        if ($user) {
-            // 2. Authenticated user daily limit
-            $userToday = AiChatLog::where('user_id', $user->id)
-                ->whereDate('created_at', $today)
-                ->count();
-            if ($userToday >= $limits->user_daily_limit) {
-                return response()->json([
-                    'message' => $limits->limit_reached_message,
-                    'limit_type' => 'user_daily',
-                ], 429);
-            }
-
-            // 3. Authenticated user monthly limit
-            $userMonth = AiChatLog::where('user_id', $user->id)
-                ->where('created_at', '>=', $monthStart)
-                ->count();
-            if ($userMonth >= $limits->user_monthly_limit) {
-                return response()->json([
-                    'message' => $limits->limit_reached_message,
-                    'limit_type' => 'user_monthly',
-                ], 429);
-            }
-        } else {
-            // 4. Unauthenticated IP daily limit
-            $ipToday = AiChatLog::where('ip_address', $ip)
-                ->whereDate('created_at', $today)
-                ->count();
-            if ($ipToday >= $limits->ip_daily_limit) {
-                return response()->json([
-                    'message' => $limits->limit_reached_message,
-                    'limit_type' => 'ip_daily',
-                ], 429);
-            }
-        }
-
-        return null;
-    }
 
     // -----------------------------------------------------------------------
     // Agent mode: Gemini Function Calling with tool loop
@@ -231,7 +179,7 @@ class AiChatController extends Controller
                 ],
             ];
 
-            $response = $this->callGeminiWithRetry($apiKey, $payload);
+            $response = $this->gemini->generate($apiKey, $payload);
 
             $data = $response->json();
             $totalInputTokens += $data['usageMetadata']['promptTokenCount'] ?? 0;
@@ -496,7 +444,7 @@ class AiChatController extends Controller
             ],
         ];
 
-        $response = $this->callGeminiWithRetry($apiKey, $payload);
+        $response = $this->gemini->generate($apiKey, $payload);
 
         $data = $response->json();
         $aiText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
@@ -918,29 +866,6 @@ class AiChatController extends Controller
         return $this->buildCoreSystemPrompt($setting, $storeContext, $userArea, $pageType);
     }
 
-    /**
-     * Call Gemini API with a single retry on 503 (high demand).
-     */
-    private function callGeminiWithRetry(string $apiKey, array $payload): \Illuminate\Http\Client\Response
-    {
-        $model = config('services.gemini.model');
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-
-        $response = Http::timeout(30)->post($endpoint, $payload);
-
-        if ($response->status() === 503) {
-            \Log::warning('Gemini API 503, retrying in 2s...');
-            usleep(2_000_000); // 2 seconds
-            $response = Http::timeout(30)->post($endpoint, $payload);
-        }
-
-        if (!$response->successful()) {
-            \Log::error('Gemini API error', ['status' => $response->status(), 'body' => substr($response->body(), 0, 1000)]);
-            throw new \Exception('Gemini API error: ' . $response->status());
-        }
-
-        return $response;
-    }
 
     private function getToneDescription(string $tone): string
     {
@@ -1251,9 +1176,13 @@ class AiChatController extends Controller
 
         // Capture refs into the streamer closure
         $self = $this;
+        $usageLimits = $this->usageLimits;
+        $tools = $this->tools;
+        $gemini = $this->gemini;
 
         $callback = function () use (
-            $self, $request, $user, $ip, $pageType, $userMessage,
+            $self, $usageLimits, $tools, $gemini,
+            $request, $user, $ip, $pageType, $userMessage,
             $storeId, $history, $mode, $userArea, $userId
         ) {
             // Disable output buffering so each echo flushes immediately.
@@ -1271,7 +1200,7 @@ class AiChatController extends Controller
 
             try {
                 // Limit checks (mirror chat())
-                $limitCheck = $self->checkUsageLimitsForStream($user, $ip);
+                $limitCheck = $usageLimits->check($user, $ip);
                 if ($limitCheck !== null) {
                     $send('error', $limitCheck);
                     return;
@@ -1327,38 +1256,6 @@ class AiChatController extends Controller
         ]);
     }
 
-    /**
-     * Mirror of checkUsageLimits() but returns an array (for SSE error event)
-     * instead of a JsonResponse.
-     */
-    private function checkUsageLimitsForStream(?object $user, string $ip): ?array
-    {
-        $limits = AiChatLimit::current();
-        $today = now()->toDateString();
-        $monthStart = now()->startOfMonth();
-
-        $globalToday = AiChatLog::whereDate('created_at', $today)->count();
-        if ($globalToday >= $limits->global_daily_limit) {
-            return ['message' => $limits->limit_reached_message, 'limit_type' => 'global_daily'];
-        }
-
-        if ($user) {
-            $userToday = AiChatLog::where('user_id', $user->id)->whereDate('created_at', $today)->count();
-            if ($userToday >= $limits->user_daily_limit) {
-                return ['message' => $limits->limit_reached_message, 'limit_type' => 'user_daily'];
-            }
-            $userMonth = AiChatLog::where('user_id', $user->id)->where('created_at', '>=', $monthStart)->count();
-            if ($userMonth >= $limits->user_monthly_limit) {
-                return ['message' => $limits->limit_reached_message, 'limit_type' => 'user_monthly'];
-            }
-        } else {
-            $ipToday = AiChatLog::where('ip_address', $ip)->whereDate('created_at', $today)->count();
-            if ($ipToday >= $limits->ip_daily_limit) {
-                return ['message' => $limits->limit_reached_message, 'limit_type' => 'ip_daily'];
-            }
-        }
-        return null;
-    }
 
     /**
      * Agent mode streaming. Internally runs the existing function-calling loop
@@ -1402,7 +1299,7 @@ class AiChatController extends Controller
                 'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048],
             ];
 
-            $response = $this->callGeminiWithRetry($apiKey, $payload);
+            $response = $this->gemini->generate($apiKey, $payload);
             $data = $response->json();
             $totalInputTokens += $data['usageMetadata']['promptTokenCount'] ?? 0;
             $totalOutputTokens += $data['usageMetadata']['candidatesTokenCount'] ?? 0;
