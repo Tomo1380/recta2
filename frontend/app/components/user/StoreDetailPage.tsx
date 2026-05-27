@@ -2585,6 +2585,48 @@ function formatAmount(value: number | string | undefined): string {
 }
 
 // ── Transfer / 足代 zone fee section ───────────────────────────────────────
+
+// マップの円と同じ fillOpacity。StoreMap.tsx と揃える (片方変えるなら両方)。
+const TRANSFER_ZONE_FILL_OPACITY = 0.28;
+
+// "#D4AF37" or "rgb(...)" を [r,g,b] に。失敗時は null。
+function parseColorToRgb(c?: string | null): [number, number, number] | null {
+  if (!c) return null;
+  const s = c.trim();
+  // #RGB / #RRGGBB
+  const hex3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(s);
+  if (hex3) {
+    return [parseInt(hex3[1] + hex3[1], 16), parseInt(hex3[2] + hex3[2], 16), parseInt(hex3[3] + hex3[3], 16)];
+  }
+  const hex6 = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(s);
+  if (hex6) {
+    return [parseInt(hex6[1], 16), parseInt(hex6[2], 16), parseInt(hex6[3], 16)];
+  }
+  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(s);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  return null;
+}
+
+// 白背景の上に複数色を alpha 0.28 で順番に乗せたときの最終色を返す。
+// マップ上は半径の大きい順に円が描かれ、小さい円が上に重なるので、
+// 凡例 zone i の「中心」に見える色は: 半径が i 以下の zone を半径降順で
+// 重ねた結果に等しい (= zone i も含む)。
+function blendZoneFillColor(
+  baseRgb: [number, number, number],
+  layers: Array<string | null | undefined>,
+): string {
+  let [r, g, b] = baseRgb;
+  for (const c of layers) {
+    const rgb = parseColorToRgb(c);
+    if (!rgb) continue;
+    const a = TRANSFER_ZONE_FILL_OPACITY;
+    r = Math.round(r * (1 - a) + rgb[0] * a);
+    g = Math.round(g * (1 - a) + rgb[1] * a);
+    b = Math.round(b * (1 - a) + rgb[2] * a);
+  }
+  return `rgb(${r},${g},${b})`;
+}
+
 function TransferMapSection({
   lat,
   lng,
@@ -2625,37 +2667,68 @@ function TransferMapSection({
           <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
             距離別の料金
           </p>
-          <div className="overflow-hidden rounded-[10px]" style={{ border: "1px solid rgba(27,37,40,0.08)" }}>
-            {zoneList.map((zone, i) => {
-              const radius = zone.radius_km;
-              const radiusLabel =
-                radius !== undefined && radius !== null && radius !== ""
-                  ? typeof radius === "number"
-                    ? `〜${radius}km`
-                    : String(radius)
-                  : zone.label ?? `ゾーン${i + 1}`;
-              const fee = formatAmount(zone.fee ?? undefined);
-              return (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm"
-                  style={{
-                    borderTop: i === 0 ? "none" : "1px solid rgba(27,37,40,0.06)",
-                    backgroundColor: i % 2 === 0 ? "rgba(212,175,55,0.03)" : "transparent",
-                  }}
-                >
-                  <span
-                    className="inline-block h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: zone.color || GOLD_HEX }}
-                  />
-                  <span className="flex-1 font-medium" style={{ color: "#1b2528" }}>
-                    {zone.label ?? radiusLabel}
-                  </span>
-                  <span style={{ color: GOLD_HEX, fontWeight: 600 }}>{fee}</span>
-                </div>
-              );
-            })}
-          </div>
+          {(() => {
+            // 凡例の色チップを「マップ上で実際に見える混合色」に揃える。
+            // マップは半径の大きい順に円を描き、小さい円が上に乗るので、
+            // 凡例 zone i の中心に見える色 = 半径が zone i 以下の zone を
+            // 半径降順で baseRgb (白) に alpha 0.28 で順に乗せた結果。
+            const parsedZones = zoneList.map((z) => ({
+              raw: z,
+              km: (() => {
+                if (z.radius_km == null) return NaN;
+                if (typeof z.radius_km === "number") return z.radius_km;
+                const m = String(z.radius_km).match(/-?\d+(?:\.\d+)?/);
+                return m ? Number(m[0]) : NaN;
+              })(),
+            }));
+            return (
+              <div className="overflow-hidden rounded-[10px]" style={{ border: "1px solid rgba(27,37,40,0.08)" }}>
+                {zoneList.map((zone, i) => {
+                  const radius = zone.radius_km;
+                  const radiusLabel =
+                    radius !== undefined && radius !== null && radius !== ""
+                      ? typeof radius === "number"
+                        ? `〜${radius}km`
+                        : String(radius)
+                      : zone.label ?? `ゾーン${i + 1}`;
+                  const fee = formatAmount(zone.fee ?? undefined);
+                  const myKm = parsedZones[i].km;
+                  // 半径が自分以下の zone を集めて、半径降順で重ねる。
+                  // NaN (半径不明) はマップに乗らないので除外。
+                  const layers = Number.isFinite(myKm)
+                    ? parsedZones
+                        .filter((z) => Number.isFinite(z.km) && z.km <= myKm)
+                        .sort((a, b) => b.km - a.km)
+                        .map((z) => z.raw.color ?? GOLD_HEX)
+                    : [zone.color ?? GOLD_HEX];
+                  const chipColor = blendZoneFillColor([255, 255, 255], layers);
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm"
+                      style={{
+                        borderTop: i === 0 ? "none" : "1px solid rgba(27,37,40,0.06)",
+                        backgroundColor: i % 2 === 0 ? "rgba(212,175,55,0.03)" : "transparent",
+                      }}
+                    >
+                      <span
+                        className="inline-block h-3 w-3 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: chipColor,
+                          // 元の色 (重なり無し) を細い枠で示してゾーン識別性を保つ
+                          boxShadow: `inset 0 0 0 1px ${zone.color || GOLD_HEX}`,
+                        }}
+                      />
+                      <span className="flex-1 font-medium" style={{ color: "#1b2528" }}>
+                        {zone.label ?? radiusLabel}
+                      </span>
+                      <span style={{ color: GOLD_HEX, fontWeight: 600 }}>{fee}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
