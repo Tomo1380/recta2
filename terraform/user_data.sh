@@ -40,6 +40,20 @@ unzip -o awscliv2.zip
 ./aws/install
 rm -rf /tmp/aws /tmp/awscliv2.zip
 
+# --- Swap (2 GB) ---
+# t3.small は RAM 2GB しかなく、vite build の rendering chunks フェーズで
+# OOM Killer が走って sshd / docker まで巻き込み停止する事故があった
+# (2026-05-27)。永続 swapfile を作って同じ事故を防ぐ。
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  echo 'vm.swappiness = 30' > /etc/sysctl.d/99-swap.conf
+  sysctl -p /etc/sysctl.d/99-swap.conf
+fi
+
 # --- App directory ---
 mkdir -p /opt/${project_name}
 chown ubuntu:ubuntu /opt/${project_name}
