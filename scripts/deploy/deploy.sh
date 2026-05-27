@@ -11,6 +11,18 @@ git fetch --all --prune
 git reset --hard origin/main
 
 echo "=== Building and restarting containers ==="
+# docker-compose.prod.yml の build args (${VITE_GOOGLE_MAPS_API_KEY:-} 等) は
+# `docker compose` を起動した shell の環境変数を参照する。runtime 用の
+# env_file (.env.prod) は build フェーズには渡らないので、ビルド時だけ
+# .env.prod を一時的に export して compose が拾えるようにする。
+# VITE_* はフロント bundle に焼き込まれるので、これを忘れると本番で
+# Google Maps が読めない等の事故になる。
+if [ -f .env.prod ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env.prod
+  set +a
+fi
 docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
 echo "=== Running migrations ==="
