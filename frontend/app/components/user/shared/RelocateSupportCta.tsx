@@ -54,21 +54,19 @@ export default function RelocateSupportCta({ variant = "top" }: RelocateSupportC
       aria-label={`${preset.title} — 上京サポートページへ`}
       className="block rounded-2xl overflow-hidden active:scale-[0.99] transition-transform"
       style={{
-        background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 60%, rgba(200,96,128,.4) 100%)`,
-        border: `1px solid ${GOLD}4d`,
+        // 元々 base linear-gradient + 右側に absolute span で gold radial を重ねていたが、
+        // span の bounding-box 左端で radial の透明域が直線で切れて「右下ボーダー
+        // 付近がガビって見える」現象が出ていた。base 背景に radial を 1 段
+        // 重ねる方式に変えると要素境界に縛られず自然にフェードする。
+        background:
+          `radial-gradient(circle at 88% 50%, ${GOLD}24 0%, transparent 55%), ` +
+          `linear-gradient(135deg, ${DARK} 0%, #2c3e46 60%, rgba(200,96,128,.4) 100%)`,
+        border: `1px solid ${GOLD}33`,
         boxShadow: "0 8px 24px rgba(0,0,0,.18)",
         textDecoration: "none",
         position: "relative",
       }}
     >
-      <span
-        aria-hidden
-        className="absolute top-0 right-0 bottom-0 pointer-events-none"
-        style={{
-          width: "44%",
-          background: `radial-gradient(circle at 70% 50%, ${GOLD}2e, transparent 60%)`,
-        }}
-      />
       <div className="flex items-center gap-3 p-4 relative">
         <span
           className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"

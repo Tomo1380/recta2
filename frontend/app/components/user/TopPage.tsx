@@ -703,7 +703,7 @@ export default function TopPage() {
         <div style={{ marginTop: "24px", position: "relative" }}>
           <EdgeTop />
           <div style={{ background: DARK, position: "relative", padding: "20px 0 24px" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "60px", background: "radial-gradient(ellipse 80% 100% at 50% 0%, rgba(212,175,55,.04) 0%, transparent 100%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "60px", pointerEvents: "none" }} />
 
             {/* AREA */}
             <div className="px-5">
