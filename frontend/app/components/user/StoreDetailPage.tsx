@@ -1502,17 +1502,62 @@ function LuxeHero({
   const hasSlides = slides.length > 0;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  // ユーザーが手動操作した直後は自動切替を一時停止する (操作 → すぐ次へ
+  // 切り替わって読めないのを防ぐ)。3 秒経ったら自動再開。
+  const [userInteracted, setUserInteracted] = useState(false);
 
   useEffect(() => {
-    if (!hasSlides || slides.length < 2 || paused) return;
+    if (!hasSlides || slides.length < 2 || paused || userInteracted) return;
     const id = setInterval(() => {
       setIndex((i) => (i + 1) % slides.length);
     }, 3000);
     return () => clearInterval(id);
-  }, [hasSlides, slides.length, paused]);
+  }, [hasSlides, slides.length, paused, userInteracted]);
 
-  const goPrev = () => setIndex((i) => (i - 1 + slides.length) % slides.length);
-  const goNext = () => setIndex((i) => (i + 1) % slides.length);
+  useEffect(() => {
+    if (!userInteracted) return;
+    const id = setTimeout(() => setUserInteracted(false), 3000);
+    return () => clearTimeout(id);
+  }, [userInteracted, index]);
+
+  const goPrev = () => {
+    setUserInteracted(true);
+    setIndex((i) => (i - 1 + slides.length) % slides.length);
+  };
+  const goNext = () => {
+    setUserInteracted(true);
+    setIndex((i) => (i + 1) % slides.length);
+  };
+  const goTo = (i: number) => {
+    setUserInteracted(true);
+    setIndex(i);
+  };
+
+  // モバイル向けスワイプ: 水平に 40px 以上ドラッグしたら前後へ。縦スクロールを
+  // 邪魔しないよう threshold は控えめに、垂直方向の動きが大きいときは無視。
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) goNext();
+    else goPrev();
+  };
+
+  // 「次に出る画像」サムネ用: index+1, index+2 を循環参照で取り出す。
+  // 2 枚しかない店舗では offset=2 が現在表示と同じになるので 1 枚だけ。
+  const nextSlides = hasSlides && slides.length > 1
+    ? (slides.length >= 3 ? [1, 2] : [1])
+        .map((offset) => ({ url: slides[(index + offset) % slides.length], offset }))
+    : [];
 
   return (
     <section
@@ -1520,6 +1565,8 @@ function LuxeHero({
       style={{ height: "440px", background: "#1b2528" }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {/* Slides */}
       {hasSlides ? (
@@ -1660,26 +1707,57 @@ function LuxeHero({
         </div>
       </div>
 
-      {/* Arrows (only when multiple slides) */}
+      {/* Arrows (only when multiple slides) — モバイルでもタップできるよう
+          常時うっすら表示 (opacity-60)。タップ/ホバーで濃く。 */}
       {slides.length > 1 && (
         <>
           <button
             onClick={goPrev}
-            className="absolute left-2 top-1/2 z-10 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-0 transition-opacity hover:opacity-100"
-            style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)" }}
+            className="absolute left-2 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             aria-label="前の写真"
           >
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="size-5" />
           </button>
           <button
             onClick={goNext}
-            className="absolute right-2 top-1/2 z-10 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-0 transition-opacity hover:opacity-100"
-            style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)" }}
+            className="absolute right-2 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             aria-label="次の写真"
           >
-            <ChevronRight className="size-4" />
+            <ChevronRight className="size-5" />
           </button>
         </>
+      )}
+
+      {/* 次に出る画像のミニサムネ (右下に縦並び 2 枚)。「次これ → その次これ」
+          を予告して、ユーザーに「もっと写真あるよ」を伝える。タップで該当
+          スライドへジャンプ。サムネは indicator バーの上に積む。 */}
+      {nextSlides.length > 0 && (
+        <div className="absolute bottom-5 right-2 z-10 flex flex-col gap-1.5">
+          {nextSlides.map(({ url, offset }) => (
+            <button
+              key={offset}
+              type="button"
+              onClick={() => goTo((index + offset) % slides.length)}
+              aria-label={`${((index + offset) % slides.length) + 1}枚目に移動`}
+              className="block overflow-hidden rounded-md transition-transform active:scale-95"
+              style={{
+                width: 44,
+                height: 44,
+                border: "1.5px solid rgba(255,255,255,0.6)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+              }}
+            >
+              <img
+                src={url}
+                alt=""
+                className="h-full w-full object-cover"
+                style={{ opacity: offset === 1 ? 0.95 : 0.7 }}
+              />
+            </button>
+          ))}
+        </div>
       )}
 
       {/* Indicator dots */}
