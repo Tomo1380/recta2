@@ -53,9 +53,9 @@ interface StepConfig {
   id: string;
   title: string;
   subtitle: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   gradient: string;
-  sections: { id: string; title: string; icon: any; required?: boolean }[];
+  sections: { id: string; title: string; icon: React.ComponentType<{ className?: string }>; required?: boolean }[];
 }
 
 const steps: StepConfig[] = [
@@ -171,10 +171,18 @@ function TextInput({
   value = "",
   onChange,
   type = "text",
-}: any) {
+  inputMode,
+}: {
+  placeholder?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+}) {
   return (
     <input
       type={type}
+      inputMode={inputMode}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
@@ -188,7 +196,12 @@ function TextArea({
   value = "",
   onChange,
   rows = 3,
-}: any) {
+}: {
+  placeholder?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+}) {
   return (
     <textarea
       value={value}
@@ -200,7 +213,17 @@ function TextArea({
   );
 }
 
-function SelectInput({ options, value, onChange, placeholder }: any) {
+function SelectInput({
+  options,
+  value,
+  onChange,
+  placeholder,
+}: {
+  options: string[];
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  placeholder?: string;
+}) {
   return (
     <select
       value={value}
@@ -324,7 +347,14 @@ function SliderField({
   leftLabel,
   rightLabel,
   required,
-}: any) {
+}: {
+  label: string;
+  value: number;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  leftLabel: string;
+  rightLabel: string;
+  required?: boolean;
+}) {
   return (
     <div>
       <label className="block text-sm mb-2 text-foreground">
@@ -429,7 +459,7 @@ function SectionCard({
   children,
 }: {
   title: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   required?: boolean;
   children: React.ReactNode;
 }) {
@@ -790,11 +820,11 @@ export function ShopEditPage() {
       fetch("/api/areas").then((r) => r.ok ? r.json() : []),
       fetch("/api/categories").then((r) => r.ok ? r.json() : []),
     ])
-      .then(([areas, categories]: [any, any]) => {
-        const areaList = Array.isArray(areas) ? areas : (areas?.data ?? []);
-        const catList = Array.isArray(categories) ? categories : (categories?.data ?? []);
-        setAreaOptions(areaList.map((a: any) => a.name).filter(Boolean));
-        setCategoryOptions(catList.map((c: any) => c.name).filter(Boolean));
+      .then(([areas, categories]: [unknown, unknown]) => {
+        const areaList = (Array.isArray(areas) ? areas : (areas as { data?: unknown[] })?.data ?? []) as { name: string }[];
+        const catList = (Array.isArray(categories) ? categories : (categories as { data?: unknown[] })?.data ?? []) as { name: string }[];
+        setAreaOptions(areaList.map((a) => a.name).filter(Boolean));
+        setCategoryOptions(catList.map((c) => c.name).filter(Boolean));
       })
       .catch(() => {
         /* マスタが取れなくても画面は止めない。Select は空になり、保存できない状態で気付ける。 */
@@ -943,7 +973,7 @@ export function ShopEditPage() {
             <Field label="店舗名" required>
               <TextInput
                 value={shopName}
-                onChange={(e: any) => setShopName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setShopName(e.target.value)}
                 placeholder="例: CLUB LUNA"
               />
             </Field>
@@ -951,7 +981,7 @@ export function ShopEditPage() {
           <Field label="エリア" required>
             <SelectInput
               value={area}
-              onChange={(e: any) => setArea(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setArea(e.target.value)}
               placeholder="エリアを選択"
               // 既存店舗の area がマスタに無い旧表記 ("新宿・歌舞伎町" 等) でも、
               // 現在値を options に合流させて value 復元を維持する。
@@ -965,7 +995,7 @@ export function ShopEditPage() {
           <Field label="最寄り駅" required>
             <TextInput
               value={station}
-              onChange={(e: any) => setStation(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStation(e.target.value)}
               placeholder="例: 新宿駅"
             />
           </Field>
@@ -973,7 +1003,7 @@ export function ShopEditPage() {
             <Field label="住所" required>
               <TextInput
                 value={address}
-                onChange={(e: any) => setAddress(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAddress(e.target.value)}
                 placeholder="例: 東京都新宿区歌舞伎町1-1-1"
               />
             </Field>
@@ -1029,7 +1059,7 @@ export function ShopEditPage() {
           <Field label="業種カテゴリ" required>
             <SelectInput
               value={category}
-              onChange={(e: any) => setCategory(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCategory(e.target.value)}
               placeholder="業種を選択"
               options={
                 category && !categoryOptions.includes(category)
@@ -1041,28 +1071,28 @@ export function ShopEditPage() {
           <Field label="営業時間（開始）">
             <TextInput
               value={openingTime}
-              onChange={(e: any) => setOpeningTime(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setOpeningTime(e.target.value)}
               placeholder="例: 20:00"
             />
           </Field>
           <Field label="営業時間（終了）">
             <TextInput
               value={closingTime}
-              onChange={(e: any) => setClosingTime(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setClosingTime(e.target.value)}
               placeholder="例: 1:00 / LAST"
             />
           </Field>
           <Field label="定休日">
             <TextInput
               value={holiday}
-              onChange={(e: any) => setHoliday(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setHoliday(e.target.value)}
               placeholder="例: 日曜日"
             />
           </Field>
           <Field label="電話番号">
             <TextInput
               value={phone}
-              onChange={(e: any) => setPhone(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPhone(e.target.value)}
               placeholder="例: 03-0000-0000"
             />
           </Field>
@@ -1070,7 +1100,7 @@ export function ShopEditPage() {
             <Field label="公式サイトURL">
               <TextInput
                 value={website}
-                onChange={(e: any) => setWebsite(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setWebsite(e.target.value)}
                 placeholder="https://"
               />
             </Field>
@@ -1130,7 +1160,7 @@ export function ShopEditPage() {
               <TextInput
                 type="number"
                 value={minWage}
-                onChange={(e: any) => setMinWage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMinWage(e.target.value)}
                 placeholder="4000"
               />
             </Field>
@@ -1138,14 +1168,14 @@ export function ShopEditPage() {
               <TextInput
                 type="number"
                 value={maxWage}
-                onChange={(e: any) => setMaxWage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMaxWage(e.target.value)}
                 placeholder="8000"
               />
             </Field>
             <Field label="日給目安">
               <TextInput
                 value={dailyPay}
-                onChange={(e: any) => setDailyPay(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPay(e.target.value)}
                 placeholder="例: 30000〜60000"
               />
             </Field>
@@ -1175,14 +1205,14 @@ export function ShopEditPage() {
           <Field label="給与補足">
             <TextArea
               value={salaryNote}
-              onChange={(e: any) => setSalaryNote(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSalaryNote(e.target.value)}
               placeholder="その他、給与に関する補足情報があれば入力してください"
             />
           </Field>
           <Field label="給与支払い方法">
             <SelectInput
               value={payrollSystemType}
-              onChange={(e: any) => setPayrollSystemType(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemType(e.target.value)}
               options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
               placeholder="選択してください"
             />
@@ -1190,7 +1220,7 @@ export function ShopEditPage() {
           <Field label="給与支払い補足">
             <TextArea
               value={payrollSystemDescription}
-              onChange={(e: any) => setPayrollSystemDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemDescription(e.target.value)}
               placeholder="給与支払いに関する補足（例: 日払い上限5万円まで等）"
               rows={2}
             />
@@ -1204,7 +1234,7 @@ export function ShopEditPage() {
             <Field label="保証期間">
               <TextInput
                 value={guaranteePeriod}
-                onChange={(e: any) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   setGuaranteePeriod(e.target.value)
                 }
                 placeholder="例: 3ヶ月"
@@ -1214,7 +1244,7 @@ export function ShopEditPage() {
           <Field label="保証詳細">
             <TextArea
               value={guaranteeDetail}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setGuaranteeDetail(e.target.value)
               }
               placeholder="保証の具体的な内容を入力してください"
@@ -1223,7 +1253,7 @@ export function ShopEditPage() {
           <Field label="ノルマ情報">
             <TextArea
               value={normaInfo}
-              onChange={(e: any) => setNormaInfo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setNormaInfo(e.target.value)}
               placeholder="ノルマの有無や内容を入力してください"
             />
           </Field>
@@ -1240,7 +1270,7 @@ export function ShopEditPage() {
               type="number"
               inputMode="numeric"
               value={avgWage}
-              onChange={(e: any) => setAvgWage(e.target.value.replace(/[^\d]/g, ""))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAvgWage(e.target.value.replace(/[^\d]/g, ""))}
               placeholder="例: 5000"
             />
           </Field>
@@ -1249,28 +1279,28 @@ export function ShopEditPage() {
               type="number"
               inputMode="numeric"
               value={trialWage}
-              onChange={(e: any) => setTrialWage(e.target.value.replace(/[^\d]/g, ""))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialWage(e.target.value.replace(/[^\d]/g, ""))}
               placeholder="例: 4500"
             />
           </Field>
           <Field label="面接可能時間（開始）">
             <TextInput
               value={interviewStart}
-              onChange={(e: any) => setInterviewStart(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewStart(e.target.value)}
               placeholder="例: 14:00"
             />
           </Field>
           <Field label="面接可能時間（終了）">
             <TextInput
               value={interviewEnd}
-              onChange={(e: any) => setInterviewEnd(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewEnd(e.target.value)}
               placeholder="例: 19:00"
             />
           </Field>
           <Field label="当日体入可否">
             <SelectInput
               value={sameDayTrial}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setSameDayTrial(e.target.value)
               }
               options={["可", "不可"]}
@@ -1328,7 +1358,7 @@ export function ShopEditPage() {
           <Field label="お店の特徴テキスト">
             <TextArea
               value={featureText}
-              onChange={(e: any) => setFeatureText(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFeatureText(e.target.value)}
               rows={3}
               placeholder="他店との差別化ポイントや特徴を入力してください"
             />
@@ -1341,14 +1371,14 @@ export function ShopEditPage() {
           <SliderField
             label="経験レベル"
             value={expLevel}
-            onChange={(e: any) => setExpLevel(Number(e.target.value))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExpLevel(Number(e.target.value))}
             leftLabel="初心者向け"
             rightLabel="経験者向け"
           />
           <SliderField
             label="雰囲気"
             value={atmosphere}
-            onChange={(e: any) =>
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setAtmosphere(Number(e.target.value))
             }
             leftLabel="落ち着き"
@@ -1365,14 +1395,14 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={castBijin}
-                  onChange={(e: any) => setCastBijin(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCastBijin(e.target.value)}
                 />
               </Field>
               <Field label="可愛い系">
                 <TextInput
                   type="number"
                   value={castKawaii}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastKawaii(e.target.value)
                   }
                 />
@@ -1381,7 +1411,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={castGlamour}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastGlamour(e.target.value)
                   }
                 />
@@ -1390,7 +1420,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={castNatural}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastNatural(e.target.value)
                   }
                 />
@@ -1408,7 +1438,7 @@ export function ShopEditPage() {
           <SliderField
             label="客層の飲み方"
             value={drinkStyle}
-            onChange={(e: any) =>
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setDrinkStyle(Number(e.target.value))
             }
             leftLabel="落ち着き"
@@ -1427,7 +1457,7 @@ export function ShopEditPage() {
           <Field label="面接時の服装アドバイス">
             <TextArea
               value={dressAdvice}
-              onChange={(e: any) => setDressAdvice(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressAdvice(e.target.value)}
               placeholder="面接時のおすすめの服装について入力してください"
             />
           </Field>
@@ -1441,14 +1471,14 @@ export function ShopEditPage() {
           <Field label="ドレスコード">
             <TextInput
               value={dressCode}
-              onChange={(e: any) => setDressCode(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCode(e.target.value)}
               placeholder="例: フリー / ドレス貸し出しあり"
             />
           </Field>
           <Field label="採用基準">
             <TextArea
               value={hiringCriteria}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setHiringCriteria(e.target.value)
               }
               placeholder="採用時に重視するポイントを入力してください"
@@ -1483,7 +1513,7 @@ export function ShopEditPage() {
           <Field label="補足メモ">
             <TextArea
               value={docNote}
-              onChange={(e: any) => setDocNote(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDocNote(e.target.value)}
               placeholder="書類に関する補足情報があれば入力してください"
             />
           </Field>
@@ -1496,7 +1526,7 @@ export function ShopEditPage() {
           <Field label="シフト情報">
             <TextArea
               value={shiftInfo}
-              onChange={(e: any) => setShiftInfo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setShiftInfo(e.target.value)}
               placeholder="例: 週2日〜OK。シフト自由制。前日までに連絡いただければ変更可能。"
             />
           </Field>
@@ -1516,7 +1546,7 @@ export function ShopEditPage() {
                     変えられず、過去月の実績を入力できなかった。 */}
                 <TextInput
                   value={entry.month}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const updated = [...hiringEntries];
                     updated[i] = { ...updated[i], month: e.target.value };
                     setHiringEntries(updated);
@@ -1538,7 +1568,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={entry.count}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const updated = [...hiringEntries];
                     updated[i] = {
                       ...updated[i],
@@ -1581,7 +1611,7 @@ export function ShopEditPage() {
           <Field label="直近の合計テキスト">
             <TextInput
               value={hiringTotal}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setHiringTotal(e.target.value)
               }
               placeholder="例: 直近5ヶ月で52名採用"
@@ -1599,7 +1629,7 @@ export function ShopEditPage() {
           <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
             <TextArea
               value={dressCodeDescription}
-              onChange={(e: any) => setDressCodeDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
               rows={3}
               placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
             />
@@ -1705,7 +1735,7 @@ export function ShopEditPage() {
           >
             <TextArea
               value={champagneDescription}
-              onChange={(e: any) => setChampagneDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setChampagneDescription(e.target.value)}
               rows={4}
               placeholder="例: ドンペリ 50,000円〜 / モエシャン 30,000円〜 など"
             />
@@ -1735,7 +1765,7 @@ export function ShopEditPage() {
                 <TextInput
                   type="number"
                   value={champagnePrices[key].amount}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setChampagnePrices({
                       ...champagnePrices,
                       [key]: { ...champagnePrices[key], amount: e.target.value },
@@ -1747,7 +1777,7 @@ export function ShopEditPage() {
               <div className="md:col-span-1">
                 <TextInput
                   value={champagnePrices[key].note}
-                  onChange={(e: any) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setChampagnePrices({
                       ...champagnePrices,
                       [key]: { ...champagnePrices[key], note: e.target.value },
@@ -1824,7 +1854,7 @@ export function ShopEditPage() {
           <Field label="セット料金 補足">
             <TextArea
               value={setFeeNotes}
-              onChange={(e: any) => setSetFeeNotes(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSetFeeNotes(e.target.value)}
               rows={2}
               placeholder="例: 延長30分ごと+1,500円、税込表記"
             />
@@ -1855,7 +1885,7 @@ export function ShopEditPage() {
                 <Field label="名前">
                   <TextInput
                     value={ep.name}
-                    onChange={(e: any) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const next = [...rectaEpisodes];
                       next[i] = { ...next[i], name: e.target.value };
                       setRectaEpisodes(next);
@@ -1866,7 +1896,7 @@ export function ShopEditPage() {
                 <Field label="Instagram URL（任意）">
                   <TextInput
                     value={ep.instagram_url}
-                    onChange={(e: any) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const next = [...rectaEpisodes];
                       next[i] = { ...next[i], instagram_url: e.target.value };
                       setRectaEpisodes(next);
@@ -1878,7 +1908,7 @@ export function ShopEditPage() {
               <Field label="写真URL（任意）">
                 <TextInput
                   value={ep.photo_url}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const next = [...rectaEpisodes];
                     next[i] = { ...next[i], photo_url: e.target.value };
                     setRectaEpisodes(next);
@@ -1889,7 +1919,7 @@ export function ShopEditPage() {
               <Field label="エピソード">
                 <TextArea
                   value={ep.comment}
-                  onChange={(e: any) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const next = [...rectaEpisodes];
                     next[i] = { ...next[i], comment: e.target.value };
                     setRectaEpisodes(next);
@@ -1922,7 +1952,7 @@ export function ShopEditPage() {
           >
             <TextArea
               value={transferDescription}
-              onChange={(e: any) => setTransferDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferDescription(e.target.value)}
               rows={3}
               placeholder="例: 営業終了後、自宅まで無料送迎あり"
             />
@@ -1930,7 +1960,7 @@ export function ShopEditPage() {
           <Field label="送り距離">
             <TextInput
               value={transferKm}
-              onChange={(e: any) => setTransferKm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTransferKm(e.target.value)}
               placeholder="例: 20km圏内"
             />
           </Field>
@@ -2082,14 +2112,14 @@ export function ShopEditPage() {
             <Field label="スタッフ名">
               <TextInput
                 value={staffName}
-                onChange={(e: any) => setStaffName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffName(e.target.value)}
                 placeholder="例: 田中"
               />
             </Field>
             <Field label="スタッフ役職">
               <TextInput
                 value={staffRole}
-                onChange={(e: any) => setStaffRole(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStaffRole(e.target.value)}
                 placeholder="例: 店長"
               />
             </Field>
@@ -2097,7 +2127,7 @@ export function ShopEditPage() {
           <Field label="コメント">
             <TextArea
               value={staffComment}
-              onChange={(e: any) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                 setStaffComment(e.target.value)
               }
               rows={4}
@@ -2860,7 +2890,7 @@ function VideoListEditor({
               </label>
               <TextInput
                 value={video.video_url}
-                onChange={(e: any) => update(i, { video_url: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { video_url: e.target.value })}
                 placeholder="例: https://youtube.com/watch?v=... または https://example.com/video.mp4"
               />
             </div>
@@ -2870,7 +2900,7 @@ function VideoListEditor({
               </label>
               <TextInput
                 value={video.label}
-                onChange={(e: any) => update(i, { label: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { label: e.target.value })}
                 placeholder="動画の見出しになります（空でも可）"
               />
             </div>
@@ -2880,7 +2910,7 @@ function VideoListEditor({
               </label>
               <TextArea
                 value={video.description}
-                onChange={(e: any) => update(i, { description: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { description: e.target.value })}
                 rows={2}
                 placeholder="動画の補足説明。改行は反映されます。"
               />
@@ -3015,7 +3045,7 @@ function StaffPhotosEditor({
               </label>
               <TextInput
                 value={photo.image_url}
-                onChange={(e: any) => update(i, { image_url: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { image_url: e.target.value })}
                 placeholder="例: https://example.com/photo.jpg または /storage/stores/xxx.jpg"
               />
             </div>
@@ -3026,7 +3056,7 @@ function StaffPhotosEditor({
                 </label>
                 <TextInput
                   value={photo.staff_type}
-                  onChange={(e: any) => update(i, { staff_type: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { staff_type: e.target.value })}
                   placeholder="任意"
                 />
               </div>
@@ -3036,7 +3066,7 @@ function StaffPhotosEditor({
                 </label>
                 <TextInput
                   value={photo.instagram_url}
-                  onChange={(e: any) => update(i, { instagram_url: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { instagram_url: e.target.value })}
                   placeholder="https://instagram.com/..."
                 />
               </div>
@@ -3047,7 +3077,7 @@ function StaffPhotosEditor({
               </label>
               <TextInput
                 value={photo.caption}
-                onChange={(e: any) => update(i, { caption: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { caption: e.target.value })}
                 placeholder="例: 在籍2年・お酒に強くなくてもOK"
               />
             </div>
