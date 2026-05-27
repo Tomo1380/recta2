@@ -2096,8 +2096,11 @@ const StoreVideoSection = forwardRef<
             mode === "stuck"
               ? { maxWidth: FRAME_WIDTH, backgroundColor: "#000" }
               : {
-                  width: 144,
-                  height: 81,
+                  // ミニプレイヤーサイズ。旧 144×81 は小さすぎて再生内容が
+                  // ほとんど見えないため Netflix/Twitch を参考にした 240×135
+                  // (16:9) に拡大。スマホ横 390px の半分以下に収まる。
+                  width: 240,
+                  height: 135,
                   backgroundColor: "#000",
                   border: "1px solid rgba(212,175,55,0.35)",
                 }

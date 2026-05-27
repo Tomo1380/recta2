@@ -1411,10 +1411,14 @@ export default function AiChatPanel({
               onChange={(e) => setInput(e.target.value)}
               placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください…"}
               disabled={isLoading || limitReached}
-              className="h-full w-full bg-transparent text-[13px] outline-none disabled:opacity-50"
+              // iOS Safari は input の font-size が 16px 未満だと
+              // フォーカス時に自動ズームしてしまう。13px 指定だと体験を壊すので
+              // 16px に固定する (placeholder/入力テキストとも)。
+              className="h-full w-full bg-transparent outline-none disabled:opacity-50"
               style={{
                 color: "#1b2528",
                 fontFamily: "'Noto Sans JP', sans-serif",
+                fontSize: "16px",
               }}
             />
             <button

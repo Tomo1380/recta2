@@ -150,8 +150,9 @@ export default function ColumnsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="記事を検索..."
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-stone-200 text-[13px] focus:outline-none focus:border-stone-400"
-            style={{ fontFamily: J }}
+            // iOS Safari の自動ズーム対策で 16px。
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-stone-200 focus:outline-none focus:border-stone-400"
+            style={{ fontFamily: J, fontSize: "16px" }}
           />
         </div>
 
