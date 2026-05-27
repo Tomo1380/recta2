@@ -663,7 +663,7 @@ export default function AiChatPanel({
   const [userArea, setUserArea] = useState<string>("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // SSE 接続を持つ AbortController を保持し、unmount or 新規送信時にキャンセルする。
   // これがないと、ユーザーが画面遷移しても fetch が裏で生き続け、reader が
@@ -845,6 +845,8 @@ export default function AiChatPanel({
       const placeholder: ChatMessage = { role: "ai", content: "", streaming: true };
       setMessages((prev) => [...prev, userMessage, placeholder]);
       setInput("");
+      // textarea の自動拡張高さを 1 行分にリセット (送信後に大きいまま残らないように)
+      if (inputRef.current) inputRef.current.style.height = "";
       setIsLoading(true);
 
       // 既存ストリームが残っていればキャンセル（連打や遷移後の再送信に備える）
@@ -1397,34 +1399,56 @@ export default function AiChatPanel({
           }}
         >
           <div
-            className="relative flex flex-1 items-center gap-2.5 rounded-[16px] px-4"
+            className="relative flex flex-1 items-end gap-2.5 rounded-[16px] px-4"
             style={{
               backgroundColor: "#f4f3f1",
-              height: "48px",
+              minHeight: "48px",
               border: "1.5px solid rgba(27,37,40,0.12)",
             }}
           >
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                // 内容に応じて高さ自動拡張 (最大 4 行相当 = 96px)
+                const t = e.currentTarget;
+                t.style.height = "auto";
+                t.style.height = `${Math.min(t.scrollHeight, 96)}px`;
+              }}
+              onKeyDown={(e) => {
+                // モバイル想定: 改行キー = 改行。送信は送信ボタンで。
+                // PC: Shift+Enter で改行、素の Enter で送信 (チャットの慣例)。
+                // 「タッチデバイス = モバイル」と判定して挙動を切替。
+                // IME 変換中の Enter は何もしない (誤送信防止)。
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                if (e.key !== "Enter") return;
+                const isTouch = typeof window !== "undefined"
+                  && (("ontouchstart" in window)
+                    || (navigator.maxTouchPoints ?? 0) > 0);
+                if (isTouch) return; // モバイルは改行を許可、送信は別ボタン
+                if (e.shiftKey) return; // PC: Shift+Enter は改行
+                e.preventDefault();
+                handleSend();
+              }}
               placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください…"}
               disabled={isLoading || limitReached}
-              // iOS Safari は input の font-size が 16px 未満だと
-              // フォーカス時に自動ズームしてしまう。13px 指定だと体験を壊すので
-              // 16px に固定する (placeholder/入力テキストとも)。
-              className="h-full w-full bg-transparent outline-none disabled:opacity-50"
+              rows={1}
+              // iOS Safari は font-size が 16px 未満だとフォーカス時に
+              // 自動ズームしてしまう。16px 固定。
+              className="w-full bg-transparent outline-none disabled:opacity-50 resize-none py-3 leading-tight"
               style={{
                 color: "#1b2528",
                 fontFamily: "'Noto Sans JP', sans-serif",
                 fontSize: "16px",
+                minHeight: "24px",
+                maxHeight: "96px",
               }}
             />
             <button
               type="submit"
               disabled={!input.trim() || isLoading || limitReached}
-              className="flex size-8 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-30 active:scale-90"
+              className="mb-2 flex size-8 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-30 active:scale-90"
               style={{
                 background: input.trim() && !isLoading && !limitReached
                   ? "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)"
