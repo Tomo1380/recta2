@@ -7,14 +7,14 @@
 import type {
   AreaCategoryReorderAreas200,
   AreaCategoryReorderCategories200,
-  AreaCategoryUploadCategoryImageBody,
   AreaResource,
   CategoryResource,
   ReorderRequest,
   StoreAreaRequest,
   StoreCategoryRequest,
   UpdateAreaRequest,
-  UpdateCategoryRequest
+  UpdateCategoryRequest,
+  UploadCategoryImageRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -121,9 +121,9 @@ import { rectaMutator } from '../mutators/auth';
  */
 export const areaCategoryUploadCategoryImage = (
     category: number,
-    areaCategoryUploadCategoryImageBody: AreaCategoryUploadCategoryImageBody,
+    uploadCategoryImageRequest: UploadCategoryImageRequest,
  ) => {const formData = new FormData();
-formData.append(`image`, areaCategoryUploadCategoryImageBody.image);
+formData.append(`image`, uploadCategoryImageRequest.image);
 
       return rectaMutator<CategoryResource>(
       {url: `/admin/categories/${category}/image`, method: 'POST',

@@ -7,9 +7,9 @@
 import type {
   IndustryKnowledge,
   IndustryKnowledgeReorder200,
-  IndustryKnowledgeReorderBody,
-  IndustryKnowledgeStoreBody,
-  IndustryKnowledgeUpdateBody
+  ReorderRequest,
+  StoreIndustryKnowledgeRequest,
+  UpdateIndustryKnowledgeRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -26,23 +26,23 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const industryKnowledgeStore = (
-    industryKnowledgeStoreBody: IndustryKnowledgeStoreBody,
+    storeIndustryKnowledgeRequest: StoreIndustryKnowledgeRequest,
  ) => {
       return rectaMutator<IndustryKnowledge>(
       {url: `/admin/ai-chat/knowledge`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: industryKnowledgeStoreBody
+      data: storeIndustryKnowledgeRequest
     },
       );
     }
   export const industryKnowledgeUpdate = (
     industryKnowledge: number,
-    industryKnowledgeUpdateBody?: IndustryKnowledgeUpdateBody,
+    updateIndustryKnowledgeRequest?: UpdateIndustryKnowledgeRequest,
  ) => {
       return rectaMutator<IndustryKnowledge>(
       {url: `/admin/ai-chat/knowledge/${industryKnowledge}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: industryKnowledgeUpdateBody
+      data: updateIndustryKnowledgeRequest
     },
       );
     }
@@ -55,12 +55,12 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const industryKnowledgeReorder = (
-    industryKnowledgeReorderBody: IndustryKnowledgeReorderBody,
+    reorderRequest: ReorderRequest,
  ) => {
       return rectaMutator<IndustryKnowledgeReorder200>(
       {url: `/admin/ai-chat/knowledge/reorder`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: industryKnowledgeReorderBody
+      data: reorderRequest
     },
       );
     }

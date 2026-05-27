@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\LineAuthCallbackRequest;
 use App\Models\AiChatLog;
 use App\Models\User;
 use App\Services\LineLoginService;
@@ -42,12 +43,9 @@ class LineAuthController extends Controller
     /**
      * LINEコールバック処理
      */
-    public function callback(Request $request)
+    public function callback(LineAuthCallbackRequest $request)
     {
-        $request->validate([
-            'code' => 'required|string',
-            'state' => 'required|string',
-        ]);
+        $request->validated();
 
         $ip = $request->ip();
         $cachedState = Cache::pull("line_oauth_state:{$ip}");

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreArticleRequest;
 use App\Http\Requests\Admin\UpdateArticleRequest;
+use App\Http\Requests\Admin\UploadArticleThumbnailRequest;
 use App\Http\Resources\ArticleResource;
 use App\Models\Article;
 use App\Support\PaginatorWithResource;
@@ -115,12 +116,8 @@ class ArticleController extends Controller
         return response()->json(null, 204);
     }
 
-    public function uploadThumbnail(Request $request, Article $article): JsonResponse
+    public function uploadThumbnail(UploadArticleThumbnailRequest $request, Article $article): JsonResponse
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,jpg,png,webp,gif|max:5120',
-        ]);
-
         $path = $request->file('image')->store('articles/thumbnails', 'public');
         $url = Storage::disk('public')->url($path);
 

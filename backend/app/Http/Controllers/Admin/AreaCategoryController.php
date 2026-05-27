@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\StoreAreaRequest;
 use App\Http\Requests\Admin\StoreCategoryRequest;
 use App\Http\Requests\Admin\UpdateAreaRequest;
 use App\Http\Requests\Admin\UpdateCategoryRequest;
+use App\Http\Requests\Admin\UploadCategoryImageRequest;
 use App\Http\Resources\AreaResource;
 use App\Http\Resources\CategoryResource;
 use App\Models\Area;
@@ -72,12 +73,8 @@ class AreaCategoryController extends Controller
     /**
      * Upload an image for a category. Stored on the public disk.
      */
-    public function uploadCategoryImage(Request $request, Category $category): CategoryResource
+    public function uploadCategoryImage(UploadCategoryImageRequest $request, Category $category): CategoryResource
     {
-        $request->validate([
-            'image' => 'required|image|max:5120',
-        ]);
-
         $path = $request->file('image')->store('categories', 'public');
         $url = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
 

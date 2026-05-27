@@ -8,7 +8,9 @@ import type {
   FineTuningQa,
   FineTuningQaDestroy200,
   FineTuningQaExportJsonlParams,
-  FineTuningQaIndex200
+  FineTuningQaIndex200,
+  StoreFineTuningQaRequest,
+  UpdateFineTuningQaRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -42,10 +44,12 @@ export const fineTuningQaIndex = (
       );
     }
   export const fineTuningQaStore = (
-
+    storeFineTuningQaRequest: StoreFineTuningQaRequest,
  ) => {
       return rectaMutator<FineTuningQa>(
-      {url: `/admin/fine-tuning/qa`, method: 'POST'
+      {url: `/admin/fine-tuning/qa`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: storeFineTuningQaRequest
     },
       );
     }
@@ -59,9 +63,12 @@ export const fineTuningQaIndex = (
     }
   export const fineTuningQaUpdate = (
     qa: number,
+    updateFineTuningQaRequest?: UpdateFineTuningQaRequest,
  ) => {
       return rectaMutator<FineTuningQa | null>(
-      {url: `/admin/fine-tuning/qa/${qa}`, method: 'PUT'
+      {url: `/admin/fine-tuning/qa/${qa}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateFineTuningQaRequest
     },
       );
     }

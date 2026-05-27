@@ -4,6 +4,11 @@
  * Recta2
  * OpenAPI spec version: 0.0.1
  */
+export interface AdminLoginRequest {
+  email: string;
+  password: string;
+}
+
 export interface AdminUser {
   id: number;
   name: string;
@@ -534,11 +539,70 @@ export interface StoreConsultationRequest {
   sort_order?: number;
 }
 
+/**
+ * @nullable
+ */
+export type StoreFineTuningQaRequestStatus = typeof StoreFineTuningQaRequestStatus[keyof typeof StoreFineTuningQaRequestStatus] | null;
+
+
+export const StoreFineTuningQaRequestStatus = {
+  active: 'active',
+  draft: 'draft',
+  archived: 'archived',
+} as const;
+
+export interface StoreFineTuningQaRequest {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  category?: string | null;
+  question: string;
+  answer: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  source?: string | null;
+  /** @nullable */
+  status?: StoreFineTuningQaRequestStatus;
+  /**
+     * @nullable
+     * @items.maxLength 50
+     */
+  tags?: string[] | null;
+}
+
+export interface StoreIndustryKnowledgeRequest {
+  /** @maxLength 50 */
+  category: string;
+  /** @maxLength 200 */
+  title: string;
+  /** @maxLength 5000 */
+  content: string;
+  is_active?: boolean;
+  /**
+     * @minItems 1
+     * @items.maxLength 50
+     */
+  keywords: string[];
+}
+
 export interface StorePickupShopRequest {
   store_id: number;
   sort_order?: number;
   is_pr?: boolean;
   visible?: boolean;
+}
+
+export interface StoreRelocateVoiceRequest {
+  /** @maxLength 255 */
+  area_from: string;
+  /** @maxLength 255 */
+  area_to: string;
+  body: string;
+  visible?: boolean;
+  display_order?: number;
 }
 
 export interface StoreReviewRequest {
@@ -578,6 +642,37 @@ export interface UpdateAdminUserRequest {
   email?: string;
   role?: UpdateAdminUserRequestRole;
   status?: UpdateAdminUserRequestStatus;
+}
+
+export interface UpdateAiChatLimitsRequest {
+  /** @minimum 1 */
+  user_daily_limit?: number;
+  /** @minimum 1 */
+  user_monthly_limit?: number;
+  /** @minimum 1 */
+  ip_daily_limit?: number;
+  /** @minimum 1 */
+  global_daily_limit?: number;
+  /** @maxLength 500 */
+  limit_reached_message?: string;
+}
+
+export type UpdateAiChatSettingRequestTone = typeof UpdateAiChatSettingRequestTone[keyof typeof UpdateAiChatSettingRequestTone];
+
+
+export const UpdateAiChatSettingRequestTone = {
+  casual: 'casual',
+  formal: 'formal',
+  friendly: 'friendly',
+} as const;
+
+export interface UpdateAiChatSettingRequest {
+  enabled?: boolean;
+  /** @nullable */
+  system_prompt?: string | null;
+  tone?: UpdateAiChatSettingRequestTone;
+  /** @nullable */
+  suggest_buttons?: string[] | null;
 }
 
 export interface UpdateAreaRequest {
@@ -675,11 +770,79 @@ export interface UpdateConsultationRequest {
   sort_order?: number;
 }
 
+/**
+ * @nullable
+ */
+export type UpdateFineTuningQaRequestStatus = typeof UpdateFineTuningQaRequestStatus[keyof typeof UpdateFineTuningQaRequestStatus] | null;
+
+
+export const UpdateFineTuningQaRequestStatus = {
+  active: 'active',
+  draft: 'draft',
+  archived: 'archived',
+} as const;
+
+export interface UpdateFineTuningQaRequest {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  category?: string | null;
+  question?: string;
+  answer?: string;
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  source?: string | null;
+  /** @nullable */
+  status?: UpdateFineTuningQaRequestStatus;
+  /**
+     * @nullable
+     * @items.maxLength 50
+     */
+  tags?: string[] | null;
+}
+
+export interface UpdateIndustryKnowledgeRequest {
+  /** @maxLength 50 */
+  category?: string;
+  /** @maxLength 200 */
+  title?: string;
+  /** @maxLength 5000 */
+  content?: string;
+  is_active?: boolean;
+  sort_order?: number;
+  /**
+     * @minItems 1
+     * @items.maxLength 50
+     */
+  keywords?: string[];
+}
+
 export interface UpdatePickupShopRequest {
   store_id?: number;
   sort_order?: number;
   is_pr?: boolean;
   visible?: boolean;
+}
+
+export interface UpdateProfileRequest {
+  /**
+     * @maxLength 50
+     * @nullable
+     */
+  nickname?: string | null;
+}
+
+export interface UpdateRelocateVoiceRequest {
+  /** @maxLength 255 */
+  area_from?: string;
+  /** @maxLength 255 */
+  area_to?: string;
+  body?: string;
+  visible?: boolean;
+  display_order?: number;
 }
 
 export type UpdateReviewStatusRequestStatus = typeof UpdateReviewStatusRequestStatus[keyof typeof UpdateReviewStatusRequestStatus];
@@ -713,6 +876,16 @@ export const UpdateUserStatusRequestStatus = {
 
 export interface UpdateUserStatusRequest {
   status: UpdateUserStatusRequestStatus;
+}
+
+export interface UploadArticleThumbnailRequest {
+  /** @maxLength 5120 */
+  image: Blob;
+}
+
+export interface UploadCategoryImageRequest {
+  /** @maxLength 5120 */
+  image: Blob;
 }
 
 export interface User {
@@ -963,24 +1136,6 @@ export type AiChatChatStreamBody = {
   user_area?: string | null;
 };
 
-export type AiChatSettingUpdateBodyTone = typeof AiChatSettingUpdateBodyTone[keyof typeof AiChatSettingUpdateBodyTone];
-
-
-export const AiChatSettingUpdateBodyTone = {
-  casual: 'casual',
-  formal: 'formal',
-  friendly: 'friendly',
-} as const;
-
-export type AiChatSettingUpdateBody = {
-  enabled?: boolean;
-  /** @nullable */
-  system_prompt?: string | null;
-  tone?: AiChatSettingUpdateBodyTone;
-  /** @nullable */
-  suggest_buttons?: string[] | null;
-};
-
 export type AiChatSettingStatsParams = {
 days?: string;
 };
@@ -995,30 +1150,12 @@ export type AiChatSettingStats200 = {
   mode_daily_stats: AiChatLog[];
 };
 
-export type AiChatSettingUpdateLimitsBody = {
-  /** @minimum 1 */
-  user_daily_limit?: number;
-  /** @minimum 1 */
-  user_monthly_limit?: number;
-  /** @minimum 1 */
-  ip_daily_limit?: number;
-  /** @minimum 1 */
-  global_daily_limit?: number;
-  /** @maxLength 500 */
-  limit_reached_message?: string;
-};
-
 export type AreaCategoryReorderAreas200 = {
   message: 'OK';
 };
 
 export type AreaCategoryReorderCategories200 = {
   message: 'OK';
-};
-
-export type AreaCategoryUploadCategoryImageBody = {
-  /** @maxLength 5120 */
-  image: Blob;
 };
 
 export type ArticlesIndexParams = {
@@ -1033,19 +1170,9 @@ export type ArticlesIndex200 = {
   total: number;
 };
 
-export type ArticleUploadThumbnailBody = {
-  /** @maxLength 5120 */
-  image: Blob;
-};
-
 export type ArticleUploadThumbnail200 = {
   thumbnail_url: string;
   article: ArticleResource;
-};
-
-export type AuthLoginBody = {
-  email: string;
-  password: string;
 };
 
 export type AuthLogin200 = {
@@ -1427,42 +1554,6 @@ export type FineTuningQaDestroy200 = {
   message: 'archived';
 };
 
-export type IndustryKnowledgeStoreBody = {
-  /** @maxLength 50 */
-  category: string;
-  /** @maxLength 200 */
-  title: string;
-  /** @maxLength 5000 */
-  content: string;
-  is_active?: boolean;
-  /**
-     * @minItems 1
-     * @items.maxLength 50
-     */
-  keywords: string[];
-};
-
-export type IndustryKnowledgeUpdateBody = {
-  /** @maxLength 50 */
-  category?: string;
-  /** @maxLength 200 */
-  title?: string;
-  /** @maxLength 5000 */
-  content?: string;
-  is_active?: boolean;
-  sort_order?: number;
-  /**
-     * @minItems 1
-     * @items.maxLength 50
-     */
-  keywords?: string[];
-};
-
-export type IndustryKnowledgeReorderBody = {
-  /** @minItems 1 */
-  ids: number[];
-};
-
 export type IndustryKnowledgeReorder200 = {
   message: 'OK';
 };
@@ -1482,7 +1573,7 @@ state: string;
 };
 
 export type LineFriendBroadcast200 = {
-  success: boolean;
+  message: string;
 };
 
 export type LineWebhookHandleBody = {
@@ -1494,7 +1585,7 @@ export type LineWebhookHandle200 = {
 };
 
 export type LineWebhookHandle403 = {
-  error: 'Invalid signature';
+  message: 'Invalid signature';
 };
 
 export type PublicArticleIndexParams = {
@@ -1664,31 +1755,6 @@ export type PublicStoreIndex200 = {
 export type PublicStoreShow200 = {
   store: unknown[];
   related: unknown[][];
-};
-
-export type RelocateVoiceStoreBody = {
-  /** @maxLength 255 */
-  area_from: string;
-  /** @maxLength 255 */
-  area_to: string;
-  body: string;
-  visible?: boolean;
-  display_order?: number;
-};
-
-export type RelocateVoiceUpdateBody = {
-  /** @maxLength 255 */
-  area_from?: string;
-  /** @maxLength 255 */
-  area_to?: string;
-  body?: string;
-  visible?: boolean;
-  display_order?: number;
-};
-
-export type RelocateVoiceReorderBody = {
-  /** @minItems 1 */
-  ids: number[];
 };
 
 export type RelocateVoiceReorder200 = {
@@ -2298,7 +2364,7 @@ export type UserShow200 = {
 };
 
 export type UserSendLineMessage200 = {
-  success: boolean;
+  message: string;
 };
 
 export type UserMessagesParams = {
@@ -2325,14 +2391,6 @@ export type UserMessages200 = {
   /** @nullable */
   friend: UserMessages200Friend;
   messages: UserMessages200Messages;
-};
-
-export type UserProfileUpdateBody = {
-  /**
-     * @maxLength 50
-     * @nullable
-     */
-  nickname?: string | null;
 };
 
 export type UserProfileLogout200 = {

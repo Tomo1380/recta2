@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\UpdateAiChatLimitsRequest;
+use App\Http\Requests\Admin\UpdateAiChatSettingRequest;
 use App\Models\AiChatLimit;
 use App\Models\AiChatLog;
 use App\Models\AiChatSetting;
@@ -19,16 +21,9 @@ class AiChatSettingController extends Controller
         return response()->json($settings);
     }
 
-    public function update(Request $request, AiChatSetting $aiChatSetting): JsonResponse
+    public function update(UpdateAiChatSettingRequest $request, AiChatSetting $aiChatSetting): JsonResponse
     {
-        $request->validate([
-            'enabled' => 'sometimes|boolean',
-            'system_prompt' => 'sometimes|nullable|string',
-            'tone' => 'sometimes|in:casual,formal,friendly',
-            'suggest_buttons' => 'sometimes|nullable|array',
-        ]);
-
-        $aiChatSetting->update($request->only(['enabled', 'system_prompt', 'tone', 'suggest_buttons']));
+        $aiChatSetting->update($request->validated());
 
         return response()->json($aiChatSetting);
     }
@@ -100,24 +95,10 @@ class AiChatSettingController extends Controller
         return response()->json(AiChatLimit::current());
     }
 
-    public function updateLimits(Request $request): JsonResponse
+    public function updateLimits(UpdateAiChatLimitsRequest $request): JsonResponse
     {
-        $request->validate([
-            'user_daily_limit' => 'sometimes|integer|min:1',
-            'user_monthly_limit' => 'sometimes|integer|min:1',
-            'ip_daily_limit' => 'sometimes|integer|min:1',
-            'global_daily_limit' => 'sometimes|integer|min:1',
-            'limit_reached_message' => 'sometimes|string|max:500',
-        ]);
-
         $limits = AiChatLimit::current();
-        $limits->update($request->only([
-            'user_daily_limit',
-            'user_monthly_limit',
-            'ip_daily_limit',
-            'global_daily_limit',
-            'limit_reached_message',
-        ]));
+        $limits->update($request->validated());
 
         return response()->json($limits);
     }

@@ -7,9 +7,9 @@
 import type {
   RelocateVoice,
   RelocateVoiceReorder200,
-  RelocateVoiceReorderBody,
-  RelocateVoiceStoreBody,
-  RelocateVoiceUpdateBody
+  ReorderRequest,
+  StoreRelocateVoiceRequest,
+  UpdateRelocateVoiceRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -26,23 +26,23 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const relocateVoiceStore = (
-    relocateVoiceStoreBody: RelocateVoiceStoreBody,
+    storeRelocateVoiceRequest: StoreRelocateVoiceRequest,
  ) => {
       return rectaMutator<RelocateVoice>(
       {url: `/admin/relocate-voices`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: relocateVoiceStoreBody
+      data: storeRelocateVoiceRequest
     },
       );
     }
   export const relocateVoiceUpdate = (
     relocateVoice: number,
-    relocateVoiceUpdateBody?: RelocateVoiceUpdateBody,
+    updateRelocateVoiceRequest?: UpdateRelocateVoiceRequest,
  ) => {
       return rectaMutator<RelocateVoice>(
       {url: `/admin/relocate-voices/${relocateVoice}`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: relocateVoiceUpdateBody
+      data: updateRelocateVoiceRequest
     },
       );
     }
@@ -55,12 +55,12 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export const relocateVoiceReorder = (
-    relocateVoiceReorderBody: RelocateVoiceReorderBody,
+    reorderRequest: ReorderRequest,
  ) => {
       return rectaMutator<RelocateVoiceReorder200>(
       {url: `/admin/relocate-voices/reorder`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: relocateVoiceReorderBody
+      data: reorderRequest
     },
       );
     }

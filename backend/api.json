@@ -561,35 +561,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "enabled": {
-                                        "type": "boolean"
-                                    },
-                                    "system_prompt": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
-                                    "tone": {
-                                        "type": "string",
-                                        "enum": [
-                                            "casual",
-                                            "formal",
-                                            "friendly"
-                                        ]
-                                    },
-                                    "suggest_buttons": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateAiChatSettingRequest"
                             }
                         }
                     }
@@ -605,14 +577,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -720,29 +692,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "user_daily_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "user_monthly_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "ip_daily_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "global_daily_limit": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                    },
-                                    "limit_reached_message": {
-                                        "type": "string",
-                                        "maxLength": 500
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateAiChatLimitsRequest"
                             }
                         }
                     }
@@ -758,11 +708,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1154,18 +1104,7 @@
                     "content": {
                         "multipart/form-data": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "image": {
-                                        "type": "string",
-                                        "format": "binary",
-                                        "contentMediaType": "application/octet-stream",
-                                        "maxLength": 5120
-                                    }
-                                },
-                                "required": [
-                                    "image"
-                                ]
+                                "$ref": "#/components/schemas/UploadCategoryImageRequest"
                             }
                         }
                     }
@@ -1181,14 +1120,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1421,18 +1360,7 @@
                     "content": {
                         "multipart/form-data": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "image": {
-                                        "type": "string",
-                                        "format": "binary",
-                                        "contentMediaType": "application/octet-stream",
-                                        "maxLength": 5120
-                                    }
-                                },
-                                "required": [
-                                    "image"
-                                ]
+                                "$ref": "#/components/schemas/UploadArticleThumbnailRequest"
                             }
                         }
                     }
@@ -1460,14 +1388,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -1483,20 +1411,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "email": {
-                                        "type": "string",
-                                        "format": "email"
-                                    },
-                                    "password": {
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "email",
-                                    "password"
-                                ]
+                                "$ref": "#/components/schemas/AdminLoginRequest"
                             }
                         }
                     }
@@ -3467,6 +3382,16 @@
                 "tags": [
                     "FineTuningQa"
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreFineTuningQaRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "201": {
                         "description": "",
@@ -3480,6 +3405,9 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -3536,6 +3464,15 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateFineTuningQaRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "",
@@ -3559,6 +3496,9 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -3643,38 +3583,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "category": {
-                                        "type": "string",
-                                        "maxLength": 50
-                                    },
-                                    "title": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "content": {
-                                        "type": "string",
-                                        "maxLength": 5000
-                                    },
-                                    "is_active": {
-                                        "type": "boolean"
-                                    },
-                                    "keywords": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "maxLength": 50
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "category",
-                                    "title",
-                                    "content",
-                                    "keywords"
-                                ]
+                                "$ref": "#/components/schemas/StoreIndustryKnowledgeRequest"
                             }
                         }
                     }
@@ -3690,11 +3599,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -3720,35 +3629,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "category": {
-                                        "type": "string",
-                                        "maxLength": 50
-                                    },
-                                    "title": {
-                                        "type": "string",
-                                        "maxLength": 200
-                                    },
-                                    "content": {
-                                        "type": "string",
-                                        "maxLength": 5000
-                                    },
-                                    "is_active": {
-                                        "type": "boolean"
-                                    },
-                                    "sort_order": {
-                                        "type": "integer"
-                                    },
-                                    "keywords": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "maxLength": 50
-                                        },
-                                        "minItems": 1
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateIndustryKnowledgeRequest"
                             }
                         }
                     }
@@ -3764,14 +3645,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -3815,19 +3696,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -3852,11 +3721,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -3959,12 +3828,12 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "success": {
-                                            "type": "boolean"
+                                        "message": {
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
-                                        "success"
+                                        "message"
                                     ]
                                 }
                             }
@@ -4027,13 +3896,13 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "error": {
+                                        "message": {
                                             "type": "string",
                                             "const": "Invalid signature"
                                         }
                                     },
                                     "required": [
-                                        "error"
+                                        "message"
                                     ]
                                 }
                             }
@@ -4860,31 +4729,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "area_from": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "area_to": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "body": {
-                                        "type": "string"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "display_order": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "area_from",
-                                    "area_to",
-                                    "body"
-                                ]
+                                "$ref": "#/components/schemas/StoreRelocateVoiceRequest"
                             }
                         }
                     }
@@ -4900,11 +4745,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -4930,26 +4775,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "area_from": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "area_to": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                    },
-                                    "body": {
-                                        "type": "string"
-                                    },
-                                    "visible": {
-                                        "type": "boolean"
-                                    },
-                                    "display_order": {
-                                        "type": "integer"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateRelocateVoiceRequest"
                             }
                         }
                     }
@@ -4965,14 +4791,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
@@ -5016,19 +4842,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "minItems": 1
-                                    }
-                                },
-                                "required": [
-                                    "ids"
-                                ]
+                                "$ref": "#/components/schemas/ReorderRequest"
                             }
                         }
                     }
@@ -5053,11 +4867,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7008,12 +6822,12 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "success": {
-                                            "type": "boolean"
+                                        "message": {
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
-                                        "success"
+                                        "message"
                                     ]
                                 }
                             }
@@ -7163,16 +6977,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "nickname": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 50
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateProfileRequest"
                             }
                         }
                     }
@@ -7195,11 +7000,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -7240,6 +7045,23 @@
     },
     "components": {
         "schemas": {
+            "AdminLoginRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "AdminLoginRequest"
+            },
             "AdminUser": {
                 "type": "object",
                 "properties": {
@@ -8878,6 +8700,92 @@
                 ],
                 "title": "StoreConsultationRequest"
             },
+            "StoreFineTuningQaRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50
+                    },
+                    "status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "active",
+                            "draft",
+                            "archived"
+                        ]
+                    },
+                    "tags": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        }
+                    }
+                },
+                "required": [
+                    "question",
+                    "answer"
+                ],
+                "title": "StoreFineTuningQaRequest"
+            },
+            "StoreIndustryKnowledgeRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "content": {
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "category",
+                    "title",
+                    "content",
+                    "keywords"
+                ],
+                "title": "StoreIndustryKnowledgeRequest"
+            },
             "StorePickupShopRequest": {
                 "type": "object",
                 "properties": {
@@ -8898,6 +8806,34 @@
                     "store_id"
                 ],
                 "title": "StorePickupShopRequest"
+            },
+            "StoreRelocateVoiceRequest": {
+                "type": "object",
+                "properties": {
+                    "area_from": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "area_to": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "display_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "area_from",
+                    "area_to",
+                    "body"
+                ],
+                "title": "StoreRelocateVoiceRequest"
             },
             "StoreReviewRequest": {
                 "type": "object",
@@ -8952,6 +8888,64 @@
                     }
                 },
                 "title": "UpdateAdminUserRequest"
+            },
+            "UpdateAiChatLimitsRequest": {
+                "type": "object",
+                "properties": {
+                    "user_daily_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "user_monthly_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "ip_daily_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "global_daily_limit": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "limit_reached_message": {
+                        "type": "string",
+                        "maxLength": 500
+                    }
+                },
+                "title": "UpdateAiChatLimitsRequest"
+            },
+            "UpdateAiChatSettingRequest": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "system_prompt": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "casual",
+                            "formal",
+                            "friendly"
+                        ]
+                    },
+                    "suggest_buttons": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "title": "UpdateAiChatSettingRequest"
             },
             "UpdateAreaRequest": {
                 "type": "object",
@@ -9139,6 +9133,85 @@
                 },
                 "title": "UpdateConsultationRequest"
             },
+            "UpdateFineTuningQaRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50
+                    },
+                    "status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "active",
+                            "draft",
+                            "archived"
+                        ]
+                    },
+                    "tags": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        }
+                    }
+                },
+                "title": "UpdateFineTuningQaRequest"
+            },
+            "UpdateIndustryKnowledgeRequest": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "content": {
+                        "type": "string",
+                        "maxLength": 5000
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 50
+                        },
+                        "minItems": 1
+                    }
+                },
+                "title": "UpdateIndustryKnowledgeRequest"
+            },
             "UpdatePickupShopRequest": {
                 "type": "object",
                 "properties": {
@@ -9156,6 +9229,42 @@
                     }
                 },
                 "title": "UpdatePickupShopRequest"
+            },
+            "UpdateProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "nickname": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50
+                    }
+                },
+                "title": "UpdateProfileRequest"
+            },
+            "UpdateRelocateVoiceRequest": {
+                "type": "object",
+                "properties": {
+                    "area_from": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "area_to": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "visible": {
+                        "type": "boolean"
+                    },
+                    "display_order": {
+                        "type": "integer"
+                    }
+                },
+                "title": "UpdateRelocateVoiceRequest"
             },
             "UpdateReviewStatusRequest": {
                 "type": "object",
@@ -9202,6 +9311,36 @@
                     "status"
                 ],
                 "title": "UpdateUserStatusRequest"
+            },
+            "UploadArticleThumbnailRequest": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "maxLength": 5120
+                    }
+                },
+                "required": [
+                    "image"
+                ],
+                "title": "UploadArticleThumbnailRequest"
+            },
+            "UploadCategoryImageRequest": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "maxLength": 5120
+                    }
+                },
+                "required": [
+                    "image"
+                ],
+                "title": "UploadCategoryImageRequest"
             },
             "User": {
                 "type": "object",

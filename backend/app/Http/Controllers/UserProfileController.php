@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\User\UpdateProfileRequest;
 use Illuminate\Http\Request;
 
 class UserProfileController extends Controller
@@ -17,18 +18,9 @@ class UserProfileController extends Controller
     /**
      * プロフィール更新
      */
-    public function update(Request $request)
+    public function update(UpdateProfileRequest $request)
     {
-        // Public profile is intentionally minimal — only the nickname is
-        // user-editable. Other demographic / preference fields are kept in
-        // the schema for analytics but aren't exposed through the user UI
-        // because we don't want to surface anything that could de-anonymise
-        // reviewers.
-        $validated = $request->validate([
-            'nickname' => 'nullable|string|max:50',
-        ]);
-
-        $request->user()->update($validated);
+        $request->user()->update($request->validated());
 
         return response()->json($request->user()->fresh());
     }
