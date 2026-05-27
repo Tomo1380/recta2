@@ -32,15 +32,10 @@ interface StoreMapProps {
   fallbackAddress?: string | null;
 }
 
-const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
-  { elementType: "geometry", stylers: [{ color: "#1b2528" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0f1618" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2c3e46" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a1012" }] },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-];
+// 元はダーク系のサイトトーンに合わせて DARK_MAP_STYLE を当てていたが、
+// 「lat/lng 取得前の標準 Google Maps embed の方が見やすい」という運用 FB
+// を受けてプレーンな Google 標準スタイルに戻した。lat/lng 取得前後で
+// 見た目が揃うようになり、店舗の場所感もパッと掴みやすくなる。
 
 const MAPS_LIBRARIES: ("places")[] = [];
 
@@ -127,11 +122,12 @@ export default function StoreMap({
         center={center}
         zoom={zoom}
         options={{
-          styles: DARK_MAP_STYLE,
+          // styles を指定しないと Google Maps 標準の明るいトーンになる。
+          // ダーク UI に揃えるよりも「Google 地図ぽい慣れた見た目」の方が
+          // ユーザーにとって場所感を取りやすい。
           disableDefaultUI: true,
           zoomControl: true,
           gestureHandling: "cooperative",
-          backgroundColor: LUXE.dark,
         }}
       >
         {/* Render outer zones first so smaller ones sit on top. */}

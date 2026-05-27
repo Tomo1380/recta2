@@ -200,10 +200,11 @@ export interface RectaEpisode {
 }
 
 export interface TransferZone {
-  radius_km?: number | string;
-  fee?: number | string;
-  color?: string;
-  label?: string;
+  /** 半径 km。number / 数字文字列 / 単位込み文字列 ("2km" 等) / null 許容。 */
+  radius_km?: number | string | null;
+  fee?: number | string | null;
+  color?: string | null;
+  label?: string | null;
 }
 
 export interface SetFeeItem {
@@ -2633,7 +2634,7 @@ function TransferMapSection({
                     ? `〜${radius}km`
                     : String(radius)
                   : zone.label ?? `ゾーン${i + 1}`;
-              const fee = formatAmount(zone.fee);
+              const fee = formatAmount(zone.fee ?? undefined);
               return (
                 <div
                   key={i}
