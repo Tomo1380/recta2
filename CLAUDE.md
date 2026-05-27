@@ -161,10 +161,31 @@ recta2/
 ### Resource は契約の明示化
 - response のシリアライズ形を Resource にまとめる。
   関係込みは `whenLoaded` を使う。
-- ただし「契約を変えるのが怖いだけ」「JSONB ネストが広い」
-  「StoreApiTransformer のような flat 互換層が既にある」場合は
-  無理に Resource 化しない。判断基準は
-  [docs/architecture/api-design.md](docs/architecture/api-design.md) 参照。
+- 旧 `StoreApiTransformer` (flat 互換層) は Phase 1-5 で削除済み。
+  `StoreResource` が同じ flat shape を返す。ADR 0003 参照。
+
+### Service 層に分けるべきもの
+- Controller は HTTP 層 (validation / Resource / 認可) だけ持つ薄い
+  ラッパーにし、ビジネスロジックは `app/Services/` 配下の Service クラスに
+  集約する。
+- 既存例:
+  - `App\Services\AiChat\{StoreToolRegistry, GeminiClient, PromptBuilder, UsageLimitGuard}`
+  - `App\Services\Store\StoreImageService`
+- 判断基準: 同じロジックを別 endpoint で重複させそうになったら Service
+  化する。1 endpoint しか使わないなら controller 内 private で OK。
+- 詳細は ADR 0004 参照。
+
+### フロントの form ロジックは hook + 純粋関数に切り出す
+- 大きなフォーム (ShopEditPage 等) の populate / payload 変換ロジックは
+  component 内に inline で書かず、`frontend/app/hooks/` 配下に純粋関数 +
+  hook として切り出す。
+- 既存例:
+  - `useShopImages` (画像 upload/delete)
+  - `useStepProgression` (多ステップ form の進捗管理)
+  - `useShopForm` + `storeToForm` / `formToPayload` (Store ⇔ form 変換)
+- 純粋関数は vitest で Unit テストする (BUG-013 などの過去事故が
+  テストとして保存される)。
+- 詳細は ADR 0005 参照。
 
 ## 参考プロジェクト
 
