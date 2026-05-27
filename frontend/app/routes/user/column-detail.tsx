@@ -398,8 +398,20 @@ export default function ColumnDetailPage() {
           border-radius: 0 8px 8px 0;
         }
         .column-body a { color: #4f46e5; text-decoration: underline; }
-        .column-body img { max-width: 100%; border-radius: 12px; margin: 1em 0; }
-        .column-body iframe { width: 100%; max-width: 640px; aspect-ratio: 16 / 9; border-radius: 12px; margin: 1em 0; height: auto; }
+        /* 画像: data-size プリセットで width を切替 (エディタと同期)。中央寄せ。
+           小画面ではすべて max-width:100% にフォールバック。 */
+        .column-body img {
+          display: block;
+          margin: 1em auto;
+          border-radius: 12px;
+          max-width: 100%;
+          height: auto;
+        }
+        .column-body img[data-size="small"]  { width: 200px; }
+        .column-body img[data-size="medium"] { width: 360px; }
+        .column-body img[data-size="large"]  { width: 560px; }
+        .column-body img[data-size="full"]   { width: 100%; }
+        .column-body iframe { width: 100%; max-width: 640px; aspect-ratio: 16 / 9; border-radius: 12px; margin: 1em auto; height: auto; display: block; }
         .column-body code { background: #f5f5f4; padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
         .column-body strong { font-weight: 700; }
       `}</style>

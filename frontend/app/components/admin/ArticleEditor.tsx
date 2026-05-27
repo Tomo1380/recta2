@@ -4,6 +4,32 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Youtube from "@tiptap/extension-youtube";
 import { useEffect, useRef, useState, useCallback } from "react";
+
+// 画像サイズプリセット。data-size 属性で出力し、CSS 側で width を割り当てる。
+// 公開ページ (column-detail.tsx の .column-body) と同じ class 名で揃える。
+type ImageSize = "small" | "medium" | "large" | "full";
+const IMAGE_SIZE_LABELS: Record<ImageSize, string> = {
+  small: "小",
+  medium: "中",
+  large: "大",
+  full: "横幅いっぱい",
+};
+const IMAGE_SIZES: ImageSize[] = ["small", "medium", "large", "full"];
+
+// TipTap 標準 Image 拡張に data-size attribute を追加。
+// 既存記事 (data-size なし) は medium 扱い。
+const SizedImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      "data-size": {
+        default: "medium",
+        parseHTML: (el) => el.getAttribute("data-size") ?? "medium",
+        renderHTML: (attrs) => ({ "data-size": attrs["data-size"] ?? "medium" }),
+      },
+    };
+  },
+});
 import {
   Bold,
   Italic,
@@ -84,6 +110,35 @@ function ToolbarButton({
   );
 }
 
+function ImageSizeButton({ editor }: { editor: Editor }) {
+  const isImage = editor.isActive("image");
+  const currentSize = (editor.getAttributes("image")["data-size"] as ImageSize | undefined) ?? "medium";
+  const next = (size: ImageSize) => {
+    editor.chain().focus().updateAttributes("image", { "data-size": size }).run();
+  };
+  return (
+    <div className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-md border border-stone-200 bg-white">
+      <span className="text-[10.5px] text-stone-500 pr-1 pl-0.5">画像</span>
+      {IMAGE_SIZES.map((s) => (
+        <button
+          key={s}
+          type="button"
+          disabled={!isImage}
+          onClick={() => next(s)}
+          title={`画像サイズ: ${IMAGE_SIZE_LABELS[s]}`}
+          className={`px-1.5 py-0.5 rounded text-[11px] transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+            isImage && currentSize === s
+              ? "bg-indigo-100 text-indigo-700"
+              : "text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          {IMAGE_SIZE_LABELS[s]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Toolbar({ editor }: { editor: Editor }) {
   const { uploadFile, uploading, error: uploadError } = useFileUpload("article-body");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,7 +146,9 @@ function Toolbar({ editor }: { editor: Editor }) {
   const handleUploadPick = useCallback(
     async (file: File) => {
       const url = await uploadFile(file);
-      if (url) editor.chain().focus().setImage({ src: url, alt: "" }).run();
+      if (url) // data-size を含めて挿入 (TipTap の setImage は attribute を素通しする)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+editor.chain().focus().setImage({ src: url, alt: "", "data-size": "medium" } as any).run();
     },
     [editor, uploadFile],
   );
@@ -115,7 +172,9 @@ function Toolbar({ editor }: { editor: Editor }) {
   const insertImage = useCallback(() => {
     const url = window.prompt("画像URLを入力");
     if (!url) return;
-    editor.chain().focus().setImage({ src: url, alt: "" }).run();
+    // data-size を含めて挿入 (TipTap の setImage は attribute を素通しする)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+editor.chain().focus().setImage({ src: url, alt: "", "data-size": "medium" } as any).run();
   }, [editor]);
 
   const insertYoutube = useCallback(() => {
@@ -247,6 +306,10 @@ function Toolbar({ editor }: { editor: Editor }) {
           e.target.value = ""; // 同じファイル再選択を許可
         }}
       />
+      {/* 画像サイズ切替: 画像にカーソルが乗っている (isActive("image")) ときのみ
+          有効。クリックで小/中/大/横幅いっぱい を循環。data-size 属性を更新するので
+          公開ページ側の CSS と合わせて表示幅が変わる。 */}
+      <ImageSizeButton editor={editor} />
       <ToolbarButton title="YouTube埋め込み" onClick={insertYoutube}>
         <YoutubeIcon className="w-4 h-4" />
       </ToolbarButton>
@@ -286,7 +349,7 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
         StarterKit.configure({
           heading: { levels: [1, 2, 3] },
         }),
-        Image.configure({ inline: false, allowBase64: false }),
+        SizedImage.configure({ inline: false, allowBase64: false }),
         Link.configure({
           openOnClick: false,
           autolink: true,
@@ -338,6 +401,10 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
     <div className="border border-stone-200 rounded-lg bg-white">
       <Toolbar editor={editor} />
       <EditorContent editor={editor} />
+      {/* エディタ用 CSS — 公開ページ (column-detail.tsx の .column-body) と
+          同じスタイルに揃えて WYSIWYG 度を高める。font-size / line-height /
+          h2 の金色下線 / 画像サイズ / iframe 16:9 等は公開ページと同期。
+          font-family まで完全に揃えるとフォント読み込みが重いので近似で OK。 */}
       <style>{`
         .tiktok-embed-placeholder {
           background: #fef3c7;
@@ -348,27 +415,51 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
           font-size: 13px;
           margin: 12px 0;
         }
-        .ProseMirror img { max-width: 100%; border-radius: 8px; }
-        .ProseMirror iframe { border-radius: 8px; }
-        .ProseMirror h1 { font-size: 1.6rem; font-weight: 700; margin: 1.2em 0 0.4em; }
-        .ProseMirror h2 { font-size: 1.3rem; font-weight: 700; margin: 1em 0 0.4em; }
-        .ProseMirror h3 { font-size: 1.1rem; font-weight: 700; margin: 1em 0 0.4em; }
+        .ProseMirror { font-size: 14.5px; line-height: 1.85; color: #1b2528; }
+        .ProseMirror p { margin: 0.9em 0; }
+        .ProseMirror h1 { font-size: 1.4rem; font-weight: 700; margin: 1.6em 0 0.6em; line-height: 1.4; }
+        .ProseMirror h2 {
+          font-size: 1.2rem; font-weight: 700; margin: 1.4em 0 0.5em; line-height: 1.45;
+          border-bottom: 2px solid #D4AF37; padding-bottom: 0.3em;
+        }
+        .ProseMirror h3 { font-size: 1.05rem; font-weight: 700; margin: 1.2em 0 0.4em; }
+        .ProseMirror ul { list-style: disc; padding-left: 1.4em; margin: 0.8em 0; }
+        .ProseMirror ol { list-style: decimal; padding-left: 1.4em; margin: 0.8em 0; }
+        .ProseMirror li { margin: 0.3em 0; }
         .ProseMirror blockquote {
-          border-left: 3px solid #d4d4d8;
-          padding-left: 12px;
-          color: #57534e;
+          border-left: 3px solid #D4AF37;
+          padding: 0.4em 0 0.4em 1em;
+          color: rgba(27,37,40,.7);
           font-style: italic;
+          margin: 1em 0;
+          background: rgba(212,175,55,.06);
+          border-radius: 0 8px 8px 0;
         }
-        .ProseMirror code {
-          background: #f5f5f4;
-          padding: 1px 6px;
-          border-radius: 4px;
-          font-size: 0.9em;
-        }
-        .ProseMirror ul { list-style: disc; padding-left: 1.4em; }
-        .ProseMirror ol { list-style: decimal; padding-left: 1.4em; }
         .ProseMirror a { color: #4f46e5; text-decoration: underline; }
-        .ProseMirror p { margin: 0.6em 0; }
+        .ProseMirror code { background: #f5f5f4; padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+        .ProseMirror strong { font-weight: 700; }
+        /* 画像サイズプリセット。data-size で width を割当て。中央寄せ。
+           large 以下は max-width: 100% を効かせて小画面で潰れないように。 */
+        .ProseMirror img {
+          display: block;
+          margin: 1em auto;
+          border-radius: 12px;
+          max-width: 100%;
+          height: auto;
+        }
+        .ProseMirror img[data-size="small"]  { width: 200px; }
+        .ProseMirror img[data-size="medium"] { width: 360px; }
+        .ProseMirror img[data-size="large"]  { width: 560px; }
+        .ProseMirror img[data-size="full"]   { width: 100%; }
+        /* 選択中の画像にうっすら枠を付けて「これが選ばれてるよ」を示す。 */
+        .ProseMirror img.ProseMirror-selectednode {
+          outline: 2px solid #4f46e5;
+          outline-offset: 2px;
+        }
+        .ProseMirror iframe {
+          width: 100%; max-width: 640px; aspect-ratio: 16 / 9;
+          border-radius: 12px; margin: 1em auto; height: auto; display: block;
+        }
       `}</style>
     </div>
   );
