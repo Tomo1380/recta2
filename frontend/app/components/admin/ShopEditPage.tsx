@@ -72,11 +72,12 @@ const steps: StepConfig[] = [
   {
     id: "step1",
     title: "店舗情報",
-    subtitle: "基本情報・特徴・SEO",
+    subtitle: "基本情報・体入・特徴",
     icon: Building2,
     gradient: "from-indigo-500 to-violet-500",
     sections: [
       { id: "basic", title: "店舗基本情報", icon: Building2, required: true },
+      { id: "trial", title: "体入（体験入店）情報", icon: Sparkles },
       { id: "features", title: "店舗の特徴", icon: Star },
     ],
   },
@@ -92,13 +93,12 @@ const steps: StepConfig[] = [
   },
   {
     id: "step3",
-    title: "報酬・体入",
-    subtitle: "報酬の内訳・体入条件・採用実績",
+    title: "報酬・採用実績",
+    subtitle: "報酬の内訳と採用実績 (体入は STEP1)",
     icon: DollarSign,
     gradient: "from-emerald-500 to-teal-500",
     sections: [
       { id: "salary", title: "報酬・待遇", icon: DollarSign, required: true },
-      { id: "trial", title: "体入情報", icon: Sparkles },
       { id: "hiring", title: "直近の採用実績", icon: TrendingUp },
     ],
   },
@@ -563,14 +563,28 @@ function SectionCard({
   icon: Icon,
   required,
   children,
+  previewAnchor,
+  onFocusEnter,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   required?: boolean;
   children: React.ReactNode;
+  /** Floating Preview 内の対応セクションを scrollIntoView するためのキー。
+      StoreDetailPage 側の data-preview-anchor 属性と一致する文字列を渡す。 */
+  previewAnchor?: string;
+  /** SectionCard 内のフィールドに focus が入ったタイミングで呼ばれる。
+      ShopEditPage が activePreviewAnchor state を更新し、Floating Preview
+      の useEffect 経由で対応 DOM までスクロールする。 */
+  onFocusEnter?: (anchor: string) => void;
 }) {
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div
+      className="bg-white border border-border rounded-xl overflow-hidden"
+      onFocusCapture={previewAnchor && onFocusEnter
+        ? () => onFocusEnter(previewAnchor)
+        : undefined}
+    >
       <div className="px-5 py-3 border-b border-border bg-muted/20">
         <div className="flex items-center gap-2.5">
           <Icon className="w-4 h-4 text-muted-foreground" />
@@ -667,6 +681,14 @@ export function ShopEditPage() {
   const { currentStep, completedSteps } = stepFlow;
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  // プレビュー自動スクロール: admin SectionCard に focus が入ったとき
+  // 対応する Floating Preview 内のセクション (data-preview-anchor) まで
+  // スクロールするための state。
+  const [activePreviewAnchor, setActivePreviewAnchor] = useState<string | null>(null);
+  const previewScrollRef = useRef<HTMLDivElement | null>(null);
+  const handlePreviewFocus = useCallback((anchor: string) => {
+    setActivePreviewAnchor(anchor);
+  }, []);
 
   // --- State ---
   const [shopName, setShopName] = useState("");
@@ -1015,6 +1037,26 @@ export function ShopEditPage() {
     setSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
+    // 必須項目チェック。STEP1 の必須フィールドが揃っていなければ保存しない。
+    // これまで required ラベルは付いていたが、未入力でも payload 送信できて
+    // しまい、API 側の validation も寛容で通っていた。フロントでまず止める。
+    const requiredErrors: string[] = [];
+    if (!shopName.trim()) requiredErrors.push("店舗名");
+    if (!area) requiredErrors.push("エリア");
+    if (!category) requiredErrors.push("業種カテゴリ");
+    if (!station.trim()) requiredErrors.push("最寄り駅");
+    if (!address.trim()) requiredErrors.push("住所");
+    if (!openingTime.trim()) requiredErrors.push("営業時間（開始）");
+    if (!closingTime.trim()) requiredErrors.push("営業時間（終了）");
+    if (requiredErrors.length > 0) {
+      setSaveError(`必須項目が未入力です: ${requiredErrors.join("、")}`);
+      setSaving(false);
+      // 最初の未入力フィールドへスクロールしたいが、STEP1 にあるので
+      // 単純に Step1 へ移動してウィンドウを上に。
+      stepFlow.goTo(0);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     try {
       const payload = buildPayload();
       if (isNew) {
@@ -1031,7 +1073,11 @@ export function ShopEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [isNew, id, buildPayload, navigate]);
+  }, [
+    isNew, id, buildPayload, navigate,
+    shopName, area, category, station, address, openingTime, closingTime,
+    stepFlow,
+  ]);
 
   // 旧 handleImageUpload / handleImageDelete は useShopImages フックに移管 (Phase 3-1)。
   // 呼び出し側は uploadShopImages / removeShopImage を使う。
@@ -1039,6 +1085,29 @@ export function ShopEditPage() {
   useEffect(() => {
     if (shopImageError) setSaveError(shopImageError);
   }, [shopImageError]);
+
+  // プレビュー自動スクロール: activePreviewAnchor が変わったら、Floating
+  // Preview 内の data-preview-anchor=ANCHOR を探して scrollIntoView する。
+  // preview を開いていないときは何もしない。
+  useEffect(() => {
+    if (!showPreview || !activePreviewAnchor) return;
+    const container = previewScrollRef.current;
+    if (!container) return;
+    const handle = window.requestAnimationFrame(() => {
+      const target = container.querySelector(
+        `[data-preview-anchor="${activePreviewAnchor}"]`,
+      ) as HTMLElement | null;
+      if (!target) return;
+      // container は overflow-y-auto。target.offsetTop はネスト次第で正しく
+      // ないので getBoundingClientRect で相対距離を出して container.scrollTop
+      // に加算する。先頭にちょっと余白を残したいので 24px 引く。
+      const cRect = container.getBoundingClientRect();
+      const tRect = target.getBoundingClientRect();
+      const delta = tRect.top - cRect.top - 24;
+      container.scrollTo({ top: container.scrollTop + delta, behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [activePreviewAnchor, showPreview]);
 
   // step ナビゲーションは useStepProgression に集約。ハンドラはスクロール処理だけ
   // 上乗せして wrapping する (旧コードはスクロール込みだったので挙動互換のため)。
@@ -1064,8 +1133,8 @@ export function ShopEditPage() {
   // データ入力済みの既存店舗を開いた直後は 0% で固定だった。
   // 各 Step の代表フィールドの充足を見て充足率を計算する。
   const stepFilled: boolean[] = [
-    // Step1: 店舗情報 (基本情報 + 特徴)
-    !!(shopName && area && category && station && address),
+    // Step1: 店舗情報 (基本情報 + 特徴)。営業時間 (開始/終了) も必須。
+    !!(shopName && area && category && station && address && openingTime && closingTime),
     // Step2: 画像・動画
     storeImages.length > 0 || videos.length > 0 || staffPhotos.length > 0,
     // Step3: 報酬・体入
@@ -1084,7 +1153,7 @@ export function ShopEditPage() {
   // --- Step Content Renderers ---
   const renderStep1 = () => (
     <div className="space-y-6">
-      <SectionCard title="店舗基本情報" icon={Building2} required>
+      <SectionCard title="店舗基本情報" icon={Building2} required previewAnchor="shop-info" onFocusEnter={handlePreviewFocus}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="md:col-span-2">
             <Field label="店舗名" required>
@@ -1185,14 +1254,14 @@ export function ShopEditPage() {
               }
             />
           </Field>
-          <Field label="営業時間（開始）">
+          <Field label="営業時間（開始）" required>
             <TextInput
               value={openingTime}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setOpeningTime(e.target.value)}
               placeholder="例: 20:00"
             />
           </Field>
-          <Field label="営業時間（終了）">
+          <Field label="営業時間（終了）" required>
             <TextInput
               value={closingTime}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setClosingTime(e.target.value)}
@@ -1225,7 +1294,7 @@ export function ShopEditPage() {
           {/* 時給/日給目安/シフト は管理画面上「店舗情報」の一部として扱う。
               ユーザー画面の店舗情報カードにも同じ並びで出る。詳細な給与
               (バック / 控除 / 保証 / ノルマ等) は STEP2「報酬・待遇」へ。 */}
-          <Field label="時給の最低額（円）" required>
+          <Field label="時給の最低額（円）">
             <TextInput
               type="number"
               value={minWage}
@@ -1233,7 +1302,7 @@ export function ShopEditPage() {
               placeholder="4000"
             />
           </Field>
-          <Field label="時給の最高額（円）" required>
+          <Field label="時給の最高額（円）">
             <TextInput
               type="number"
               value={maxWage}
@@ -1258,29 +1327,24 @@ export function ShopEditPage() {
               />
             </Field>
           </div>
-          <div className="md:col-span-2">
-            <Field
-              label="SEOメタディスクリプション"
-              hint="任意。検索結果の説明文に使われます（120〜140 文字推奨）。未入力なら自動生成。"
-            >
-              <TextArea
-                value={seoMetaDescription}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSeoMetaDescription(e.target.value)}
-                placeholder="例: 新宿歌舞伎町のキャバクラ◯◯。時給◯円〜、日払いOK。体入歓迎で未経験も安心。"
-                rows={2}
-              />
-            </Field>
-          </div>
+          {/* SEO メタディスクリプションは運営側で書きにくいと判断したため
+              入力欄を撤去。バックエンド (StoreResource::resolveMetaDescription)
+              で「【エリア】のカテゴリ・店名。時給◯円〜、体入◯円〜。
+              features_text 先頭60字」を自動生成して <meta description> に
+              出力する。state (seoMetaDescription) は将来運営入力を復活
+              させたい時のために残置 (空のまま送信されると自動生成側に
+              フォールバック)。 */}
         </div>
       </SectionCard>
 
+      {sectionTrial()}
       {sectionFeatures()}
     </div>
   );
 
   // 「店舗画像・動画」は新 STEP2 で別レンダラとして使うため切り出し。
   const sectionImages = () => (
-    <SectionCard title="店舗画像・動画" icon={ImageIcon}>
+    <SectionCard title="店舗画像・動画" icon={ImageIcon} previewAnchor="shop-media" onFocusEnter={handlePreviewFocus}>
       <div className="space-y-5">
         <Field
           label="店舗画像"
@@ -1322,6 +1386,60 @@ export function ShopEditPage() {
     </SectionCard>
   );
 
+  // 体入（体験入店）情報。元 STEP3 にあったが、求職者目線ではユーザー画面
+  // 上部に出る情報なので STEP1「店舗情報」末尾に同居させる。中身: 体入時給
+  // (最低/最高)、面接可能時間 (開始/終了)、当日体入可否。
+  const sectionTrial = () => (
+    <SectionCard title="体入（体験入店）情報" icon={Sparkles} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* BUG-013: 体入時給は単位なしの数値だけ受け付ける。
+            表示側 (StoreDetailPage) は数値前提で `.toLocaleString()` を呼ぶ
+            ため、`"5,000円"` のような文字列が入ると表示が崩れる。 */}
+        <Field label="体入時給（最低額・円）">
+          <TextInput
+            type="number"
+            inputMode="numeric"
+            value={trialMinWage}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMinWage(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder="例: 4500"
+          />
+        </Field>
+        <Field label="体入時給（最高額・円）">
+          <TextInput
+            type="number"
+            inputMode="numeric"
+            value={trialMaxWage}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMaxWage(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder="例: 6000"
+          />
+        </Field>
+        <Field label="面接可能時間(開始)">
+          <TextInput
+            value={interviewStart}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewStart(e.target.value)}
+            placeholder="例: 14:00"
+          />
+        </Field>
+        <Field label="面接可能時間(終了)">
+          <TextInput
+            value={interviewEnd}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewEnd(e.target.value)}
+            placeholder="例: 19:00"
+          />
+        </Field>
+        <Field label="当日体入可否">
+          <SelectInput
+            value={sameDayTrial}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+              setSameDayTrial(e.target.value)
+            }
+            options={["可", "不可"]}
+          />
+        </Field>
+      </div>
+    </SectionCard>
+  );
+
   // === sectionFeatures に続く section helpers ===
   // NOTE: 「店舗の特徴」は renderStep1 末尾 (店舗画像・動画 SectionCard の
   // *直後*) に挿入するが、JSX の構造を最小修正にするため renderStep1 の return
@@ -1329,7 +1447,7 @@ export function ShopEditPage() {
   // ユーザー画面 (詳細ページ) の「【店名】の特徴は？」カードと対応させるため、
   // sectionFeatures というレンダラを別出ししておく。
   const sectionFeatures = () => (
-    <SectionCard title="店舗の特徴" icon={Star}>
+    <SectionCard title="店舗の特徴" icon={Star} previewAnchor="shop-info" onFocusEnter={handlePreviewFocus}>
       <div className="space-y-5">
         <Field
           label="特徴タグ"
@@ -1381,7 +1499,7 @@ export function ShopEditPage() {
 
   const renderStep2 = () => (
     <div className="space-y-6">
-      <SectionCard title="報酬・待遇" icon={DollarSign} required>
+      <SectionCard title="報酬・待遇" icon={DollarSign} previewAnchor="salary" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここはバック・
               控除・備考・支払い方法・保証・ノルマ等の詳細を扱う。 */}
@@ -1462,58 +1580,10 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="体入（体験入店）情報" icon={Sparkles}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* BUG-013: 体入時給は単位なしの数値だけ受け付ける。
-              表示側 (StoreDetailPage) は数値前提で `.toLocaleString()` を呼ぶ
-              ため、`"5,000円"` のような文字列が入ると表示が崩れる。 */}
-          <Field label="体入時給（最低額・円）">
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              value={trialMinWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMinWage(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="例: 4500"
-            />
-          </Field>
-          <Field label="体入時給（最高額・円）">
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              value={trialMaxWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMaxWage(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="例: 6000"
-            />
-          </Field>
-          <Field label="面接可能時間（開始）">
-            <TextInput
-              value={interviewStart}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewStart(e.target.value)}
-              placeholder="例: 14:00"
-            />
-          </Field>
-          <Field label="面接可能時間（終了）">
-            <TextInput
-              value={interviewEnd}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewEnd(e.target.value)}
-              placeholder="例: 19:00"
-            />
-          </Field>
-          <Field label="当日体入可否">
-            <SelectInput
-              value={sameDayTrial}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setSameDayTrial(e.target.value)
-              }
-              options={["可", "不可"]}
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
+      {/* 体入（体験入店）情報は STEP1「店舗情報」に移動済み (sectionTrial)。 */}
       {/* 直近の採用実績は体入と一緒に検討できるほうが運営フローに合うので、
-          STEP4 から STEP2 (体入) 直後に移動。 */}
-      <SectionCard title="直近の採用実績" icon={TrendingUp}>
+          STEP4 から STEP3 (報酬・体入) 直後に維持。 */}
+      <SectionCard title="直近の採用実績" icon={TrendingUp} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           {hiringEntries.map((entry, i) => (
             <div
@@ -1605,7 +1675,7 @@ export function ShopEditPage() {
   const renderStep3 = () => (
     <div className="space-y-6">
       {/* 「店舗の特徴」は STEP1 末尾に移動 (sectionFeatures)。 */}
-      <SectionCard title="店舗分析" icon={BarChart3}>
+      <SectionCard title="店舗分析" icon={BarChart3} previewAnchor="analysis" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-6">
           <SliderField
             label="経験レベル"
@@ -1691,7 +1761,7 @@ export function ShopEditPage() {
 
   const renderStep4 = () => (
     <div className="space-y-6">
-      <SectionCard title="面接・採用" icon={UserCheck}>
+      <SectionCard title="面接・採用" icon={UserCheck} previewAnchor="interview" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <Field label="面接時の服装アドバイス">
             <TextArea
@@ -1739,7 +1809,7 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="必要書類" icon={FileText}>
+      <SectionCard title="必要書類" icon={FileText} previewAnchor="interview" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <Field
             label="書類リスト"
@@ -1771,7 +1841,7 @@ export function ShopEditPage() {
   const renderStep5 = () => (
     <div className="space-y-6">
       {/* 送り・足代 (ユーザー画面で先に出るので先頭に) */}
-      <SectionCard title="送り・交通サポート" icon={Car}>
+      <SectionCard title="送り・交通サポート" icon={Car} previewAnchor="transfer" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <Field
             label="送りの説明"
@@ -1870,7 +1940,7 @@ export function ShopEditPage() {
 
       {/* シャンパン情報 (説明文) → シャンパン金額 (4 銘柄) → セット料金 の順で
           単価系を並べる。ユーザー画面でもこの並びになっている。 */}
-      <SectionCard title="シャンパン情報" icon={Wine}>
+      <SectionCard title="シャンパン情報" icon={Wine} previewAnchor="champagne" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <Field
             label="シャンパン説明"
@@ -1886,7 +1956,7 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="シャンパン金額（4銘柄）" icon={Wine}>
+      <SectionCard title="シャンパン金額（4銘柄）" icon={Wine} previewAnchor="champagne" onFocusEnter={handlePreviewFocus}>
         <p className="text-xs text-muted-foreground mb-4">
           新地・六本木の高級店向け。空欄でも構いません。
         </p>
@@ -1934,7 +2004,7 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="セット料金" icon={DollarSign}>
+      <SectionCard title="セット料金" icon={DollarSign} previewAnchor="set-fee" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <Field
             label="セット料金項目"
@@ -2005,7 +2075,7 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="ドレスコード（OK / NG）" icon={Star}>
+      <SectionCard title="ドレスコード（OK / NG）" icon={Star} previewAnchor="dress-code" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
             <TextArea
@@ -2110,7 +2180,7 @@ export function ShopEditPage() {
 
       {/* シャンパン情報・金額・セット料金は STEP5 上部 (送り直後) に移動済み。 */}
 
-      <SectionCard title="レクタ経由入店女性エピソード" icon={Sparkles}>
+      <SectionCard title="レクタ経由入店女性エピソード" icon={Sparkles} previewAnchor="recta" onFocusEnter={handlePreviewFocus}>
         <p className="text-xs text-muted-foreground mb-4">
           レクタ経由で入店した在籍キャストのエピソードを登録できます（顔出しOK時のみ）。
         </p>
@@ -2197,7 +2267,7 @@ export function ShopEditPage() {
   // STEP6 コミュニケーション・公開 — Q&A → スタッフコメント → 系列店舗 → ピックアップ → 公開設定
   const renderStep6 = () => (
     <div className="space-y-6">
-      <SectionCard title="Q&A" icon={HelpCircle}>
+      <SectionCard title="Q&A" icon={HelpCircle} previewAnchor="qa" onFocusEnter={handlePreviewFocus}>
         <Field
           label="よくある質問"
           hint="求職者からよく聞かれる質問と回答を登録してください"
@@ -2211,7 +2281,7 @@ export function ShopEditPage() {
         </Field>
       </SectionCard>
 
-      <SectionCard title="スタッフコメント" icon={MessageSquare}>
+      <SectionCard title="スタッフコメント" icon={MessageSquare} previewAnchor="staff" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Field label="スタッフ名">
@@ -2249,7 +2319,7 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="系列店舗" icon={Building2}>
+      <SectionCard title="系列店舗" icon={Building2} previewAnchor="related" onFocusEnter={handlePreviewFocus}>
         <Field
           label="紐づけ店舗"
           hint="詳細ページで「系列店舗」として表示する他店舗を選択してください。"
@@ -2510,8 +2580,8 @@ export function ShopEditPage() {
               <div className="relative bg-[#f7f6f3] rounded-[38px] h-[844px] overflow-hidden flex flex-col">
                 {/* Dynamic island */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 w-[120px] h-[32px] bg-black rounded-b-[20px]" />
-                {/* Scrollable content */}
-                <div className="flex-1 overflow-y-auto overscroll-contain pt-8">
+                {/* Scrollable content (admin focus 時にここを scroll させる) */}
+                <div ref={previewScrollRef} className="flex-1 overflow-y-auto overscroll-contain pt-8">
                   <StoreDetailPage
               id={isNew ? 0 : Number(id)}
               previewData={{

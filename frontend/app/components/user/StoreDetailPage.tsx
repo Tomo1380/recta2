@@ -787,6 +787,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           <SectionCard
             icon={<Sparkles size={20} style={{ color: "#D4AF37" }} />}
             title="体験入店情報"
+            previewAnchor="trial"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               {/* 数値がない店舗で「¥0」を出すと「タダ働き？」と読まれる
@@ -903,6 +904,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 ? `【${store.name}】の特徴は？`
                 : "店舗情報"
             }
+            previewAnchor="shop-info"
           >
             {store.features_text && (
               <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.65)" }}>
@@ -968,14 +970,22 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
           {/* ============================================================ */}
           {/* 6. Salary & Benefits */}
+          {/* 時給/日給目安は「店舗情報」カードへ移動済み。ここはバック・控除・
+              支払い方法・保証・ノルマ・給与備考。すべて空なら丸ごと非表示
+              (空のカードを残すと見出し詐欺になる)。 */}
           {/* ============================================================ */}
+          {((store.back_items ?? []).length > 0
+            || (store.fee_items ?? []).length > 0
+            || store.payroll_system_type
+            || store.guarantee_period
+            || store.norma_info
+            || store.salary_notes) && (
           <SectionCard
             icon={<Award size={20} style={{ color: "#D4AF37" }} />}
             title="報酬・待遇"
+            previewAnchor="salary"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              {/* 時給/日給目安は「店舗情報」カードへ移動済み。ここはバック以下の
-                  詳細情報のみ。 */}
               {(store.back_items ?? []).length > 0 && (
                 <InfoRow
                   label="バック"
@@ -1019,6 +1029,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               {store.salary_notes && <InfoRow label="給与備考" value={store.salary_notes} />}
             </div>
           </SectionCard>
+          )}
 
           {/* Relocate-support CTA — re-prompt the simulator for users coming from outside Tokyo */}
           <RelocateSupportCta variant="salary" />
@@ -1028,32 +1039,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {store.analysis && <AnalysisSection analysis={store.analysis} />}
 
-          {/* ============================================================ */}
-          {/* 8. Image Gallery */}
-          {/* ============================================================ */}
-          {store.images && store.images.length > 0 && (
-            <SectionCard
-              icon={<Building size={20} style={{ color: "#D4AF37" }} />}
-              title="店内写真"
-            >
-              <div className="grid grid-cols-2 gap-2">
-                {store.images
-                  .sort((a, b) => a.order - b.order)
-                  .map((img, i) => (
-                    <div
-                      key={img.url}
-                      className={`relative overflow-hidden rounded-[12px] ${i === 0 ? "col-span-2 aspect-[16/9]" : "aspect-square"}`}
-                    >
-                      <img
-                        src={img.url}
-                        alt={`${store.name} ${i + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ))}
-              </div>
-            </SectionCard>
-          )}
+          {/* 店内写真セクションは廃止。ページ最上部のヘッダー画像で十分
+              なので、同じ写真をもう一度カードで出さない。 */}
 
           {/* ============================================================ */}
           {/* 8b. Staff gallery — 在籍女性 / レクタ経由入店女性 の写真 */}
@@ -1069,6 +1056,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             <SectionCard
               icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
               title="面接情報"
+              previewAnchor="interview"
             >
               <div className="space-y-4">
                 {store.interview_info && (
@@ -1244,6 +1232,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             <SectionCard
               icon={<MessageSquare size={20} style={{ color: "#D4AF37" }} />}
               title="よくある質問"
+              previewAnchor="qa"
             >
               <Accordion type="multiple" className="w-full">
                 {store.qa.map((item, i) => (
@@ -1283,6 +1272,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             <SectionCard
               icon={<MessageSquare size={20} style={{ color: "#D4AF37" }} />}
               title="スタッフコメント"
+              previewAnchor="staff"
             >
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -1417,13 +1407,15 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}
           {/* ============================================================ */}
-          <RelatedStoresSection
-            title="系列店舗"
-            icon={<Building size={20} style={{ color: "#D4AF37" }} />}
-            stores={store.related_stores}
-            ids={store.related_store_ids}
-            currentId={store.id}
-          />
+          <div data-preview-anchor="related">
+            <RelatedStoresSection
+              title="系列店舗"
+              icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+              stores={store.related_stores}
+              ids={store.related_store_ids}
+              currentId={store.id}
+            />
+          </div>
 
           {/* ============================================================ */}
           {/* 16. Recently viewed stores (あなたが見た記事) */}
@@ -2224,13 +2216,19 @@ function SectionCard({
   icon,
   title,
   children,
+  previewAnchor,
 }: {
   icon: React.ReactNode;
   title: string;
   children: React.ReactNode;
+  /** 管理画面のプレビューパネル (FloatingPreview) が、admin SectionCard の
+      フォーカス時に対応するこのセクションまで自動スクロールするためのキー。
+      ShopEditPage 側で同じキーを SectionCard.previewAnchor に渡している。 */
+  previewAnchor?: string;
 }) {
   return (
     <div
+      data-preview-anchor={previewAnchor}
       className="overflow-hidden rounded-[16px] bg-white"
       style={{
         boxShadow: "0px 4px 20px rgba(0,0,0,0.06), 0px 1px 3px rgba(0,0,0,0.04)",
