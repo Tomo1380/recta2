@@ -501,8 +501,26 @@ export default function TopPage() {
                     )}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,transparent 30%,rgba(0,0,0,.5) 100%)" }} />
                     {store.category && (
-                      <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md" style={{ background: "rgba(200,96,128,.9)", backdropFilter: "blur(4px)" }}>
-                        <span style={{ fontFamily: J, fontSize: "9px", fontWeight: 600, color: "white", letterSpacing: "0.04em" }}>{store.category}</span>
+                      <div
+                        className="absolute top-2.5 left-2.5 inline-flex items-center px-2 rounded-md"
+                        style={{
+                          height: 18,
+                          background: "rgba(200,96,128,.9)",
+                          backdropFilter: "blur(4px)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: J,
+                            fontSize: "9px",
+                            fontWeight: 600,
+                            color: "white",
+                            letterSpacing: "0.04em",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {store.category}
+                        </span>
                       </div>
                     )}
                     {idx === 0 && (

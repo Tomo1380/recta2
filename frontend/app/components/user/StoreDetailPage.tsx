@@ -1431,7 +1431,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* LINE CTA #3 — between access map and recently-viewed list */}
           <LineCtaCard
             variant="card"
-            title="気になったら、まずLINEへ"
+            title="気になったら、直接聞いてみよう"
             description="体入予約・条件交渉までLINEで完結"
             ctaLabel="LINE追加"
             source="store-detail:map-card"
