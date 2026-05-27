@@ -45,6 +45,9 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
       - RenderSeeder → ProductionSeeder にリネーム (Render.com 不使用)。
         本番初回投入用: 管理者 + マスター + 設定 + AI 教材のみ、
         店舗/ユーザー/口コミは入れない設計に変更。冪等。
+      - TestQaSeeder 削除 (DatabaseSeeder の真部分集合だったので統合)。
+        QA も `migrate:fresh --seed` を使う。完全空 DB が必要なら
+        `migrate:fresh` 単独で代用。
 - 詳細は ADR 0003/0004/0005 と各 `refactor-phase-N` tag 参照。
 
 ### 修正
