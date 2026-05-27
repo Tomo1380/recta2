@@ -344,6 +344,25 @@ function formatWageRange(
   return `〜${formatCurrency(maxStr!)}`;
 }
 
+/**
+ * クイックステータス用のコンパクトなレンジ表記。¥ 記号は省略してカンマ区切り
+ * だけで返す ("8,000〜10,000" / "8,000〜" / "〜10,000" / "—")。両端が同じ値の
+ * ときは 1 値だけ。formatWageRange より幅が狭い枠 (4 セル横並び) で使う用。
+ */
+function formatQuickRange(
+  min: number | string | null | undefined,
+  max: number | string | null | undefined,
+): string {
+  const minStr = toAmountString(min);
+  const maxStr = toAmountString(max);
+  const fmt = (s: string) => Number(s).toLocaleString();
+  if (!minStr && !maxStr) return "—";
+  if (minStr && maxStr) {
+    return minStr === maxStr ? fmt(minStr) : `${fmt(minStr)}〜${fmt(maxStr)}`;
+  }
+  return minStr ? `${fmt(minStr)}〜` : `〜${fmt(maxStr!)}`;
+}
+
 function toAmountString(v: number | string | null | undefined): string | null {
   if (v == null) return null;
   if (typeof v === "number") return v > 0 ? String(v) : null;
@@ -635,42 +654,32 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               border: "1px solid rgba(27,37,40,0.06)",
             }}
           >
+            {/* 体験時給・時給は「最低〜最高」のレンジで表示。片方欠けてたら
+                「8,000〜」「〜10,000」のように見せる (空欄であることを明示)。
+                4 セル横並びに収めるため ¥ 記号は省き、フォントを 13px に。 */}
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 体験時給
               </div>
               <div
-                className="mt-0.5 text-[14px] font-bold tabular-nums"
+                className="mt-0.5 text-[13px] font-bold tabular-nums leading-tight"
                 style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
               >
-                {(() => {
-                  // 上部クイックステータスは「1 行で 1 値」のレイアウト。
-                  // レンジを表示すると桁が崩れるので、min を優先 (なければ
-                  // max → 通常時給の min) で 1 値だけ表示する。0/未入力は
-                  // 「—」で空欄を明示。
-                  const candidate =
-                    store.trial_hourly_min ??
-                    store.trial_hourly_max ??
-                    store.trial_avg_hourly ??
-                    store.trial_hourly ??
-                    store.hourly_min ??
-                    null;
-                  const num = Number(candidate);
-                  return num > 0 ? `¥${num.toLocaleString()}` : "—";
-                })()}
+                {formatQuickRange(
+                  store.trial_hourly_min ?? store.trial_avg_hourly,
+                  store.trial_hourly_max ?? store.trial_hourly,
+                )}
               </div>
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                最高時給
+                時給
               </div>
               <div
-                className="mt-0.5 text-[14px] font-bold tabular-nums"
+                className="mt-0.5 text-[13px] font-bold tabular-nums leading-tight"
                 style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
               >
-                {store.hourly_max && store.hourly_max > 0
-                  ? `¥${store.hourly_max.toLocaleString()}`
-                  : "—"}
+                {formatQuickRange(store.hourly_min, store.hourly_max)}
               </div>
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>

@@ -60,11 +60,8 @@ export function LoginPage() {
 
         <div className="relative z-10 max-w-md">
           <h2 className="text-white text-4xl tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, lineHeight: 1.2 }}>
-            Manage everything<br />in one place.
+            Recta 管理画面
           </h2>
-          <p className="text-indigo-300 mt-4 text-[15px] leading-relaxed">
-            店舗管理、ユーザー分析、口コミ管理など、すべてを一つのプラットフォームで。
-          </p>
         </div>
 
         <p className="text-indigo-700 text-[13px] relative z-10">
