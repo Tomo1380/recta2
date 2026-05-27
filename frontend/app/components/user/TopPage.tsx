@@ -65,7 +65,7 @@ interface RecentReview {
   tweet_id?: string | null;
   tweet_author_screen_name?: string | null;
   created_at: string;
-  store: { id: number; name: string; area: string; category: string } | null;
+  store: { id: number; name: string; area: string; category: string; image_url?: string | null } | null;
   user: RecentReviewUser | null;
 }
 
@@ -160,31 +160,47 @@ function GlowOrbs() {
 }
 
 function EdgeTop() {
+  // drop-shadow を SVG 全体に効かせると、塗り潰し path (DARK の波下) の下端に
+  // 影が漏れてベージュ背景に水平な黒い帯として見えてしまう。
+  // 影は波線の strokes だけに乗せて、塗り潰し path には乗せない構成にする。
   return (
     <div style={{ position: "relative", height: "54px", marginBottom: "-1px" }}>
       <div style={{ position: "absolute", top: "-8px", left: "8%", width: "84%", height: "28px", background: "radial-gradient(ellipse 100% 100%, rgba(212,175,55,.18) 0%, transparent 70%)", pointerEvents: "none" }} />
-      <svg viewBox="0 0 430 54" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 6px 18px rgba(27,37,40,.25))" }}>
+      <svg viewBox="0 0 430 54" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
         <defs>
           <linearGradient id="eT1g" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor={GOLD} stopOpacity="0.15" /><stop offset="25%" stopColor={GOLD} stopOpacity="0.7" /><stop offset="50%" stopColor={GOLD} stopOpacity="0.25" /><stop offset="75%" stopColor={GOLD} stopOpacity="0.8" /><stop offset="100%" stopColor={GOLD} stopOpacity="0.2" /></linearGradient>
+          <filter id="eT1Shadow" x="-5%" y="-50%" width="110%" height="200%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="rgba(27,37,40,0.25)" />
+          </filter>
         </defs>
         <path d="M0,54 L430,54 L430,14 C380,4 310,26 250,16 C190,6 130,28 70,22 C35,19 10,30 0,36 Z" fill={DARK} />
-        <path d="M0,36 C10,30 35,19 70,22 C130,28 190,6 250,16 C310,26 380,4 430,14" fill="none" stroke={GOLD} strokeWidth="12" opacity="0.08" />
-        <path d="M0,36 C10,30 35,19 70,22 C130,28 190,6 250,16 C310,26 380,4 430,14" fill="none" stroke="url(#eT1g)" strokeWidth="2.5" />
-        <path d="M0,35 C10,29 35,18 70,21 C130,27 190,5 250,15 C310,25 380,3 430,13" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="0.8" />
+        <g filter="url(#eT1Shadow)">
+          <path d="M0,36 C10,30 35,19 70,22 C130,28 190,6 250,16 C310,26 380,4 430,14" fill="none" stroke={GOLD} strokeWidth="12" opacity="0.08" />
+          <path d="M0,36 C10,30 35,19 70,22 C130,28 190,6 250,16 C310,26 380,4 430,14" fill="none" stroke="url(#eT1g)" strokeWidth="2.5" />
+          <path d="M0,35 C10,29 35,18 70,21 C130,27 190,5 250,15 C310,25 380,3 430,13" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="0.8" />
+        </g>
       </svg>
     </div>
   );
 }
 
 function EdgeBottom() {
+  // EdgeTop と同じ理由で drop-shadow を strokes だけに限定する。
   return (
     <div style={{ position: "relative", height: "54px", marginTop: "-1px" }}>
-      <svg viewBox="0 0 430 54" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", filter: "drop-shadow(0 -6px 18px rgba(27,37,40,.25))" }}>
-        <defs><linearGradient id="eB1g" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor={GOLD} stopOpacity="0.2" /><stop offset="30%" stopColor={GOLD} stopOpacity="0.8" /><stop offset="55%" stopColor={GOLD} stopOpacity="0.2" /><stop offset="80%" stopColor={GOLD} stopOpacity="0.7" /><stop offset="100%" stopColor={GOLD} stopOpacity="0.15" /></linearGradient></defs>
+      <svg viewBox="0 0 430 54" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
+        <defs>
+          <linearGradient id="eB1g" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor={GOLD} stopOpacity="0.2" /><stop offset="30%" stopColor={GOLD} stopOpacity="0.8" /><stop offset="55%" stopColor={GOLD} stopOpacity="0.2" /><stop offset="80%" stopColor={GOLD} stopOpacity="0.7" /><stop offset="100%" stopColor={GOLD} stopOpacity="0.15" /></linearGradient>
+          <filter id="eB1Shadow" x="-5%" y="-200%" width="110%" height="300%">
+            <feDropShadow dx="0" dy="-3" stdDeviation="3" floodColor="rgba(27,37,40,0.25)" />
+          </filter>
+        </defs>
         <path d="M0,0 L430,0 L430,40 C380,48 310,28 250,38 C190,48 130,26 70,34 C35,38 10,28 0,20 Z" fill={DARK} />
-        <path d="M0,20 C10,28 35,38 70,34 C130,26 190,48 250,38 C310,28 380,48 430,40" fill="none" stroke={GOLD} strokeWidth="12" opacity="0.08" />
-        <path d="M0,20 C10,28 35,38 70,34 C130,26 190,48 250,38 C310,28 380,48 430,40" fill="none" stroke="url(#eB1g)" strokeWidth="2.5" />
-        <path d="M0,19 C10,27 35,37 70,33 C130,25 190,47 250,37 C310,27 380,47 430,39" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="0.8" />
+        <g filter="url(#eB1Shadow)">
+          <path d="M0,20 C10,28 35,38 70,34 C130,26 190,48 250,38 C310,28 380,48 430,40" fill="none" stroke={GOLD} strokeWidth="12" opacity="0.08" />
+          <path d="M0,20 C10,28 35,38 70,34 C130,26 190,48 250,38 C310,28 380,48 430,40" fill="none" stroke="url(#eB1g)" strokeWidth="2.5" />
+          <path d="M0,19 C10,27 35,37 70,33 C130,25 190,47 250,37 C310,27 380,47 430,39" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="0.8" />
+        </g>
       </svg>
       <div style={{ position: "absolute", bottom: "-6px", left: "8%", width: "84%", height: "20px", background: "radial-gradient(ellipse, rgba(212,175,55,.15) 0%, transparent 70%)", pointerEvents: "none" }} />
     </div>
