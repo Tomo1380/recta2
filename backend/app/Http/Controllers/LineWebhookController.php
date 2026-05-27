@@ -27,7 +27,7 @@ class LineWebhookController extends Controller
 
         if (!$this->lineService->verifySignature($body, $signature)) {
             Log::warning('LINE webhook: invalid signature');
-            return response()->json(['error' => 'Invalid signature'], 403);
+            return response()->json(['message' => 'Invalid signature'], 403);
         }
 
         $events = $request->input('events', []);
