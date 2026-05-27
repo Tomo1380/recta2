@@ -494,7 +494,7 @@ class AiChatController extends Controller
         $setting = AiChatSetting::where('page_type', $pageType)->first();
         if (!$setting || !$setting->enabled) {
             return response()->json([
-                'error' => 'チャットは現在無効です。',
+                'message' => 'チャットは現在無効です。',
             ], 403);
         }
 

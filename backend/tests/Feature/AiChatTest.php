@@ -195,10 +195,9 @@ class AiChatTest extends TestCase
             'mode' => 'agent',
         ]);
 
-        // 現状: {error: 'チャットは現在無効です。'} の独自 shape。
-        // Phase 1 で {message: ..., errors: ...} に統一する対象。
+        // Phase 1-3 で {error} から Laravel 標準の {message} 形に統一済み
         $response->assertStatus(403)
-            ->assertJsonStructure(['error']);
+            ->assertJson(['message' => 'チャットは現在無効です。']);
     }
 
     public function test_chat_returns_403_when_setting_absent(): void

@@ -111,17 +111,17 @@ class UserController extends Controller
     /**
      * Send a LINE push message to a user via their line_user_id.
      *
-     * @response array{success: bool}
+     * @response array{message: string}
      */
     public function sendLineMessage(SendUserLineMessageRequest $request, User $user, LineMessagingService $lineService): JsonResponse
     {
         if (!$user->line_user_id) {
-            return response()->json(['error' => 'このユーザーにはLINE IDが紐付けられていません'], 422);
+            return response()->json(['message' => 'このユーザーにはLINE IDが紐付けられていません'], 422);
         }
 
         $friend = $user->lineFriend;
         if (!$friend || !$friend->is_following) {
-            return response()->json(['error' => 'このユーザーはLINE友だちではないためメッセージを送信できません'], 422);
+            return response()->json(['message' => 'このユーザーはLINE友だちではないためメッセージを送信できません'], 422);
         }
 
         $messageText = $request->validated()['message'];
@@ -131,7 +131,7 @@ class UserController extends Controller
 
         if (!$result['success']) {
             return response()->json([
-                'error' => 'メッセージの送信に失敗しました',
+                'message' => 'メッセージの送信に失敗しました',
                 'details' => $result['body'],
             ], 422);
         }
@@ -144,7 +144,7 @@ class UserController extends Controller
             'content' => $messageText,
         ]);
 
-        return response()->json(['success' => true]);
+        return response()->json(['message' => '送信しました']);
     }
 
     /**
