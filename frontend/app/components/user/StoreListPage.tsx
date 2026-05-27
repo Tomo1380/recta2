@@ -234,7 +234,9 @@ function EditorialStoreCard({
           )}
 
           {/* Hourly — 片方しか無いとき "¥0 〜" にしないように、欠けてる側は
-              空白にしてレンジ「〜¥6,000」「¥4,000〜」を表現する。 */}
+              空白にしてレンジ「〜¥6,000」「¥4,000〜」を表現する。最低額と
+              最高額で色/サイズが違うと「片方が安そう」「片方が強調されてる」
+              ように読まれるので、ラベル以外は同じ色・同じウェイトで揃える。 */}
           {(store.hourly_min || store.hourly_max) && (
             <div className="mt-1 flex items-baseline gap-1.5">
               <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>時給</span>
@@ -250,8 +252,8 @@ function EditorialStoreCard({
                 <>
                   <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.35)" }}>〜</span>
                   <span
-                    className="text-[12px] font-semibold tabular-nums leading-none"
-                    style={{ color: "#D4AF37", fontFamily: "'Outfit', sans-serif" }}
+                    className="text-[14px] font-bold tabular-nums leading-none"
+                    style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
                   >
                     ¥{store.hourly_max.toLocaleString()}
                   </span>
