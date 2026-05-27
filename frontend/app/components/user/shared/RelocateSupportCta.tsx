@@ -61,7 +61,8 @@ export default function RelocateSupportCta({ variant = "top" }: RelocateSupportC
         background:
           `radial-gradient(circle at 88% 50%, ${GOLD}24 0%, transparent 55%), ` +
           `linear-gradient(135deg, ${DARK} 0%, #2c3e46 60%, rgba(200,96,128,.4) 100%)`,
-        border: `1px solid ${GOLD}33`,
+        // ボーダー無し: 金ボーダーが背景グラデの境目で「がび」って見えていた。
+        // ボックスシャドウで浮かせれば縁の存在感は出る。
         boxShadow: "0 8px 24px rgba(0,0,0,.18)",
         textDecoration: "none",
         position: "relative",
