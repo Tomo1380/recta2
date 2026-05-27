@@ -24,7 +24,6 @@ import {
   Map as MapIcon,
   Wine,
   Heart,
-  Shirt,
   Calculator,
   Wallet,
   Instagram,
@@ -169,6 +168,7 @@ interface Review {
 
 // New JSONB shapes (DB redesign 2026-05)
 export interface DressExample {
+  /** @deprecated 画像は廃止。旧データ互換のため optional 残置。 */
   image_url?: string;
   note?: string;
 }
@@ -1051,9 +1051,21 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           )}
 
           {/* ============================================================ */}
-          {/* 9. Interview Info (+ Required documents as sub-block) */}
+          {/* 9. Interview Info (+ Required documents + Dress code as sub-blocks) */}
           {/* ============================================================ */}
-          {(store.interview_info || store.required_documents) && (
+          {(() => {
+            const dressDetail = store.dress_code_detail
+              ?? (typeof store.dress_code === "object" ? (store.dress_code as DressCodeObject | null) : null);
+            const dressFallbackString = typeof store.dress_code === "string" ? store.dress_code : null;
+            const hasDress = !!(
+              dressDetail?.description
+              || (dressDetail?.ok_examples ?? []).length > 0
+              || (dressDetail?.ng_examples ?? []).length > 0
+              || dressFallbackString
+            );
+            const showSection = !!(store.interview_info || store.required_documents || hasDress);
+            if (!showSection) return null;
+            return (
             <SectionCard
               icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
               title="面接情報"
@@ -1167,9 +1179,33 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     )}
                   </div>
                 )}
+
+                {/* ドレスコード — 旧 DressCodeSection (独立カード) を統合。
+                    画像がある時はサムネ + OK/NG バッジ、画像が無ければ note を
+                    bullet テキストだけで列挙する。情報量が薄い時にカード 1 枚
+                    使わなくて済むよう、面接情報内のサブブロックに同居。 */}
+                {hasDress && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
+                      ドレスコード
+                    </h3>
+                    {(dressDetail?.description || dressFallbackString) && (
+                      <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+                        {dressDetail?.description || dressFallbackString}
+                      </p>
+                    )}
+                    {(dressDetail?.ok_examples ?? []).length > 0 && (
+                      <DressExampleList items={dressDetail?.ok_examples ?? []} variant="ok" />
+                    )}
+                    {(dressDetail?.ng_examples ?? []).length > 0 && (
+                      <DressExampleList items={dressDetail?.ng_examples ?? []} variant="ng" />
+                    )}
+                  </div>
+                )}
               </div>
             </SectionCard>
-          )}
+            );
+          })()}
 
           {/* LINE CTA #2 — 面接情報の直後。「面接前の不安、LINEで」の文脈で
               必要書類を含む面接ブロックの締めとして置く。 */}
@@ -1209,13 +1245,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           {/* ============================================================ */}
           <RectaEpisodesSection episodes={store.recta_episodes} />
 
-          {/* ============================================================ */}
-          {/* 11d. Dress code OK / NG examples */}
-          {/* ============================================================ */}
-          <DressCodeSection
-            detail={store.dress_code_detail ?? (typeof store.dress_code === "object" ? (store.dress_code as DressCodeObject | null) : undefined)}
-            fallback={typeof store.dress_code === "string" ? store.dress_code : null}
-          />
+          {/* ドレスコードは「面接情報」セクション内に統合 (画像も廃止し
+              テキストだけに簡素化)。独立 SectionCard は廃止。 */}
 
           {/* ============================================================ */}
           {/* 11e. Salary simulator (interactive, derived from hourly_min/max) */}
@@ -3122,55 +3153,11 @@ function RectaEpisodesSection({ episodes }: { episodes?: RectaEpisode[] | null }
 }
 
 // ── Dress code OK / NG examples ───────────────────────────────────────────
-function DressCodeSection({
-  detail,
-  fallback,
-}: {
-  detail?: DressCodeObject | null;
-  fallback?: string | null;
-}) {
-  const ok = detail?.ok_examples ?? [];
-  const ng = detail?.ng_examples ?? [];
-  const description = detail?.description;
-
-  if (ok.length === 0 && ng.length === 0 && !description && !fallback) return null;
-
-  return (
-    <SectionCard
-      icon={<Shirt size={20} style={{ color: GOLD_HEX }} />}
-      title="ドレスコード"
-    >
-      {(description || fallback) && (
-        <p
-          className="mb-4 text-sm leading-relaxed"
-          style={{ color: "rgba(27,37,40,0.7)" }}
-        >
-          {description || fallback}
-        </p>
-      )}
-
-      {ok.length > 0 && (
-        <div className="mb-4 space-y-2">
-          <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
-            OKな例
-          </p>
-          <DressGallery items={ok} variant="ok" />
-        </div>
-      )}
-
-      {ng.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
-            NGな例
-          </p>
-          <DressGallery items={ng} variant="ng" />
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function DressGallery({
+// 旧 DressCodeSection / DressGallery (独立カード + サムネ 3 列) は廃止し、
+// 「面接情報」セクション内のサブブロックとして DressExampleList (テキストのみ)
+// を使う。OK/NG 画像 (image_url) は運用上不要と判断したため、表示も入力も廃止。
+// 既存データの image_url は読み捨て (mute) する。
+function DressExampleList({
   items,
   variant,
 }: {
@@ -3179,44 +3166,22 @@ function DressGallery({
 }) {
   const badgeBg = variant === "ok" ? "rgba(34,197,94,0.95)" : "rgba(220,38,38,0.95)";
   const badgeText = variant === "ok" ? "OK" : "NG";
+  const notes = items.map((it) => it.note?.trim()).filter((s): s is string => !!s);
+  if (notes.length === 0) return null;
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {items.map((item, i) => (
-        <div
-          key={i}
-          className="overflow-hidden rounded-[10px]"
-          style={{ border: "1px solid rgba(27,37,40,0.08)" }}
-        >
-          <div className="relative aspect-[3/4] w-full bg-[rgba(27,37,40,0.04)]">
-            {item.image_url ? (
-              <img
-                src={item.image_url}
-                alt={`${badgeText}例 ${i + 1}`}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shirt size={28} style={{ color: "rgba(27,37,40,0.3)" }} />
-              </div>
-            )}
-            <span
-              className="absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
-              style={{ backgroundColor: badgeBg }}
-            >
-              {badgeText}
-            </span>
-          </div>
-          {item.note && (
-            <p
-              className="px-2 py-1.5 text-[11px] leading-snug"
-              style={{ color: "rgba(27,37,40,0.6)" }}
-            >
-              {item.note}
-            </p>
-          )}
-        </div>
+    <ul className="space-y-1">
+      {notes.map((note, i) => (
+        <li key={i} className="flex items-baseline gap-2 text-sm" style={{ color: "rgba(27,37,40,0.75)" }}>
+          <span
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
+            style={{ backgroundColor: badgeBg }}
+          >
+            {badgeText}
+          </span>
+          <span>{note}</span>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

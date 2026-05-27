@@ -440,53 +440,10 @@ function SliderField({
  * 返ってきた public URL を value に流す。
  * StaffPhotosEditor / DressCode OK・NG など複数箇所で再利用。
  */
-function ImageUrlInput({
-  value,
-  onChange,
-  kind,
-  placeholder = "https://example.com/image.jpg",
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  kind: string;
-  placeholder?: string;
-}) {
-  const { uploadFile, uploading, error } = useFileUpload(kind);
-  return (
-    <div>
-      <div className="flex gap-2 items-start">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="flex-1 w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/50"
-        />
-        <label
-          className="shrink-0 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-border bg-white text-[12px] cursor-pointer hover:bg-accent transition disabled:opacity-50 whitespace-nowrap"
-          aria-disabled={uploading}
-        >
-          <Upload className="w-3.5 h-3.5" />
-          {uploading ? "..." : "画像を選択"}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={uploading}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const url = await uploadFile(file);
-                if (url) onChange(url);
-              }
-              e.target.value = ""; // 同じファイル再選択を許可
-            }}
-          />
-        </label>
-      </div>
-      {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
-    </div>
-  );
-}
+// ImageUrlInput (URL 入力 + 「画像を選択」ボタン) は元々ドレスコード
+// OK/NG / 在籍女性ギャラリー /etc の単一画像 URL フィールドで使っていた。
+// ドレスコード OK/NG の画像を廃止した結果 consumer が無くなったので削除。
+// 必要になったら git history から取り戻せる。
 
 function ImageUploadZone({
   onUpload,
@@ -803,8 +760,9 @@ export function ShopEditPage() {
     lavay: { amount: "", note: "" },
   });
   const [dressCodeDescription, setDressCodeDescription] = useState("");
-  const [dressCodeOk, setDressCodeOk] = useState<{ note: string; image_url: string }[]>([]);
-  const [dressCodeNg, setDressCodeNg] = useState<{ note: string; image_url: string }[]>([]);
+  // 画像 (image_url) は廃止し note のみ。型は将来の互換のため optional 拡張可。
+  const [dressCodeOk, setDressCodeOk] = useState<{ note: string }[]>([]);
+  const [dressCodeNg, setDressCodeNg] = useState<{ note: string }[]>([]);
   const [setFeeList, setSetFeeList] = useState<
     { label: string; amount: string; note: string }[]
   >([]);
@@ -2085,95 +2043,19 @@ export function ShopEditPage() {
               placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
             />
           </Field>
-          <Field label="OKな例" hint="OKな服装の説明文（任意で画像URL）を登録できます">
-            <div className="space-y-2">
-              {dressCodeOk.map((item, i) => (
-                <div key={i} className="flex gap-2 items-start group">
-                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <input
-                      value={item.note}
-                      onChange={(e) => {
-                        const next = [...dressCodeOk];
-                        next[i] = { ...next[i], note: e.target.value };
-                        setDressCodeOk(next);
-                      }}
-                      placeholder="例: 明るめのカラードレス"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                    <ImageUrlInput
-                      value={item.image_url}
-                      onChange={(next) => {
-                        const arr = [...dressCodeOk];
-                        arr[i] = { ...arr[i], image_url: next };
-                        setDressCodeOk(arr);
-                      }}
-                      kind="dress-code"
-                      placeholder="画像URL（任意）または「画像を選択」"
-                    />
-                  </div>
-                  <button
-                    onClick={() => setDressCodeOk(dressCodeOk.filter((_, idx) => idx !== i))}
-                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => setDressCodeOk([...dressCodeOk, { note: "", image_url: "" }])}
-                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
-              >
-                <Plus className="w-3.5 h-3.5" /> OK例を追加
-              </button>
-            </div>
+          <Field label="OKな例" hint="OKな服装の説明をテキストで列挙してください">
+            <DynamicTextList
+              items={dressCodeOk.map((d) => d.note)}
+              setItems={(notes) => setDressCodeOk(notes.map((n) => ({ note: n })))}
+              placeholder="例: 明るめのカラードレス"
+            />
           </Field>
-          <Field label="NGな例" hint="NGな服装の説明文（任意で画像URL）を登録できます">
-            <div className="space-y-2">
-              {dressCodeNg.map((item, i) => (
-                <div key={i} className="flex gap-2 items-start group">
-                  <div className="text-muted-foreground/40 text-xs w-5 text-center shrink-0 pt-3">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <input
-                      value={item.note}
-                      onChange={(e) => {
-                        const next = [...dressCodeNg];
-                        next[i] = { ...next[i], note: e.target.value };
-                        setDressCodeNg(next);
-                      }}
-                      placeholder="例: 黒ドレス・ビジュー付き"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    />
-                    <ImageUrlInput
-                      value={item.image_url}
-                      onChange={(next) => {
-                        const arr = [...dressCodeNg];
-                        arr[i] = { ...arr[i], image_url: next };
-                        setDressCodeNg(arr);
-                      }}
-                      kind="dress-code"
-                      placeholder="画像URL（任意）または「画像を選択」"
-                    />
-                  </div>
-                  <button
-                    onClick={() => setDressCodeNg(dressCodeNg.filter((_, idx) => idx !== i))}
-                    className="p-1.5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition mt-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => setDressCodeNg([...dressCodeNg, { note: "", image_url: "" }])}
-                className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition px-5"
-              >
-                <Plus className="w-3.5 h-3.5" /> NG例を追加
-              </button>
-            </div>
+          <Field label="NGな例" hint="NGな服装の説明をテキストで列挙してください">
+            <DynamicTextList
+              items={dressCodeNg.map((d) => d.note)}
+              setItems={(notes) => setDressCodeNg(notes.map((n) => ({ note: n })))}
+              placeholder="例: 黒ドレス・ビジュー付き"
+            />
           </Field>
         </div>
       </SectionCard>
@@ -2724,18 +2606,13 @@ export function ShopEditPage() {
                   dress_code: dressCodeDescription || dressCodeOk.length > 0 || dressCodeNg.length > 0
                     ? {
                         description: dressCodeDescription || undefined,
+                        // 画像 (image_url) は廃止。note のみ。
                         ok_examples: dressCodeOk
-                          .filter((e) => e.note || e.image_url)
-                          .map((e) => ({
-                            note: e.note || undefined,
-                            image_url: e.image_url || "",
-                          })),
+                          .filter((e) => e.note)
+                          .map((e) => ({ note: e.note })),
                         ng_examples: dressCodeNg
-                          .filter((e) => e.note || e.image_url)
-                          .map((e) => ({
-                            note: e.note || undefined,
-                            image_url: e.image_url || "",
-                          })),
+                          .filter((e) => e.note)
+                          .map((e) => ({ note: e.note })),
                       }
                     : null,
                   payroll_system_type: payrollSystemType || null,

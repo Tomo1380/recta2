@@ -35,7 +35,10 @@ export type TransferZoneDraft = {
   fee: string;
   color: string;
 };
-export type DressExampleDraft = { note: string; image_url: string };
+// 画像 (image_url) は運用上不要と判断し、UI から撤去。既存データの
+// image_url は読み込み時に捨てる (formToPayload で送らない)。型としては
+// 残しても害がないので、note のみのオブジェクトに簡略化。
+export type DressExampleDraft = { note: string };
 export type ChampagnePriceDraft = { amount: string; note: string };
 export type ChampagneKey = "tequila" | "belle_epoque" | "armand" | "lavay";
 export type RectaEpisodeDraft = {
@@ -346,11 +349,13 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     store.dress_code_detail ??
     (typeof store.dress_code === "object" ? store.dress_code : null);
   const dressCodeDescription: string = dressDetail?.description ?? "";
+  // image_url は廃止。既存データに残っていても捨てる (DB 上はキーが
+  // 残るが UI / payload に出さなければ次回保存で消える)。
   const dressCodeOk: DressExampleDraft[] = (dressDetail?.ok_examples ?? []).map(
-    (e: AnyStore) => ({ note: e?.note ?? "", image_url: e?.image_url ?? "" }),
+    (e: AnyStore) => ({ note: e?.note ?? "" }),
   );
   const dressCodeNg: DressExampleDraft[] = (dressDetail?.ng_examples ?? []).map(
-    (e: AnyStore) => ({ note: e?.note ?? "", image_url: e?.image_url ?? "" }),
+    (e: AnyStore) => ({ note: e?.note ?? "" }),
   );
 
   const sf = store.set_fee ?? {};
@@ -632,18 +637,13 @@ export function formToPayload(
       form.dressCodeNg.length > 0
         ? {
             description: form.dressCodeDescription.trim() || undefined,
+            // 画像 (image_url) は廃止。note のみを送る。
             ok_examples: form.dressCodeOk
-              .filter((e) => e.note.trim() || e.image_url.trim())
-              .map((e) => ({
-                note: e.note.trim() || undefined,
-                image_url: e.image_url.trim() || undefined,
-              })),
+              .filter((e) => e.note.trim())
+              .map((e) => ({ note: e.note.trim() })),
             ng_examples: form.dressCodeNg
-              .filter((e) => e.note.trim() || e.image_url.trim())
-              .map((e) => ({
-                note: e.note.trim() || undefined,
-                image_url: e.image_url.trim() || undefined,
-              })),
+              .filter((e) => e.note.trim())
+              .map((e) => ({ note: e.note.trim() })),
           }
         : null,
     set_fee:

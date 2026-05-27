@@ -904,11 +904,11 @@ class StoreSeeder extends Seeder
                 'dress_code' => [
                     'description' => 'ドレス必須。露出控えめ・上品な装い推奨。レンタル可。',
                     'ok_examples' => [
-                        ['image_url' => 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600&q=80', 'note' => '黒・ネイビーの上品ロングドレス'],
-                        ['image_url' => 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=600&q=80', 'note' => '袖ありの落ち着いた色味'],
+                        ['note' => '黒・ネイビーの上品ロングドレス'],
+                        ['note' => '袖ありの落ち着いた色味'],
                     ],
                     'ng_examples' => [
-                        ['image_url' => 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&q=80', 'note' => '露出の多すぎるミニ丈は不可'],
+                        ['note' => '露出の多すぎるミニ丈は不可'],
                     ],
                 ],
                 'set_fee' => [
@@ -1089,7 +1089,7 @@ class StoreSeeder extends Seeder
                 'dress_code' => [
                     'description' => 'ドレス貸出無料。お店に常時20着以上ストック。',
                     'ok_examples' => [
-                        ['image_url' => 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600&q=80', 'note' => '華やかなロングドレス'],
+                        ['note' => '華やかなロングドレス'],
                     ],
                 ],
                 'set_fee' => [
