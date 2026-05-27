@@ -2483,11 +2483,17 @@ function EmptyValue() {
 function AnalysisSection({ analysis }: { analysis: Analysis }) {
   // 各項目が 0 (未入力) のときは個別に非表示。全部 0 / 空ならセクション自体を
   // 出さない (StoreDetailPage 側で `hasAnalysis` を計算して条件 render する)。
+  // 各スタイルの「イメージ」を視覚化する色。元のセットは派手系が真っ黒で
+  // 暗すぎ、素人系が薄ピンクで可愛い系と判別しづらいフィードバックあり。
+  //   綺麗系   = エレガント / 大人 → シャンパンゴールド
+  //   可愛い系 = フェミニン / 甘い → ローズピンク
+  //   派手系   = 華やか / 濃いめ → ワインレッド (バーガンディ)
+  //   素人系   = ナチュラル / 透明感 → ソフトベージュ
   const castSegments = [
     { label: "綺麗系", value: analysis.cast_style.beauty, color: "#D4AF37" },
-    { label: "可愛い系", value: analysis.cast_style.cute, color: "rgba(200,96,128,1)" },
-    { label: "派手系", value: analysis.cast_style.glamour, color: "#1b2528" },
-    { label: "素人系", value: analysis.cast_style.natural, color: "rgba(200,96,128,0.5)" },
+    { label: "可愛い系", value: analysis.cast_style.cute, color: "#E89BB0" },
+    { label: "派手系", value: analysis.cast_style.glamour, color: "#9D4B5C" },
+    { label: "素人系", value: analysis.cast_style.natural, color: "#C9B89A" },
   ];
   const castTotal = castSegments.reduce((sum, s) => sum + (Number(s.value) || 0), 0);
   const hasCast = castTotal > 0;
@@ -2568,10 +2574,10 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
               // Show the in-bar label only when the segment is wide enough
               // for the text to fit cleanly (~8% of the bar).
               const showLabel = pct >= 8;
-              // Use white text on segments where charcoal text wouldn't hit
-              // WCAG AA (4.5:1) at 10px: the dark navy and the saturated
-              // pink both fail the contrast check otherwise.
-              const useWhiteText = seg.color === "#1b2528" || seg.color === "rgba(200,96,128,1)";
+              // WCAG AA (4.5:1) at 10px を満たすため、暗い背景には白テキスト。
+              // 新色セットだと派手系 (バーガンディ #9D4B5C) のみ白テキストが必要。
+              // 残り (ゴールド / ローズピンク / ベージュ) はチャコール文字で OK。
+              const useWhiteText = seg.color === "#9D4B5C";
               return (
                 <div
                   key={seg.label}
