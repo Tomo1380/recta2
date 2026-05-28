@@ -23,6 +23,21 @@ if [ -f .env.prod ]; then
   . ./.env.prod
   set +a
 fi
+
+# build cache 対策: 過去に「build args が空でビルドされた image」が
+# キャッシュとして残ると、後で値が入っても BuildKit がレイヤー再利用して
+# しまうケースがある (= マップ用 API キーが bundle に焼き込まれない事故)。
+# VITE_GOOGLE_MAPS_API_KEY が前回ビルド時と変わっていたら node だけ
+# --no-cache で焼き直す。stamp ファイルで前回値を覚えておく。
+STAMP=/tmp/recta2-vite-args.stamp
+NEW="${VITE_GOOGLE_MAPS_API_KEY:-}"
+OLD="$(cat "$STAMP" 2>/dev/null || true)"
+if [ "$NEW" != "$OLD" ]; then
+  echo "    VITE_* args changed — rebuilding node with --no-cache"
+  docker compose -f docker-compose.prod.yml build --no-cache node
+  printf '%s' "$NEW" > "$STAMP"
+fi
+
 docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
 echo "=== Running migrations ==="
