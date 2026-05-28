@@ -30,6 +30,8 @@ export type LineCtaSource =
   | "store-detail:chat-inline"
   | "store-detail:docs-inline"
   | "store-detail:map-card"
+  | "store-detail:bottom-card"
+  | "store-detail:floating"
   | "store-detail:compare-result"
   | "store-detail:chat-end"
   | "column:end"

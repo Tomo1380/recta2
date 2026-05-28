@@ -43,6 +43,8 @@ import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { LineIcon } from "~/components/user/shared/LineIcon";
+import { openLineFriendAdd } from "~/lib/line";
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
 import CompareToggle from "~/components/user/shared/CompareToggle";
 import StoreMap from "~/components/shared/StoreMap";
@@ -748,39 +750,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           </div>
 
           {/* ============================================================ */}
-          {/* 2. AI Chat (replaces old Shop Intro Card — chat intro summarizes store info) */}
-          {/* ============================================================ */}
-          <AiChatPanel
-            pageType="detail"
-            storeId={store.id}
-            storeName={store.name}
-            storeInfo={{
-              name: store.name,
-              area: store.area,
-              category: store.category,
-              nearest_station: store.nearest_station,
-              hourly_min: store.hourly_min ?? undefined,
-              hourly_max: store.hourly_max ?? undefined,
-              feature_tags: store.feature_tags,
-              description: store.description,
-              business_hours: store.business_hours,
-              // 後方互換: AiChatPanel.StoreContext は same_day_trial: boolean
-              // を期待しているので、即日体入のときだけ true を渡す。
-              same_day_trial: store.trial_type === "same_day",
-              trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
-            }}
-          />
-
-          {/* LINE CTA #1 — between AI chat and video */}
-          <LineCtaCard
-            variant="slim"
-            title="チャットでは聞きにくいことも"
-            description="担当スタッフがLINEで直接お答えします"
-            ctaLabel="相談する"
-            source="store-detail:chat-inline"
-          />
-
-          {/* ============================================================ */}
           {/* 3. Store videos — multiple videos with labels & descriptions */}
           {/*    Renders display_order ascending. Each video is               */}
           {/*    play-to-stick; only one can be `stuck`/`mini` at a time      */}
@@ -1234,18 +1203,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             );
           })()}
 
-          {/* LINE CTA #2 — 面接情報の直後。「面接前の不安、LINEで」の文脈で
-              必要書類を含む面接ブロックの締めとして置く。 */}
-          {store.required_documents && (
-            <LineCtaCard
-              variant="slim"
-              title="面接前の不安、LINEで気軽に質問"
-              description="服装・持ち物・当日の流れまで個別にサポート"
-              ctaLabel="質問する"
-              source="store-detail:docs-inline"
-            />
-          )}
-
           {/* ============================================================ */}
           {/* 11a. Transfer / 足代 — distance-based zone fee map + table */}
           {/* ============================================================ */}
@@ -1258,14 +1215,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           />
 
           {/* ============================================================ */}
-          {/* 11b. Champagne prices + Set fee — お店の単価が分かる「価格表」系を
-                  隣接させる (運営要望)。 */}
+          {/* 11b. Champagne prices — シャンパン価格表 */}
+          {/* セット料金は「アクセス」直下に移動 (運営要望)。 */}
           {/* ============================================================ */}
           <ChampagnePricesSection
             prices={store.champagne_prices}
             fallback={store.champagne_description}
           />
-          <SetFeeSection setFee={store.set_fee} />
 
           {/* ============================================================ */}
           {/* 11c. Recta-keiyū episodes (レクタ経由入店女性エピソード) */}
@@ -1469,13 +1425,40 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             </div>
           </SectionCard>
 
-          {/* LINE CTA #3 — between access map and recently-viewed list */}
+          {/* ============================================================ */}
+          {/* 15b. Set fee (セット料金) — アクセスの直下 (運営要望) */}
+          {/* ============================================================ */}
+          <SetFeeSection setFee={store.set_fee} />
+
+          {/* ============================================================ */}
+          {/* 15c. AI Chat + LINE CTA — 店舗詳細の下部に集約 (運営要望)。
+                  動画/紹介と「もう一押し」が分離していたのを統合し、CTA は
+                  最下部 1 箇所に絞る。 */}
+          {/* ============================================================ */}
+          <AiChatPanel
+            pageType="detail"
+            storeId={store.id}
+            storeName={store.name}
+            storeInfo={{
+              name: store.name,
+              area: store.area,
+              category: store.category,
+              nearest_station: store.nearest_station,
+              hourly_min: store.hourly_min ?? undefined,
+              hourly_max: store.hourly_max ?? undefined,
+              feature_tags: store.feature_tags,
+              description: store.description,
+              business_hours: store.business_hours,
+              same_day_trial: store.trial_type === "same_day",
+              trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
+            }}
+          />
           <LineCtaCard
             variant="card"
             title="気になったら、直接聞いてみよう"
             description="体入予約・条件交渉までLINEで完結"
             ctaLabel="LINE追加"
-            source="store-detail:map-card"
+            source="store-detail:bottom-card"
           />
 
           {/* ============================================================ */}
@@ -1509,10 +1492,37 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
       </div>
 
+      {/* Floating LINE 相談 — 右下固定。プレビュー時は非表示。
+          BottomTabBar (layout 側) との重なりを避けるため、モバイルでは
+          tab bar の上に来るよう bottom 値を tab bar 高さ分だけ持ち上げる。 */}
+      {!previewData && <LineFloatingButton />}
+
       {/* BottomTabBar is rendered by routes/user/layout.tsx. The admin shop
           preview imports StoreDetailPage directly (outside that layout), so the
           tab bar naturally doesn't leak into admin views. */}
     </>
+  );
+}
+
+// Floating LINE 相談 button — 右下固定。store-detail 専用。
+function LineFloatingButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => openLineFriendAdd("store-detail:floating")}
+      aria-label="LINE で相談"
+      className="fixed z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+      style={{
+        right: 16,
+        // モバイルは BottomTabBar (約 64px) を避け、PC は通常位置。
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+        backgroundColor: "#06C755",
+        boxShadow: "0 6px 20px rgba(6,199,85,0.4)",
+      }}
+    >
+      <LineIcon size={20} />
+      <span className="hidden sm:inline">LINEで相談</span>
+    </button>
   );
 }
 
@@ -3182,10 +3192,10 @@ function ChampagneBottleSlot({
       <img
         src={src}
         alt={alt}
-        className="h-[88px] w-auto object-contain"
+        className="h-[60px] w-auto object-contain"
         style={{
           filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.5))",
-          maxWidth: 80,
+          maxWidth: 60,
         }}
         onError={(e) => {
           // Hide cleanly when the bottle asset hasn't been shipped yet.
@@ -3792,7 +3802,7 @@ function RelatedStoresSection({
   );
 }
 
-// ── Reviews section (3 visible + blur for 4+) ─────────────────────────────
+// ── Reviews section (1 visible by default + 「もっと見る」 expand) ───────
 function ReviewsSection({
   storeId,
   reviews,
@@ -3802,16 +3812,20 @@ function ReviewsSection({
   reviews: Review[];
   reviewsCount: number;
 }) {
-  // 口コミ投稿と同じ判定 (LINE ログイン済みか) を使う。
-  // 未ログイン: 3件 + blur ゲート / ログイン済み: 全件表示。
+  // 未ログイン: 1件 + blur ゲート / ログイン済み: 初期1件 + もっと見るで展開。
   // admin プレビュー時は UserAuthProvider 外なので safe 版を使い、
   // Provider 不在なら未ログイン扱いで blur ゲート表示にする。
   const userAuth = useUserAuthSafe();
   const isAuthenticated = userAuth?.isAuthenticated ?? false;
-  const visible = isAuthenticated ? reviews : reviews.slice(0, 3);
-  const hidden = isAuthenticated ? [] : reviews.slice(3);
+  const [expanded, setExpanded] = useState(false);
+  const INITIAL_VISIBLE = 1;
+  const visible = isAuthenticated
+    ? (expanded ? reviews : reviews.slice(0, INITIAL_VISIBLE))
+    : reviews.slice(0, INITIAL_VISIBLE);
+  const hidden = isAuthenticated ? [] : reviews.slice(INITIAL_VISIBLE);
   // ログイン済みなら「続きはログインで全件公開」CTA は出さない。
   const hasHidden = !isAuthenticated && (hidden.length > 0 || reviewsCount > visible.length);
+  const canExpand = isAuthenticated && reviews.length > INITIAL_VISIBLE;
 
   // Compute summary stats from visible reviews (or fallbacks if none)
   const ratings = reviews.map((r) => r.rating ?? 0).filter((n) => n > 0);
@@ -4007,7 +4021,25 @@ function ReviewsSection({
           </button>
         </div>
       )}
-      {!hasHidden && <div className="pb-5" />}
+      {/* もっと見る / 折りたたむ ボタン (ログイン済み・口コミ2件以上) */}
+      {canExpand && (
+        <div className="flex justify-center pb-5 pt-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-full border bg-white px-5 py-2 text-xs font-semibold transition-colors hover:bg-[rgba(212,175,55,0.08)]"
+            style={{
+              color: GOLD_HEX,
+              borderColor: "rgba(212,175,55,0.45)",
+            }}
+          >
+            {expanded
+              ? "閉じる"
+              : `もっと見る (あと${reviews.length - INITIAL_VISIBLE}件)`}
+          </button>
+        </div>
+      )}
+      {!hasHidden && !canExpand && <div className="pb-5" />}
     </div>
   );
 }

@@ -174,7 +174,6 @@ async function streamMessage(
   history: { role: string; content: string }[],
   mode: ChatMode,
   storeId: number | undefined,
-  userArea: string | undefined,
   signal: AbortSignal,
   handlers: StreamHandlers,
 ): Promise<void> {
@@ -196,7 +195,6 @@ async function streamMessage(
       store_id: storeId,
       history,
       mode,
-      user_area: userArea,
     }),
     signal,
   });
@@ -642,25 +640,16 @@ export default function AiChatPanel({
   const [limitReached, setLimitReached] = useState(false);
 
   // Intro animation state.
-  // BUG-E15: タブ切替などで AiChatPanel が再マウントされると intro が再生され、
-  // 「条件に合うお店を探したいです」が勝手に挿入されるバグの原因だった。
-  // sessionStorage で同一セッション内では再生済みフラグを保持する。
-  const introStorageKey = `recta:intro-played:${pageType}`;
+  // 以前は sessionStorage に「再生済み」フラグを保存していたが、
+  // 「リロード時に intro が出ないことがある」フィードバックを受けて撤廃。
+  // ページ遷移・リロード時は必ず再生する。再マウント時の再注入は
+  // setHasSent (ユーザーが何か送信したら以後 intro はスキップ) で防ぐ。
   const [introPhase, setIntroPhase] = useState<
     "idle" | "typing-user" | "show-user" | "typing-ai" | "show-ai" | "done"
   >("idle");
   const [introUserText, setIntroUserText] = useState("");
   const [introAiText, setIntroAiText] = useState("");
-  const [introPlayed, setIntroPlayed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return sessionStorage.getItem(introStorageKey) === "1";
-    } catch {
-      return false;
-    }
-  });
-
-  const [userArea, setUserArea] = useState<string>("");
+  const [introPlayed, setIntroPlayed] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -673,35 +662,6 @@ export default function AiChatPanel({
   useEffect(() => () => {
     abortRef.current?.abort();
     abortRef.current = null;
-  }, []);
-
-  // ---- Detect user area from geolocation (best-effort, once) ----
-  useEffect(() => {
-    if (preview) return;
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&accept-language=ja`,
-          );
-          const data = await res.json();
-          const area =
-            data?.address?.city ||
-            data?.address?.town ||
-            data?.address?.county ||
-            data?.address?.state ||
-            "";
-          if (area) setUserArea(area);
-        } catch {
-          // silently ignore
-        }
-      },
-      () => {
-        // permission denied or error — default to empty (Tokyo assumed)
-      },
-      { timeout: 5000 },
-    );
   }, []);
 
   // ---- Load config ----
@@ -731,6 +691,11 @@ export default function AiChatPanel({
     const el = panelRef.current;
     if (!el) return;
 
+    // threshold は低めに (0.05)。チャットパネルが viewport より大きい場合に
+    // 0.3 達しないことがあり、その場合 intro が一切始まらないバグになる。
+    // 加えてフォールバックで 1.5 秒後に強制的に再生開始する: モバイルの
+    // ヘッダー固定で IntersectionObserver の発火タイミングが
+    // 想定外になるケースを救う。
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && introPhase === "idle") {
@@ -738,11 +703,18 @@ export default function AiChatPanel({
           observer.disconnect();
         }
       },
-      { threshold: 0.3 },
+      { threshold: 0.05 },
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+    const fallback = setTimeout(() => {
+      if (introPhase === "idle") setIntroPhase("typing-user");
+    }, 1500);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
   }, [introPlayed, introPhase, messages.length, preview]);
 
   // ---- Intro animation: typewriter effect ----
@@ -783,13 +755,6 @@ export default function AiChatPanel({
           setTimeout(() => {
             setIntroPhase("done");
             setIntroPlayed(true);
-            // BUG-E15: 同一セッション内では再生済みとして記録、再マウントで
-            // 「条件に合うお店を探したいです」が再注入されないようにする。
-            try {
-              sessionStorage.setItem(introStorageKey, "1");
-            } catch {
-              /* ignore */
-            }
           }, 500);
         }
       }, 30);
@@ -874,7 +839,6 @@ export default function AiChatPanel({
           history,
           mode,
           storeId,
-          userArea,
           controller.signal,
           {
             onStatus: (label) => {
@@ -944,7 +908,7 @@ export default function AiChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, messages, pageType, storeId, introPhase, mode, userArea, limitReached, preview],
+    [input, isLoading, messages, pageType, storeId, introPhase, mode, limitReached, preview],
   );
 
   if (!enabled) return null;
