@@ -582,6 +582,7 @@ function SheetChip({
 // ---------------------------------------------------------------------------
 
 const SORT_TABS = [
+  { id: "priority", label: "おすすめ順" },
   { id: "experience_guaranteed", label: "当日体入" },
   { id: "hourly_desc", label: "時給順" },
   { id: "popular", label: "評価順" },
@@ -593,7 +594,7 @@ export default function StoreListPage() {
 
   const currentArea = searchParams.get("area") || "";
   const currentCategory = searchParams.get("category") || "";
-  const currentSort = searchParams.get("sort") || "newest";
+  const currentSort = searchParams.get("sort") || "priority";
   const currentQuery = searchParams.get("q") || "";
 
   const [searchInput, setSearchInput] = useState(currentQuery);

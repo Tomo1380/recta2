@@ -142,6 +142,11 @@ export interface ShopForm {
   // SEO
   /** 検索結果用 meta description (120〜140 文字推奨)。空なら自動生成。 */
   seoMetaDescription: string;
+
+  /** 表示優先度 (-1000〜1000)。値が大きいほど一覧で上位に。デフォルト 0。
+   *  number に寄せず string で持つことで、空入力 = 0 扱いと数値編集中の
+   *  「-」「途中数字」を許容する。submit 時に payload で number に変換。 */
+  priority: string;
 }
 
 const EMPTY_CHAMPAGNE = (): Record<ChampagneKey, ChampagnePriceDraft> => ({
@@ -175,6 +180,7 @@ export const INITIAL_FORM: ShopForm = {
   rectaEpisodes: [], qaItems: [],
   staffName: "", staffRole: "", staffComment: "", supportItems: [],
   seoMetaDescription: "",
+  priority: "0",
 };
 
 type ShopFormAction =
@@ -490,6 +496,10 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
       (staffObj as AnyStore | null)?.support_items ??
       [],
     seoMetaDescription: store.seo_meta_description ?? "",
+    priority:
+      typeof (store as AnyStore).priority === "number"
+        ? String((store as AnyStore).priority)
+        : "0",
   };
 }
 
@@ -685,6 +695,10 @@ export function formToPayload(
       })),
     seo_meta_description: form.seoMetaDescription.trim() || null,
     publish_status: publishStatus,
+    priority: (() => {
+      const v = parseInt(form.priority, 10);
+      return Number.isFinite(v) ? v : 0;
+    })(),
     // images はサーバ側で別エンドポイント (POST /admin/stores/:id/images) で
     // 管理しているため、buildPayload には含めない。storeImages は extras で
     // 受け取るが、payload に挿入する必要がある場合のみ呼び出し側で merge する。

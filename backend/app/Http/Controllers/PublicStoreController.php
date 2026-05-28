@@ -68,10 +68,11 @@ class PublicStoreController extends Controller
         // で空が返るバグになっていた (BUG-E02)。
         $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
 
-        // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+        // 体験確約フラグでの絞り込み。フロントの「当日体入」タブ (BUG-E09)
         // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
         // 絞り込み。「即日体入」リボンを出している店舗を抽出。
-        $sort = $request->input('sort', 'newest');
+        // デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
+        $sort = $request->input('sort', 'priority');
         if ($sort === 'experience_guaranteed') {
             $query->where('guarantee->same_day_trial', 'same_day');
         }
@@ -102,8 +103,14 @@ class PublicStoreController extends Controller
                 $query->orderByRaw("$avgSql desc nulls last")
                       ->orderByRaw("$countSql desc");
                 break;
-            default: // newest
+            case 'newest':
                 $query->orderByDesc('created_at');
+                break;
+            case 'priority':
+            default:
+                // 表示優先度順 (priority desc)、同値内は新しい順。
+                // 「おすすめ順」「表示優先」のフロントタブとは同じ実装。
+                $query->orderByDesc('priority')->orderByDesc('created_at');
         }
 
         $stores = $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])

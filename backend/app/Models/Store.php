@@ -27,6 +27,7 @@ class Store extends Model
         'dress_code', 'set_fee',
         'recta_episodes', 'related_store_ids',
         'experience_guaranteed', 'publish_status',
+        'priority',
         'seo_meta_description',
     ];
 

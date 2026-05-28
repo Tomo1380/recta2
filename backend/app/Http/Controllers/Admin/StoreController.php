@@ -86,6 +86,7 @@ class StoreController extends Controller
             'champagne_description' => 'nullable|string',
             'experience_guaranteed' => 'nullable|boolean',
             'publish_status' => 'nullable|in:published,unpublished,draft',
+            'priority' => 'nullable|integer|between:-1000,1000',
             'seo_meta_description' => 'nullable|string|max:500',
 
             // JSONB columns (free-form arrays)
@@ -156,6 +157,7 @@ class StoreController extends Controller
             'dress_code', 'set_fee',
             'recta_episodes', 'related_store_ids',
             'experience_guaranteed', 'publish_status',
+            'priority',
             'seo_meta_description',
         ];
     }
