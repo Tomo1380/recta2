@@ -1326,8 +1326,18 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
           {/* ============================================================ */}
           {/* 13. Staff Comment */}
+          {/* JSONB 上は staff_comment が常に dict で来るが、name/comment が
+              すべて null の店舗もある (= 運営未入力)。中身が全部空ならカード
+              ごと非表示。name.charAt(0) が null で落ちる事故も同時に防ぐ。 */}
           {/* ============================================================ */}
-          {store.staff_comment && (
+          {(() => {
+            const sc = store.staff_comment;
+            const name = sc?.name?.trim() ?? "";
+            const role = sc?.role?.trim() ?? "";
+            const comment = sc?.comment?.trim() ?? "";
+            const supports = sc?.supports ?? [];
+            if (!name && !role && !comment && supports.length === 0) return null;
+            return (
             <SectionCard
               icon={<MessageSquare size={20} style={{ color: "#D4AF37" }} />}
               title="スタッフコメント"
@@ -1339,23 +1349,27 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold"
                     style={{ backgroundColor: "rgba(212,175,55,0.12)", color: "#D4AF37" }}
                   >
-                    {store.staff_comment.name.charAt(0)}
+                    {name ? name.charAt(0) : "?"}
                   </div>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
-                      {store.staff_comment.name} / Recta キャリアアドバイザー
+                      {name || "—"} / Recta キャリアアドバイザー
                     </p>
-                    <p className="text-xs" style={{ color: "rgba(27,37,40,0.45)" }}>
-                      {store.staff_comment.role}
-                    </p>
+                    {role && (
+                      <p className="text-xs" style={{ color: "rgba(27,37,40,0.45)" }}>
+                        {role}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
-                  {store.staff_comment.comment}
-                </p>
-                {(store.staff_comment.supports ?? []).length > 0 && (
+                {comment && (
+                  <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+                    {comment}
+                  </p>
+                )}
+                {supports.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {(store.staff_comment.supports ?? []).map((s, i) => (
+                    {supports.map((s, i) => (
                       <span
                         key={i}
                         className="rounded-full px-2.5 py-0.5 text-xs font-medium"
@@ -1368,7 +1382,8 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                 )}
               </div>
             </SectionCard>
-          )}
+            );
+          })()}
 
           {/* ============================================================ */}
           {/* 15. Access / Map */}
@@ -1631,7 +1646,7 @@ function LuxeHero({
                 textShadow: "0 8px 30px rgba(0,0,0,0.6)",
               }}
             >
-              {name.charAt(0)}
+              {name ? name.charAt(0) : "?"}
             </span>
           </div>
         </div>
@@ -3224,7 +3239,7 @@ function RectaEpisodesSection({ episodes }: { episodes?: RectaEpisode[] | null }
                     color: GOLD_HEX,
                   }}
                 >
-                  {ep.name.charAt(0)}
+                  {ep.name ? ep.name.charAt(0) : "?"}
                 </div>
               )}
             </div>
@@ -3743,7 +3758,7 @@ function RelatedStoresSection({
                   style={{ background: "linear-gradient(135deg, #1b2528, #2a3a3f)" }}
                 >
                   <span style={{ fontSize: "20px", fontWeight: 700, color: GOLD_HEX }}>
-                    {s.name.charAt(0)}
+                    {s.name ? s.name.charAt(0) : "?"}
                   </span>
                 </div>
               )}
