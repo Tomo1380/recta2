@@ -1546,40 +1546,17 @@ function LineFloatingButton() {
         letterSpacing: "0.02em",
       }}
     >
-      {/* LINE アイコン枠 — ゴールド円形バッジ */}
+      {/* LINE アイコン枠 — LINE 緑バッジ */}
       <span
         className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full"
         style={{
-          background:
-            "linear-gradient(135deg, #f0d36a 0%, #d4af37 55%, #9a7a20 100%)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
+          background: "linear-gradient(135deg, #06D660 0%, #06C755 100%)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
         }}
       >
-        <LineIcon size={16} fill="#1b2528" />
-        {/* 受付中シグナル — 右上 4px の小さな金ドット */}
-        <span
-          aria-hidden
-          className="absolute -right-0.5 -top-0.5 size-2 rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, #ffe066 0%, #d4af37 60%, transparent 100%)",
-            boxShadow: "0 0 6px rgba(255,224,102,0.85)",
-          }}
-        />
+        <LineIcon size={16} fill="white" />
       </span>
       <span className="whitespace-nowrap">LINEで相談</span>
-      <span
-        aria-hidden
-        className="text-[10px] font-medium uppercase"
-        style={{
-          color: "rgba(212,175,55,0.7)",
-          fontFamily: "'Outfit', sans-serif",
-          letterSpacing: "0.18em",
-          marginLeft: -4,
-        }}
-      >
-        24h
-      </span>
     </button>
   );
 }
