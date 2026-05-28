@@ -12,7 +12,10 @@ import { AuthProvider } from "~/lib/auth";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
-  { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+  // SVG faviconは現代ブラウザ全部対応。ベクターなのでどの解像度でも綺麗。
+  // 非対応ブラウザ (古い Edge / Safari の一部) は .ico に fallback。
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
   { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
   { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
