@@ -1523,25 +1523,36 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
   );
 }
 
-// Floating LINE 相談 button — 右下固定。store-detail 専用。
-// luxe トーン: 黒地 + ゴールド輪郭 + ゴールド光彩。LINE 緑のベタ塗りではなく
-// 「Recta の世界観」に乗せた控えめ高級感。常時受付シグナルは右上の小さな金ドット
-// (パルスではなく静的な点で、注意ばかり奪わないように)。
+// Floating LINE 相談 button — 画面右下コーナーにアタッチ。
+// 「浮いてる」ではなく「画面端から生えている」見せ方 (Intercom / Zendesk 系)。
+// 右端と下端はピッタリ画面に張り付き、左上角だけ 16px R で「コーナーから
+// 切り取られた」シルエットを作る。ホバーは -translate-y ではなく内側の
+// ゴールド輪郭が明るくなる微小フィードバックで「壁から離さない」。
 function LineFloatingButton() {
   return (
     <button
       type="button"
       onClick={() => openLineFriendAdd("store-detail:floating")}
       aria-label="LINE で相談"
-      className="group fixed z-40 inline-flex items-center gap-2.5 rounded-full px-4 py-3 text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95"
+      className="group fixed z-40 inline-flex items-center gap-2.5 px-4 py-3 text-[13px] font-bold text-white transition-all active:scale-[0.98]"
       style={{
-        right: 16,
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
-        background:
-          "linear-gradient(135deg, #1b2528 0%, #0f1618 100%)",
-        border: "1px solid rgba(212,175,55,0.55)",
+        right: 0,
+        bottom: 0,
+        // 端は直線、左上角だけ大きめに丸める。コーナーから「切り出された」シルエット。
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        paddingRight: "calc(env(safe-area-inset-right, 0px) + 16px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+        background: "linear-gradient(135deg, #1b2528 0%, #0f1618 100%)",
+        // 接合辺 (右辺・下辺) には border を出さず、外側を向く左辺・上辺だけに
+        // ゴールドのヘアラインを出して「壁から生えてる」シルエットを際立たせる。
+        borderTop: "1px solid rgba(212,175,55,0.55)",
+        borderLeft: "1px solid rgba(212,175,55,0.55)",
+        // 影は左上方向に出す (右下は画面端なので影が出ても切れる)。
         boxShadow:
-          "0 8px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(212,175,55,0.18), inset 0 1px 0 rgba(212,175,55,0.18)",
+          "-6px -6px 20px rgba(0,0,0,0.18), -1px -1px 0 rgba(212,175,55,0.08), inset 1px 1px 0 rgba(212,175,55,0.12)",
         fontFamily: "'Noto Sans JP', sans-serif",
         letterSpacing: "0.02em",
       }}
