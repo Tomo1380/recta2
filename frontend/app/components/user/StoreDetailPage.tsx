@@ -764,6 +764,64 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           </div>
 
           {/* ============================================================ */}
+          {/* 2. 動画 1 本目 → AI チャット → 動画 2 本目以降 → 体験入店情報。
+                  ファーストビュー直後に動画 1 本でフックを作り、AIチャット
+                  + LINE CTA で相談導線、さらに動画があれば下に並べる順序。 */}
+          {/* ============================================================ */}
+          {(() => {
+            const videos = (store.videos && store.videos.length > 0)
+              ? store.videos
+              : (store.video_url
+                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
+                  : []);
+            const firstVideo = videos.slice(0, 1);
+            const restVideos = videos.slice(1);
+            return (
+              <>
+                {firstVideo.length > 0 && (
+                  <StoreVideosBlock
+                    videos={firstVideo}
+                    fallbackPosterUrl={sortedImages[0]?.url}
+                    controller={stickyController}
+                  />
+                )}
+                <AiChatPanel
+                  pageType="detail"
+                  storeId={store.id}
+                  storeName={store.name}
+                  storeInfo={{
+                    name: store.name,
+                    area: store.area,
+                    category: store.category,
+                    nearest_station: store.nearest_station,
+                    hourly_min: store.hourly_min ?? undefined,
+                    hourly_max: store.hourly_max ?? undefined,
+                    feature_tags: store.feature_tags,
+                    description: store.description,
+                    business_hours: store.business_hours,
+                    same_day_trial: store.trial_type === "same_day",
+                    trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
+                  }}
+                />
+                <LineCtaCard
+                  variant="card"
+                  title="気になったら、直接聞いてみよう"
+                  description="体入予約・条件交渉までLINEで完結"
+                  ctaLabel="LINE追加"
+                  source="store-detail:chat-inline"
+                />
+                {restVideos.length > 0 && (
+                  <StoreVideosBlock
+                    videos={restVideos}
+                    fallbackPosterUrl={sortedImages[0]?.url}
+                    controller={stickyController}
+                  />
+                )}
+              </>
+            );
+          })()}
+
+          {/* ============================================================ */}
           {/* 4. Experience Entry (体験入店情報) */}
           {/* ============================================================ */}
           <SectionCard
@@ -886,20 +944,6 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               </div>
             )}
           </SectionCard>
-
-          {/* ============================================================ */}
-          {/* 4b. Store videos — 体験入店情報の直下に配置 (運営要望)。
-                  複数動画あり、display_order 昇順。 */}
-          {/* ============================================================ */}
-          <StoreVideosBlock
-            videos={(store.videos && store.videos.length > 0)
-              ? store.videos
-              : (store.video_url
-                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
-                  : [])}
-            fallbackPosterUrl={sortedImages[0]?.url}
-            controller={stickyController}
-          />
 
           {/* ============================================================ */}
           {/* 5. Detailed Info - Shop Features */}
@@ -1441,37 +1485,6 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           {/* 15b. Set fee (セット料金) — アクセスの直下 (運営要望) */}
           {/* ============================================================ */}
           <SetFeeSection setFee={store.set_fee} />
-
-          {/* ============================================================ */}
-          {/* 15c. AI Chat + LINE CTA — 店舗詳細の下部に集約 (運営要望)。
-                  動画/紹介と「もう一押し」が分離していたのを統合し、CTA は
-                  最下部 1 箇所に絞る。 */}
-          {/* ============================================================ */}
-          <AiChatPanel
-            pageType="detail"
-            storeId={store.id}
-            storeName={store.name}
-            storeInfo={{
-              name: store.name,
-              area: store.area,
-              category: store.category,
-              nearest_station: store.nearest_station,
-              hourly_min: store.hourly_min ?? undefined,
-              hourly_max: store.hourly_max ?? undefined,
-              feature_tags: store.feature_tags,
-              description: store.description,
-              business_hours: store.business_hours,
-              same_day_trial: store.trial_type === "same_day",
-              trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
-            }}
-          />
-          <LineCtaCard
-            variant="card"
-            title="気になったら、直接聞いてみよう"
-            description="体入予約・条件交渉までLINEで完結"
-            ctaLabel="LINE追加"
-            source="store-detail:bottom-card"
-          />
 
           {/* ============================================================ */}
           {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}
