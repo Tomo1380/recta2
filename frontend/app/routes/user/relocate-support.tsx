@@ -38,6 +38,20 @@ const FEATURES = [
   { Icon: ShieldCheck, label: "保証制度", note: "最低保証3〜6ヶ月で安心スタート" },
 ];
 
+export function meta() {
+  const title = "上京サポート - 地方から東京で働きたい方へ | Recta";
+  const desc =
+    "オンライン面接・住居完備・引越し費用補助・体験入店（体入）確約まで、東京で働きたい方をRectaが一気通貫でサポート。来店不要で始められます。";
+  return [
+    { title },
+    { name: "description", content: desc },
+    { property: "og:title", content: title },
+    { property: "og:description", content: desc },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ];
+}
+
 export default function RelocateSupportPage() {
   const navigate = useNavigate();
   const [voices, setVoices] = useState<RelocateVoice[]>([]);

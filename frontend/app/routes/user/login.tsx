@@ -12,7 +12,10 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router";
 
 export function meta() {
-  return [{ title: "ログイン - Recta" }];
+  return [
+    { title: "ログイン - Recta" },
+    { name: "robots", content: "noindex,nofollow" },
+  ];
 }
 
 function LineIcon({ className }: { className?: string }) {

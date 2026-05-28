@@ -3,7 +3,10 @@ import { useSearchParams, useNavigate } from "react-router";
 import { useUserAuth } from "~/lib/user-auth";
 
 export function meta() {
-  return [{ title: "認証中... - Recta" }];
+  return [
+    { title: "認証中... - Recta" },
+    { name: "robots", content: "noindex,nofollow" },
+  ];
 }
 
 export default function AuthCallbackPage() {

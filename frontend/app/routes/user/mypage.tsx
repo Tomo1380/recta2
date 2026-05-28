@@ -30,7 +30,11 @@ import { userApi } from "~/lib/api";
 import type { Review } from "~/lib/types";
 
 export function meta() {
-  return [{ title: "マイページ - Recta" }];
+  // 個人領域なのでインデックスさせない
+  return [
+    { title: "マイページ - Recta" },
+    { name: "robots", content: "noindex,nofollow" },
+  ];
 }
 
 export default function MyPage() {

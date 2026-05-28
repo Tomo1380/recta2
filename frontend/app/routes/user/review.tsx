@@ -24,7 +24,10 @@ import { userApi } from "~/lib/api";
 import type { Store } from "~/lib/types";
 
 export function meta() {
-  return [{ title: "口コミを投稿 - Recta" }];
+  return [
+    { title: "口コミを投稿 - Recta" },
+    { name: "robots", content: "noindex,nofollow" },
+  ];
 }
 
 const MIN_BODY_LENGTH = 10;

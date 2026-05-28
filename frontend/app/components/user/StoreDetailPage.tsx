@@ -322,6 +322,8 @@ interface StoreDetailPageProps {
   id: number;
   /** When provided, skip API fetch and render this data directly (for admin preview) */
   previewData?: StoreDetailResponse;
+  /** SSR loader 由来の初期データ。あれば初回 fetch をスキップして即描画。 */
+  initialData?: StoreDetailResponse;
 }
 
 // ---------------------------------------------------------------------------
@@ -511,9 +513,10 @@ function LoadingSkeleton() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function StoreDetailPage({ id, previewData }: StoreDetailPageProps) {
-  const [data, setData] = useState<StoreDetailResponse | null>(previewData ?? null);
-  const [loading, setLoading] = useState(!previewData);
+export default function StoreDetailPage({ id, previewData, initialData }: StoreDetailPageProps) {
+  const seed = previewData ?? initialData ?? null;
+  const [data, setData] = useState<StoreDetailResponse | null>(seed);
+  const [loading, setLoading] = useState(!seed);
   const [error, setError] = useState<string | null>(null);
   // Shared controller — ensures only one video can be `stuck`/`mini` at a time.
   const stickyController = useStickyVideoController();
@@ -528,6 +531,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
   useEffect(() => {
     if (previewData) return; // Skip fetch in preview mode
+    // SSR loader 由来の initialData が同じ id のものならスキップ。
+    // id が変わった (navigate by Link) ときは再 fetch する。
+    if (initialData && initialData.store?.id === id) return;
 
     let cancelled = false;
     setLoading(true);
