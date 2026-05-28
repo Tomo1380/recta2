@@ -449,6 +449,29 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
           outline: 2px solid #4f46e5;
           outline-offset: 2px;
         }
+        /* TipTap ResizableNodeView は wrapper を作って img をその中に置き、
+           [data-resize-handle="bottom-right"] 等の div を四隅 / 端に挿入する。
+           デフォルトでは width/height/background が空 (= 見えない) なので
+           ここで「インディゴの 12px つまみ」を当てる。
+           position は内部で absolute / top|bottom|left|right に既に設定済み。 */
+        .ProseMirror [data-resize-handle] {
+          width: 12px;
+          height: 12px;
+          background: #4f46e5;
+          border: 2px solid white;
+          border-radius: 3px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+          z-index: 5;
+        }
+        /* 右下用のカーソル。他方向は cursor を別途指定 (current は bottom-right のみ)。 */
+        .ProseMirror [data-resize-handle="bottom-right"] { cursor: nwse-resize; transform: translate(50%, 50%); }
+        .ProseMirror [data-resize-handle="bottom-left"]  { cursor: nesw-resize; transform: translate(-50%, 50%); }
+        .ProseMirror [data-resize-handle="top-right"]    { cursor: nesw-resize; transform: translate(50%, -50%); }
+        .ProseMirror [data-resize-handle="top-left"]     { cursor: nwse-resize; transform: translate(-50%, -50%); }
+        .ProseMirror [data-resize-handle="top"]          { cursor: ns-resize; height: 8px; transform: translateY(-50%); }
+        .ProseMirror [data-resize-handle="bottom"]       { cursor: ns-resize; height: 8px; transform: translateY(50%); }
+        .ProseMirror [data-resize-handle="left"]         { cursor: ew-resize; width: 8px; transform: translateX(-50%); }
+        .ProseMirror [data-resize-handle="right"]        { cursor: ew-resize; width: 8px; transform: translateX(50%); }
         .ProseMirror iframe {
           width: 100%; max-width: 640px; aspect-ratio: 16 / 9;
           border-radius: 12px; margin: 1em auto; height: auto; display: block;
