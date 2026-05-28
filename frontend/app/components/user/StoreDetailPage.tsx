@@ -44,6 +44,7 @@ import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import { LineIcon } from "~/components/user/shared/LineIcon";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { openLineFriendAdd } from "~/lib/line";
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
 import CompareToggle from "~/components/user/shared/CompareToggle";
@@ -1496,14 +1497,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
 
       </div>
 
-      {/* Floating LINE 相談 — 右下固定。プレビュー時は非表示。
-          BottomTabBar (layout 側) との重なりを避けるため、モバイルでは
-          tab bar の上に来るよう bottom 値を tab bar 高さ分だけ持ち上げる。 */}
+      {/* Floating LINE 相談 — 右下固定。プレビュー時は非表示。 */}
       {!previewData && <LineFloatingButton />}
-
-      {/* BottomTabBar is rendered by routes/user/layout.tsx. The admin shop
-          preview imports StoreDetailPage directly (outside that layout), so the
-          tab bar naturally doesn't leak into admin views. */}
     </>
   );
 }
@@ -1518,8 +1513,7 @@ function LineFloatingButton() {
       className="fixed z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
       style={{
         right: 16,
-        // モバイルは BottomTabBar (約 64px) を避け、PC は通常位置。
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         backgroundColor: "#06C755",
         boxShadow: "0 6px 20px rgba(6,199,85,0.4)",
       }}
@@ -1619,9 +1613,8 @@ function LuxeHero({
     <section
       className="relative isolate mx-auto w-full overflow-hidden"
       style={{
-        // 4:5 (iPhone 縦撮り) ポートレート。max-width で PC 幅でも縦長に。
-        aspectRatio: "4 / 5",
-        maxWidth: 500,
+        // 16:9 シネマ。スマホ縦持ちで画面の 1/3 強を占める控えめなヒーロー。
+        aspectRatio: "16 / 9",
         background: "#1b2528",
       }}
       onMouseEnter={() => setPaused(true)}
@@ -1724,26 +1717,15 @@ function LuxeHero({
         >
           <ChevronLeft className="size-5" />
         </Link>
-        {/* パンくず: ホーム > 店舗一覧 > 店舗名 */}
-        <nav
-          aria-label="パンくず"
-          className="flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-full px-3 py-1.5 text-[11px] text-white"
-          style={{
-            backgroundColor: "rgba(0,0,0,0.4)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.15)",
-          }}
-        >
-          <Link to="/" className="shrink-0 opacity-80 hover:opacity-100">
-            ホーム
-          </Link>
-          <ChevronRight className="size-3 shrink-0 opacity-50" />
-          <Link to="/stores" className="shrink-0 opacity-80 hover:opacity-100">
-            店舗一覧
-          </Link>
-          <ChevronRight className="size-3 shrink-0 opacity-50" />
-          <span className="truncate font-semibold">{name}</span>
-        </nav>
+        <Breadcrumb
+          variant="overlay"
+          className="min-w-0 flex-1"
+          items={[
+            { label: "ホーム", to: "/" },
+            { label: "店舗一覧", to: "/stores" },
+            { label: name },
+          ]}
+        />
       </div>
 
       {/* Editorial overlay — bottom */}
@@ -3051,7 +3033,7 @@ function ChampagnePricesSection({
                     key={tpl.key}
                     className="relative grid grid-cols-12 items-center"
                     style={{
-                      minHeight: 96,
+                      minHeight: 64,
                       // hairline divider between rows
                       borderTop: i === 0 ? "none" : "1px solid rgba(212,175,55,0.18)",
                     }}
@@ -3221,10 +3203,10 @@ function ChampagneBottleSlot({
       <img
         src={src}
         alt={alt}
-        className="h-[60px] w-auto object-contain"
+        className="h-[40px] w-auto object-contain"
         style={{
           filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.5))",
-          maxWidth: 60,
+          maxWidth: 40,
         }}
         onError={(e) => {
           // Hide cleanly when the bottle asset hasn't been shipped yet.
@@ -3863,14 +3845,6 @@ function ReviewsSection({
     : 0;
   const total = reviewsCount || ratings.length;
 
-  // Bucket distribution (use loaded reviews; for unloaded use weighted estimate centered on avg).
-  const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  ratings.forEach((r) => {
-    const bucket = Math.round(Math.max(1, Math.min(5, r)));
-    dist[bucket] = (dist[bucket] ?? 0) + 1;
-  });
-  const distMax = Math.max(...Object.values(dist), 1);
-
   return (
     <div
       id="reviews"
@@ -3893,69 +3867,42 @@ function ReviewsSection({
         </a>
       </div>
 
-      {/* Summary panel — cream gradient + gold border */}
+      {/* Summary panel — cream gradient + gold border (コンパクト版) */}
       {total > 0 && (
-        <div className="mx-5 mb-4">
+        <div className="mx-5 mb-3">
           <div
-            className="grid grid-cols-[110px_1fr] items-center gap-4 rounded-2xl p-4"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5"
             style={{
               background: "linear-gradient(135deg, #fffdf6, #fff8e8)",
               border: "1px solid rgba(212,175,55,0.28)",
             }}
           >
-            <div
-              className="border-r pr-4 text-center"
-              style={{ borderColor: "rgba(212,175,55,0.22)" }}
-            >
-              <div
-                className="text-[36px] font-bold leading-none tabular-nums"
+            <div className="flex items-baseline gap-1.5">
+              <span
+                className="text-[24px] font-bold leading-none tabular-nums"
                 style={{ color: GOLD_HEX, fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.02em" }}
               >
                 {avg.toFixed(1)}
-              </div>
-              <div className="mt-1.5 inline-flex">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    size={11}
-                    style={{
-                      color: i < Math.round(avg) ? GOLD_HEX : "rgba(212,175,55,0.25)",
-                      fill: i < Math.round(avg) ? GOLD_HEX : "none",
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="mt-1 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                {total}件
-              </div>
+              </span>
+              <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                / 5
+              </span>
             </div>
-            <div>
-              {[5, 4, 3, 2, 1].map((s) => {
-                const pct = ratings.length > 0 ? (dist[s] / distMax) * 100 : 0;
-                return (
-                  <div
-                    key={s}
-                    className="mb-[5px] grid grid-cols-[14px_1fr] items-center gap-2 text-[10.5px]"
-                    style={{ color: "rgba(27,37,40,0.5)", fontFamily: "'Outfit', sans-serif" }}
-                  >
-                    <span className="tabular-nums">{s}</span>
-                    <div
-                      className="h-[5px] overflow-hidden rounded-full"
-                      style={{ backgroundColor: "rgba(27,37,40,0.06)" }}
-                    >
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background: "linear-gradient(90deg, #D4AF37, #c8960c)",
-                          transition: "width 400ms ease",
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="inline-flex">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  size={11}
+                  style={{
+                    color: i < Math.round(avg) ? GOLD_HEX : "rgba(212,175,55,0.25)",
+                    fill: i < Math.round(avg) ? GOLD_HEX : "none",
+                  }}
+                />
+              ))}
             </div>
+            <span className="ml-auto text-[10.5px]" style={{ color: "rgba(27,37,40,0.55)" }}>
+              {total}件のクチコミ
+            </span>
           </div>
         </div>
       )}
@@ -3987,39 +3934,21 @@ function ReviewsSection({
         </div>
       )}
 
-      {/* Blurred locked reviews + login CTA */}
+      {/* Login CTA — 未ログイン時のみ。blur した「読めない口コミ」のプレビューは
+          縦長で割に合わなかったので廃止し、シンプルなゲートカード 1 枚に。 */}
       {hasHidden && (
-        <div className="relative mt-3 px-5 pb-5 pt-12">
-          {/* Fade overlay */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-5 top-0 h-20"
-            style={{
-              background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 100%)",
-            }}
-          />
-          <div
-            className="space-y-2.5"
-            style={{ filter: "blur(6px)", userSelect: "none", pointerEvents: "none" }}
-          >
-            {(hidden.length > 0 ? hidden : visible).slice(0, 2).map((review) => (
-              <ReviewItem key={`locked-${review.id}`} review={review} />
-            ))}
-          </div>
-          {/* Gold gate card */}
+        <div className="mx-5 mb-5 mt-2">
           <button
             type="button"
             onClick={() => { window.location.href = "/login"; }}
-            className="absolute inset-x-5 z-10 flex items-center gap-3 rounded-2xl bg-white p-4 text-left"
+            className="flex w-full items-center gap-3 rounded-2xl bg-white p-3.5 text-left"
             style={{
-              top: "55%",
-              transform: "translateY(-50%)",
               border: "1px solid rgba(212,175,55,0.32)",
-              boxShadow: "0 6px 20px rgba(212,175,55,0.18)",
+              boxShadow: "0 4px 14px rgba(212,175,55,0.14)",
             }}
           >
             <span
-              className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl"
               style={{
                 background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.05))",
                 border: "1px solid rgba(212,175,55,0.32)",
@@ -4028,22 +3957,16 @@ function ReviewsSection({
               🔒
             </span>
             <div className="min-w-0 flex-1">
-              <div
-                className="text-[13px] font-semibold"
-                style={{ color: "#1b2528" }}
-              >
-                続きはログインで全件公開
+              <div className="text-[13px] font-semibold" style={{ color: "#1b2528" }}>
+                ログインで残り{Math.max(reviewsCount - visible.length, 1)}件の口コミを表示
               </div>
               <div className="mt-0.5 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                あと {Math.max(reviewsCount - visible.length, 1)} 件のクチコミ
+                LINEで30秒・無料
               </div>
             </div>
             <span
-              className="shrink-0 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-white"
-              style={{
-                backgroundColor: "#06C755",
-                boxShadow: "0 4px 14px rgba(6,199,85,0.3)",
-              }}
+              className="shrink-0 rounded-xl px-3.5 py-2 text-[12px] font-semibold text-white"
+              style={{ backgroundColor: "#06C755", boxShadow: "0 4px 14px rgba(6,199,85,0.3)" }}
             >
               ログイン
             </span>

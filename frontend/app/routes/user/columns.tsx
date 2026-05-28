@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router";
 import { Loader2, ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 import { userApi } from "~/lib/api";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import type {
   ArticleSummary,
   PublicArticleIndexResponse,
@@ -70,6 +71,12 @@ export default function ColumnsPage() {
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%" }}>
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "コラム" },
+        ]}
+      />
       {/* Hero */}
       <div
         style={{

@@ -1,24 +1,17 @@
 import { Outlet } from "react-router";
 import { UserAuthProvider } from "~/lib/user-auth";
 import AmbientBackground from "~/components/user/shared/AmbientBackground";
-import BottomTabBar from "~/components/user/shared/BottomTabBar";
 import CompareSelectionBar from "~/components/user/shared/CompareSelectionBar";
-import { BOTTOM_TAB_HEIGHT, LUXE, MOBILE_FRAME_WIDTH } from "~/lib/luxe-tokens";
+import { LUXE, MOBILE_FRAME_WIDTH } from "~/lib/luxe-tokens";
 
 /**
  * User-facing shell.
  *
- * The whole user site is locked to a 430px mobile column. On desktop the
- * viewport is filled with an ambient dark/gold background that sits *behind*
- * the centered frame — so anyone visiting on a laptop still sees the brand
- * world rather than two big black bars.
+ * 430px のモバイルカラムに固定。デスクトップではアンビエント背景の上にこの
+ * フレームを中央配置する。
  *
- * BottomTabBar and CompareSelectionBar live here (not in each page) so they
- * render exactly once, inside the centered frame, and we don't have to repeat
- * the `pb-[68px]` and `<BottomTabBar />` ritual in every page component.
- *
- * Note: the admin shop preview renders `StoreDetailPage` outside this layout,
- * so the BottomTabBar/CompareSelectionBar don't leak into admin views.
+ * BottomTabBar は撤去 (運営要望: 各ページに breadcrumb + 右下 LINE
+ * フローティングでナビ代替)。CompareSelectionBar は比較トレイ専用なので残す。
  */
 export default function UserLayout() {
   return (
@@ -27,19 +20,12 @@ export default function UserLayout() {
         className="relative min-h-screen flex justify-center"
         style={{ fontFamily: LUXE.fontFamily }}
       >
-        {/* Desktop-only ambient brand world. Hidden on mobile by the centered frame. */}
         <AmbientBackground />
-
-        {/* Centered mobile-first column. Everything user-facing renders inside this. */}
         <div
           className="relative z-10 flex w-full min-h-screen flex-col bg-[#f5f5f5]"
-          style={{
-            maxWidth: MOBILE_FRAME_WIDTH,
-            paddingBottom: BOTTOM_TAB_HEIGHT,
-          }}
+          style={{ maxWidth: MOBILE_FRAME_WIDTH }}
         >
           <Outlet />
-          <BottomTabBar />
           <CompareSelectionBar />
         </div>
       </div>

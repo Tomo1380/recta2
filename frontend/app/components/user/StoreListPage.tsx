@@ -21,6 +21,7 @@ import {
 } from "~/components/ui/pagination";
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
 import AiChatPanel from "~/components/user/AiChatPanel";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { LUXE } from "~/lib/luxe-tokens";
 
 // ---------------------------------------------------------------------------
@@ -685,6 +686,12 @@ export default function StoreListPage() {
 
   return (
     <>
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "店舗一覧" },
+        ]}
+      />
       {/* ----------------------------------------------------------- */}
       {/* Editorial poster hero — "STORES / お店一覧" (with login)    */}
       {/* ----------------------------------------------------------- */}

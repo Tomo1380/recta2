@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Home, Wallet, Plane, ShieldCheck } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import type { RelocateVoice } from "../../../orval/generated/api.schemas";
 
 const GOLD = "#d4af37";
@@ -83,6 +84,12 @@ export default function RelocateSupportPage() {
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%" }}>
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "上京サポート" },
+        ]}
+      />
       {/* ── HERO ── */}
       <div
         style={{

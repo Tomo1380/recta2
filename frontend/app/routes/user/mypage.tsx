@@ -26,6 +26,7 @@ import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { useUserAuth } from "~/lib/user-auth";
 import UserAvatar from "~/components/user/shared/UserAvatar";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { userApi } from "~/lib/api";
 import type { Review } from "~/lib/types";
 
@@ -138,6 +139,12 @@ export default function MyPage() {
 
   return (
     <div className="pb-12" style={{ backgroundColor: "#f7f6f3", minHeight: "100%" }}>
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "マイページ" },
+        ]}
+      />
       {/* Header */}
       <div
         className="px-4 py-6"

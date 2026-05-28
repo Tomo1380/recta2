@@ -4,6 +4,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { FileText, ChevronRight } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
 
 // ─── SSR loader & meta ────────────────────────────────────────
@@ -224,6 +225,13 @@ export function ColumnArticleView({
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%", paddingBottom: "60px" }}>
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "コラム", to: "/columns" },
+          { label: article.title },
+        ]}
+      />
       {/* Hero */}
       <div
         style={{
