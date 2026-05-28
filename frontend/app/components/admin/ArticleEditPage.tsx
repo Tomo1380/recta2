@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
 import { ApiError, api } from "~/lib/api";
 import type { Article } from "~/lib/types";
 import { ArticleEditor } from "./ArticleEditor";
+import { FloatingPreview } from "./shared/FloatingPreview";
+import { ColumnArticleView } from "~/routes/user/column-detail";
 
 // status は backend で 'draft' | 'published' に正規化されているが、
 // 生成型 (ArticleResource) では string となっている。フォーム側はゆるく
@@ -53,7 +55,33 @@ export function ArticleEditPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // プレビュー用の article オブジェクト。フォーム値と editor の bodyHtml から
+  // 公開ページと同じ構造を作る。実 API のレスポンスとは違って都度生成なので、
+  // 一部の運用フィールド (id, slug, published_at) は仮値で埋める。
+  const previewArticle = useMemo<Article>(
+    () => ({
+      id: articleId ?? 0,
+      slug: form.slug || "preview",
+      title: form.title || "（タイトル未入力）",
+      excerpt: form.excerpt || null,
+      category: form.category || null,
+      tags: form.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      status: form.status as Article["status"],
+      thumbnail_url: form.thumbnail_url,
+      body: body as Article["body"],
+      body_html: bodyHtml,
+      published_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Article),
+    [articleId, form, body, bodyHtml],
+  );
 
   // Load when editing
   useEffect(() => {
@@ -218,6 +246,14 @@ export function ArticleEditPage() {
               削除
             </button>
           )}
+          <button
+            onClick={() => setShowPreview((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-[13px] hover:bg-muted transition"
+            aria-pressed={showPreview}
+          >
+            <Eye className="w-4 h-4" />
+            {showPreview ? "プレビュー閉じる" : "プレビュー"}
+          </button>
           <button
             disabled={saving}
             onClick={() => handleSave("draft")}
@@ -402,6 +438,24 @@ export function ArticleEditPage() {
           </div>
         </aside>
       </div>
+
+      {/* Floating draggable preview — 公開記事ページ (ColumnArticleView) を
+          スマホシェル (390×844, scale 0.8) に詰めて表示。bodyHtml と form 値が
+          変わると即時反映される。 */}
+      {showPreview && (
+        <FloatingPreview onClose={() => setShowPreview(false)}>
+          <div className="flex flex-col items-center" style={{ transform: "scale(0.8)", transformOrigin: "top center" }}>
+            <div className="w-[390px] bg-black rounded-[48px] p-[10px] shadow-2xl ring-1 ring-white/10">
+              <div className="relative bg-[#f7f6f3] rounded-[38px] h-[844px] overflow-hidden flex flex-col">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 w-[120px] h-[32px] bg-black rounded-b-[20px]" />
+                <div className="flex-1 overflow-y-auto overscroll-contain pt-8">
+                  <ColumnArticleView article={previewArticle} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </FloatingPreview>
+      )}
     </div>
   );
 }

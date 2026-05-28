@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { Loader2, FileText, ChevronRight } from "lucide-react";
+import { FileText, ChevronRight } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
 
@@ -99,6 +99,33 @@ function formatDate(s: string | null): string {
  *
  * Also strips any inline <script> tags that snuck in (defensive).
  */
+function ColumnNotFound() {
+  return (
+    <div
+      style={{ background: "#faf9f5", minHeight: "60vh", padding: "60px 20px" }}
+      className="flex flex-col items-center justify-center text-center gap-3"
+    >
+      <FileText className="w-8 h-8 text-stone-300" />
+      <p style={{ fontFamily: J, color: DARK, fontSize: "14px" }}>
+        記事が見つかりませんでした
+      </p>
+      <Link
+        to="/columns"
+        className="px-4 py-2 rounded-lg"
+        style={{
+          fontFamily: J,
+          background: DARK,
+          color: "white",
+          fontSize: "13px",
+          textDecoration: "none",
+        }}
+      >
+        コラム一覧へ
+      </Link>
+    </div>
+  );
+}
+
 function transformBodyHtml(html: string): { html: string; needsTikTokScript: boolean } {
   if (!html) return { html: "", needsTikTokScript: false };
 
@@ -128,8 +155,6 @@ export default function ColumnDetailPage() {
 
   const [article, setArticle] = useState<Article | null>(initial.article);
   const [related, setRelated] = useState<ArticleSummary[]>(initial.related ?? []);
-  const [loading, setLoading] = useState(false);
-  const [notFound, setNotFound] = useState(false);
 
   // React Router の loader は CSR navigation でも自動で再実行されるので、
   // useLoaderData の変化を state に反映するだけで OK（手動 fetch 不要）。
@@ -137,13 +162,29 @@ export default function ColumnDetailPage() {
     if (initial.article && initial.article.slug === slug) {
       setArticle(initial.article);
       setRelated(initial.related ?? []);
-      setNotFound(false);
     }
   }, [slug, initial]);
 
+  if (!article) {
+    return <ColumnNotFound />;
+  }
+  return <ColumnArticleView article={article} related={related} />;
+}
+
+/**
+ * 記事本文の表示部分のプレゼンテーション。loader 経由でなく、
+ * props 経由で記事を渡せるので管理画面のプレビューにも使える。
+ */
+export function ColumnArticleView({
+  article,
+  related = [],
+}: {
+  article: Article;
+  related?: ArticleSummary[];
+}) {
   const { html, needsTikTokScript } = useMemo(
-    () => transformBodyHtml(article?.body_html ?? ""),
-    [article?.body_html],
+    () => transformBodyHtml(article.body_html ?? ""),
+    [article.body_html],
   );
 
   // title / OG meta は SSR meta() で出力済み。CSR navigation 時は React Router
@@ -163,42 +204,7 @@ export default function ColumnDetailPage() {
     s.src = "https://www.tiktok.com/embed.js";
     s.async = true;
     document.body.appendChild(s);
-  }, [needsTikTokScript, slug]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-32" style={{ background: "#faf9f5" }}>
-        <Loader2 className="w-6 h-6 text-stone-400 animate-spin" />
-      </div>
-    );
-  }
-
-  if (notFound || !article) {
-    return (
-      <div
-        style={{ background: "#faf9f5", minHeight: "60vh", padding: "60px 20px" }}
-        className="flex flex-col items-center justify-center text-center gap-3"
-      >
-        <FileText className="w-8 h-8 text-stone-300" />
-        <p style={{ fontFamily: J, color: DARK, fontSize: "14px" }}>
-          記事が見つかりませんでした
-        </p>
-        <Link
-          to="/columns"
-          className="px-4 py-2 rounded-lg"
-          style={{
-            fontFamily: J,
-            background: DARK,
-            color: "white",
-            fontSize: "13px",
-            textDecoration: "none",
-          }}
-        >
-          コラム一覧へ
-        </Link>
-      </div>
-    );
-  }
+  }, [needsTikTokScript, article.slug]);
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%", paddingBottom: "60px" }}>
