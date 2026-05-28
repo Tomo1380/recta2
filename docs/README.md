@@ -35,6 +35,12 @@
 | [qa-prompts.md](qa-prompts.md) | Claude/Playwright モンキーテスト用プロンプト集 (シナリオ A / 境界 B / 認証 C) + 運用 Tip + 履歴 |
 | [ai-chat-test-questions.md](ai-chat-test-questions.md) | AI チャットの回帰テスト用 Q&A 57 件 (DB知識 / 一般知識 / LINE誘導 / NG) |
 
+### セキュリティ
+
+| ファイル | 内容 |
+|---|---|
+| [security-audit-2026-05-29.md](security-audit-2026-05-29.md) | 2026-05-29 時点の OWASP Top 10 観点監査結果。High 3 件 (DOMPurify, Sanctum TTL, AdminUser RBAC) 修正済み、Medium 3 件は次フェーズ |
+
 ### 変更履歴
 
 | ファイル | 内容 |

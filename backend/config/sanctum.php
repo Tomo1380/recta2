@@ -47,7 +47,11 @@ return [
     |
     */
 
-    'expiration' => null,
+    // 30 日 = 43200 分。admin / user 共通の TTL。
+    // 既存トークンは expires_at が null のままだが、Sanctum は created_at +
+    // expiration を上書きで適用するので、デプロイ時点で実質 30 日 (created_at
+    // 起点) 以前のトークンが順次失効する。
+    'expiration' => env('SANCTUM_EXPIRATION', 43200),
 
     /*
     |--------------------------------------------------------------------------

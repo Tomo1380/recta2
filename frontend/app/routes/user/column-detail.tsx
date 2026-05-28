@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Link, useParams, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { FileText, ChevronRight } from "lucide-react";
+import DOMPurify from "isomorphic-dompurify";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
 
@@ -138,9 +139,24 @@ function transformBodyHtml(html: string): { html: string; needsTikTokScript: boo
     },
   );
 
-  // Defensive: remove any <script> tag from body content (TikTok script loaded
-  // separately below).
-  const safe = transformed.replace(/<script[\s\S]*?<\/script>/gi, "");
+  // XSS 対策: DOMPurify でサニタイズ。
+  //   - <script> や onload / onerror / javascript: URL を除去
+  //   - 必要な埋め込み要素 (iframe, blockquote.tiktok-embed) は明示的に許可
+  //   - SSR/CSR 両対応: isomorphic-dompurify が環境を自動判別
+  const safe = DOMPurify.sanitize(transformed, {
+    ADD_TAGS: ["iframe"],
+    ADD_ATTR: [
+      "allow",
+      "allowfullscreen",
+      "frameborder",
+      "scrolling",
+      "data-video-id",
+      "cite",
+      "target",
+    ],
+    // YouTube/TikTok/X 埋め込みの iframe を許可するため
+    ALLOW_DATA_ATTR: true,
+  });
 
   return { html: safe, needsTikTokScript };
 }
