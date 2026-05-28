@@ -750,22 +750,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           </div>
 
           {/* ============================================================ */}
-          {/* 3. Store videos — multiple videos with labels & descriptions */}
-          {/*    Renders display_order ascending. Each video is               */}
-          {/*    play-to-stick; only one can be `stuck`/`mini` at a time      */}
-          {/*    thanks to the shared `stickyController`.                     */}
-          {/* ============================================================ */}
-          <StoreVideosBlock
-            videos={(store.videos && store.videos.length > 0)
-              ? store.videos
-              : (store.video_url
-                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
-                  : [])}
-            fallbackPosterUrl={sortedImages[0]?.url}
-            controller={stickyController}
-          />
-
-          {/* ============================================================ */}
           {/* 4. Experience Entry (体験入店情報) */}
           {/* ============================================================ */}
           <SectionCard
@@ -888,6 +872,20 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
               </div>
             )}
           </SectionCard>
+
+          {/* ============================================================ */}
+          {/* 4b. Store videos — 体験入店情報の直下に配置 (運営要望)。
+                  複数動画あり、display_order 昇順。 */}
+          {/* ============================================================ */}
+          <StoreVideosBlock
+            videos={(store.videos && store.videos.length > 0)
+              ? store.videos
+              : (store.video_url
+                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
+                  : [])}
+            fallbackPosterUrl={sortedImages[0]?.url}
+            controller={stickyController}
+          />
 
           {/* ============================================================ */}
           {/* 5. Detailed Info - Shop Features */}
@@ -1613,8 +1611,13 @@ function LuxeHero({
 
   return (
     <section
-      className="relative isolate w-full overflow-hidden"
-      style={{ height: "440px", background: "#1b2528" }}
+      className="relative isolate mx-auto w-full overflow-hidden"
+      style={{
+        // 4:5 (iPhone 縦撮り) ポートレート。max-width で PC 幅でも縦長に。
+        aspectRatio: "4 / 5",
+        maxWidth: 500,
+        background: "#1b2528",
+      }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={onTouchStart}
@@ -1701,11 +1704,11 @@ function LuxeHero({
         </button>
       )}
 
-      {/* Floating top — 戻るボタンのみ (カウンター pill は廃止、進捗バーで代替) */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-3">
+      {/* Floating top — 戻るボタン + パンくず */}
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 p-3">
         <Link
           to="/stores"
-          className="inline-flex size-9 items-center justify-center rounded-full text-white"
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-white"
           style={{
             backgroundColor: "rgba(0,0,0,0.4)",
             backdropFilter: "blur(8px)",
@@ -1715,6 +1718,26 @@ function LuxeHero({
         >
           <ChevronLeft className="size-5" />
         </Link>
+        {/* パンくず: ホーム > 店舗一覧 > 店舗名 */}
+        <nav
+          aria-label="パンくず"
+          className="flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-full px-3 py-1.5 text-[11px] text-white"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.4)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.15)",
+          }}
+        >
+          <Link to="/" className="shrink-0 opacity-80 hover:opacity-100">
+            ホーム
+          </Link>
+          <ChevronRight className="size-3 shrink-0 opacity-50" />
+          <Link to="/stores" className="shrink-0 opacity-80 hover:opacity-100">
+            店舗一覧
+          </Link>
+          <ChevronRight className="size-3 shrink-0 opacity-50" />
+          <span className="truncate font-semibold">{name}</span>
+        </nav>
       </div>
 
       {/* Editorial overlay — bottom */}
@@ -1785,7 +1808,7 @@ function LuxeHero({
 
       {/* Arrows (only when multiple slides) — モバイルでもタップできるよう
           常時うっすら表示 (opacity-60)。タップ/ホバーで濃く。 */}
-      {slides.length > 1 && (
+      {hasSlides && slides.length > 1 && (
         <>
           <button
             onClick={goPrev}
@@ -1812,7 +1835,7 @@ function LuxeHero({
           あるか」も視覚的に伝わる。色だけで状態を表し、戻ったときに
           ぐにゃっと width が animate しないように一発切替にしている
           (内側塗り span を持たず、外側ボタンの背景色だけで塗る)。 */}
-      {slides.length > 1 && (
+      {hasSlides && slides.length > 1 && (
         <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center gap-1 px-5">
           {slides.map((_, i) => {
             const active = i <= index;
