@@ -71,12 +71,6 @@ export default function ColumnsPage() {
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%" }}>
-      <Breadcrumb
-        items={[
-          { label: "ホーム", to: "/" },
-          { label: "コラム" },
-        ]}
-      />
       {/* Hero */}
       <div
         style={{
@@ -148,7 +142,14 @@ export default function ColumnsPage() {
         </div>
       </div>
 
-      <div className="px-5 pt-6 space-y-4">
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "コラム" },
+        ]}
+      />
+
+      <div className="px-5 pt-4 space-y-4">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />

@@ -686,12 +686,6 @@ export default function StoreListPage() {
 
   return (
     <>
-      <Breadcrumb
-        items={[
-          { label: "ホーム", to: "/" },
-          { label: "店舗一覧" },
-        ]}
-      />
       {/* ----------------------------------------------------------- */}
       {/* Editorial poster hero — "STORES / お店一覧" (with login)    */}
       {/* ----------------------------------------------------------- */}
@@ -764,6 +758,13 @@ export default function StoreListPage() {
           </div>
         </div>
       </section>
+
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "店舗一覧" },
+        ]}
+      />
 
       {/* ----------------------------------------------------------- */}
       {/* AI Chat — breathing room from hero                          */}

@@ -225,13 +225,6 @@ export function ColumnArticleView({
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%", paddingBottom: "60px" }}>
-      <Breadcrumb
-        items={[
-          { label: "ホーム", to: "/" },
-          { label: "コラム", to: "/columns" },
-          { label: article.title },
-        ]}
-      />
       {/* Hero */}
       <div
         style={{
@@ -291,6 +284,14 @@ export function ColumnArticleView({
           </p>
         </div>
       </div>
+
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "コラム", to: "/columns" },
+          { label: article.title },
+        ]}
+      />
 
       {article.thumbnail_url && (
         <div className="px-5 pt-4">

@@ -139,12 +139,6 @@ export default function MyPage() {
 
   return (
     <div className="pb-12" style={{ backgroundColor: "#f7f6f3", minHeight: "100%" }}>
-      <Breadcrumb
-        items={[
-          { label: "ホーム", to: "/" },
-          { label: "マイページ" },
-        ]}
-      />
       {/* Header */}
       <div
         className="px-4 py-6"
@@ -183,7 +177,14 @@ export default function MyPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl space-y-6 px-4 pt-6">
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "マイページ" },
+        ]}
+      />
+
+      <div className="mx-auto max-w-2xl space-y-6 px-4 pt-4">
         {/* Profile Edit */}
         <Card>
           <CardHeader>

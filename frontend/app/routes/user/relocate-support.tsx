@@ -84,12 +84,6 @@ export default function RelocateSupportPage() {
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%" }}>
-      <Breadcrumb
-        items={[
-          { label: "ホーム", to: "/" },
-          { label: "上京サポート" },
-        ]}
-      />
       {/* ── HERO ── */}
       <div
         style={{
@@ -126,8 +120,15 @@ export default function RelocateSupportPage() {
         </div>
       </div>
 
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "上京サポート" },
+        ]}
+      />
+
       {/* ── FEATURES ── */}
-      <div className="px-5 pt-6">
+      <div className="px-5 pt-4">
         <div className="grid grid-cols-2 gap-3">
           {FEATURES.map(({ Icon, label, note }) => (
             <div key={label} className="rounded-2xl p-4" style={{ background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 16px rgba(0,0,0,.04)" }}>
