@@ -1524,22 +1524,62 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
 }
 
 // Floating LINE 相談 button — 右下固定。store-detail 専用。
+// luxe トーン: 黒地 + ゴールド輪郭 + ゴールド光彩。LINE 緑のベタ塗りではなく
+// 「Recta の世界観」に乗せた控えめ高級感。常時受付シグナルは右上の小さな金ドット
+// (パルスではなく静的な点で、注意ばかり奪わないように)。
 function LineFloatingButton() {
   return (
     <button
       type="button"
       onClick={() => openLineFriendAdd("store-detail:floating")}
       aria-label="LINE で相談"
-      className="fixed z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+      className="group fixed z-40 inline-flex items-center gap-2.5 rounded-full px-4 py-3 text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95"
       style={{
         right: 16,
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
-        backgroundColor: "#06C755",
-        boxShadow: "0 6px 20px rgba(6,199,85,0.4)",
+        background:
+          "linear-gradient(135deg, #1b2528 0%, #0f1618 100%)",
+        border: "1px solid rgba(212,175,55,0.55)",
+        boxShadow:
+          "0 8px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(212,175,55,0.18), inset 0 1px 0 rgba(212,175,55,0.18)",
+        fontFamily: "'Noto Sans JP', sans-serif",
+        letterSpacing: "0.02em",
       }}
     >
-      <LineIcon size={20} />
-      <span className="hidden sm:inline">LINEで相談</span>
+      {/* LINE アイコン枠 — ゴールド円形バッジ */}
+      <span
+        className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full"
+        style={{
+          background:
+            "linear-gradient(135deg, #f0d36a 0%, #d4af37 55%, #9a7a20 100%)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
+        }}
+      >
+        <LineIcon size={16} fill="#1b2528" />
+        {/* 受付中シグナル — 右上 4px の小さな金ドット */}
+        <span
+          aria-hidden
+          className="absolute -right-0.5 -top-0.5 size-2 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, #ffe066 0%, #d4af37 60%, transparent 100%)",
+            boxShadow: "0 0 6px rgba(255,224,102,0.85)",
+          }}
+        />
+      </span>
+      <span className="whitespace-nowrap">LINEで相談</span>
+      <span
+        aria-hidden
+        className="text-[10px] font-medium uppercase"
+        style={{
+          color: "rgba(212,175,55,0.7)",
+          fontFamily: "'Outfit', sans-serif",
+          letterSpacing: "0.18em",
+          marginLeft: -4,
+        }}
+      >
+        24h
+      </span>
     </button>
   );
 }
