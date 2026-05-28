@@ -103,3 +103,13 @@ export function useUserAuth() {
     throw new Error("useUserAuth must be used within UserAuthProvider");
   return ctx;
 }
+
+/**
+ * useUserAuth の throw しない版。Provider 外 (例: admin プレビューで
+ * StoreDetailPage を直接 render するケース) で使うと null を返す。
+ * 呼び出し側は ?? 等でフォールバック必須。
+ */
+export function useUserAuthSafe() {
+  const ctx = useContext(UserAuthContext);
+  return ctx;
+}

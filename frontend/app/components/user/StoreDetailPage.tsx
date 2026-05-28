@@ -48,7 +48,7 @@ import CompareToggle from "~/components/user/shared/CompareToggle";
 import StoreMap from "~/components/shared/StoreMap";
 import LuxeCard from "~/components/user/shared/LuxeCard";
 import { pushViewedStore } from "~/lib/viewed-stores";
-import { useUserAuth } from "~/lib/user-auth";
+import { useUserAuthSafe } from "~/lib/user-auth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -3804,7 +3804,10 @@ function ReviewsSection({
 }) {
   // 口コミ投稿と同じ判定 (LINE ログイン済みか) を使う。
   // 未ログイン: 3件 + blur ゲート / ログイン済み: 全件表示。
-  const { isAuthenticated } = useUserAuth();
+  // admin プレビュー時は UserAuthProvider 外なので safe 版を使い、
+  // Provider 不在なら未ログイン扱いで blur ゲート表示にする。
+  const userAuth = useUserAuthSafe();
+  const isAuthenticated = userAuth?.isAuthenticated ?? false;
   const visible = isAuthenticated ? reviews : reviews.slice(0, 3);
   const hidden = isAuthenticated ? [] : reviews.slice(3);
   // ログイン済みなら「続きはログインで全件公開」CTA は出さない。
