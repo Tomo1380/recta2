@@ -398,8 +398,12 @@ export default function ColumnDetailPage() {
           border-radius: 0 8px 8px 0;
         }
         .column-body a { color: #4f46e5; text-decoration: underline; }
-        /* 画像: data-size プリセットで width を切替 (エディタと同期)。中央寄せ。
-           小画面ではすべて max-width:100% にフォールバック。 */
+        /* 画像: 中央寄せ + 角丸 + max-width:100% (小画面で潰れない)。
+           新規: 幅は HTML 属性 <img width="320"> としてエディタから保存され、
+                ブラウザがそのまま尊重するので CSS 側で値を指定しない。
+           旧記事の data-size プリセット (small/medium/large/full) も
+           後方互換で width を当てる。ただし width 属性がある img には
+           当てない (新仕様 = ドラッグサイズが優先)。 */
         .column-body img {
           display: block;
           margin: 1em auto;
@@ -407,10 +411,10 @@ export default function ColumnDetailPage() {
           max-width: 100%;
           height: auto;
         }
-        .column-body img[data-size="small"]  { width: 200px; }
-        .column-body img[data-size="medium"] { width: 360px; }
-        .column-body img[data-size="large"]  { width: 560px; }
-        .column-body img[data-size="full"]   { width: 100%; }
+        .column-body img[data-size="small"]:not([width])  { width: 200px; }
+        .column-body img[data-size="medium"]:not([width]) { width: 360px; }
+        .column-body img[data-size="large"]:not([width])  { width: 560px; }
+        .column-body img[data-size="full"]:not([width])   { width: 100%; }
         .column-body iframe { width: 100%; max-width: 640px; aspect-ratio: 16 / 9; border-radius: 12px; margin: 1em auto; height: auto; display: block; }
         .column-body code { background: #f5f5f4; padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
         .column-body strong { font-weight: 700; }

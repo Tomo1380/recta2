@@ -6,26 +6,33 @@ import Youtube from "@tiptap/extension-youtube";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 // 画像サイズプリセット。data-size 属性で出力し、CSS 側で width を割り当てる。
-// 公開ページ (column-detail.tsx の .column-body) と同じ class 名で揃える。
-type ImageSize = "small" | "medium" | "large" | "full";
-const IMAGE_SIZE_LABELS: Record<ImageSize, string> = {
-  small: "小",
-  medium: "中",
-  large: "大",
-  full: "横幅いっぱい",
-};
-const IMAGE_SIZES: ImageSize[] = ["small", "medium", "large", "full"];
-
-// TipTap 標準 Image 拡張に data-size attribute を追加。
-// 既存記事 (data-size なし) は medium 扱い。
+// TipTap v3 公式 Image 拡張に width / height 属性を追加。
+// resize オプション (下の configure 側で enabled:true) で右下つまみが出て
+// ドラッグでリサイズ → width 属性 (px integer) に保存される。
+// HTML として保存され、公開ページの dangerouslySetInnerHTML でそのまま
+// 効く (.column-body img { max-width:100% }) ので、編集と公開の見た目が
+// 一致する。
 const SizedImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      "data-size": {
-        default: "medium",
-        parseHTML: (el) => el.getAttribute("data-size") ?? "medium",
-        renderHTML: (attrs) => ({ "data-size": attrs["data-size"] ?? "medium" }),
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const w = el.getAttribute("width");
+          return w ? Number(w) : null;
+        },
+        renderHTML: (attrs) =>
+          attrs.width ? { width: String(attrs.width) } : {},
+      },
+      height: {
+        default: null,
+        parseHTML: (el) => {
+          const h = el.getAttribute("height");
+          return h ? Number(h) : null;
+        },
+        renderHTML: (attrs) =>
+          attrs.height ? { height: String(attrs.height) } : {},
       },
     };
   },
@@ -110,34 +117,10 @@ function ToolbarButton({
   );
 }
 
-function ImageSizeButton({ editor }: { editor: Editor }) {
-  const isImage = editor.isActive("image");
-  const currentSize = (editor.getAttributes("image")["data-size"] as ImageSize | undefined) ?? "medium";
-  const next = (size: ImageSize) => {
-    editor.chain().focus().updateAttributes("image", { "data-size": size }).run();
-  };
-  return (
-    <div className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-md border border-stone-200 bg-white">
-      <span className="text-[10.5px] text-stone-500 pr-1 pl-0.5">画像</span>
-      {IMAGE_SIZES.map((s) => (
-        <button
-          key={s}
-          type="button"
-          disabled={!isImage}
-          onClick={() => next(s)}
-          title={`画像サイズ: ${IMAGE_SIZE_LABELS[s]}`}
-          className={`px-1.5 py-0.5 rounded text-[11px] transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-            isImage && currentSize === s
-              ? "bg-indigo-100 text-indigo-700"
-              : "text-stone-600 hover:bg-stone-100"
-          }`}
-        >
-          {IMAGE_SIZE_LABELS[s]}
-        </button>
-      ))}
-    </div>
-  );
-}
+// 画像サイズプリセットボタン (4 段階) は撤去。
+// TipTap v3 公式 resize ハンドル (画像をクリック → 右下つまみドラッグ)
+// に置き換えた。サイズは width 属性 (px) として HTML に直接保存され、
+// 公開ページの <img max-width:100% /> でそのまま反映される。
 
 function Toolbar({ editor }: { editor: Editor }) {
   const { uploadFile, uploading, error: uploadError } = useFileUpload("article-body");
@@ -146,9 +129,9 @@ function Toolbar({ editor }: { editor: Editor }) {
   const handleUploadPick = useCallback(
     async (file: File) => {
       const url = await uploadFile(file);
-      if (url) // data-size を含めて挿入 (TipTap の setImage は attribute を素通しする)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-editor.chain().focus().setImage({ src: url, alt: "", "data-size": "medium" } as any).run();
+      // 初期 width は指定しない (= 原寸表示)。ユーザーが右下つまみで好きな
+      // サイズに変える想定。max-width:100% で必ずカード幅以内に収まる。
+      if (url) editor.chain().focus().setImage({ src: url, alt: "" }).run();
     },
     [editor, uploadFile],
   );
@@ -172,9 +155,7 @@ editor.chain().focus().setImage({ src: url, alt: "", "data-size": "medium" } as 
   const insertImage = useCallback(() => {
     const url = window.prompt("画像URLを入力");
     if (!url) return;
-    // data-size を含めて挿入 (TipTap の setImage は attribute を素通しする)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-editor.chain().focus().setImage({ src: url, alt: "", "data-size": "medium" } as any).run();
+    editor.chain().focus().setImage({ src: url, alt: "" }).run();
   }, [editor]);
 
   const insertYoutube = useCallback(() => {
@@ -306,10 +287,8 @@ editor.chain().focus().setImage({ src: url, alt: "", "data-size": "medium" } as 
           e.target.value = ""; // 同じファイル再選択を許可
         }}
       />
-      {/* 画像サイズ切替: 画像にカーソルが乗っている (isActive("image")) ときのみ
-          有効。クリックで小/中/大/横幅いっぱい を循環。data-size 属性を更新するので
-          公開ページ側の CSS と合わせて表示幅が変わる。 */}
-      <ImageSizeButton editor={editor} />
+      {/* 画像サイズ調整は TipTap v3 公式 resize ハンドルに置換 (画像クリック →
+          右下つまみドラッグ)。ツールバーボタンは廃止。 */}
       <ToolbarButton title="YouTube埋め込み" onClick={insertYoutube}>
         <YoutubeIcon className="w-4 h-4" />
       </ToolbarButton>
@@ -349,7 +328,19 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
         StarterKit.configure({
           heading: { levels: [1, 2, 3] },
         }),
-        SizedImage.configure({ inline: false, allowBase64: false }),
+        // TipTap v3 公式の resize 機能。画像にカーソルが乗ると右下に
+        // つまみが出てドラッグでサイズ変更。aspect ratio は常時固定して
+        // 縦横比が崩れないようにする。最小幅は 80px。
+        SizedImage.configure({
+          inline: false,
+          allowBase64: false,
+          resize: {
+            enabled: true,
+            alwaysPreserveAspectRatio: true,
+            minWidth: 80,
+            directions: ["bottom-right"],
+          },
+        }),
         Link.configure({
           openOnClick: false,
           autolink: true,
@@ -438,8 +429,9 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
         .ProseMirror a { color: #4f46e5; text-decoration: underline; }
         .ProseMirror code { background: #f5f5f4; padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
         .ProseMirror strong { font-weight: 700; }
-        /* 画像サイズプリセット。data-size で width を割当て。中央寄せ。
-           large 以下は max-width: 100% を効かせて小画面で潰れないように。 */
+        /* 画像: 中央寄せ + 角丸 + max-width:100% で必ずカード幅以内。
+           新規はリサイズハンドルで width 属性を直接書き込む。旧 data-size
+           プリセットの記事は後方互換で width が無い時だけ CSS で当てる。 */
         .ProseMirror img {
           display: block;
           margin: 1em auto;
@@ -447,11 +439,12 @@ export function ArticleEditor({ initialContent, onChange }: Props) {
           max-width: 100%;
           height: auto;
         }
-        .ProseMirror img[data-size="small"]  { width: 200px; }
-        .ProseMirror img[data-size="medium"] { width: 360px; }
-        .ProseMirror img[data-size="large"]  { width: 560px; }
-        .ProseMirror img[data-size="full"]   { width: 100%; }
-        /* 選択中の画像にうっすら枠を付けて「これが選ばれてるよ」を示す。 */
+        .ProseMirror img[data-size="small"]:not([width])  { width: 200px; }
+        .ProseMirror img[data-size="medium"]:not([width]) { width: 360px; }
+        .ProseMirror img[data-size="large"]:not([width])  { width: 560px; }
+        .ProseMirror img[data-size="full"]:not([width])   { width: 100%; }
+        /* 選択中の画像にうっすら枠を付けて「これが選ばれてるよ」を示す。
+           リサイズハンドル (右下つまみ) はこの選択枠に重ねて TipTap が描画。 */
         .ProseMirror img.ProseMirror-selectednode {
           outline: 2px solid #4f46e5;
           outline-offset: 2px;
