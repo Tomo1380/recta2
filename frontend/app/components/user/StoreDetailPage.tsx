@@ -688,7 +688,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
       />
 
       <div className="relative z-10" style={{ backgroundColor: "#f5f5f5" }}>
-        <div className="space-y-4 px-4 pb-24 pt-4">
+        <Breadcrumb
+          items={[
+            { label: "ホーム", to: "/" },
+            { label: "店舗一覧", to: "/stores" },
+            { label: store.name },
+          ]}
+        />
+        <div className="space-y-4 px-4 pb-24 pt-2">
           {/* ============================================================ */}
           {/* Quick stats — 4 strip                                       */}
           {/* ============================================================ */}
@@ -1703,7 +1710,7 @@ function LuxeHero({
         </button>
       )}
 
-      {/* Floating top — 戻るボタン + パンくず */}
+      {/* Floating top — 戻るボタンのみ (パンくずは Hero 下のコンテンツ領域に移動)。 */}
       <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 p-3">
         <Link
           to="/stores"
@@ -1717,15 +1724,6 @@ function LuxeHero({
         >
           <ChevronLeft className="size-5" />
         </Link>
-        <Breadcrumb
-          variant="overlay"
-          className="min-w-0 flex-1"
-          items={[
-            { label: "ホーム", to: "/" },
-            { label: "店舗一覧", to: "/stores" },
-            { label: name },
-          ]}
-        />
       </div>
 
       {/* Editorial overlay — bottom */}
@@ -3023,75 +3021,67 @@ function ChampagnePricesSection({
               </p>
             )}
 
-            {/* Rows */}
-            <ul className="relative space-y-0">
-              {visible.map(({ tpl, item }, i) => {
+            {/* 2x2 グリッド — 縦に長い zigzag を廃止して、カード型でコンパクトに */}
+            <ul className="relative grid grid-cols-2 gap-2.5">
+              {visible.map(({ tpl, item }) => {
                 const src = item!.image_url || tpl.defaultImage;
-                const bottleOnRight = i % 2 === 0;
                 return (
                   <li
                     key={tpl.key}
-                    className="relative grid grid-cols-12 items-center"
+                    className="relative flex items-center gap-2 rounded-xl px-2.5 py-2"
                     style={{
-                      minHeight: 64,
-                      // hairline divider between rows
-                      borderTop: i === 0 ? "none" : "1px solid rgba(212,175,55,0.18)",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(212,175,55,0.18)",
                     }}
                   >
-                    {/* Bottle photo — switch column placement to create the
-                        zigzag, leaving the text centered. */}
-                    {!bottleOnRight && (
-                      <ChampagneBottleSlot src={src} alt={tpl.kanaName} side="left" />
-                    )}
-                    <div
-                      className={
-                        bottleOnRight
-                          ? "col-span-9 pl-2 pr-1 text-center"
-                          : "col-span-9 col-start-1 pr-2 pl-1 text-center"
-                      }
+                    <img
+                      src={src}
+                      alt={tpl.kanaName}
+                      className="h-[44px] w-auto shrink-0 object-contain"
                       style={{
-                        // text always takes 9 of 12; bottle takes 3 on the
-                        // opposite side via col-start placement
-                        gridColumnStart: bottleOnRight ? 1 : 4,
+                        filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
+                        maxWidth: 28,
                       }}
-                    >
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.visibility = "hidden";
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
                       <p
-                        className="m-0"
+                        className="m-0 truncate"
                         style={{
                           fontFamily: "'Great Vibes', cursive",
-                          fontSize: 26,
-                          lineHeight: 1.15,
+                          fontSize: 20,
+                          lineHeight: 1.1,
                           color: "#f7d976",
-                          textShadow: "0 1px 6px rgba(0,0,0,0.4)",
+                          textShadow: "0 1px 4px rgba(0,0,0,0.4)",
                         }}
                       >
                         {tpl.scriptName}
                       </p>
                       <p
-                        className="mt-1 text-[11.5px]"
+                        className="mt-0.5 truncate text-[10px]"
                         style={{
-                          color: "rgba(255,255,255,0.7)",
+                          color: "rgba(255,255,255,0.55)",
                           fontFamily: "'Noto Sans JP', sans-serif",
-                          letterSpacing: "0.06em",
                         }}
                       >
                         {tpl.kanaName}
-                        <span
-                          className="ml-3 tabular-nums"
-                          style={{
-                            fontFamily: "'Outfit', sans-serif",
-                            fontWeight: 600,
-                            color: "#ffe066",
-                          }}
-                        >
-                          ¥ {formatYen(item!.amount)}
-                        </span>
+                      </p>
+                      <p
+                        className="mt-0.5 tabular-nums text-[12px] font-semibold"
+                        style={{
+                          fontFamily: "'Outfit', sans-serif",
+                          color: "#ffe066",
+                        }}
+                      >
+                        ¥{formatYen(item!.amount)}
                       </p>
                       {item!.note && (
                         <p
-                          className="mt-1 text-[10px]"
+                          className="mt-0.5 truncate text-[9.5px]"
                           style={{
-                            color: "rgba(255,255,255,0.42)",
+                            color: "rgba(255,255,255,0.4)",
                             fontFamily: "'Noto Sans JP', sans-serif",
                           }}
                         >
@@ -3099,9 +3089,6 @@ function ChampagnePricesSection({
                         </p>
                       )}
                     </div>
-                    {bottleOnRight && (
-                      <ChampagneBottleSlot src={src} alt={tpl.kanaName} side="right" />
-                    )}
                   </li>
                 );
               })}
@@ -3176,43 +3163,6 @@ function ChampagnePricesSection({
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-/** A single bottle slot in the zigzag menu. 3/12 of the row width on the
- *  named side; bottle PNG is shown contained so transparent backgrounds blend
- *  into the surrounding dark slab. Hides gracefully if the asset is missing. */
-function ChampagneBottleSlot({
-  src,
-  alt,
-  side,
-}: {
-  src: string;
-  alt: string;
-  side: "left" | "right";
-}) {
-  return (
-    <div
-      className="col-span-3 flex h-full items-center"
-      style={{
-        gridColumnStart: side === "left" ? 1 : 10,
-        justifyContent: side === "left" ? "flex-start" : "flex-end",
-      }}
-    >
-      <img
-        src={src}
-        alt={alt}
-        className="h-[40px] w-auto object-contain"
-        style={{
-          filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.5))",
-          maxWidth: 40,
-        }}
-        onError={(e) => {
-          // Hide cleanly when the bottle asset hasn't been shipped yet.
-          (e.target as HTMLImageElement).style.visibility = "hidden";
-        }}
-      />
     </div>
   );
 }
@@ -3854,17 +3804,10 @@ function ReviewsSection({
         border: "1px solid rgba(27,37,40,0.06)",
       }}
     >
-      <div className="flex items-center justify-between px-5 pb-3 pt-5">
+      <div className="px-5 pb-3 pt-5">
         <SectionHeading icon={<Star size={20} style={{ color: GOLD_HEX }} />}>
           リアルな声・口コミ
         </SectionHeading>
-        <a
-          href={`/stores/${storeId}/review`}
-          className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
-        >
-          口コミを書く
-        </a>
       </div>
 
       {/* Summary panel — cream gradient + gold border (コンパクト版) */}
@@ -3975,7 +3918,7 @@ function ReviewsSection({
       )}
       {/* もっと見る / 折りたたむ ボタン (ログイン済み・口コミ2件以上) */}
       {canExpand && (
-        <div className="flex justify-center pb-5 pt-3">
+        <div className="flex justify-center pt-3">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
@@ -3991,7 +3934,27 @@ function ReviewsSection({
           </button>
         </div>
       )}
-      {!hasHidden && !canExpand && <div className="pb-5" />}
+      {/* 口コミを書くボタン — セクション下部。
+          - ログイン済み: 通常 CTA、いつでも投稿できる導線として一貫
+          - 未ログイン: 上の blur gate がログインを促すので、ここのボタンは
+            投稿ページに進んでログイン誘導するシンプルな見せ方 */}
+      {isAuthenticated && visible.length > 0 && (
+        <div className="flex justify-center px-5 pb-5 pt-4">
+          <a
+            href={`/stores/${storeId}/review`}
+            className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
+          >
+            このお店の口コミを書く
+          </a>
+        </div>
+      )}
+      {(!isAuthenticated || visible.length === 0) && !hasHidden && !canExpand && (
+        <div className="pb-5" />
+      )}
+      {(!isAuthenticated || visible.length === 0) && (hasHidden || canExpand) && (
+        <div className="pb-5" />
+      )}
     </div>
   );
 }
