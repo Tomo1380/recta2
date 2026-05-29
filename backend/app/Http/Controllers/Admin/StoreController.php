@@ -87,6 +87,8 @@ class StoreController extends Controller
             'experience_guaranteed' => 'nullable|boolean',
             'publish_status' => 'nullable|in:published,unpublished,draft',
             'priority' => 'nullable|integer|between:-1000,1000',
+            // slug: lowercase / digit / hyphen のみ。store 自身を除いて unique。
+            'slug' => ['nullable', 'string', 'max:160', 'regex:/^[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?$/'],
             'seo_meta_description' => 'nullable|string|max:500',
 
             // JSONB columns (free-form arrays)
@@ -158,6 +160,7 @@ class StoreController extends Controller
             'recta_episodes', 'related_store_ids',
             'experience_guaranteed', 'publish_status',
             'priority',
+            'slug',
             'seo_meta_description',
         ];
     }

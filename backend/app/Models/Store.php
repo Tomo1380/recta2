@@ -13,7 +13,7 @@ class Store extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'area', 'address', 'lat', 'lng', 'nearest_station', 'category',
+        'name', 'slug', 'area', 'address', 'lat', 'lng', 'nearest_station', 'category',
         'phone', 'website_url',
         'schedule',
         'wage', 'compensation', 'guarantee', 'interview',

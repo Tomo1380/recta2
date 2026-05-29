@@ -234,6 +234,7 @@ export interface RelatedStoreLite {
 
 export interface StoreDetailStore {
   id: number;
+  slug?: string | null;
   name: string;
   area: string;
   address: string;

@@ -18,11 +18,11 @@ const GOLD = "#d4af37";
 const DARK = "#1b2528";
 const J = "'Noto Sans JP',sans-serif";
 
-export function meta({ params }: { params: { id?: string } }) {
+export function meta({ params }: { params: { slugOrId?: string } }) {
   return buildMetaTags({
     title: "口コミを投稿 - Recta",
     description: "Recta に登録されたお店の口コミを投稿できます。",
-    path: `/stores/${params.id ?? ""}/review`,
+    path: `/stores/${params.slugOrId ?? ""}/review`,
     noindex: true,
   });
 }
@@ -30,8 +30,12 @@ export function meta({ params }: { params: { id?: string } }) {
 const MIN_BODY_LENGTH = 10;
 
 export default function ReviewPage() {
-  const { id } = useParams();
-  const storeId = Number(id);
+  const { slugOrId } = useParams();
+  // ReviewPage 内は店舗 ID で操作する。store fetch 後に id を取得して書き換える。
+  const [resolvedStoreId, setResolvedStoreId] = useState<number | null>(
+    slugOrId && /^\d+$/.test(slugOrId) ? Number(slugOrId) : null,
+  );
+  const storeId = resolvedStoreId ?? 0;
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading, user } = useUserAuth();
 
@@ -62,7 +66,8 @@ export default function ReviewPage() {
   };
 
   useEffect(() => {
-    fetch(`/api/stores/${storeId}`)
+    if (!slugOrId) return;
+    fetch(`/api/stores/${slugOrId}`)
       .then((res) => res.json())
       .then((data: Store | { data: Store } | { store: Store }) => {
         const s =
@@ -70,10 +75,13 @@ export default function ReviewPage() {
           : "data" in data ? (data as { data: Store }).data
           : (data as Store);
         setStore(s);
+        if (s && typeof (s as { id?: number }).id === "number") {
+          setResolvedStoreId((s as { id: number }).id);
+        }
       })
       .catch(() => {})
       .finally(() => setStoreLoading(false));
-  }, [storeId]);
+  }, [slugOrId]);
 
   const handleSubmit = async () => {
     setError("");

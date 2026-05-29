@@ -1,4 +1,4 @@
-import { useParams, useLoaderData } from "react-router";
+import { useParams, useLoaderData, redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
@@ -19,15 +19,23 @@ function resolveApiBase(): string {
 }
 
 export async function loader({ params }: LoaderFunctionArgs): Promise<StoreDetailResponse | null> {
-  const id = params.id;
-  if (!id || Number.isNaN(Number(id))) return null;
+  const slugOrId = params.slugOrId;
+  if (!slugOrId) return null;
   try {
-    const res = await fetch(`${resolveApiBase()}/api/stores/${id}`, {
+    const res = await fetch(`${resolveApiBase()}/api/stores/${slugOrId}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return null;
-    return (await res.json()) as StoreDetailResponse;
-  } catch {
+    const json = (await res.json()) as StoreDetailResponse;
+    // ID URL でアクセスされた場合、正規 (slug) URL に 301 redirect する。
+    // SEO 重複回避 + 被リンク資産の集約。
+    if (/^\d+$/.test(slugOrId) && json.store?.slug && json.store.slug !== slugOrId) {
+      throw redirect(`/stores/${json.store.slug}`, 301);
+    }
+    return json;
+  } catch (e) {
+    // Response (redirect 含む) は throw のまま伝播
+    if (e instanceof Response) throw e;
     return null;
   }
 }
@@ -58,13 +66,17 @@ export function meta({
   return buildMetaTags({
     title,
     description: desc,
-    path: `/stores/${store.id}`,
+    // canonical は常に slug 版 (slug 未設定なら ID で fallback)
+    path: `/stores/${store.slug ?? store.id}`,
     image: ogImage,
   });
 }
 
 export default function StoreDetail() {
-  const { id } = useParams();
+  const { slugOrId } = useParams();
   const loaderData = useLoaderData() as StoreDetailResponse | null;
-  return <StoreDetailPage id={Number(id)} initialData={loaderData ?? undefined} />;
+  // 既存 StoreDetailPage は id (number) を必須にしているので、
+  // loader data の store.id を優先、未取得なら parseInt fallback (slug の場合は NaN)
+  const id = loaderData?.store?.id ?? Number(slugOrId);
+  return <StoreDetailPage id={id} initialData={loaderData ?? undefined} />;
 }

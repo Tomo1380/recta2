@@ -121,9 +121,20 @@ class PublicStoreController extends Controller
 
     /**
      * Store detail.
+     *
+     * URL param は slug または ID。数値オンリーなら ID として fallback で引く。
+     * 旧 ID URL からのアクセスを許容しつつ、新規流入は slug ベースに統一する。
      */
-    public function show(Store $store): JsonResponse
+    public function show(string $slugOrId): JsonResponse
     {
+        $store = Store::where('slug', $slugOrId)
+            ->orWhere(function ($q) use ($slugOrId) {
+                if (preg_match('/^\d+$/', $slugOrId)) {
+                    $q->where('id', (int) $slugOrId);
+                }
+            })
+            ->firstOrFail();
+
         if ($store->publish_status !== 'published') {
             abort(404);
         }
