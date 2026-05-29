@@ -75,11 +75,12 @@ export interface AiChatSetting {
   /** @nullable */
   openai_finetuned_model: string | null;
   /** @nullable */
-  suggest_buttons: unknown[] | null;
-  /** @nullable */
   created_at: string | null;
   /** @nullable */
   updated_at: string | null;
+  /** @nullable */
+  suggest_categories: unknown[] | null;
+  suggest_display_mode: string;
 }
 
 export interface Area {
@@ -593,13 +594,53 @@ export const UpdateAiChatSettingRequestTone = {
   friendly: 'friendly',
 } as const;
 
+/**
+ * off          : サジェスト非表示
+ * chips_only   : L2 chip のみ並べる (label/sub 非表示)
+ * categorized  : L1 タブ + L2 chip
+ */
+export type UpdateAiChatSettingRequestSuggestDisplayMode = typeof UpdateAiChatSettingRequestSuggestDisplayMode[keyof typeof UpdateAiChatSettingRequestSuggestDisplayMode];
+
+
+export const UpdateAiChatSettingRequestSuggestDisplayMode = {
+  off: 'off',
+  chips_only: 'chips_only',
+  categorized: 'categorized',
+} as const;
+
+export type UpdateAiChatSettingRequestSuggestCategoriesItem = {
+  /** @maxLength 32 */
+  id: string;
+  /** @maxLength 40 */
+  label: string;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  sub?: string | null;
+  /**
+     * @minItems 1
+     * @maxItems 10
+     * @items.maxLength 80
+     */
+  chips: string[];
+};
+
 export interface UpdateAiChatSettingRequest {
   enabled?: boolean;
   /** @nullable */
   system_prompt?: string | null;
   tone?: UpdateAiChatSettingRequestTone;
-  /** @nullable */
-  suggest_buttons?: string[] | null;
+  /** off          : サジェスト非表示
+   * chips_only   : L2 chip のみ並べる (label/sub 非表示)
+   * categorized  : L1 タブ + L2 chip */
+  suggest_display_mode?: UpdateAiChatSettingRequestSuggestDisplayMode;
+  /**
+     * suggest_categories: [{id, label, sub, chips: string[]}]
+     * @maxItems 6
+     * @nullable
+     */
+  suggest_categories?: UpdateAiChatSettingRequestSuggestCategoriesItem[] | null;
 }
 
 export interface UpdateAreaRequest {
@@ -815,6 +856,19 @@ export interface UploadCategoryImageRequest {
   image: Blob;
 }
 
+export interface UploadMediaRequest {
+  /**
+     * 5MB 上限はフロントの圧縮ロジック次第で見直す。とりあえず 10MB に。
+     * @maxLength 10240
+     */
+  image: Blob;
+}
+
+export interface UploadStoreImageRequest {
+  /** @maxLength 5120 */
+  image: Blob;
+}
+
 export interface User {
   id: number;
   line_user_id: string;
@@ -961,6 +1015,11 @@ export type AdminUserIndex200 = {
   total: number;
 };
 
+export type AdminUserDestroy409 = {
+  /** Error overview. */
+  message: string;
+};
+
 export type AdminUserResetPassword200 = {
   message: 'パスワードをリセットしました。';
 };
@@ -971,14 +1030,16 @@ page_type?: string;
 
 export type AiChatConfig200 = {
   enabled: boolean;
-  suggest_buttons: unknown[];
+  suggest_categories: unknown[];
+  suggest_display_mode: string;
 } | {
   enabled: boolean;
   /**
      * @minItems 0
      * @maxItems 0
      */
-  suggest_buttons: string[];
+  suggest_categories: string[];
+  suggest_display_mode: 'off';
 };
 
 export type AiChatChatBodyPageType = typeof AiChatChatBodyPageType[keyof typeof AiChatChatBodyPageType];
@@ -1021,7 +1082,126 @@ export type AiChatChatBody = {
   user_area?: string | null;
 };
 
-export type AiChatChat200 = { [key: string]: unknown };
+export type AiChatChat200 = {
+  message: 'ただいま混み合っております。少し時間を置いてから再度お試しください。';
+  /**
+     * @minItems 0
+     * @maxItems 0
+     */
+  stores: string[];
+  /**
+     * @minItems 0
+     * @maxItems 0
+     */
+  follow_ups: string[];
+  meta: {
+  mode: unknown;
+  model: 'error';
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  response_ms: number;
+  tool_calls: number;
+};
+} | {
+  message: null | unknown[] | string | { [key: string]: unknown };
+  stores: (string | {
+  id: string;
+  name: string;
+  area: string;
+  /** @nullable */
+  category: string | null;
+  nearest_station: string;
+  hourly_min: string;
+  hourly_max: string;
+  feature_tags: string;
+  description: string;
+  images: string;
+})[];
+  /**
+     * @minItems 0
+     * @maxItems 0
+     */
+  follow_ups: string[];
+  meta: {
+  mode: 'agent';
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: string;
+  response_ms: number;
+  tool_calls: number;
+};
+} | {
+  message: null | unknown[] | string | { [key: string]: unknown };
+  stores: unknown[] | ({
+  id: number;
+  name: string;
+  area: string;
+  category: string;
+  /** @nullable */
+  nearest_station: string | null;
+  /** @nullable */
+  hourly_min: string | null;
+  /** @nullable */
+  hourly_max: string | null;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  feature_tags: unknown[] | null;
+  /** @nullable */
+  images: unknown[] | null;
+  average_rating: number;
+})[];
+  /**
+     * @minItems 0
+     * @maxItems 0
+     */
+  follow_ups: string[];
+  meta: {
+  mode: 'finetuned';
+  model: string;
+  input_tokens: string | 0;
+  output_tokens: string | 0;
+  total_tokens: string;
+  response_ms: number;
+  tool_calls: number;
+};
+} | {
+  message: string;
+  stores: unknown[];
+  /**
+     * @minItems 0
+     * @maxItems 0
+     */
+  follow_ups: string[];
+  meta: {
+  mode: unknown;
+  model: 'mock';
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  response_ms: number;
+  tool_calls: number;
+};
+};
+
+export type AiChatChat403 = {
+  message: 'チャットは現在無効です。';
+};
+
+export type AiChatChat429 = null | {
+  message: string;
+  limit_type: 'ip_daily';
+} | {
+  message: string;
+  limit_type: 'user_monthly';
+} | {
+  message: string;
+  limit_type: 'user_daily';
+} | {
+  message: string;
+  limit_type: 'global_daily';
+};
 
 export type AiChatChatStreamBodyPageType = typeof AiChatChatStreamBodyPageType[keyof typeof AiChatChatStreamBodyPageType];
 
@@ -1515,6 +1695,10 @@ export type LineWebhookHandle403 = {
   message: 'Invalid signature';
 };
 
+export type MediaUploadStore201 = {
+  url: string;
+};
+
 export type PublicArticleIndexParams = {
 per_page?: string;
 };
@@ -1578,6 +1762,8 @@ export type PublicStoreHome200RecentReviewsItemStore = {
   name: string;
   area: string;
   category: string;
+  /** @nullable */
+  image_url: string | null;
 } | null;
 
 /**
@@ -1619,10 +1805,10 @@ export type PublicStoreHome200 = {
 
 export type PublicStoreIndexParams = {
 /**
- * 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+ * 体験確約フラグでの絞り込み。フロントの「当日体入」タブ (BUG-E09)
  *  が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
- *  絞り込み。リボンを出している条件 (guarantee.same_day_trial=true)
- *  と一致させる。
+ *  絞り込み。「体験確約」リボンを出している店舗を抽出。
+ *  デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
  */
 sort?: string;
 per_page?: string;
@@ -1683,6 +1869,129 @@ export const StoresStoreBodyPublishStatus = {
   draft: 'draft',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StoresStoreBodyWageRegularUnit = typeof StoresStoreBodyWageRegularUnit[keyof typeof StoresStoreBodyWageRegularUnit] | null;
+
+
+export const StoresStoreBodyWageRegularUnit = {
+  hour: 'hour',
+  day: 'day',
+} as const;
+
+export type StoresStoreBodyWageRegular = {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  min?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max?: number | null;
+  /** @nullable */
+  unit?: StoresStoreBodyWageRegularUnit;
+};
+
+export type StoresStoreBodyWageTrial = {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  hourly_min?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  hourly_max?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  days?: number | null;
+};
+
+/**
+ * wage は freeform array だが、金額キーは number 強制 (string で
+ * 「1,500円」が混入すると比較ページ等で計算が破綻する)。
+ */
+export type StoresStoreBodyWage = {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  daily_estimate_min?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  daily_estimate_max?: number | null;
+  regular?: StoresStoreBodyWageRegular;
+  trial?: StoresStoreBodyWageTrial;
+};
+
+/**
+ * @nullable
+ */
+export type StoresStoreBodyCompensationBackItemUnit = typeof StoresStoreBodyCompensationBackItemUnit[keyof typeof StoresStoreBodyCompensationBackItemUnit] | null;
+
+
+export const StoresStoreBodyCompensationBackItemUnit = {
+  yen: 'yen',
+  percent: 'percent',
+  free: 'free',
+} as const;
+
+export type StoresStoreBodyCompensationBackItem = {
+  /** @maxLength 60 */
+  label?: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  value?: number | null;
+  /** @nullable */
+  unit?: StoresStoreBodyCompensationBackItemUnit;
+};
+
+/**
+ * @nullable
+ */
+export type StoresStoreBodyCompensationFeesItemUnit = typeof StoresStoreBodyCompensationFeesItemUnit[keyof typeof StoresStoreBodyCompensationFeesItemUnit] | null;
+
+
+export const StoresStoreBodyCompensationFeesItemUnit = {
+  yen: 'yen',
+  percent: 'percent',
+  free: 'free',
+} as const;
+
+export type StoresStoreBodyCompensationFeesItem = {
+  /** @maxLength 60 */
+  label?: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  value?: number | null;
+  /** @nullable */
+  unit?: StoresStoreBodyCompensationFeesItemUnit;
+  /** @nullable */
+  per_day?: boolean | null;
+};
+
+/**
+ * compensation.back / fees は {label, value:int, unit:'yen'|'percent'|'free'} 構造。
+ */
+export type StoresStoreBodyCompensation = {
+  /** @nullable */
+  back?: StoresStoreBodyCompensationBackItem[] | null;
+  /** @nullable */
+  fees?: StoresStoreBodyCompensationFeesItem[] | null;
+};
+
 export type StoresStoreBodyQaItem = {
   question: string;
   answer: string;
@@ -1708,7 +2017,7 @@ export type StoresStoreBodyTransferZonesItem = {
 export type StoresStoreBodyVideosItem = {
   /**
      * @maxLength 500
-     * @pattern #^(https?://
+     * @pattern #^(https?://|/storage/)#
      */
   video_url?: string;
   /**
@@ -1721,7 +2030,7 @@ export type StoresStoreBodyVideosItem = {
   /**
      * @maxLength 500
      * @nullable
-     * @pattern #^(https?://
+     * @pattern #^(https?://|/storage/)#
      */
   poster_url?: string | null;
 };
@@ -1729,7 +2038,7 @@ export type StoresStoreBodyVideosItem = {
 export type StoresStoreBodyStaffPhotosItem = {
   /**
      * @maxLength 500
-     * @pattern #^(https?://
+     * @pattern #^(https?://|/storage/)#
      */
   image_url?: string;
   /**
@@ -1815,14 +2124,28 @@ export type StoresStoreBody = {
   /** @nullable */
   publish_status?: StoresStoreBodyPublishStatus;
   /**
+     * @minimum -1000
+     * @maximum 1000
+     * @nullable
+     */
+  priority?: number | null;
+  /**
+     * slug: lowercase / digit / hyphen のみ。store 自身を除いて unique。
+     * @maxLength 160
+     * @nullable
+     * @pattern ^[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?$
+     */
+  slug?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  seo_meta_description?: string | null;
+  /**
      * JSONB columns (free-form arrays)
      * @nullable
      */
   schedule?: string[] | null;
-  /** @nullable */
-  wage?: string[] | null;
-  /** @nullable */
-  compensation?: string[] | null;
   /** @nullable */
   guarantee?: string[] | null;
   /** @nullable */
@@ -1845,6 +2168,11 @@ export type StoresStoreBody = {
   set_fee?: string[] | null;
   /** @nullable */
   recta_episodes?: string[] | null;
+  /** wage は freeform array だが、金額キーは number 強制 (string で
+   * 「1,500円」が混入すると比較ページ等で計算が破綻する)。 */
+  wage?: StoresStoreBodyWage;
+  /** compensation.back / fees は {label, value:int, unit:'yen'|'percent'|'free'} 構造。 */
+  compensation?: StoresStoreBodyCompensation;
   /** @nullable */
   feature_tags?: string[] | null;
   /** @nullable */
@@ -1856,7 +2184,10 @@ export type StoresStoreBody = {
   /**
      * store_videos の同期に使うペイロード。配列で受け取り、
    * controller 側で順序・差分を解決して store_videos テーブルに反映する。 URL は `url` validation ではなく regex で「http(s) もしくは内部 storage パス」
-   * のみ許容する。`url` だと `javascript:` や `data:` も通すブラウザがあるため。
+   * のみ許容する (`url` だと javascript: や data: も通すブラウザがあるため)。
+   * NOTE: Laravel は rule を文字列で書くと `|` で分割するので、regex の中に
+   * alternation の `|` を含めると pattern が壊れる ("No ending delimiter '#' found")。
+   * regex ルールは必ず array 形式で書く。
      * @nullable
      */
   videos?: StoresStoreBodyVideosItem[] | null;
@@ -1878,6 +2209,134 @@ export const StoresUpdateBodyPublishStatus = {
   unpublished: 'unpublished',
   draft: 'draft',
 } as const;
+
+/**
+ * @nullable
+ */
+export type StoresUpdateBodySameDayTrial = typeof StoresUpdateBodySameDayTrial[keyof typeof StoresUpdateBodySameDayTrial] | null;
+
+
+export const StoresUpdateBodySameDayTrial = {
+  same_day: 'same_day',
+  normal: 'normal',
+  none: 'none',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StoresUpdateBodyWageRegularUnit = typeof StoresUpdateBodyWageRegularUnit[keyof typeof StoresUpdateBodyWageRegularUnit] | null;
+
+
+export const StoresUpdateBodyWageRegularUnit = {
+  hour: 'hour',
+  day: 'day',
+} as const;
+
+export type StoresUpdateBodyWageRegular = {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  min?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max?: number | null;
+  /** @nullable */
+  unit?: StoresUpdateBodyWageRegularUnit;
+};
+
+export type StoresUpdateBodyWageTrial = {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  hourly_min?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  hourly_max?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  days?: number | null;
+};
+
+export type StoresUpdateBodyWage = {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  daily_estimate_min?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  daily_estimate_max?: number | null;
+  regular?: StoresUpdateBodyWageRegular;
+  trial?: StoresUpdateBodyWageTrial;
+};
+
+/**
+ * @nullable
+ */
+export type StoresUpdateBodyCompensationBackItemUnit = typeof StoresUpdateBodyCompensationBackItemUnit[keyof typeof StoresUpdateBodyCompensationBackItemUnit] | null;
+
+
+export const StoresUpdateBodyCompensationBackItemUnit = {
+  yen: 'yen',
+  percent: 'percent',
+  free: 'free',
+} as const;
+
+export type StoresUpdateBodyCompensationBackItem = {
+  /** @maxLength 60 */
+  label?: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  value?: number | null;
+  /** @nullable */
+  unit?: StoresUpdateBodyCompensationBackItemUnit;
+};
+
+/**
+ * @nullable
+ */
+export type StoresUpdateBodyCompensationFeesItemUnit = typeof StoresUpdateBodyCompensationFeesItemUnit[keyof typeof StoresUpdateBodyCompensationFeesItemUnit] | null;
+
+
+export const StoresUpdateBodyCompensationFeesItemUnit = {
+  yen: 'yen',
+  percent: 'percent',
+  free: 'free',
+} as const;
+
+export type StoresUpdateBodyCompensationFeesItem = {
+  /** @maxLength 60 */
+  label?: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  value?: number | null;
+  /** @nullable */
+  unit?: StoresUpdateBodyCompensationFeesItemUnit;
+  /** @nullable */
+  per_day?: boolean | null;
+};
+
+export type StoresUpdateBodyCompensation = {
+  /** @nullable */
+  back?: StoresUpdateBodyCompensationBackItem[] | null;
+  /** @nullable */
+  fees?: StoresUpdateBodyCompensationFeesItem[] | null;
+};
 
 export type StoresUpdateBodyQaItem = {
   question: string;
@@ -1904,7 +2363,7 @@ export type StoresUpdateBodyTransferZonesItem = {
 export type StoresUpdateBodyVideosItem = {
   /**
      * @maxLength 500
-     * @pattern #^(https?://
+     * @pattern #^(https?://|/storage/)#
      */
   video_url?: string;
   /**
@@ -1917,7 +2376,7 @@ export type StoresUpdateBodyVideosItem = {
   /**
      * @maxLength 500
      * @nullable
-     * @pattern #^(https?://
+     * @pattern #^(https?://|/storage/)#
      */
   poster_url?: string | null;
 };
@@ -1925,7 +2384,7 @@ export type StoresUpdateBodyVideosItem = {
 export type StoresUpdateBodyStaffPhotosItem = {
   /**
      * @maxLength 500
-     * @pattern #^(https?://
+     * @pattern #^(https?://|/storage/)#
      */
   image_url?: string;
   /**
@@ -2017,12 +2476,25 @@ export type StoresUpdateBody = {
   experience_guaranteed?: boolean | null;
   /** @nullable */
   publish_status?: StoresUpdateBodyPublishStatus;
+  /**
+     * @minimum -1000
+     * @maximum 1000
+     * @nullable
+     */
+  priority?: number | null;
+  /**
+     * @maxLength 160
+     * @nullable
+     * @pattern ^[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?$
+     */
+  slug?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  seo_meta_description?: string | null;
   /** @nullable */
   schedule?: string[] | null;
-  /** @nullable */
-  wage?: string[] | null;
-  /** @nullable */
-  compensation?: string[] | null;
   /** @nullable */
   guarantee?: string[] | null;
   /** @nullable */
@@ -2097,7 +2569,7 @@ export type StoresUpdateBody = {
   /** @nullable */
   norma_info?: string | null;
   /** @nullable */
-  same_day_trial?: boolean | null;
+  same_day_trial?: StoresUpdateBodySameDayTrial;
   /**
      * @maxLength 255
      * @nullable
@@ -2108,6 +2580,16 @@ export type StoresUpdateBody = {
      * @nullable
      */
   trial_hourly?: string | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  trial_hourly_min?: string | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  trial_hourly_max?: string | null;
   /**
      * @maxLength 100
      * @nullable
@@ -2132,6 +2614,8 @@ export type StoresUpdateBody = {
   interview_end?: string | null;
   /** @nullable */
   interview_info?: string[] | null;
+  wage?: StoresUpdateBodyWage;
+  compensation?: StoresUpdateBodyCompensation;
   /** @nullable */
   feature_tags?: string[] | null;
   /** @nullable */
@@ -2150,19 +2634,17 @@ export type StoresUpdateBody = {
   fee_items?: StoresUpdateBodyFeeItemsItem[] | null;
 };
 
-export type StoreUploadImageBody = {
-  /** @maxLength 5120 */
-  image: Blob;
-};
-
 export type StoreUploadImage201 = {
   url: string;
   images: unknown[];
 };
 
+/**
+ * @nullable
+ */
 export type StoreDeleteImage200 = {
   images: unknown[];
-};
+} | null;
 
 export type UserIndexParams = {
 line_status?: string;

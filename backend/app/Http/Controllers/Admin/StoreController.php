@@ -86,12 +86,35 @@ class StoreController extends Controller
             'champagne_description' => 'nullable|string',
             'experience_guaranteed' => 'nullable|boolean',
             'publish_status' => 'nullable|in:published,unpublished,draft',
+            'priority' => 'nullable|integer|between:-1000,1000',
+            // slug: lowercase / digit / hyphen のみ。store 自身を除いて unique。
+            'slug' => ['nullable', 'string', 'max:160', 'regex:/^[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?$/'],
             'seo_meta_description' => 'nullable|string|max:500',
 
             // JSONB columns (free-form arrays)
             'schedule' => 'nullable|array',
+            // wage は freeform array だが、金額キーは number 強制 (string で
+            // 「1,500円」が混入すると比較ページ等で計算が破綻する)。
             'wage' => 'nullable|array',
+            'wage.regular.min' => 'nullable|integer|min:0',
+            'wage.regular.max' => 'nullable|integer|min:0',
+            'wage.regular.unit' => 'nullable|string|in:hour,day',
+            'wage.trial.hourly_min' => 'nullable|integer|min:0',
+            'wage.trial.hourly_max' => 'nullable|integer|min:0',
+            'wage.trial.days' => 'nullable|integer|min:0',
+            'wage.daily_estimate_min' => 'nullable|integer|min:0',
+            'wage.daily_estimate_max' => 'nullable|integer|min:0',
+            // compensation.back / fees は {label, value:int, unit:'yen'|'percent'|'free'} 構造。
             'compensation' => 'nullable|array',
+            'compensation.back' => 'nullable|array',
+            'compensation.back.*.label' => 'required_with:compensation.back|string|max:60',
+            'compensation.back.*.value' => 'nullable|integer|min:0',
+            'compensation.back.*.unit' => 'nullable|string|in:yen,percent,free',
+            'compensation.fees' => 'nullable|array',
+            'compensation.fees.*.label' => 'required_with:compensation.fees|string|max:60',
+            'compensation.fees.*.value' => 'nullable|integer|min:0',
+            'compensation.fees.*.unit' => 'nullable|string|in:yen,percent,free',
+            'compensation.fees.*.per_day' => 'nullable|boolean',
             'guarantee' => 'nullable|array',
             'interview' => 'nullable|array',
             'feature_tags' => 'nullable|array',
@@ -156,6 +179,8 @@ class StoreController extends Controller
             'dress_code', 'set_fee',
             'recta_episodes', 'related_store_ids',
             'experience_guaranteed', 'publish_status',
+            'priority',
+            'slug',
             'seo_meta_description',
         ];
     }

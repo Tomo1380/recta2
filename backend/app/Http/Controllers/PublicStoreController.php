@@ -70,8 +70,9 @@ class PublicStoreController extends Controller
 
         // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
         // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
-        // 絞り込み。「即日体入」リボンを出している店舗を抽出。
-        $sort = $request->input('sort', 'newest');
+        // 絞り込み。「体験確約」リボンを出している店舗を抽出。
+        // デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
+        $sort = $request->input('sort', 'priority');
         if ($sort === 'experience_guaranteed') {
             $query->where('guarantee->same_day_trial', 'same_day');
         }
@@ -102,8 +103,14 @@ class PublicStoreController extends Controller
                 $query->orderByRaw("$avgSql desc nulls last")
                       ->orderByRaw("$countSql desc");
                 break;
-            default: // newest
+            case 'newest':
                 $query->orderByDesc('created_at');
+                break;
+            case 'priority':
+            default:
+                // 表示優先度順 (priority desc)、同値内は新しい順。
+                // 「おすすめ順」「表示優先」のフロントタブとは同じ実装。
+                $query->orderByDesc('priority')->orderByDesc('created_at');
         }
 
         $stores = $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
@@ -114,9 +121,20 @@ class PublicStoreController extends Controller
 
     /**
      * Store detail.
+     *
+     * URL param は slug または ID。数値オンリーなら ID として fallback で引く。
+     * 旧 ID URL からのアクセスを許容しつつ、新規流入は slug ベースに統一する。
      */
-    public function show(Store $store): JsonResponse
+    public function show(string $slugOrId): JsonResponse
     {
+        $store = Store::where('slug', $slugOrId)
+            ->orWhere(function ($q) use ($slugOrId) {
+                if (preg_match('/^\d+$/', $slugOrId)) {
+                    $q->where('id', (int) $slugOrId);
+                }
+            })
+            ->firstOrFail();
+
         if ($store->publish_status !== 'published') {
             abort(404);
         }

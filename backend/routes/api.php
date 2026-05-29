@@ -32,9 +32,19 @@ Route::get('/', fn () => response()->json(['status' => 'ok']));
 // ========== 公開API ==========
 Route::get('/home', [PublicStoreController::class, 'home']);
 Route::get('/stores', [PublicStoreController::class, 'index']);
-Route::get('/stores/{store}', [PublicStoreController::class, 'show'])->whereNumber('store');
+Route::get('/stores/{store}', [PublicStoreController::class, 'show'])
+    ->where('store', '[A-Za-z0-9\-]+');
 Route::get('/areas', [PublicStoreController::class, 'areas']);
 Route::get('/categories', [PublicStoreController::class, 'categories']);
+
+// SEO ランディングページ: エリア × 業態の組み合わせ
+Route::get('/landings/areas/{slug}', [\App\Http\Controllers\PublicLandingController::class, 'area']);
+Route::get('/landings/categories/{slug}', [\App\Http\Controllers\PublicLandingController::class, 'category']);
+Route::get('/landings/areas/{areaSlug}/categories/{categorySlug}', [\App\Http\Controllers\PublicLandingController::class, 'areaCategory']);
+
+// 業界用語集 (Glossary)
+Route::get('/glossary', [\App\Http\Controllers\PublicGlossaryController::class, 'index']);
+Route::get('/glossary/{slug}', [\App\Http\Controllers\PublicGlossaryController::class, 'show']);
 Route::get('/relocate-voices', [PublicRelocateController::class, 'voices']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
 Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');

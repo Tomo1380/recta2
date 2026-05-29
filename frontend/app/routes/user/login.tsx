@@ -10,9 +10,15 @@ import {
 import { useUserAuth } from "~/lib/user-auth";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta() {
-  return [{ title: "ログイン - Recta" }];
+  return buildMetaTags({
+    title: "ログイン - Recta",
+    description: "LINE で Recta にログインして、口コミ投稿やマイページを利用できます。",
+    path: "/login",
+    noindex: true,
+  });
 }
 
 function LineIcon({ className }: { className?: string }) {

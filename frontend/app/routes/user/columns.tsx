@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router";
 import { Loader2, ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 import { userApi } from "~/lib/api";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import TrendingTopics, { type TrendingItem } from "~/components/user/shared/TrendingTopics";
+import { buildMetaTags } from "~/lib/seo";
 import type {
   ArticleSummary,
   PublicArticleIndexResponse,
@@ -12,14 +15,12 @@ const DARK = "#1b2528";
 const J = "'Noto Sans JP',sans-serif";
 
 export function meta() {
-  return [
-    { title: "コラム | Recta - ナイトワーク業界ガイド" },
-    {
-      name: "description",
-      content:
-        "キャバクラとラウンジの違い、ノルマやバックの仕組み、グループ解説など。ナイトワーク業界をやさしく学べるコラム集。",
-    },
-  ];
+  return buildMetaTags({
+    title: "コラム | Recta - ナイトワーク業界ガイド",
+    description:
+      "キャバクラとラウンジの違い、ノルマやバックの仕組み、グループ解説など。ナイトワーク業界をやさしく学べるコラム集。",
+    path: "/columns",
+  });
 }
 
 function formatDate(s: string | null): string {
@@ -37,6 +38,24 @@ export default function ColumnsPage() {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [consultations, setConsultations] = useState<TrendingItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/home")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { consultations?: { question: string; answer?: string | null; tag?: string; count?: number | string | null }[] } | null) => {
+        const list = (json?.consultations ?? [])
+          .filter((c) => !!c.answer)
+          .map((c) => ({
+            q: c.question,
+            a: c.answer ?? "",
+            tag: c.tag?.replace(/^#/, ""),
+            count: c.count != null ? `${c.count}` : undefined,
+          }));
+        setConsultations(list);
+      })
+      .catch(() => setConsultations([]));
+  }, []);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -141,7 +160,14 @@ export default function ColumnsPage() {
         </div>
       </div>
 
-      <div className="px-5 pt-6 space-y-4">
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "コラム" },
+        ]}
+      />
+
+      <div className="px-5 pt-4 space-y-4">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -312,6 +338,11 @@ export default function ColumnsPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* みんなの相談 — トップから移動 */}
+      <div className="pb-10">
+        <TrendingTopics pool={consultations} />
       </div>
     </div>
   );

@@ -296,12 +296,22 @@ class PublicApiTest extends TestCase
 
     public function test_can_get_chat_config(): void
     {
+        $categories = [
+            [
+                'id' => 'ask',
+                'label' => '質問する',
+                'sub' => 'AIに直接聞いてみる',
+                'chips' => ['未経験でも大丈夫？', '日払いできる？'],
+            ],
+        ];
+
         AiChatSetting::create([
             'page_type' => 'top',
             'enabled' => true,
             'system_prompt' => 'test prompt',
             'tone' => 'friendly',
-            'suggest_buttons' => ['条件で探したい', '適正時給診断'],
+            'suggest_categories' => $categories,
+            'suggest_display_mode' => 'categorized',
         ]);
 
         $response = $this->getJson('/api/chat/config?page_type=top');
@@ -309,8 +319,37 @@ class PublicApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'enabled' => true,
+                'suggest_categories' => $categories,
+                'suggest_display_mode' => 'categorized',
             ])
-            ->assertJsonStructure(['enabled', 'suggest_buttons']);
+            ->assertJsonStructure(['enabled', 'suggest_categories', 'suggest_display_mode']);
+    }
+
+    public function test_chat_config_exposes_chips_only_display_mode(): void
+    {
+        AiChatSetting::create([
+            'page_type' => 'list',
+            'enabled' => true,
+            'system_prompt' => 'test',
+            'tone' => 'friendly',
+            'suggest_display_mode' => 'chips_only',
+            'suggest_categories' => [
+                [
+                    'id' => 'rank',
+                    'label' => 'ランキング',
+                    'sub' => '人気順',
+                    'chips' => ['ベスト3を厳選して！', '高時給だけ'],
+                ],
+            ],
+        ]);
+
+        $response = $this->getJson('/api/chat/config?page_type=list');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'enabled' => true,
+                'suggest_display_mode' => 'chips_only',
+            ]);
     }
 
     public function test_chat_config_returns_disabled_when_no_setting(): void
@@ -320,7 +359,8 @@ class PublicApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'enabled' => false,
-                'suggest_buttons' => [],
+                'suggest_categories' => [],
+                'suggest_display_mode' => 'off',
             ]);
     }
 
@@ -338,7 +378,8 @@ class PublicApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'enabled' => false,
-                'suggest_buttons' => [],
+                'suggest_categories' => [],
+                'suggest_display_mode' => 'off',
             ]);
     }
 

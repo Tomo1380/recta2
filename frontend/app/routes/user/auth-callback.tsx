@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router";
 import { useUserAuth } from "~/lib/user-auth";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta() {
-  return [{ title: "認証中... - Recta" }];
+  return buildMetaTags({
+    title: "認証中... - Recta",
+    description: "LINE 認証を処理しています。",
+    path: "/auth/callback",
+    noindex: true,
+  });
 }
 
 export default function AuthCallbackPage() {

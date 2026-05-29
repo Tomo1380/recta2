@@ -14,6 +14,7 @@ use App\Services\AiChat\GeminiClient;
 use App\Services\AiChat\PromptBuilder;
 use App\Services\AiChat\StoreToolRegistry;
 use App\Services\AiChat\UsageLimitGuard;
+use App\Support\AgentTextSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -46,13 +47,15 @@ class AiChatController extends Controller
         if (!$setting || !$setting->enabled) {
             return response()->json([
                 'enabled' => false,
-                'suggest_buttons' => [],
+                'suggest_categories' => [],
+                'suggest_display_mode' => 'off',
             ]);
         }
 
         return response()->json([
             'enabled' => true,
-            'suggest_buttons' => $setting->suggest_buttons ?? [],
+            'suggest_categories' => $setting->suggest_categories ?? [],
+            'suggest_display_mode' => $setting->suggest_display_mode ?? 'categorized',
         ]);
     }
 
@@ -219,8 +222,8 @@ class AiChatController extends Controller
                 ]);
 
                 $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
-                // Strip [STORE:ID] markers from display text (cards are shown separately)
-                $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+                // Strip [STORE:ID] markers + guard against fabricated store lines
+                $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
                 return response()->json([
                     'message' => $displayText,
@@ -394,7 +397,7 @@ class AiChatController extends Controller
         ]);
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+        $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
         return response()->json([
             'message' => $displayText,
@@ -466,7 +469,7 @@ class AiChatController extends Controller
         ]);
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+        $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
         return response()->json([
             'message' => $displayText,
@@ -636,7 +639,7 @@ class AiChatController extends Controller
 
             $line = "・{$s->name}（{$s->area}/{$s->nearest_station}）時給" . number_format($hourlyMin) . "〜" . number_format($hourlyMax) . "円";
             $features = [];
-            if (!empty($guarantee['same_day_trial'])) $features[] = '当日体入OK';
+            if (!empty($guarantee['same_day_trial'])) $features[] = '体験確約OK';
             if (!empty($guarantee['period'])) $features[] = '保証あり';
             $tags = $s->feature_tags ?? [];
             if (in_array('未経験歓迎', $tags)) $features[] = '未経験歓迎';
@@ -653,7 +656,7 @@ class AiChatController extends Controller
         } elseif (str_contains($message, 'ノルマ')) {
             $response = "ノルマなしで働けるお店をご紹介します！\n\n{$storeList}\n\nプレッシャーなく、自分のペースで働ける環境が整っています。{$lineCta}";
         } elseif (str_contains($message, '体入') || str_contains($message, '体験入店')) {
-            $response = "体験入店できるお店をご紹介します！\n\n{$storeList}\n\n当日体入OKのお店なら、思い立ったらすぐ体験できます。{$lineCta}";
+            $response = "体験入店できるお店をご紹介します！\n\n{$storeList}\n\n体験確約OKのお店なら、思い立ったらすぐ体験できます。{$lineCta}";
         } elseif (str_contains($message, '保証')) {
             $response = "保証制度があるお店をご紹介します！\n\n{$storeList}\n\n保証期間中は安定した収入が確保できるので、安心してスタートできます。{$lineCta}";
         } else {
@@ -907,8 +910,8 @@ class AiChatController extends Controller
             if (empty($functionCalls)) {
                 // Final text reply — stream it as typewriter chunks.
                 $aiText = collect($parts)->filter(fn($p) => isset($p['text']))->pluck('text')->implode('');
-                $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
                 $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
+                $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
                 $elapsed = round((microtime(true) - $startTime) * 1000);
 

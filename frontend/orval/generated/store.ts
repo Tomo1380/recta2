@@ -9,11 +9,11 @@ import type {
   StoreGeocode200,
   StoreGeocodeBody,
   StoreUploadImage201,
-  StoreUploadImageBody,
   StoresIndex200,
   StoresIndexParams,
   StoresStoreBody,
-  StoresUpdateBody
+  StoresUpdateBody,
+  UploadStoreImageRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -83,16 +83,11 @@ export const storeGeocode = (
     },
       );
     }
-  /**
- * @summary Upload an image for a store.
-Accepts multipart form data with an 'image' file field.
-Stores to storage/app/public/stores/ and returns the URL
- */
-export const storeUploadImage = (
+  export const storeUploadImage = (
     store: number,
-    storeUploadImageBody: StoreUploadImageBody,
+    uploadStoreImageRequest: UploadStoreImageRequest,
  ) => {const formData = new FormData();
-formData.append(`image`, storeUploadImageBody.image);
+formData.append(`image`, uploadStoreImageRequest.image);
 
       return rectaMutator<StoreUploadImage201>(
       {url: `/admin/stores/${store}/images`, method: 'POST',
@@ -101,10 +96,7 @@ formData.append(`image`, storeUploadImageBody.image);
     },
       );
     }
-  /**
- * @summary Delete an image from a store by index
- */
-export const storeDeleteImage = (
+  export const storeDeleteImage = (
     store: number,
     index: number,
  ) => {

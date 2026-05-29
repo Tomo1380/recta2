@@ -17,7 +17,7 @@ import {
  * 追加できる導線も提供する。
  *
  * 挙動:
- * - 未追加 → 押下で tray に追加。即時遷移はせず、CompareSelectionBar から
+ * - 未追加 → 押下で tray に追加。即時遷移はせず、UserFab から
  *   ユーザーが明示的に「比較する」を押すまで待つ（誤タップ事故防止）。
  * - 追加済 → 「比較リストに追加済み」表示 + 取り消しボタン。
  * - tray 満杯 (4件) + 未追加 → disabled で「最大4件まで」表示。
@@ -60,7 +60,7 @@ export default function CompareToggle({
 
   const onAdd = () => {
     if (trayFull) return;
-    // 即遷移はしない（誤タップ事故防止）。CompareSelectionBar が画面下に
+    // 即遷移はしない（誤タップ事故防止）。UserFab が画面下に
     // floating 表示され、ユーザーが「比較する」を押すまで待つ。
     addToCompareTray({
       id: storeId,

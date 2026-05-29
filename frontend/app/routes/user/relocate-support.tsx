@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Home, Wallet, Plane, ShieldCheck } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { buildMetaTags } from "~/lib/seo";
 import type { RelocateVoice } from "../../../orval/generated/api.schemas";
 
 const GOLD = "#d4af37";
@@ -37,6 +39,15 @@ const FEATURES = [
   { Icon: Plane, label: "交通費全額", note: "面接・体入時の交通費を全額負担" },
   { Icon: ShieldCheck, label: "保証制度", note: "最低保証3〜6ヶ月で安心スタート" },
 ];
+
+export function meta() {
+  return buildMetaTags({
+    title: "上京サポート - 地方から東京で働きたい方へ | Recta",
+    description:
+      "オンライン面接・住居完備・引越し費用補助・体験入店（体入）確約まで、東京で働きたい方をRectaが一気通貫でサポート。来店不要で始められます。",
+    path: "/relocate-support",
+  });
+}
 
 export default function RelocateSupportPage() {
   const navigate = useNavigate();
@@ -105,8 +116,15 @@ export default function RelocateSupportPage() {
         </div>
       </div>
 
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "上京サポート" },
+        ]}
+      />
+
       {/* ── FEATURES ── */}
-      <div className="px-5 pt-6">
+      <div className="px-5 pt-4">
         <div className="grid grid-cols-2 gap-3">
           {FEATURES.map(({ Icon, label, note }) => (
             <div key={label} className="rounded-2xl p-4" style={{ background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 16px rgba(0,0,0,.04)" }}>

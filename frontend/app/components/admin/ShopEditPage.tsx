@@ -626,7 +626,7 @@ export function ShopEditPage() {
   const [trialMaxWage, setTrialMaxWage] = useState("");
   const [interviewStart, setInterviewStart] = useState("");
   const [interviewEnd, setInterviewEnd] = useState("");
-  // 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし)。
+  // 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし)。
   const [sameDayTrial, setSameDayTrial] = useState<"same_day" | "normal" | "none">("normal");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -711,6 +711,9 @@ export function ShopEditPage() {
   const [seoMetaDescription, setSeoMetaDescription] = useState("");
 
   const [publishStatus, setPublishStatus] = useState<"published" | "unpublished" | "draft">("draft");
+  /** 表示優先度 (-1000〜1000)。値が大きいほど一覧で上位。デフォルト 0。
+   *  string で保持し、submit 時に payload で number 変換。 */
+  const [priority, setPriority] = useState<string>("0");
   // 画像アップロード/削除の state とハンドラは useShopImages フックに集約。
   // setStoreImages は populate (既存店舗 GET 後の反映) と save 後の reset で
   // 使うので、フックから返ってきた setter を引き続きそのまま使う。
@@ -808,6 +811,7 @@ export function ShopEditPage() {
     if (f.staffComment !== undefined) setStaffComment(f.staffComment);
     if (f.supportItems !== undefined) setSupportItems(f.supportItems);
     if (f.seoMetaDescription !== undefined) setSeoMetaDescription(f.seoMetaDescription);
+    if (f.priority !== undefined) setPriority(f.priority);
     // publish_status と images は ShopForm 範囲外
     setPublishStatus(store.publish_status || "draft");
     setStoreImages(
@@ -901,6 +905,7 @@ export function ShopEditPage() {
       setFeeList, setFeeNotes, rectaEpisodes, qaItems,
       staffName, staffRole, staffComment, supportItems,
       seoMetaDescription,
+      priority,
     };
     return formToPayload(form, { storeImages: [], publishStatus });
   }, [
@@ -921,6 +926,7 @@ export function ShopEditPage() {
     setFeeList, setFeeNotes, rectaEpisodes, qaItems,
     staffName, staffRole, staffComment, supportItems,
     seoMetaDescription,
+    priority,
     publishStatus,
   ]);
 
@@ -1279,7 +1285,7 @@ export function ShopEditPage() {
 
   // 体入（体験入店）情報。元 STEP3 にあったが、求職者目線ではユーザー画面
   // 上部に出る情報なので STEP1「店舗情報」末尾に同居させる。中身: 体入時給
-  // (最低/最高)、面接可能時間 (開始/終了)、当日体入可否。
+  // (最低/最高)、面接可能時間 (開始/終了)、体験確約可否。
   const sectionTrial = () => (
     <SectionCard title="体入（体験入店）情報" icon={Sparkles} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1318,7 +1324,7 @@ export function ShopEditPage() {
             placeholder="例: 19:00"
           />
         </Field>
-        <Field label="体入の種類" hint="店舗詳細やフィルターで「即日体入OK」リボンの出し分けに使用">
+        <Field label="体入の種類" hint="店舗詳細やフィルターで「体験確約OK」リボンの出し分けに使用">
           <select
             value={sameDayTrial}
             onChange={(e) =>
@@ -1326,8 +1332,8 @@ export function ShopEditPage() {
             }
             className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
           >
-            <option value="same_day">即日体入</option>
-            <option value="normal">通常体入</option>
+            <option value="same_day">体験確約</option>
+            <option value="normal">体入可能</option>
             <option value="none">体入なし</option>
           </select>
         </Field>
@@ -2219,6 +2225,20 @@ export function ShopEditPage() {
               <option value="published">公開中</option>
               <option value="unpublished">非公開</option>
             </select>
+          </Field>
+          <Field
+            label="表示優先度"
+            hint="一覧の「おすすめ順」で並べる際の優先度。値が大きいほど上位に表示されます。範囲: -1000〜1000。デフォルト 0。"
+          >
+            <input
+              type="number"
+              min={-1000}
+              max={1000}
+              step={10}
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-32 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all tabular-nums"
+            />
           </Field>
           {/* 公開開始/終了日時・SEO メタディスクリプション は STEP1 / 他で
               扱うため公開設定からは撤去。日時スケジューラは未実装、SEO は

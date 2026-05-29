@@ -43,6 +43,9 @@ import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { LineIcon } from "~/components/user/shared/LineIcon";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { openLineFriendAdd } from "~/lib/line";
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
 import CompareToggle from "~/components/user/shared/CompareToggle";
 import StoreMap from "~/components/shared/StoreMap";
@@ -56,14 +59,21 @@ import { useUserAuthSafe } from "~/lib/user-auth";
 
 interface BackItem {
   label: string;
-  // バックは「500円」「10%」「5,000〜10,000円」のように単位込みで運営が
-  // 入力するため文字列で扱う。表示はそのまま render。
-  amount: string | number;
+  // 新スキーマ: value (int) + unit。
+  value?: number;
+  unit?: "yen" | "percent" | "free";
+  per_day?: boolean;
+  /** @deprecated 旧 string 形式 */
+  amount?: string | number;
 }
 
 interface FeeItem {
   label: string;
-  amount: string | number;
+  value?: number;
+  unit?: "yen" | "percent" | "free";
+  per_day?: boolean;
+  /** @deprecated 旧 string 形式 */
+  amount?: string | number;
 }
 
 interface StoreImage {
@@ -231,6 +241,7 @@ export interface RelatedStoreLite {
 
 export interface StoreDetailStore {
   id: number;
+  slug?: string | null;
   name: string;
   area: string;
   address: string;
@@ -270,7 +281,7 @@ export interface StoreDetailStore {
   interview_hours: string;
   interview_start: string | null;
   interview_end: string | null;
-  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   feature_tags: string[];
   description: string;
@@ -320,6 +331,8 @@ interface StoreDetailPageProps {
   id: number;
   /** When provided, skip API fetch and render this data directly (for admin preview) */
   previewData?: StoreDetailResponse;
+  /** SSR loader 由来の初期データ。あれば初回 fetch をスキップして即描画。 */
+  initialData?: StoreDetailResponse;
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +420,24 @@ function toAmountString(v: number | string | null | undefined): string | null {
   // 数字のみ "0" は未入力扱い
   if (/^0+$/.test(s)) return null;
   return s;
+}
+
+/**
+ * back/fee items の {value, unit} を表示用文字列に変換。
+ * 旧 amount (string|number) もフォールバックで処理。
+ */
+function formatAmountItem(item: { value?: number; unit?: string; per_day?: boolean; amount?: string | number }): string {
+  if (item.unit === "free" || (item.unit === "yen" && item.value === 0)) return "無料";
+  if (typeof item.value === "number") {
+    const text = item.unit === "percent" ? `${item.value}%` : `¥${item.value.toLocaleString()}`;
+    return item.per_day ? `${text}/日` : text;
+  }
+  // 旧データフォールバック
+  if (item.amount != null) {
+    if (typeof item.amount === "number") return `¥${item.amount.toLocaleString()}`;
+    return String(item.amount);
+  }
+  return "—";
 }
 
 function formatCurrency(amount: number | string): string {
@@ -509,9 +540,10 @@ function LoadingSkeleton() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function StoreDetailPage({ id, previewData }: StoreDetailPageProps) {
-  const [data, setData] = useState<StoreDetailResponse | null>(previewData ?? null);
-  const [loading, setLoading] = useState(!previewData);
+export default function StoreDetailPage({ id, previewData, initialData }: StoreDetailPageProps) {
+  const seed = previewData ?? initialData ?? null;
+  const [data, setData] = useState<StoreDetailResponse | null>(seed);
+  const [loading, setLoading] = useState(!seed);
   const [error, setError] = useState<string | null>(null);
   // Shared controller — ensures only one video can be `stuck`/`mini` at a time.
   const stickyController = useStickyVideoController();
@@ -526,6 +558,9 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
   useEffect(() => {
     if (previewData) return; // Skip fetch in preview mode
+    // SSR loader 由来の initialData が同じ id のものならスキップ。
+    // id が変わった (navigate by Link) ときは再 fetch する。
+    if (initialData && initialData.store?.id === id) return;
 
     let cancelled = false;
     setLoading(true);
@@ -679,7 +714,14 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
       />
 
       <div className="relative z-10" style={{ backgroundColor: "#f5f5f5" }}>
-        <div className="space-y-4 px-4 pb-24 pt-4">
+        <Breadcrumb
+          items={[
+            { label: "ホーム", to: "/" },
+            { label: "店舗一覧", to: "/stores" },
+            { label: store.name },
+          ]}
+        />
+        <div className="space-y-4 px-4 pb-24 pt-2">
           {/* ============================================================ */}
           {/* Quick stats — 4 strip                                       */}
           {/* ============================================================ */}
@@ -748,53 +790,62 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           </div>
 
           {/* ============================================================ */}
-          {/* 2. AI Chat (replaces old Shop Intro Card — chat intro summarizes store info) */}
+          {/* 2. 動画 1 本目 → AI チャット → 動画 2 本目以降 → 体験入店情報。
+                  ファーストビュー直後に動画 1 本でフックを作り、AIチャット
+                  + LINE CTA で相談導線、さらに動画があれば下に並べる順序。 */}
           {/* ============================================================ */}
-          <AiChatPanel
-            pageType="detail"
-            storeId={store.id}
-            storeName={store.name}
-            storeInfo={{
-              name: store.name,
-              area: store.area,
-              category: store.category,
-              nearest_station: store.nearest_station,
-              hourly_min: store.hourly_min ?? undefined,
-              hourly_max: store.hourly_max ?? undefined,
-              feature_tags: store.feature_tags,
-              description: store.description,
-              business_hours: store.business_hours,
-              // 後方互換: AiChatPanel.StoreContext は same_day_trial: boolean
-              // を期待しているので、即日体入のときだけ true を渡す。
-              same_day_trial: store.trial_type === "same_day",
-              trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
-            }}
-          />
-
-          {/* LINE CTA #1 — between AI chat and video */}
-          <LineCtaCard
-            variant="slim"
-            title="チャットでは聞きにくいことも"
-            description="担当スタッフがLINEで直接お答えします"
-            ctaLabel="相談する"
-            source="store-detail:chat-inline"
-          />
-
-          {/* ============================================================ */}
-          {/* 3. Store videos — multiple videos with labels & descriptions */}
-          {/*    Renders display_order ascending. Each video is               */}
-          {/*    play-to-stick; only one can be `stuck`/`mini` at a time      */}
-          {/*    thanks to the shared `stickyController`.                     */}
-          {/* ============================================================ */}
-          <StoreVideosBlock
-            videos={(store.videos && store.videos.length > 0)
+          {(() => {
+            const videos = (store.videos && store.videos.length > 0)
               ? store.videos
               : (store.video_url
                   ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
-                  : [])}
-            fallbackPosterUrl={sortedImages[0]?.url}
-            controller={stickyController}
-          />
+                  : []);
+            const firstVideo = videos.slice(0, 1);
+            const restVideos = videos.slice(1);
+            return (
+              <>
+                {firstVideo.length > 0 && (
+                  <StoreVideosBlock
+                    videos={firstVideo}
+                    fallbackPosterUrl={sortedImages[0]?.url}
+                    controller={stickyController}
+                  />
+                )}
+                <AiChatPanel
+                  pageType="detail"
+                  storeId={store.id}
+                  storeName={store.name}
+                  storeInfo={{
+                    name: store.name,
+                    area: store.area,
+                    category: store.category,
+                    nearest_station: store.nearest_station,
+                    hourly_min: store.hourly_min ?? undefined,
+                    hourly_max: store.hourly_max ?? undefined,
+                    feature_tags: store.feature_tags,
+                    description: store.description,
+                    business_hours: store.business_hours,
+                    same_day_trial: store.trial_type === "same_day",
+                    trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
+                  }}
+                />
+                <LineCtaCard
+                  variant="card"
+                  title="気になったら、直接聞いてみよう"
+                  description="体入予約・条件交渉までLINEで完結"
+                  ctaLabel="LINE追加"
+                  source="store-detail:chat-inline"
+                />
+                {restVideos.length > 0 && (
+                  <StoreVideosBlock
+                    videos={restVideos}
+                    fallbackPosterUrl={sortedImages[0]?.url}
+                    controller={stickyController}
+                  />
+                )}
+              </>
+            );
+          })()}
 
           {/* ============================================================ */}
           {/* 4. Experience Entry (体験入店情報) */}
@@ -840,7 +891,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                         className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
                         style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
                       >
-                        即日体入OK
+                        体験確約OK
                       </span>
                     );
                   }
@@ -850,7 +901,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                         className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
                         style={{ border: "1px solid rgba(212,175,55,0.4)", color: "rgba(168,130,20,0.9)", background: "rgba(212,175,55,0.06)" }}
                       >
-                        通常体入あり
+                        体入可能あり
                       </span>
                     );
                   }
@@ -1021,7 +1072,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     <ul className="space-y-0.5">
                       {(store.back_items ?? []).map((item) => (
                         <li key={item.label} className="text-sm">
-                          {item.label}: {formatCurrency(item.amount)}
+                          {item.label}: {formatAmountItem(item)}
                         </li>
                       ))}
                     </ul>
@@ -1035,7 +1086,7 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
                     <ul className="space-y-0.5">
                       {(store.fee_items ?? []).map((item) => (
                         <li key={item.label} className="text-sm">
-                          {item.label}: {formatCurrency(item.amount)}
+                          {item.label}: {formatAmountItem(item)}
                         </li>
                       ))}
                     </ul>
@@ -1234,18 +1285,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             );
           })()}
 
-          {/* LINE CTA #2 — 面接情報の直後。「面接前の不安、LINEで」の文脈で
-              必要書類を含む面接ブロックの締めとして置く。 */}
-          {store.required_documents && (
-            <LineCtaCard
-              variant="slim"
-              title="面接前の不安、LINEで気軽に質問"
-              description="服装・持ち物・当日の流れまで個別にサポート"
-              ctaLabel="質問する"
-              source="store-detail:docs-inline"
-            />
-          )}
-
           {/* ============================================================ */}
           {/* 11a. Transfer / 足代 — distance-based zone fee map + table */}
           {/* ============================================================ */}
@@ -1258,14 +1297,13 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
           />
 
           {/* ============================================================ */}
-          {/* 11b. Champagne prices + Set fee — お店の単価が分かる「価格表」系を
-                  隣接させる (運営要望)。 */}
+          {/* 11b. Champagne prices — シャンパン価格表 */}
+          {/* セット料金は「アクセス」直下に移動 (運営要望)。 */}
           {/* ============================================================ */}
           <ChampagnePricesSection
             prices={store.champagne_prices}
             fallback={store.champagne_description}
           />
-          <SetFeeSection setFee={store.set_fee} />
 
           {/* ============================================================ */}
           {/* 11c. Recta-keiyū episodes (レクタ経由入店女性エピソード) */}
@@ -1469,14 +1507,10 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
             </div>
           </SectionCard>
 
-          {/* LINE CTA #3 — between access map and recently-viewed list */}
-          <LineCtaCard
-            variant="card"
-            title="気になったら、直接聞いてみよう"
-            description="体入予約・条件交渉までLINEで完結"
-            ctaLabel="LINE追加"
-            source="store-detail:map-card"
-          />
+          {/* ============================================================ */}
+          {/* 15b. Set fee (セット料金) — アクセスの直下 (運営要望) */}
+          {/* ============================================================ */}
+          <SetFeeSection setFee={store.set_fee} />
 
           {/* ============================================================ */}
           {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}
@@ -1509,9 +1543,6 @@ export default function StoreDetailPage({ id, previewData }: StoreDetailPageProp
 
       </div>
 
-      {/* BottomTabBar is rendered by routes/user/layout.tsx. The admin shop
-          preview imports StoreDetailPage directly (outside that layout), so the
-          tab bar naturally doesn't leak into admin views. */}
     </>
   );
 }
@@ -1575,60 +1606,115 @@ function LuxeHero({
     setIndex(i);
   };
 
-  // モバイル向けスワイプ: 水平に 40px 以上ドラッグしたら前後へ。縦スクロールを
-  // 邪魔しないよう threshold は控えめに、垂直方向の動きが大きいときは無視。
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStart.current = { x: t.clientX, y: t.clientY };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchStart.current;
-    touchStart.current = null;
-    if (!start) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) goNext();
-    else goPrev();
-  };
+  // スワイプ: 水平ドラッグで slide を「指で押す」感覚にする。
+  // - dragging 中は transition を切り、dragOffset を transform に直接反映
+  // - 指を離したときに threshold (width の 15% or 40px) で前後を判定
+  // - 縦方向の方が支配的なら無視 (縦スクロールを邪魔しない)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef<{ x: number; y: number; w: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
-  // 次に出る画像を右端に「peek」(覗かせ) 表示する用。映画的に「この向こうに
-  // まだある」を暗喩で伝えるパターン (Netflix / Stories / Smashing 推奨)。
-  // ミニサムネと枚数カウンターは廃止して、peek + 進捗バーに統一する。
-  const peekUrl = hasSlides && slides.length > 1
-    ? slides[(index + 1) % slides.length]
-    : null;
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!hasSlides || slides.length < 2) return;
+    const w = containerRef.current?.clientWidth ?? 0;
+    dragStart.current = { x: e.clientX, y: e.clientY, w };
+    setUserInteracted(true);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragStart.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (!dragging) {
+      // まず水平意図か縦スクロール意図かを判定 (16px の dead zone)
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        dragStart.current = null;
+        return;
+      }
+      setDragging(true);
+    }
+    // ループ端でのゴム引き効果は省略 (modern carousel は素直に edge stick)
+    const clamped =
+      index === 0 && dx > 0
+        ? dx * 0.35
+        : index === slides.length - 1 && dx < 0
+          ? dx * 0.35
+          : dx;
+    setDragOffset(clamped);
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!dragStart.current) {
+      setDragging(false);
+      return;
+    }
+    const start = dragStart.current;
+    dragStart.current = null;
+    const dx = e.clientX - start.x;
+    const w = start.w || 1;
+    const ratio = dx / w;
+    const threshold = 0.15; // 15% スワイプで次へ
+    setDragging(false);
+    setDragOffset(0);
+    if (ratio < -threshold || dx < -50) goNext();
+    else if (ratio > threshold || dx > 50) goPrev();
+  };
 
   return (
     <section
-      className="relative isolate w-full overflow-hidden"
-      style={{ height: "440px", background: "#1b2528" }}
+      ref={containerRef}
+      className="relative isolate mx-auto w-full overflow-hidden touch-pan-y select-none"
+      style={{
+        // 16:9 シネマ。スマホ縦持ちで画面の 1/3 強を占める控えめなヒーロー。
+        aspectRatio: "16 / 9",
+        background: "#1b2528",
+      }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
     >
-      {/* Slides */}
+      {/* Slides — 横スライド (translateX)。
+          peek を別ボタンで描画しない代わりに、トラック幅を 100% で並べた
+          うえで「次画像が右端から自然にちらっと見える」見え方は、
+          スライド開始時の drag offset + 各画像の object-cover で出す。 */}
       {hasSlides ? (
-        slides.map((src, i) => (
-          <div
-            key={i}
-            className="absolute inset-0"
-            style={{
-              opacity: i === index ? 1 : 0,
-              transition: "opacity 800ms ease",
-            }}
-          >
-            <img
-              src={src}
-              alt=""
-              className="h-full w-full object-cover"
-              style={{ transform: i === index ? "scale(1.04)" : "scale(1)", transition: "transform 4s ease-out" }}
-            />
-          </div>
-        ))
+        <div
+          className="absolute inset-0 flex h-full"
+          style={{
+            width: `${slides.length * 100}%`,
+            transform: `translate3d(calc(${-index * (100 / slides.length)}% + ${dragOffset}px), 0, 0)`,
+            transition: dragging
+              ? "none"
+              : "transform 520ms cubic-bezier(0.22, 1, 0.36, 1)",
+            willChange: "transform",
+          }}
+        >
+          {slides.map((src, i) => (
+            <div
+              key={i}
+              className="relative h-full shrink-0"
+              style={{ width: `${100 / slides.length}%` }}
+            >
+              <img
+                src={src}
+                alt=""
+                draggable={false}
+                // 1 枚目はヒーローなので eager、2 枚目以降は lazy。
+                loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={i === 0 ? "high" : undefined}
+                className="h-full w-full object-cover"
+                style={{
+                  transform: i === index ? "scale(1.04)" : "scale(1)",
+                  transition: "transform 4s ease-out",
+                }}
+              />
+            </div>
+          ))}
+        </div>
       ) : (
         <div
           className="absolute inset-0"
@@ -1661,51 +1747,6 @@ function LuxeHero({
             "linear-gradient(180deg, rgba(8,6,16,0.55) 0%, rgba(8,6,16,0.05) 35%, rgba(8,6,16,0.8) 100%)",
         }}
       />
-
-      {/* Peek — 次画像を右端から 14px だけ覗かせる (Option B「シネマ peek」)。
-          「この向こうにもう一枚ある」のシグナルを暗喩で。peek にはうっすら
-          ダークグラデを乗せて、主役 (現在画像) との階層を保つ。タップで次へ。 */}
-      {peekUrl && (
-        <button
-          type="button"
-          onClick={goNext}
-          aria-label="次の写真"
-          className="absolute right-0 top-0 z-[5] h-full overflow-hidden"
-          style={{ width: 18, cursor: "pointer" }}
-        >
-          <img
-            src={peekUrl}
-            alt=""
-            className="h-full w-full object-cover"
-            style={{ filter: "brightness(0.65) saturate(0.85)" }}
-          />
-          {/* 主役との境目を作る縦グラデ (左側だけ濃く) */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(90deg, rgba(8,6,16,0.7) 0%, rgba(8,6,16,0.15) 100%)",
-            }}
-          />
-        </button>
-      )}
-
-      {/* Floating top — 戻るボタンのみ (カウンター pill は廃止、進捗バーで代替) */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-3">
-        <Link
-          to="/stores"
-          className="inline-flex size-9 items-center justify-center rounded-full text-white"
-          style={{
-            backgroundColor: "rgba(0,0,0,0.4)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.15)",
-          }}
-          aria-label="戻る"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
-      </div>
 
       {/* Editorial overlay — bottom */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-6">
@@ -1759,7 +1800,7 @@ function LuxeHero({
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              即日体入OK
+              体験確約OK
             </span>
           )}
           {trialType === "normal" && (
@@ -1773,13 +1814,12 @@ function LuxeHero({
         </div>
       </div>
 
-      {/* Arrows (only when multiple slides) — モバイルでもタップできるよう
-          常時うっすら表示 (opacity-60)。タップ/ホバーで濃く。 */}
-      {slides.length > 1 && (
+      {/* Arrows — PC (sm 以上) のみ表示。スマホは指でスワイプ。 */}
+      {hasSlides && slides.length > 1 && (
         <>
           <button
             onClick={goPrev}
-            className="absolute left-2 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100"
+            className="absolute left-2 top-1/2 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100 sm:inline-flex"
             style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             aria-label="前の写真"
           >
@@ -1787,7 +1827,7 @@ function LuxeHero({
           </button>
           <button
             onClick={goNext}
-            className="absolute right-2 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100"
+            className="absolute right-2 top-1/2 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100 sm:inline-flex"
             style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             aria-label="次の写真"
           >
@@ -1802,7 +1842,7 @@ function LuxeHero({
           あるか」も視覚的に伝わる。色だけで状態を表し、戻ったときに
           ぐにゃっと width が animate しないように一発切替にしている
           (内側塗り span を持たず、外側ボタンの背景色だけで塗る)。 */}
-      {slides.length > 1 && (
+      {hasSlides && slides.length > 1 && (
         <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center gap-1 px-5">
           {slides.map((_, i) => {
             const active = i <= index;
@@ -2071,6 +2111,8 @@ const StoreVideoSection = forwardRef<
             <img
               src={effectivePoster}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
               onError={(e) => {
                 // maxresdefault is missing for some shorter videos — fall back
@@ -2429,8 +2471,9 @@ function StaffGallerySection({
               <img
                 src={photo.image_url}
                 alt={photo.caption ?? `${storeName} 在籍女性 ${i + 1}`}
-                className="absolute inset-0 h-full w-full object-cover"
                 loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover"
               />
               {photo.staff_type && (
                 <span
@@ -3002,75 +3045,69 @@ function ChampagnePricesSection({
               </p>
             )}
 
-            {/* Rows */}
-            <ul className="relative space-y-0">
-              {visible.map(({ tpl, item }, i) => {
+            {/* 2x2 グリッド — 縦に長い zigzag を廃止して、カード型でコンパクトに */}
+            <ul className="relative grid grid-cols-2 gap-2.5">
+              {visible.map(({ tpl, item }) => {
                 const src = item!.image_url || tpl.defaultImage;
-                const bottleOnRight = i % 2 === 0;
                 return (
                   <li
                     key={tpl.key}
-                    className="relative grid grid-cols-12 items-center"
+                    className="relative flex items-center gap-2 rounded-xl px-2.5 py-2"
                     style={{
-                      minHeight: 96,
-                      // hairline divider between rows
-                      borderTop: i === 0 ? "none" : "1px solid rgba(212,175,55,0.18)",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(212,175,55,0.18)",
                     }}
                   >
-                    {/* Bottle photo — switch column placement to create the
-                        zigzag, leaving the text centered. */}
-                    {!bottleOnRight && (
-                      <ChampagneBottleSlot src={src} alt={tpl.kanaName} side="left" />
-                    )}
-                    <div
-                      className={
-                        bottleOnRight
-                          ? "col-span-9 pl-2 pr-1 text-center"
-                          : "col-span-9 col-start-1 pr-2 pl-1 text-center"
-                      }
+                    <img
+                      src={src}
+                      alt={tpl.kanaName}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-[44px] w-auto shrink-0 object-contain"
                       style={{
-                        // text always takes 9 of 12; bottle takes 3 on the
-                        // opposite side via col-start placement
-                        gridColumnStart: bottleOnRight ? 1 : 4,
+                        filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
+                        maxWidth: 28,
                       }}
-                    >
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.visibility = "hidden";
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
                       <p
-                        className="m-0"
+                        className="m-0 truncate"
                         style={{
                           fontFamily: "'Great Vibes', cursive",
-                          fontSize: 26,
-                          lineHeight: 1.15,
+                          fontSize: 20,
+                          lineHeight: 1.1,
                           color: "#f7d976",
-                          textShadow: "0 1px 6px rgba(0,0,0,0.4)",
+                          textShadow: "0 1px 4px rgba(0,0,0,0.4)",
                         }}
                       >
                         {tpl.scriptName}
                       </p>
                       <p
-                        className="mt-1 text-[11.5px]"
+                        className="mt-0.5 truncate text-[10px]"
                         style={{
-                          color: "rgba(255,255,255,0.7)",
+                          color: "rgba(255,255,255,0.55)",
                           fontFamily: "'Noto Sans JP', sans-serif",
-                          letterSpacing: "0.06em",
                         }}
                       >
                         {tpl.kanaName}
-                        <span
-                          className="ml-3 tabular-nums"
-                          style={{
-                            fontFamily: "'Outfit', sans-serif",
-                            fontWeight: 600,
-                            color: "#ffe066",
-                          }}
-                        >
-                          ¥ {formatYen(item!.amount)}
-                        </span>
+                      </p>
+                      <p
+                        className="mt-0.5 tabular-nums text-[12px] font-semibold"
+                        style={{
+                          fontFamily: "'Outfit', sans-serif",
+                          color: "#ffe066",
+                        }}
+                      >
+                        ¥{formatYen(item!.amount)}
                       </p>
                       {item!.note && (
                         <p
-                          className="mt-1 text-[10px]"
+                          className="mt-0.5 truncate text-[9.5px]"
                           style={{
-                            color: "rgba(255,255,255,0.42)",
+                            color: "rgba(255,255,255,0.4)",
                             fontFamily: "'Noto Sans JP', sans-serif",
                           }}
                         >
@@ -3078,9 +3115,6 @@ function ChampagnePricesSection({
                         </p>
                       )}
                     </div>
-                    {bottleOnRight && (
-                      <ChampagneBottleSlot src={src} alt={tpl.kanaName} side="right" />
-                    )}
                   </li>
                 );
               })}
@@ -3159,43 +3193,6 @@ function ChampagnePricesSection({
   );
 }
 
-/** A single bottle slot in the zigzag menu. 3/12 of the row width on the
- *  named side; bottle PNG is shown contained so transparent backgrounds blend
- *  into the surrounding dark slab. Hides gracefully if the asset is missing. */
-function ChampagneBottleSlot({
-  src,
-  alt,
-  side,
-}: {
-  src: string;
-  alt: string;
-  side: "left" | "right";
-}) {
-  return (
-    <div
-      className="col-span-3 flex h-full items-center"
-      style={{
-        gridColumnStart: side === "left" ? 1 : 10,
-        justifyContent: side === "left" ? "flex-start" : "flex-end",
-      }}
-    >
-      <img
-        src={src}
-        alt={alt}
-        className="h-[88px] w-auto object-contain"
-        style={{
-          filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.5))",
-          maxWidth: 80,
-        }}
-        onError={(e) => {
-          // Hide cleanly when the bottle asset hasn't been shipped yet.
-          (e.target as HTMLImageElement).style.visibility = "hidden";
-        }}
-      />
-    </div>
-  );
-}
-
 /** "18,000" — drops the leading ¥ which is rendered as a label by the caller. */
 function formatYen(value: unknown): string {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -3228,6 +3225,8 @@ function RectaEpisodesSection({ episodes }: { episodes?: RectaEpisode[] | null }
                 <img
                   src={ep.photo_url}
                   alt={ep.name}
+                  loading="lazy"
+                  decoding="async"
                   className="h-16 w-16 rounded-full object-cover"
                   style={{ border: "2px solid rgba(212,175,55,0.3)" }}
                 />
@@ -3327,21 +3326,20 @@ function SalarySimulatorSection({
   const baseSales = 200_000;
   const baseNominations = 0;
 
-  // back_rate: infer from store back_items if any are expressed as percentage
-  // values (≤ 100), otherwise a sensible 30%.
-  // amount は string (例: "10%") か number ("500") のどちらもあり得る。
+  // back_rate: 新スキーマで unit="percent" の項目があればそれを採用、
+  // なければ旧 amount=string "10%" もフォールバック、最後はデフォ 30%。
   const inferredBackRate = (() => {
     for (const b of backItems ?? []) {
+      if (b.unit === "percent" && typeof b.value === "number" && b.value > 0 && b.value <= 100) {
+        return b.value / 100;
+      }
+      // 旧データ救済 (amount=string)
       const raw = typeof b.amount === "number" ? String(b.amount) : b.amount;
-      // "10%" "15 %" のようなパターンは％として採用
       const pct = /^\s*(\d+(?:\.\d+)?)\s*%\s*$/.exec(raw ?? "");
       if (pct) {
         const n = Number(pct[1]);
         if (n > 0 && n <= 100) return n / 100;
       }
-      // 数値のみで 0 < n ≤ 100 のときも %（旧データ互換）として扱う
-      const n = Number(raw);
-      if (Number.isFinite(n) && n > 0 && n <= 100) return n / 100;
     }
     return 0.3;
   })();
@@ -3750,6 +3748,8 @@ function RelatedStoresSection({
                 <img
                   src={s.image_url}
                   alt={s.name}
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : (
@@ -3792,7 +3792,7 @@ function RelatedStoresSection({
   );
 }
 
-// ── Reviews section (3 visible + blur for 4+) ─────────────────────────────
+// ── Reviews section (1 visible by default + 「もっと見る」 expand) ───────
 function ReviewsSection({
   storeId,
   reviews,
@@ -3802,16 +3802,20 @@ function ReviewsSection({
   reviews: Review[];
   reviewsCount: number;
 }) {
-  // 口コミ投稿と同じ判定 (LINE ログイン済みか) を使う。
-  // 未ログイン: 3件 + blur ゲート / ログイン済み: 全件表示。
+  // 未ログイン: 1件 + blur ゲート / ログイン済み: 初期1件 + もっと見るで展開。
   // admin プレビュー時は UserAuthProvider 外なので safe 版を使い、
   // Provider 不在なら未ログイン扱いで blur ゲート表示にする。
   const userAuth = useUserAuthSafe();
   const isAuthenticated = userAuth?.isAuthenticated ?? false;
-  const visible = isAuthenticated ? reviews : reviews.slice(0, 3);
-  const hidden = isAuthenticated ? [] : reviews.slice(3);
+  const [expanded, setExpanded] = useState(false);
+  const INITIAL_VISIBLE = 1;
+  const visible = isAuthenticated
+    ? (expanded ? reviews : reviews.slice(0, INITIAL_VISIBLE))
+    : reviews.slice(0, INITIAL_VISIBLE);
+  const hidden = isAuthenticated ? [] : reviews.slice(INITIAL_VISIBLE);
   // ログイン済みなら「続きはログインで全件公開」CTA は出さない。
   const hasHidden = !isAuthenticated && (hidden.length > 0 || reviewsCount > visible.length);
+  const canExpand = isAuthenticated && reviews.length > INITIAL_VISIBLE;
 
   // Compute summary stats from visible reviews (or fallbacks if none)
   const ratings = reviews.map((r) => r.rating ?? 0).filter((n) => n > 0);
@@ -3819,14 +3823,6 @@ function ReviewsSection({
     ? ratings.reduce((s, n) => s + n, 0) / ratings.length
     : 0;
   const total = reviewsCount || ratings.length;
-
-  // Bucket distribution (use loaded reviews; for unloaded use weighted estimate centered on avg).
-  const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  ratings.forEach((r) => {
-    const bucket = Math.round(Math.max(1, Math.min(5, r)));
-    dist[bucket] = (dist[bucket] ?? 0) + 1;
-  });
-  const distMax = Math.max(...Object.values(dist), 1);
 
   return (
     <div
@@ -3837,82 +3833,48 @@ function ReviewsSection({
         border: "1px solid rgba(27,37,40,0.06)",
       }}
     >
-      <div className="flex items-center justify-between px-5 pb-3 pt-5">
+      <div className="px-5 pb-3 pt-5">
         <SectionHeading icon={<Star size={20} style={{ color: GOLD_HEX }} />}>
           リアルな声・口コミ
         </SectionHeading>
-        <a
-          href={`/stores/${storeId}/review`}
-          className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
-        >
-          口コミを書く
-        </a>
       </div>
 
-      {/* Summary panel — cream gradient + gold border */}
+      {/* Summary panel — cream gradient + gold border (コンパクト版) */}
       {total > 0 && (
-        <div className="mx-5 mb-4">
+        <div className="mx-5 mb-3">
           <div
-            className="grid grid-cols-[110px_1fr] items-center gap-4 rounded-2xl p-4"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5"
             style={{
               background: "linear-gradient(135deg, #fffdf6, #fff8e8)",
               border: "1px solid rgba(212,175,55,0.28)",
             }}
           >
-            <div
-              className="border-r pr-4 text-center"
-              style={{ borderColor: "rgba(212,175,55,0.22)" }}
-            >
-              <div
-                className="text-[36px] font-bold leading-none tabular-nums"
+            <div className="flex items-baseline gap-1.5">
+              <span
+                className="text-[24px] font-bold leading-none tabular-nums"
                 style={{ color: GOLD_HEX, fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.02em" }}
               >
                 {avg.toFixed(1)}
-              </div>
-              <div className="mt-1.5 inline-flex">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    size={11}
-                    style={{
-                      color: i < Math.round(avg) ? GOLD_HEX : "rgba(212,175,55,0.25)",
-                      fill: i < Math.round(avg) ? GOLD_HEX : "none",
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="mt-1 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                {total}件
-              </div>
+              </span>
+              <span className="text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
+                / 5
+              </span>
             </div>
-            <div>
-              {[5, 4, 3, 2, 1].map((s) => {
-                const pct = ratings.length > 0 ? (dist[s] / distMax) * 100 : 0;
-                return (
-                  <div
-                    key={s}
-                    className="mb-[5px] grid grid-cols-[14px_1fr] items-center gap-2 text-[10.5px]"
-                    style={{ color: "rgba(27,37,40,0.5)", fontFamily: "'Outfit', sans-serif" }}
-                  >
-                    <span className="tabular-nums">{s}</span>
-                    <div
-                      className="h-[5px] overflow-hidden rounded-full"
-                      style={{ backgroundColor: "rgba(27,37,40,0.06)" }}
-                    >
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background: "linear-gradient(90deg, #D4AF37, #c8960c)",
-                          transition: "width 400ms ease",
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="inline-flex">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  size={11}
+                  style={{
+                    color: i < Math.round(avg) ? GOLD_HEX : "rgba(212,175,55,0.25)",
+                    fill: i < Math.round(avg) ? GOLD_HEX : "none",
+                  }}
+                />
+              ))}
             </div>
+            <span className="ml-auto text-[10.5px]" style={{ color: "rgba(27,37,40,0.55)" }}>
+              {total}件のクチコミ
+            </span>
           </div>
         </div>
       )}
@@ -3944,39 +3906,21 @@ function ReviewsSection({
         </div>
       )}
 
-      {/* Blurred locked reviews + login CTA */}
+      {/* Login CTA — 未ログイン時のみ。blur した「読めない口コミ」のプレビューは
+          縦長で割に合わなかったので廃止し、シンプルなゲートカード 1 枚に。 */}
       {hasHidden && (
-        <div className="relative mt-3 px-5 pb-5 pt-12">
-          {/* Fade overlay */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-5 top-0 h-20"
-            style={{
-              background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 100%)",
-            }}
-          />
-          <div
-            className="space-y-2.5"
-            style={{ filter: "blur(6px)", userSelect: "none", pointerEvents: "none" }}
-          >
-            {(hidden.length > 0 ? hidden : visible).slice(0, 2).map((review) => (
-              <ReviewItem key={`locked-${review.id}`} review={review} />
-            ))}
-          </div>
-          {/* Gold gate card */}
+        <div className="mx-5 mb-5 mt-2">
           <button
             type="button"
             onClick={() => { window.location.href = "/login"; }}
-            className="absolute inset-x-5 z-10 flex items-center gap-3 rounded-2xl bg-white p-4 text-left"
+            className="flex w-full items-center gap-3 rounded-2xl bg-white p-3.5 text-left"
             style={{
-              top: "55%",
-              transform: "translateY(-50%)",
               border: "1px solid rgba(212,175,55,0.32)",
-              boxShadow: "0 6px 20px rgba(212,175,55,0.18)",
+              boxShadow: "0 4px 14px rgba(212,175,55,0.14)",
             }}
           >
             <span
-              className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl"
               style={{
                 background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.05))",
                 border: "1px solid rgba(212,175,55,0.32)",
@@ -3985,29 +3929,61 @@ function ReviewsSection({
               🔒
             </span>
             <div className="min-w-0 flex-1">
-              <div
-                className="text-[13px] font-semibold"
-                style={{ color: "#1b2528" }}
-              >
-                続きはログインで全件公開
+              <div className="text-[13px] font-semibold" style={{ color: "#1b2528" }}>
+                ログインで残り{Math.max(reviewsCount - visible.length, 1)}件の口コミを表示
               </div>
               <div className="mt-0.5 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                あと {Math.max(reviewsCount - visible.length, 1)} 件のクチコミ
+                LINEで30秒・無料
               </div>
             </div>
             <span
-              className="shrink-0 rounded-xl px-4 py-2.5 text-[12px] font-semibold text-white"
-              style={{
-                backgroundColor: "#06C755",
-                boxShadow: "0 4px 14px rgba(6,199,85,0.3)",
-              }}
+              className="shrink-0 rounded-xl px-3.5 py-2 text-[12px] font-semibold text-white"
+              style={{ backgroundColor: "#06C755", boxShadow: "0 4px 14px rgba(6,199,85,0.3)" }}
             >
               ログイン
             </span>
           </button>
         </div>
       )}
-      {!hasHidden && <div className="pb-5" />}
+      {/* もっと見る / 折りたたむ ボタン (ログイン済み・口コミ2件以上) */}
+      {canExpand && (
+        <div className="flex justify-center pt-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-full border bg-white px-5 py-2 text-xs font-semibold transition-colors hover:bg-[rgba(212,175,55,0.08)]"
+            style={{
+              color: GOLD_HEX,
+              borderColor: "rgba(212,175,55,0.45)",
+            }}
+          >
+            {expanded
+              ? "閉じる"
+              : `もっと見る (あと${reviews.length - INITIAL_VISIBLE}件)`}
+          </button>
+        </div>
+      )}
+      {/* 口コミを書くボタン — セクション下部。
+          - ログイン済み: 通常 CTA、いつでも投稿できる導線として一貫
+          - 未ログイン: 上の blur gate がログインを促すので、ここのボタンは
+            投稿ページに進んでログイン誘導するシンプルな見せ方 */}
+      {isAuthenticated && visible.length > 0 && (
+        <div className="flex justify-center px-5 pb-5 pt-4">
+          <a
+            href={`/stores/${storeId}/review`}
+            className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
+          >
+            このお店の口コミを書く
+          </a>
+        </div>
+      )}
+      {(!isAuthenticated || visible.length === 0) && !hasHidden && !canExpand && (
+        <div className="pb-5" />
+      )}
+      {(!isAuthenticated || visible.length === 0) && (hasHidden || canExpand) && (
+        <div className="pb-5" />
+      )}
     </div>
   );
 }

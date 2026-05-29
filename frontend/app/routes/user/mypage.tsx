@@ -26,11 +26,18 @@ import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { useUserAuth } from "~/lib/user-auth";
 import UserAvatar from "~/components/user/shared/UserAvatar";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { buildMetaTags } from "~/lib/seo";
 import { userApi } from "~/lib/api";
 import type { Review } from "~/lib/types";
 
 export function meta() {
-  return [{ title: "マイページ - Recta" }];
+  return buildMetaTags({
+    title: "マイページ - Recta",
+    description: "Recta マイページ。プロフィール編集や投稿口コミの管理ができます。",
+    path: "/mypage",
+    noindex: true,
+  });
 }
 
 export default function MyPage() {
@@ -172,7 +179,14 @@ export default function MyPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl space-y-6 px-4 pt-6">
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "マイページ" },
+        ]}
+      />
+
+      <div className="mx-auto max-w-2xl space-y-6 px-4 pt-4">
         {/* Profile Edit */}
         <Card>
           <CardHeader>

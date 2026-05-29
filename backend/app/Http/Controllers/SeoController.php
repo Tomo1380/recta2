@@ -58,13 +58,15 @@ class SeoController extends Controller
         $urls[] = ['loc' => $base . '/columns', 'priority' => '0.8', 'changefreq' => 'weekly'];
         $urls[] = ['loc' => $base . '/relocate-support', 'priority' => '0.7', 'changefreq' => 'monthly'];
 
+        // 個別店舗: slug があれば slug URL を、なければ ID で出す
         Store::where('publish_status', 'published')
-            ->select('id', 'updated_at')
+            ->select('id', 'slug', 'updated_at')
             ->orderBy('id')
             ->chunkById(500, function ($stores) use (&$urls, $base) {
                 foreach ($stores as $s) {
+                    $key = $s->slug ?: (string) $s->id;
                     $urls[] = [
-                        'loc' => $base . '/stores/' . $s->id,
+                        'loc' => $base . '/stores/' . $key,
                         'lastmod' => optional($s->updated_at)->toAtomString(),
                         'priority' => '0.7',
                         'changefreq' => 'weekly',
@@ -74,7 +76,7 @@ class SeoController extends Controller
 
         Article::where('status', 'published')
             ->whereNotNull('published_at')
-            ->select('slug', 'updated_at', 'published_at')
+            ->select('id', 'slug', 'updated_at', 'published_at')
             ->orderBy('id')
             ->chunkById(500, function ($articles) use (&$urls, $base) {
                 foreach ($articles as $a) {
@@ -87,21 +89,55 @@ class SeoController extends Controller
                 }
             });
 
-        foreach (Area::where('visible', true)->get(['slug']) as $area) {
+        // SEO ランディング: エリア LP / 業態 LP / エリア × 業態 LP
+        $visibleAreas = Area::where('visible', true)->get(['slug']);
+        $visibleCategories = Category::where('visible', true)->get(['slug']);
+
+        foreach ($visibleAreas as $area) {
             $urls[] = [
-                'loc' => $base . '/stores?area=' . urlencode($area->slug),
-                'priority' => '0.6',
+                'loc' => $base . '/jobs/areas/' . $area->slug,
+                'priority' => '0.8',
                 'changefreq' => 'weekly',
             ];
         }
 
-        foreach (Category::where('visible', true)->get(['slug']) as $cat) {
+        foreach ($visibleCategories as $cat) {
             $urls[] = [
-                'loc' => $base . '/stores?category=' . urlencode($cat->slug),
-                'priority' => '0.6',
+                'loc' => $base . '/jobs/categories/' . $cat->slug,
+                'priority' => '0.8',
                 'changefreq' => 'weekly',
             ];
         }
+
+        foreach ($visibleAreas as $area) {
+            foreach ($visibleCategories as $cat) {
+                $urls[] = [
+                    'loc' => $base . '/jobs/areas/' . $area->slug . '/categories/' . $cat->slug,
+                    'priority' => '0.75',
+                    'changefreq' => 'weekly',
+                ];
+            }
+        }
+
+        // Glossary 一覧 + 個別用語
+        $urls[] = [
+            'loc' => $base . '/glossary',
+            'priority' => '0.7',
+            'changefreq' => 'monthly',
+        ];
+        \App\Models\IndustryKnowledge::where('is_active', true)
+            ->select('id', 'slug', 'updated_at')
+            ->orderBy('id')
+            ->chunkById(500, function ($entries) use (&$urls, $base) {
+                foreach ($entries as $entry) {
+                    $urls[] = [
+                        'loc' => $base . '/glossary/' . $entry->slug,
+                        'lastmod' => optional($entry->updated_at)->toAtomString(),
+                        'priority' => '0.6',
+                        'changefreq' => 'monthly',
+                    ];
+                }
+            });
 
         return $urls;
     }
@@ -118,6 +154,11 @@ class SeoController extends Controller
             'Disallow: /mypage',
             'Disallow: /login',
             'Disallow: /auth/',
+            // 比較 URL は ids の組み合わせで実質無限・薄ページなのでクロール対象外
+            'Disallow: /compare/',
+            // 口コミ投稿フォーム自体は store-detail から到達するもので、
+            // 検索結果に出す価値はない
+            'Disallow: /stores/*/review',
             '',
             'Sitemap: ' . $base . '/sitemap.xml',
             '',

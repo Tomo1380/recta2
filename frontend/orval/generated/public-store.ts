@@ -42,13 +42,15 @@ export const publicStoreIndex = (
       );
     }
   /**
+ * URL param は slug または ID。数値オンリーなら ID として fallback で引く。
+ * 旧 ID URL からのアクセスを許容しつつ、新規流入は slug ベースに統一する。
  * @summary Store detail
  */
 export const publicStoreShow = (
-    store: number,
+    slugOrId: string,
  ) => {
       return rectaMutator<PublicStoreShow200>(
-      {url: `/stores/${store}`, method: 'GET'
+      {url: `/stores/${slugOrId}`, method: 'GET'
     },
       );
     }

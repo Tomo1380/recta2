@@ -175,7 +175,7 @@ class PromptBuilder
             "・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
             "  研修制度が充実していて未経験でも安心。保証期間もあります\n\n" .
             "・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜\n" .
-            "  ノルマなしで気楽に働ける環境。当日体入OK・全額日払いです\n\n" .
+            "  ノルマなしで気楽に働ける環境。体験確約OK・全額日払いです\n\n" .
             "体入で雰囲気を確かめてから決めるのがおすすめです！\n\n" .
             "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
 
@@ -198,6 +198,15 @@ class PromptBuilder
             "あなたは「Recta AI（採用アシスタントAI）」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。\n" .
             "口調: {$toneDesc}\n" .
             "一人称は使わない。絵文字は使わない。日本語のみで回答する。\n\n";
+
+        $prompt .=
+            "【絶対厳守・店舗情報のハルシネーション禁止】\n" .
+            "- 店舗名・時給・エリア・最寄り駅・特徴などの具体的な店舗情報は、search_stores（詳細ページでは提示済みの店舗データ）から取得した実データのみを書く。\n" .
+            "- search_stores を呼んでいないのに具体的な店舗名や時給を文章に書くことは固く禁止する。実在しない店舗を絶対に創作しない。\n" .
+            "- 店舗を勧めたいときは必ず先に search_stores を呼ぶ。検索しない/結果が無い場合は店舗名を一切出さず、『ご希望の条件（エリア・時給・働き方など）を教えていただければお店をお探しします』と案内する。\n" .
+            "- 業界用語の解説や不安への回答に店舗紹介を“おまけ”で付け足す場合も、このルールを必ず守る（search_stores を呼ばずに店名・時給を書かない）。\n" .
+            "- 『〜のお店をピックアップしました／ご紹介します／おすすめです』のように店舗を列挙する文章を書くなら、その直前に必ず search_stores を呼ぶこと。検索していないのに店舗を列挙するのは禁止。\n" .
+            "- LINEのURL・友だち追加リンク・LINE ID を本文に書かない。LINE誘導は定型文『もっと詳しく知りたい方は、LINEで担当者に直接相談できます！』のみとし、URL や ID は書かない（リンクはアプリ側が表示する）。\n\n";
 
         if ($setting->system_prompt) {
             $prompt .= "【運営からの追加指示】\n{$setting->system_prompt}\n\n";
@@ -254,6 +263,7 @@ class PromptBuilder
 
             "【給与の表現】\n" .
             "- 時給は「○,○○○円〜」の形式。確定値のように書かない\n" .
+            "- 時給に幅がある場合は「○,○○○〜○,○○○円」と書く。末尾に余分な「〜」を付けない（「3,000円〜9,500円〜」のような重複は禁止）\n" .
             "- バック率・日給は「目安」と添える\n" .
             "- 保証期間がある場合は積極的に言及する（安心材料）\n";
 
@@ -316,7 +326,7 @@ class PromptBuilder
         if ($backs) $context .= "バック: {$backs}\n";
         if ($norma) $context .= "ノルマ: {$norma}\n";
         if ($guaranteePeriod) $context .= "保証: {$guaranteePeriod} {$guaranteeDetails}\n";
-        if ($sameDayTrial) $context .= "当日体入: OK（体入時給: {$trialHourly}）\n";
+        if ($sameDayTrial) $context .= "体験確約: OK（体入時給: {$trialHourly}）\n";
         if ($tags) $context .= "特徴: {$tags}\n";
         $context .= "説明: {$store->description}\n";
         if ($store->features_text) $context .= "詳細特徴: {$store->features_text}\n";

@@ -2,7 +2,16 @@ import { useEffect, useState, useMemo } from "react";
 import { Link, useParams, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { FileText, ChevronRight } from "lucide-react";
+import DOMPurify from "isomorphic-dompurify";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { absoluteUrl, buildMetaTags } from "~/lib/seo";
+import {
+  buildArticleSchema,
+  buildBreadcrumbSchema,
+  buildSchemaGraph,
+  serializeSchema,
+} from "~/lib/schema";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
 
 // ─── SSR loader & meta ────────────────────────────────────────
@@ -58,25 +67,33 @@ export async function loader({ params }: LoaderFunctionArgs) {
   return (await res.json()) as PublicArticleShowResponse;
 }
 
-export function meta({ data }: { data: PublicArticleShowResponse | undefined }) {
+export function meta({
+  data,
+  params,
+}: {
+  data: PublicArticleShowResponse | undefined;
+  params: { slug?: string };
+}) {
   const article = data?.article;
   if (!article) {
-    return [{ title: "コラム | Recta" }];
+    return buildMetaTags({
+      title: "コラム | Recta",
+      description: "Recta のコラム記事です。",
+      path: `/columns/${params.slug ?? ""}`,
+    });
   }
   const desc = article.excerpt || article.title;
   const title = `${article.title} | Recta コラム`;
-  const tags: Array<Record<string, string>> = [
-    { title },
-    { name: "description", content: desc },
-    { property: "og:title", content: article.title },
-    { property: "og:description", content: desc },
-    { property: "og:type", content: "article" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ];
-  if (article.thumbnail_url) {
-    tags.push({ property: "og:image", content: article.thumbnail_url });
-  }
-  return tags;
+  return buildMetaTags({
+    title,
+    description: desc,
+    path: `/columns/${article.slug}`,
+    image: article.thumbnail_url ?? null,
+    type: "article",
+    extra: article.published_at
+      ? [{ property: "article:published_time", content: article.published_at }]
+      : [],
+  });
 }
 
 const GOLD = "#d4af37";
@@ -138,9 +155,24 @@ function transformBodyHtml(html: string): { html: string; needsTikTokScript: boo
     },
   );
 
-  // Defensive: remove any <script> tag from body content (TikTok script loaded
-  // separately below).
-  const safe = transformed.replace(/<script[\s\S]*?<\/script>/gi, "");
+  // XSS 対策: DOMPurify でサニタイズ。
+  //   - <script> や onload / onerror / javascript: URL を除去
+  //   - 必要な埋め込み要素 (iframe, blockquote.tiktok-embed) は明示的に許可
+  //   - SSR/CSR 両対応: isomorphic-dompurify が環境を自動判別
+  const safe = DOMPurify.sanitize(transformed, {
+    ADD_TAGS: ["iframe"],
+    ADD_ATTR: [
+      "allow",
+      "allowfullscreen",
+      "frameborder",
+      "scrolling",
+      "data-video-id",
+      "cite",
+      "target",
+    ],
+    // YouTube/TikTok/X 埋め込みの iframe を許可するため
+    ALLOW_DATA_ATTR: true,
+  });
 
   return { html: safe, needsTikTokScript };
 }
@@ -168,7 +200,38 @@ export default function ColumnDetailPage() {
   if (!article) {
     return <ColumnNotFound />;
   }
-  return <ColumnArticleView article={article} related={related} />;
+
+  const canonical = absoluteUrl(`/columns/${article.slug}`);
+  const schemaJson = serializeSchema(
+    buildSchemaGraph([
+      buildArticleSchema({
+        headline: article.title,
+        description: article.excerpt ?? null,
+        url: canonical,
+        image: article.thumbnail_url ?? null,
+        datePublished: article.published_at ?? null,
+        dateModified: article.updated_at ?? article.published_at ?? null,
+        authorName: "Recta 編集部",
+        category: article.category ?? null,
+        tags: (article.tags as string[] | null | undefined) ?? null,
+      }),
+      buildBreadcrumbSchema([
+        { name: "ホーム", url: absoluteUrl("/") },
+        { name: "コラム", url: absoluteUrl("/columns") },
+        { name: article.title, url: canonical },
+      ]),
+    ]),
+  );
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: schemaJson }}
+      />
+      <ColumnArticleView article={article} related={related} />
+    </>
+  );
 }
 
 /**
@@ -267,6 +330,14 @@ export function ColumnArticleView({
           </p>
         </div>
       </div>
+
+      <Breadcrumb
+        items={[
+          { label: "ホーム", to: "/" },
+          { label: "コラム", to: "/columns" },
+          { label: article.title },
+        ]}
+      />
 
       {article.thumbnail_url && (
         <div className="px-5 pt-4">

@@ -1,10 +1,13 @@
 import StoreListPage from "~/components/user/StoreListPage";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta() {
-  return [
-    { title: "お店を探す - Recta" },
-    { name: "description", content: "キャバクラ・ラウンジ・クラブの求人一覧。エリア・カテゴリで絞り込み検索。" },
-  ];
+  return buildMetaTags({
+    title: "お店を探す - キャバクラ・ラウンジ・クラブ求人 | Recta",
+    description:
+      "東京・六本木・銀座・新宿・渋谷のキャバクラ・ラウンジ・クラブ求人を一覧表示。体験確約・時給順・評価順で絞り込み、AIチャットからも相談できます。",
+    path: "/stores",
+  });
 }
 
 export default function Stores() {

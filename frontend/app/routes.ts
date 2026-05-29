@@ -5,16 +5,28 @@ export default [
   layout("routes/user/layout.tsx", [
     index("routes/user/top.tsx"),
     route("stores", "routes/user/stores.tsx"),
-    route("stores/:id", "routes/user/store-detail.tsx"),
+    route("stores/:slugOrId", "routes/user/store-detail.tsx"),
     route("login", "routes/user/login.tsx"),
     route("auth/callback", "routes/user/auth-callback.tsx"),
     route("mypage", "routes/user/mypage.tsx"),
-    route("stores/:id/review", "routes/user/review.tsx"),
+    route("stores/:slugOrId/review", "routes/user/review.tsx"),
     route("relocate-support", "routes/user/relocate-support.tsx"),
     // ids はカンマ区切り (2〜4件)。例: /compare/1,5,8
     route("compare/:ids", "routes/user/compare.tsx"),
     route("columns", "routes/user/columns.tsx"),
     route("columns/:slug", "routes/user/column-detail.tsx"),
+
+    // SEO ランディングページ (エリア × 業態 × 交差)
+    route("jobs/areas/:areaSlug", "routes/user/landings/area.tsx"),
+    route("jobs/categories/:categorySlug", "routes/user/landings/category.tsx"),
+    route(
+      "jobs/areas/:areaSlug/categories/:categorySlug",
+      "routes/user/landings/area-category.tsx",
+    ),
+
+    // 業界用語集 (Glossary)
+    route("glossary", "routes/user/glossary/index.tsx"),
+    route("glossary/:slug", "routes/user/glossary/detail.tsx"),
 
     // 法務・運営関連 (Footer から導線)
     route("terms", "routes/user/legal/terms.tsx"),
