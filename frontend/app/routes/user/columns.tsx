@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Loader2, ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 import { userApi } from "~/lib/api";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { buildMetaTags } from "~/lib/seo";
 import type {
   ArticleSummary,
   PublicArticleIndexResponse,
@@ -13,14 +14,12 @@ const DARK = "#1b2528";
 const J = "'Noto Sans JP',sans-serif";
 
 export function meta() {
-  return [
-    { title: "コラム | Recta - ナイトワーク業界ガイド" },
-    {
-      name: "description",
-      content:
-        "キャバクラとラウンジの違い、ノルマやバックの仕組み、グループ解説など。ナイトワーク業界をやさしく学べるコラム集。",
-    },
-  ];
+  return buildMetaTags({
+    title: "コラム | Recta - ナイトワーク業界ガイド",
+    description:
+      "キャバクラとラウンジの違い、ノルマやバックの仕組み、グループ解説など。ナイトワーク業界をやさしく学べるコラム集。",
+    path: "/columns",
+  });
 }
 
 function formatDate(s: string | null): string {

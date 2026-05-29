@@ -1,14 +1,14 @@
 import type { Route } from "./+types/terms";
 import LegalPage, { Article } from "~/components/user/shared/LegalPage";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "利用規約 - Recta" },
-    {
-      name: "description",
-      content: "Recta（レクタ）の利用規約。本サービスをご利用いただく前に必ずお読みください。",
-    },
-  ];
+  return buildMetaTags({
+    title: "利用規約 - Recta",
+    description:
+      "Recta（レクタ）の利用規約。本サービスをご利用いただく前に必ずお読みください。",
+    path: "/terms",
+  });
 }
 
 export default function TermsPage() {

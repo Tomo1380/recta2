@@ -1,14 +1,14 @@
 import type { Route } from "./+types/privacy";
 import LegalPage, { Section } from "~/components/user/shared/LegalPage";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "プライバシーポリシー - Recta" },
-    {
-      name: "description",
-      content: "Recta（レクタ）における個人情報の取扱いについて定めたプライバシーポリシーです。",
-    },
-  ];
+  return buildMetaTags({
+    title: "プライバシーポリシー - Recta",
+    description:
+      "Recta（レクタ）における個人情報の取扱いについて定めたプライバシーポリシーです。",
+    path: "/privacy",
+  });
 }
 
 export default function PrivacyPage() {

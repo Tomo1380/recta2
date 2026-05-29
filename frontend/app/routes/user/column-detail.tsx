@@ -5,6 +5,7 @@ import { FileText, ChevronRight } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { buildMetaTags } from "~/lib/seo";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
 
 // ─── SSR loader & meta ────────────────────────────────────────
@@ -60,25 +61,33 @@ export async function loader({ params }: LoaderFunctionArgs) {
   return (await res.json()) as PublicArticleShowResponse;
 }
 
-export function meta({ data }: { data: PublicArticleShowResponse | undefined }) {
+export function meta({
+  data,
+  params,
+}: {
+  data: PublicArticleShowResponse | undefined;
+  params: { slug?: string };
+}) {
   const article = data?.article;
   if (!article) {
-    return [{ title: "コラム | Recta" }];
+    return buildMetaTags({
+      title: "コラム | Recta",
+      description: "Recta のコラム記事です。",
+      path: `/columns/${params.slug ?? ""}`,
+    });
   }
   const desc = article.excerpt || article.title;
   const title = `${article.title} | Recta コラム`;
-  const tags: Array<Record<string, string>> = [
-    { title },
-    { name: "description", content: desc },
-    { property: "og:title", content: article.title },
-    { property: "og:description", content: desc },
-    { property: "og:type", content: "article" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ];
-  if (article.thumbnail_url) {
-    tags.push({ property: "og:image", content: article.thumbnail_url });
-  }
-  return tags;
+  return buildMetaTags({
+    title,
+    description: desc,
+    path: `/columns/${article.slug}`,
+    image: article.thumbnail_url ?? null,
+    type: "article",
+    extra: article.published_at
+      ? [{ property: "article:published_time", content: article.published_at }]
+      : [],
+  });
 }
 
 const GOLD = "#d4af37";

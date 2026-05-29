@@ -5,6 +5,7 @@ import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { useUserAuth } from "~/lib/user-auth";
 import { userApi } from "~/lib/api";
+import { buildMetaTags } from "~/lib/seo";
 import type { Store } from "~/lib/types";
 
 const XLogo = ({ size = 14 }: { size?: number }) => (
@@ -17,11 +18,13 @@ const GOLD = "#d4af37";
 const DARK = "#1b2528";
 const J = "'Noto Sans JP',sans-serif";
 
-export function meta() {
-  return [
-    { title: "口コミを投稿 - Recta" },
-    { name: "robots", content: "noindex,nofollow" },
-  ];
+export function meta({ params }: { params: { id?: string } }) {
+  return buildMetaTags({
+    title: "口コミを投稿 - Recta",
+    description: "Recta に登録されたお店の口コミを投稿できます。",
+    path: `/stores/${params.id ?? ""}/review`,
+    noindex: true,
+  });
 }
 
 const MIN_BODY_LENGTH = 10;

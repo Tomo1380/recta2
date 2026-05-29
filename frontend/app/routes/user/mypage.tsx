@@ -27,15 +27,17 @@ import { Badge } from "~/components/ui/badge";
 import { useUserAuth } from "~/lib/user-auth";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { buildMetaTags } from "~/lib/seo";
 import { userApi } from "~/lib/api";
 import type { Review } from "~/lib/types";
 
 export function meta() {
-  // 個人領域なのでインデックスさせない
-  return [
-    { title: "マイページ - Recta" },
-    { name: "robots", content: "noindex,nofollow" },
-  ];
+  return buildMetaTags({
+    title: "マイページ - Recta",
+    description: "Recta マイページ。プロフィール編集や投稿口コミの管理ができます。",
+    path: "/mypage",
+    noindex: true,
+  });
 }
 
 export default function MyPage() {

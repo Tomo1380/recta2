@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Home, Wallet, Plane, ShieldCheck } from "lucide-react";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import { buildMetaTags } from "~/lib/seo";
 import type { RelocateVoice } from "../../../orval/generated/api.schemas";
 
 const GOLD = "#d4af37";
@@ -40,17 +41,12 @@ const FEATURES = [
 ];
 
 export function meta() {
-  const title = "上京サポート - 地方から東京で働きたい方へ | Recta";
-  const desc =
-    "オンライン面接・住居完備・引越し費用補助・体験入店（体入）確約まで、東京で働きたい方をRectaが一気通貫でサポート。来店不要で始められます。";
-  return [
-    { title },
-    { name: "description", content: desc },
-    { property: "og:title", content: title },
-    { property: "og:description", content: desc },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ];
+  return buildMetaTags({
+    title: "上京サポート - 地方から東京で働きたい方へ | Recta",
+    description:
+      "オンライン面接・住居完備・引越し費用補助・体験入店（体入）確約まで、東京で働きたい方をRectaが一気通貫でサポート。来店不要で始められます。",
+    path: "/relocate-support",
+  });
 }
 
 export default function RelocateSupportPage() {

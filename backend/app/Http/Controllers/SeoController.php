@@ -118,6 +118,11 @@ class SeoController extends Controller
             'Disallow: /mypage',
             'Disallow: /login',
             'Disallow: /auth/',
+            // 比較 URL は ids の組み合わせで実質無限・薄ページなのでクロール対象外
+            'Disallow: /compare/',
+            // 口コミ投稿フォーム自体は store-detail から到達するもので、
+            // 検索結果に出す価値はない
+            'Disallow: /stores/*/review',
             '',
             'Sitemap: ' . $base . '/sitemap.xml',
             '',

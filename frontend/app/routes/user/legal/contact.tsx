@@ -1,15 +1,15 @@
 import type { Route } from "./+types/contact";
 import LegalPage, { Section } from "~/components/user/shared/LegalPage";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "お問い合わせ - Recta" },
-    {
-      name: "description",
-      content: "Recta（レクタ）へのお問い合わせは、LINE公式アカウントよりお気軽にご連絡ください。",
-    },
-  ];
+  return buildMetaTags({
+    title: "お問い合わせ - Recta",
+    description:
+      "Recta（レクタ）へのお問い合わせは、LINE公式アカウントよりお気軽にご連絡ください。",
+    path: "/contact",
+  });
 }
 
 export default function ContactPage() {

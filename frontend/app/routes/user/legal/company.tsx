@@ -1,14 +1,14 @@
 import type { Route } from "./+types/company";
 import LegalPage, { InfoRow, Section } from "~/components/user/shared/LegalPage";
+import { buildMetaTags } from "~/lib/seo";
 
 export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "運営会社 - Recta" },
-    {
-      name: "description",
-      content: "Recta（レクタ）を運営する会社情報および募集情報等提供事業届出に関する情報です。",
-    },
-  ];
+  return buildMetaTags({
+    title: "運営会社 - Recta",
+    description:
+      "Recta（レクタ）を運営する会社情報および募集情報等提供事業届出に関する情報です。",
+    path: "/company",
+  });
 }
 
 export default function CompanyPage() {
