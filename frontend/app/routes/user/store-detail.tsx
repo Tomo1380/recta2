@@ -2,7 +2,15 @@ import { useParams, useLoaderData, redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
-import { buildMetaTags } from "~/lib/seo";
+import { absoluteUrl, buildMetaTags } from "~/lib/seo";
+import {
+  buildBreadcrumbSchema,
+  buildFAQSchema,
+  buildJobPostingSchema,
+  buildLocalBusinessSchema,
+  buildSchemaGraph,
+  serializeSchema,
+} from "~/lib/schema";
 
 // SSR loader で店舗データを先取りして動的 meta を出す。
 // 失敗時は client-side で /api/stores/:id を叩く既存ロジックに任せるため、
@@ -75,8 +83,90 @@ export function meta({
 export default function StoreDetail() {
   const { slugOrId } = useParams();
   const loaderData = useLoaderData() as StoreDetailResponse | null;
-  // 既存 StoreDetailPage は id (number) を必須にしているので、
-  // loader data の store.id を優先、未取得なら parseInt fallback (slug の場合は NaN)
   const id = loaderData?.store?.id ?? Number(slugOrId);
-  return <StoreDetailPage id={id} initialData={loaderData ?? undefined} />;
+  const store = loaderData?.store;
+
+  // SSR で構造化データを出す。SchemaGraph に LocalBusiness + JobPosting +
+  // BreadcrumbList + (qa があれば) FAQPage を入れて 1 タグに集約。
+  let schemaJson: string | null = null;
+  if (store) {
+    const canonical = absoluteUrl(`/stores/${store.slug ?? store.id}`);
+    const image =
+      (store as { images?: { url: string }[] | null }).images?.[0]?.url ?? null;
+    const description =
+      ((store as { meta_description?: string | null }).meta_description?.trim() as string | undefined) ||
+      ((store as { features_text?: string | null }).features_text?.trim() as string | undefined) ||
+      ((store as { description?: string | null }).description?.trim() as string | undefined) ||
+      `${store.name}の店舗情報・体験入店・口コミ・面接情報。`;
+
+    const schemas: object[] = [];
+
+    schemas.push(
+      buildLocalBusinessSchema({
+        name: store.name,
+        category: store.category,
+        url: canonical,
+        address: store.address ?? null,
+        area: store.area ?? null,
+        lat: store.lat ?? null,
+        lng: store.lng ?? null,
+        telephone: (store as { phone?: string | null }).phone ?? null,
+        websiteUrl: (store as { website_url?: string | null }).website_url ?? null,
+        image,
+        averageRating: (store as { average_rating?: number | null }).average_rating ?? null,
+        reviewsCount: (store as { reviews_count?: number | null }).reviews_count ?? null,
+      }),
+    );
+
+    const createdAt = (store as unknown as { created_at?: string }).created_at;
+    if (createdAt) {
+      schemas.push(
+        buildJobPostingSchema({
+          storeName: store.name,
+          area: store.area ?? null,
+          category: store.category ?? null,
+          url: canonical,
+          datePosted: createdAt,
+          description,
+          hourlyMin: (store as { hourly_min?: number | null }).hourly_min ?? null,
+          hourlyMax: (store as { hourly_max?: number | null }).hourly_max ?? null,
+          address: store.address ?? null,
+          image,
+        }),
+      );
+    }
+
+    schemas.push(
+      buildBreadcrumbSchema([
+        { name: "ホーム", url: absoluteUrl("/") },
+        { name: "店舗一覧", url: absoluteUrl("/stores") },
+        { name: store.name, url: canonical },
+      ]),
+    );
+
+    const qa = (store as { qa?: { question: string; answer: string }[] | null }).qa ?? null;
+    if (qa && qa.length > 0) {
+      schemas.push(
+        buildFAQSchema(
+          qa
+            .filter((q) => q.question && q.answer)
+            .map((q) => ({ question: q.question, answer: q.answer })),
+        ),
+      );
+    }
+
+    schemaJson = serializeSchema(buildSchemaGraph(schemas));
+  }
+
+  return (
+    <>
+      {schemaJson && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: schemaJson }}
+        />
+      )}
+      <StoreDetailPage id={id} initialData={loaderData ?? undefined} />
+    </>
+  );
 }

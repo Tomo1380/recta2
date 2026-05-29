@@ -1,5 +1,11 @@
 import TopPage from "~/components/user/TopPage";
 import { buildMetaTags } from "~/lib/seo";
+import {
+  buildOrganizationSchema,
+  buildSchemaGraph,
+  buildWebSiteSchema,
+  serializeSchema,
+} from "~/lib/schema";
 
 export function meta() {
   return buildMetaTags({
@@ -10,6 +16,18 @@ export function meta() {
   });
 }
 
+const SCHEMA_JSON = serializeSchema(
+  buildSchemaGraph([buildOrganizationSchema(), buildWebSiteSchema()]),
+);
+
 export default function Top() {
-  return <TopPage />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: SCHEMA_JSON }}
+      />
+      <TopPage />
+    </>
+  );
 }

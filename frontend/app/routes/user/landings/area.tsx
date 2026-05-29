@@ -1,7 +1,13 @@
 import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import LandingPage, { type LandingPayload } from "~/components/user/landing/LandingPage";
-import { buildMetaTags } from "~/lib/seo";
+import { absoluteUrl, buildMetaTags } from "~/lib/seo";
+import {
+  buildBreadcrumbSchema,
+  buildItemListSchema,
+  buildSchemaGraph,
+  serializeSchema,
+} from "~/lib/schema";
 
 function resolveApiBase(): string {
   if (typeof window !== "undefined") return "";
@@ -58,5 +64,35 @@ export default function AreaLanding() {
       </div>
     );
   }
-  return <LandingPage data={data} />;
+  const schemaJson = data.area ? buildAreaSchema(data) : null;
+  return (
+    <>
+      {schemaJson && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: schemaJson }}
+        />
+      )}
+      <LandingPage data={data} />
+    </>
+  );
+}
+
+function buildAreaSchema(data: LandingPayload): string {
+  const area = data.area!;
+  const canonical = absoluteUrl(`/jobs/areas/${area.slug}`);
+  const items = data.stores.slice(0, 20).map((s) => ({
+    name: s.name,
+    url: absoluteUrl(`/stores/${s.slug ?? s.id}`),
+  }));
+  return serializeSchema(
+    buildSchemaGraph([
+      buildBreadcrumbSchema([
+        { name: "ホーム", url: absoluteUrl("/") },
+        { name: "求人を探す", url: absoluteUrl("/stores") },
+        { name: area.name, url: canonical },
+      ]),
+      buildItemListSchema(items),
+    ]),
+  );
 }

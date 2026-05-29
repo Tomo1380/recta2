@@ -1,7 +1,14 @@
 import { useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import LandingPage, { type LandingPayload } from "~/components/user/landing/LandingPage";
-import { buildMetaTags } from "~/lib/seo";
+import { absoluteUrl, buildMetaTags } from "~/lib/seo";
+import {
+  buildBreadcrumbSchema,
+  buildFAQSchema,
+  buildItemListSchema,
+  buildSchemaGraph,
+  serializeSchema,
+} from "~/lib/schema";
 
 function resolveApiBase(): string {
   if (typeof window !== "undefined") return "";
@@ -59,5 +66,57 @@ export default function AreaCategoryLanding() {
       </div>
     );
   }
-  return <LandingPage data={data} />;
+
+  const schemaJson = data.area && data.category
+    ? buildLandingSchema(data)
+    : null;
+
+  return (
+    <>
+      {schemaJson && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: schemaJson }}
+        />
+      )}
+      <LandingPage data={data} />
+    </>
+  );
+}
+
+function buildLandingSchema(data: LandingPayload): string {
+  const area = data.area!;
+  const category = data.category!;
+  const canonical = absoluteUrl(`/jobs/areas/${area.slug}/categories/${category.slug}`);
+  const items = data.stores.slice(0, 20).map((s) => ({
+    name: s.name,
+    url: absoluteUrl(`/stores/${s.slug ?? s.id}`),
+  }));
+  return serializeSchema(
+    buildSchemaGraph([
+      buildBreadcrumbSchema([
+        { name: "ホーム", url: absoluteUrl("/") },
+        { name: "求人を探す", url: absoluteUrl("/stores") },
+        { name: area.name, url: absoluteUrl(`/jobs/areas/${area.slug}`) },
+        { name: category.name, url: canonical },
+      ]),
+      buildItemListSchema(items),
+      buildFAQSchema([
+        {
+          question: `${area.name}で${category.name}の体入はできますか？`,
+          answer: `Recta では ${area.name} エリアの ${category.name} 求人を ${data.stats.count} 件掲載中。当日体入 OK の店舗も多数あり、LINE で直接相談できます。`,
+        },
+        {
+          question: `${area.name}の${category.name}の時給はどれくらいですか？`,
+          answer: data.stats.hourly_min && data.stats.hourly_max
+            ? `掲載店舗の時給は ¥${data.stats.hourly_min.toLocaleString()}〜¥${data.stats.hourly_max.toLocaleString()} のレンジです。最低時給の平均は ¥${(data.stats.avg_hourly_min ?? 0).toLocaleString()}。`
+            : "店舗ごとに異なりますので、各詳細ページの「時給」項目をご確認ください。",
+        },
+        {
+          question: "未経験でも応募できますか？",
+          answer: "ほとんどの店舗で未経験 OK です。各詳細ページの「応募条件」「面接情報」を確認のうえ、LINE で気軽にご相談ください。",
+        },
+      ]),
+    ]),
+  );
 }

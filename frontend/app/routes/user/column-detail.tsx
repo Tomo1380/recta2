@@ -5,7 +5,13 @@ import { FileText, ChevronRight } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
-import { buildMetaTags } from "~/lib/seo";
+import { absoluteUrl, buildMetaTags } from "~/lib/seo";
+import {
+  buildArticleSchema,
+  buildBreadcrumbSchema,
+  buildSchemaGraph,
+  serializeSchema,
+} from "~/lib/schema";
 import type { Article, ArticleSummary, PublicArticleShowResponse } from "~/lib/types";
 
 // ─── SSR loader & meta ────────────────────────────────────────
@@ -194,7 +200,38 @@ export default function ColumnDetailPage() {
   if (!article) {
     return <ColumnNotFound />;
   }
-  return <ColumnArticleView article={article} related={related} />;
+
+  const canonical = absoluteUrl(`/columns/${article.slug}`);
+  const schemaJson = serializeSchema(
+    buildSchemaGraph([
+      buildArticleSchema({
+        headline: article.title,
+        description: article.excerpt ?? null,
+        url: canonical,
+        image: article.thumbnail_url ?? null,
+        datePublished: article.published_at ?? null,
+        dateModified: article.updated_at ?? article.published_at ?? null,
+        authorName: "Recta 編集部",
+        category: article.category ?? null,
+        tags: (article.tags as string[] | null | undefined) ?? null,
+      }),
+      buildBreadcrumbSchema([
+        { name: "ホーム", url: absoluteUrl("/") },
+        { name: "コラム", url: absoluteUrl("/columns") },
+        { name: article.title, url: canonical },
+      ]),
+    ]),
+  );
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: schemaJson }}
+      />
+      <ColumnArticleView article={article} related={related} />
+    </>
+  );
 }
 
 /**
