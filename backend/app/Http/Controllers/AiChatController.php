@@ -14,6 +14,7 @@ use App\Services\AiChat\GeminiClient;
 use App\Services\AiChat\PromptBuilder;
 use App\Services\AiChat\StoreToolRegistry;
 use App\Services\AiChat\UsageLimitGuard;
+use App\Support\AgentTextSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -221,8 +222,8 @@ class AiChatController extends Controller
                 ]);
 
                 $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
-                // Strip [STORE:ID] markers from display text (cards are shown separately)
-                $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+                // Strip [STORE:ID] markers + guard against fabricated store lines
+                $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
                 return response()->json([
                     'message' => $displayText,
@@ -396,7 +397,7 @@ class AiChatController extends Controller
         ]);
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+        $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
         return response()->json([
             'message' => $displayText,
@@ -468,7 +469,7 @@ class AiChatController extends Controller
         ]);
 
         $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
+        $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
         return response()->json([
             'message' => $displayText,
@@ -909,8 +910,8 @@ class AiChatController extends Controller
             if (empty($functionCalls)) {
                 // Final text reply — stream it as typewriter chunks.
                 $aiText = collect($parts)->filter(fn($p) => isset($p['text']))->pluck('text')->implode('');
-                $displayText = preg_replace('/\[STORE:\d+\]\s*/', '', $aiText);
                 $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
+                $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
                 $elapsed = round((microtime(true) - $startTime) * 1000);
 
