@@ -1285,7 +1285,7 @@ export function ShopEditPage() {
 
   // 体入（体験入店）情報。元 STEP3 にあったが、求職者目線ではユーザー画面
   // 上部に出る情報なので STEP1「店舗情報」末尾に同居させる。中身: 体入時給
-  // (最低/最高)、面接可能時間 (開始/終了)、当日体入可否。
+  // (最低/最高)、面接可能時間 (開始/終了)、体験確約可否。
   const sectionTrial = () => (
     <SectionCard title="体入（体験入店）情報" icon={Sparkles} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

@@ -50,7 +50,7 @@ export function meta({
   const count = data.stats.count;
   return buildMetaTags({
     title: `${areaName}のナイトワーク求人[${count}件]・キャバクラ/ラウンジ/クラブ | Recta`,
-    description: `${areaName}エリアのキャバクラ・ラウンジ・クラブ・ガールズバー求人を ${count} 件掲載。当日体入・高時給・LINE 相談 OK の店舗を一覧で比較できます。`,
+    description: `${areaName}エリアのキャバクラ・ラウンジ・クラブ・ガールズバー求人を ${count} 件掲載。体験確約・高時給・LINE 相談 OK の店舗を一覧で比較できます。`,
     path: `/jobs/areas/${data.area.slug}`,
   });
 }

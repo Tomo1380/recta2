@@ -116,15 +116,10 @@ export default function PrivacyPage() {
               <td className="py-2">米国</td>
               <td className="py-2">AIチャットの応答生成（Gemini API）、地図表示（Google Maps）、フォント配信</td>
             </tr>
-            <tr style={{ borderBottom: "1px solid rgba(27,37,40,0.06)" }}>
+            <tr>
               <td className="py-2">LINE株式会社</td>
               <td className="py-2">日本</td>
               <td className="py-2">LINEログイン、Messaging API、トーク窓口</td>
-            </tr>
-            <tr>
-              <td className="py-2">OpenAI, L.L.C.</td>
-              <td className="py-2">米国</td>
-              <td className="py-2">AIチャット応答品質改善のためのモデルファインチューニング（個人を特定する情報を除外した上で利用）</td>
             </tr>
           </tbody>
         </table>

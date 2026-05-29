@@ -396,7 +396,7 @@ export default function TopPage() {
                 ここでハードコードされていたため、管理画面で変えても反映されなかった。
                 API レスポンス (data.banner) を優先し、無い場合だけ既定文言にフォールバック。 */}
             <p style={{ fontFamily: J, fontWeight: 500, fontSize: "15px", letterSpacing: "0.04em", color: "rgba(255,255,255,.96)", lineHeight: 1.5, textShadow: "0 1px 12px rgba(0,0,0,.5)", margin: "0 0 4px" }}>{data.banner?.hero_tagline || "AIと探す、理想のナイトワーク"}</p>
-            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>{data.banner?.hero_subtitle || "キャバクラ・ラウンジ・クラブ｜都内厳選"}</p>
+            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>{data.banner?.hero_subtitle || "キャバクラ・ラウンジ・クラブ｜全国厳選"}</p>
           </div>
         </div>
 

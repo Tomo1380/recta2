@@ -584,7 +584,7 @@ function SheetChip({
 
 const SORT_TABS = [
   { id: "priority", label: "おすすめ順" },
-  { id: "experience_guaranteed", label: "当日体入" },
+  { id: "experience_guaranteed", label: "体験確約" },
   { id: "hourly_desc", label: "時給順" },
   { id: "popular", label: "評価順" },
   { id: "newest", label: "新着" },

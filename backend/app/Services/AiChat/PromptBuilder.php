@@ -175,7 +175,7 @@ class PromptBuilder
             "・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
             "  研修制度が充実していて未経験でも安心。保証期間もあります\n\n" .
             "・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜\n" .
-            "  ノルマなしで気楽に働ける環境。当日体入OK・全額日払いです\n\n" .
+            "  ノルマなしで気楽に働ける環境。体験確約OK・全額日払いです\n\n" .
             "体入で雰囲気を確かめてから決めるのがおすすめです！\n\n" .
             "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
 
@@ -326,7 +326,7 @@ class PromptBuilder
         if ($backs) $context .= "バック: {$backs}\n";
         if ($norma) $context .= "ノルマ: {$norma}\n";
         if ($guaranteePeriod) $context .= "保証: {$guaranteePeriod} {$guaranteeDetails}\n";
-        if ($sameDayTrial) $context .= "当日体入: OK（体入時給: {$trialHourly}）\n";
+        if ($sameDayTrial) $context .= "体験確約: OK（体入時給: {$trialHourly}）\n";
         if ($tags) $context .= "特徴: {$tags}\n";
         $context .= "説明: {$store->description}\n";
         if ($store->features_text) $context .= "詳細特徴: {$store->features_text}\n";

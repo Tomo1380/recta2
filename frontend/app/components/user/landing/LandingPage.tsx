@@ -309,7 +309,7 @@ function buildHeadings(
   if (area && category) {
     return {
       headingTitle: `${area.name}の${category.name}求人・体入・バイト`,
-      headingDescription: `${area.name}エリアの${category.name}の求人を ${stats.count} 件掲載。平均最低時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜。当日体入・LINE 相談・24h サポート。`,
+      headingDescription: `${area.name}エリアの${category.name}の求人を ${stats.count} 件掲載。平均最低時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜。体験確約・LINE 相談・24h サポート。`,
       breadcrumbItems: [
         { label: "ホーム", to: "/" },
         { label: "求人を探す", to: "/stores" },
@@ -332,7 +332,7 @@ function buildHeadings(
   if (category) {
     return {
       headingTitle: `${category.name}の求人一覧`,
-      headingDescription: `${category.name}の求人を ${stats.count} 件掲載。当日体入・高時給・未経験 OK の店舗を比較検討できます。`,
+      headingDescription: `${category.name}の求人を ${stats.count} 件掲載。体験確約・高時給・未経験 OK の店舗を比較検討できます。`,
       breadcrumbItems: [
         { label: "ホーム", to: "/" },
         { label: "求人を探す", to: "/stores" },
@@ -356,7 +356,7 @@ function buildAboutText(
   return (
     `${areaName}の${categoryName}は、未経験から始める方も多く、お店ごとに体入時給・バック・ノルマ・送り条件が大きく違います。` +
     `Recta では各店舗の時給レンジ、面接情報、体入の流れ、口コミ評価を一覧で比較でき、` +
-    `気になる店舗は LINE から直接担当者へ相談できます。当日体入・住居サポート・上京サポートも、` +
+    `気になる店舗は LINE から直接担当者へ相談できます。体験確約・住居サポート・上京サポートも、` +
     `各店舗ページに条件が明示されているので、自分に合う一店を効率よく見つけられます。`
   );
 }
