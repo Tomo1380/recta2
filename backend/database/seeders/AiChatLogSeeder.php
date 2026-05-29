@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Admin ダッシュボードのチャート (日次トレンド / モード分布 / Top users) が
- * 初期状態でも見栄え良く出るよう、過去 30 日分のログを 30 件投入する。
+ * 初期状態でも見栄え良く出るよう、過去 30 日分のログを 80 件投入する。
  */
 class AiChatLogSeeder extends Seeder
 {
@@ -33,7 +33,7 @@ class AiChatLogSeeder extends Seeder
         ];
 
         $logs = [];
-        for ($i = 0; $i < 30; $i++) {
+        for ($i = 0; $i < 80; $i++) {
             $sample = $samples[$i % count($samples)];
             // fake() ヘルパは fakerphp/faker (require-dev) に依存するため
             // production composer install では使えない。素の PHP で代替。

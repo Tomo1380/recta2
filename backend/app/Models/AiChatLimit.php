@@ -22,7 +22,7 @@ class AiChatLimit extends Model
         return static::firstOrCreate([], [
             'user_daily_limit' => 50,
             'user_monthly_limit' => 500,
-            'ip_daily_limit' => 10,
+            'ip_daily_limit' => 30,
             'global_daily_limit' => 10000,
             'limit_reached_message' => '本日のチャット上限に達しました。明日またご利用ください。',
         ]);
