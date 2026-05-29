@@ -1728,6 +1728,10 @@ function LuxeHero({
                 src={src}
                 alt=""
                 draggable={false}
+                // 1 枚目はヒーローなので eager、2 枚目以降は lazy。
+                loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={i === 0 ? "high" : undefined}
                 className="h-full w-full object-cover"
                 style={{
                   transform: i === index ? "scale(1.04)" : "scale(1)",
@@ -2133,6 +2137,8 @@ const StoreVideoSection = forwardRef<
             <img
               src={effectivePoster}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
               onError={(e) => {
                 // maxresdefault is missing for some shorter videos — fall back
@@ -2491,8 +2497,9 @@ function StaffGallerySection({
               <img
                 src={photo.image_url}
                 alt={photo.caption ?? `${storeName} 在籍女性 ${i + 1}`}
-                className="absolute inset-0 h-full w-full object-cover"
                 loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover"
               />
               {photo.staff_type && (
                 <span
@@ -3080,6 +3087,8 @@ function ChampagnePricesSection({
                     <img
                       src={src}
                       alt={tpl.kanaName}
+                      loading="lazy"
+                      decoding="async"
                       className="h-[44px] w-auto shrink-0 object-contain"
                       style={{
                         filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
@@ -3242,6 +3251,8 @@ function RectaEpisodesSection({ episodes }: { episodes?: RectaEpisode[] | null }
                 <img
                   src={ep.photo_url}
                   alt={ep.name}
+                  loading="lazy"
+                  decoding="async"
                   className="h-16 w-16 rounded-full object-cover"
                   style={{ border: "2px solid rgba(212,175,55,0.3)" }}
                 />
@@ -3764,6 +3775,8 @@ function RelatedStoresSection({
                 <img
                   src={s.image_url}
                   alt={s.name}
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : (

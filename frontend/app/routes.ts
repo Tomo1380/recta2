@@ -24,6 +24,10 @@ export default [
       "routes/user/landings/area-category.tsx",
     ),
 
+    // 業界用語集 (Glossary)
+    route("glossary", "routes/user/glossary/index.tsx"),
+    route("glossary/:slug", "routes/user/glossary/detail.tsx"),
+
     // 法務・運営関連 (Footer から導線)
     route("terms", "routes/user/legal/terms.tsx"),
     route("privacy", "routes/user/legal/privacy.tsx"),

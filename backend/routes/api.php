@@ -41,6 +41,10 @@ Route::get('/categories', [PublicStoreController::class, 'categories']);
 Route::get('/landings/areas/{slug}', [\App\Http\Controllers\PublicLandingController::class, 'area']);
 Route::get('/landings/categories/{slug}', [\App\Http\Controllers\PublicLandingController::class, 'category']);
 Route::get('/landings/areas/{areaSlug}/categories/{categorySlug}', [\App\Http\Controllers\PublicLandingController::class, 'areaCategory']);
+
+// 業界用語集 (Glossary)
+Route::get('/glossary', [\App\Http\Controllers\PublicGlossaryController::class, 'index']);
+Route::get('/glossary/{slug}', [\App\Http\Controllers\PublicGlossaryController::class, 'show']);
 Route::get('/relocate-voices', [PublicRelocateController::class, 'voices']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
 Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');

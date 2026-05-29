@@ -1,5 +1,5 @@
 import { useParams, useLoaderData, redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import type { LoaderFunctionArgs, LinksFunction } from "react-router";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
 import { absoluteUrl, buildMetaTags } from "~/lib/seo";
@@ -47,6 +47,30 @@ export async function loader({ params }: LoaderFunctionArgs): Promise<StoreDetai
     return null;
   }
 }
+
+/**
+ * Hero 画像 (1 枚目) を rel=preload で SSR レスポンスに含めることで LCP を改善。
+ * 同じ画像は LuxeHero でも表示されるが、preload で並列ダウンロードが先行する。
+ */
+export const links: LinksFunction = ({
+  data,
+}: {
+  data?: StoreDetailResponse | null;
+} = {}) => {
+  const hero = (data?.store as { images?: { url: string }[] | null } | undefined)
+    ?.images?.[0]?.url;
+  if (!hero) return [];
+  return [
+    {
+      rel: "preload",
+      as: "image",
+      href: hero,
+      // モバイル Safari のため
+      imageSrcSet: undefined,
+      fetchPriority: "high" as unknown as undefined,
+    },
+  ];
+};
 
 export function meta({
   data,

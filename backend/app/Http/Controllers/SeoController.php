@@ -119,6 +119,26 @@ class SeoController extends Controller
             }
         }
 
+        // Glossary 一覧 + 個別用語
+        $urls[] = [
+            'loc' => $base . '/glossary',
+            'priority' => '0.7',
+            'changefreq' => 'monthly',
+        ];
+        \App\Models\IndustryKnowledge::where('is_active', true)
+            ->select('id', 'slug', 'updated_at')
+            ->orderBy('id')
+            ->chunkById(500, function ($entries) use (&$urls, $base) {
+                foreach ($entries as $entry) {
+                    $urls[] = [
+                        'loc' => $base . '/glossary/' . $entry->slug,
+                        'lastmod' => optional($entry->updated_at)->toAtomString(),
+                        'priority' => '0.6',
+                        'changefreq' => 'monthly',
+                    ];
+                }
+            });
+
         return $urls;
     }
 
