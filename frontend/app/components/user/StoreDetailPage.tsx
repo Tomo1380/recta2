@@ -1631,35 +1631,64 @@ function LuxeHero({
     setIndex(i);
   };
 
-  // モバイル向けスワイプ: 水平に 40px 以上ドラッグしたら前後へ。縦スクロールを
-  // 邪魔しないよう threshold は控えめに、垂直方向の動きが大きいときは無視。
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStart.current = { x: t.clientX, y: t.clientY };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchStart.current;
-    touchStart.current = null;
-    if (!start) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) goNext();
-    else goPrev();
-  };
+  // スワイプ: 水平ドラッグで slide を「指で押す」感覚にする。
+  // - dragging 中は transition を切り、dragOffset を transform に直接反映
+  // - 指を離したときに threshold (width の 15% or 40px) で前後を判定
+  // - 縦方向の方が支配的なら無視 (縦スクロールを邪魔しない)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef<{ x: number; y: number; w: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
-  // 次に出る画像を右端に「peek」(覗かせ) 表示する用。映画的に「この向こうに
-  // まだある」を暗喩で伝えるパターン (Netflix / Stories / Smashing 推奨)。
-  // ミニサムネと枚数カウンターは廃止して、peek + 進捗バーに統一する。
-  const peekUrl = hasSlides && slides.length > 1
-    ? slides[(index + 1) % slides.length]
-    : null;
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!hasSlides || slides.length < 2) return;
+    const w = containerRef.current?.clientWidth ?? 0;
+    dragStart.current = { x: e.clientX, y: e.clientY, w };
+    setUserInteracted(true);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragStart.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (!dragging) {
+      // まず水平意図か縦スクロール意図かを判定 (16px の dead zone)
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        dragStart.current = null;
+        return;
+      }
+      setDragging(true);
+    }
+    // ループ端でのゴム引き効果は省略 (modern carousel は素直に edge stick)
+    const clamped =
+      index === 0 && dx > 0
+        ? dx * 0.35
+        : index === slides.length - 1 && dx < 0
+          ? dx * 0.35
+          : dx;
+    setDragOffset(clamped);
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!dragStart.current) {
+      setDragging(false);
+      return;
+    }
+    const start = dragStart.current;
+    dragStart.current = null;
+    const dx = e.clientX - start.x;
+    const w = start.w || 1;
+    const ratio = dx / w;
+    const threshold = 0.15; // 15% スワイプで次へ
+    setDragging(false);
+    setDragOffset(0);
+    if (ratio < -threshold || dx < -50) goNext();
+    else if (ratio > threshold || dx > 50) goPrev();
+  };
 
   return (
     <section
-      className="relative isolate mx-auto w-full overflow-hidden"
+      ref={containerRef}
+      className="relative isolate mx-auto w-full overflow-hidden touch-pan-y select-none"
       style={{
         // 16:9 シネマ。スマホ縦持ちで画面の 1/3 強を占める控えめなヒーロー。
         aspectRatio: "16 / 9",
@@ -1667,28 +1696,46 @@ function LuxeHero({
       }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
     >
-      {/* Slides */}
+      {/* Slides — 横スライド (translateX)。
+          peek を別ボタンで描画しない代わりに、トラック幅を 100% で並べた
+          うえで「次画像が右端から自然にちらっと見える」見え方は、
+          スライド開始時の drag offset + 各画像の object-cover で出す。 */}
       {hasSlides ? (
-        slides.map((src, i) => (
-          <div
-            key={i}
-            className="absolute inset-0"
-            style={{
-              opacity: i === index ? 1 : 0,
-              transition: "opacity 800ms ease",
-            }}
-          >
-            <img
-              src={src}
-              alt=""
-              className="h-full w-full object-cover"
-              style={{ transform: i === index ? "scale(1.04)" : "scale(1)", transition: "transform 4s ease-out" }}
-            />
-          </div>
-        ))
+        <div
+          className="absolute inset-0 flex h-full"
+          style={{
+            width: `${slides.length * 100}%`,
+            transform: `translate3d(calc(${-index * (100 / slides.length)}% + ${dragOffset}px), 0, 0)`,
+            transition: dragging
+              ? "none"
+              : "transform 520ms cubic-bezier(0.22, 1, 0.36, 1)",
+            willChange: "transform",
+          }}
+        >
+          {slides.map((src, i) => (
+            <div
+              key={i}
+              className="relative h-full shrink-0"
+              style={{ width: `${100 / slides.length}%` }}
+            >
+              <img
+                src={src}
+                alt=""
+                draggable={false}
+                className="h-full w-full object-cover"
+                style={{
+                  transform: i === index ? "scale(1.04)" : "scale(1)",
+                  transition: "transform 4s ease-out",
+                }}
+              />
+            </div>
+          ))}
+        </div>
       ) : (
         <div
           className="absolute inset-0"
@@ -1721,51 +1768,6 @@ function LuxeHero({
             "linear-gradient(180deg, rgba(8,6,16,0.55) 0%, rgba(8,6,16,0.05) 35%, rgba(8,6,16,0.8) 100%)",
         }}
       />
-
-      {/* Peek — 次画像を右端から 14px だけ覗かせる (Option B「シネマ peek」)。
-          「この向こうにもう一枚ある」のシグナルを暗喩で。peek にはうっすら
-          ダークグラデを乗せて、主役 (現在画像) との階層を保つ。タップで次へ。 */}
-      {peekUrl && (
-        <button
-          type="button"
-          onClick={goNext}
-          aria-label="次の写真"
-          className="absolute right-0 top-0 z-[5] h-full overflow-hidden"
-          style={{ width: 18, cursor: "pointer" }}
-        >
-          <img
-            src={peekUrl}
-            alt=""
-            className="h-full w-full object-cover"
-            style={{ filter: "brightness(0.65) saturate(0.85)" }}
-          />
-          {/* 主役との境目を作る縦グラデ (左側だけ濃く) */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(90deg, rgba(8,6,16,0.7) 0%, rgba(8,6,16,0.15) 100%)",
-            }}
-          />
-        </button>
-      )}
-
-      {/* Floating top — 戻るボタンのみ (パンくずは Hero 下のコンテンツ領域に移動)。 */}
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 p-3">
-        <Link
-          to="/stores"
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-white"
-          style={{
-            backgroundColor: "rgba(0,0,0,0.4)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.15)",
-          }}
-          aria-label="戻る"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
-      </div>
 
       {/* Editorial overlay — bottom */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-6">
@@ -1833,13 +1835,12 @@ function LuxeHero({
         </div>
       </div>
 
-      {/* Arrows (only when multiple slides) — モバイルでもタップできるよう
-          常時うっすら表示 (opacity-60)。タップ/ホバーで濃く。 */}
+      {/* Arrows — PC (sm 以上) のみ表示。スマホは指でスワイプ。 */}
       {hasSlides && slides.length > 1 && (
         <>
           <button
             onClick={goPrev}
-            className="absolute left-2 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100"
+            className="absolute left-2 top-1/2 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100 sm:inline-flex"
             style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             aria-label="前の写真"
           >
@@ -1847,7 +1848,7 @@ function LuxeHero({
           </button>
           <button
             onClick={goNext}
-            className="absolute right-2 top-1/2 z-10 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100"
+            className="absolute right-2 top-1/2 z-10 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full text-white opacity-60 transition-opacity hover:opacity-100 active:opacity-100 sm:inline-flex"
             style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             aria-label="次の写真"
           >
