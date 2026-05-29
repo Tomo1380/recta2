@@ -1,7 +1,7 @@
 import { Outlet } from "react-router";
 import { UserAuthProvider } from "~/lib/user-auth";
 import AmbientBackground from "~/components/user/shared/AmbientBackground";
-import CompareSelectionBar from "~/components/user/shared/CompareSelectionBar";
+import UserFab from "~/components/user/shared/UserFab";
 import { LUXE, MOBILE_FRAME_WIDTH } from "~/lib/luxe-tokens";
 
 /**
@@ -10,8 +10,10 @@ import { LUXE, MOBILE_FRAME_WIDTH } from "~/lib/luxe-tokens";
  * 430px のモバイルカラムに固定。デスクトップではアンビエント背景の上にこの
  * フレームを中央配置する。
  *
- * BottomTabBar は撤去 (運営要望: 各ページに breadcrumb + 右下 LINE
- * フローティングでナビ代替)。CompareSelectionBar は比較トレイ専用なので残す。
+ * BottomTabBar は撤去。右下フローティング (UserFab) で
+ *  - 常時 LINE 相談アイコン
+ *  - 比較リストが 1 件以上のときだけ比較アイコン + 件数バッジ
+ * を縦スタック表示し、タップでボトムシート展開。
  */
 export default function UserLayout() {
   return (
@@ -26,7 +28,7 @@ export default function UserLayout() {
           style={{ maxWidth: MOBILE_FRAME_WIDTH }}
         >
           <Outlet />
-          <CompareSelectionBar />
+          <UserFab />
         </div>
       </div>
     </UserAuthProvider>

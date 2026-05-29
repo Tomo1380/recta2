@@ -143,18 +143,20 @@ class StoreSeeder extends Seeder
         '終電上がりOKで学校や本業との両立もバッチリです',
     ];
 
+    // back_items / fees の値は { value: int, unit: 'yen'|'percent'|'free' } 構造。
+    // 旧形式 amount=string ('1,500円' / '10%' / '無料') は廃止。
     private const BACK_OPTIONS = [
-        ['label' => '指名バック', 'amounts' => ['1,000円', '1,500円', '2,000円', '2,500円', '3,000円']],
-        ['label' => 'ドリンクバック', 'amounts' => ['300円', '500円', '700円', '1,000円']],
-        ['label' => 'ボトルバック', 'amounts' => ['5%', '8%', '10%', '15%', '20%']],
-        ['label' => '同伴バック', 'amounts' => ['2,000円', '3,000円', '4,000円', '5,000円']],
-        ['label' => 'フードバック', 'amounts' => ['200円', '300円', '500円']],
+        ['label' => '指名バック', 'unit' => 'yen', 'values' => [1000, 1500, 2000, 2500, 3000]],
+        ['label' => 'ドリンクバック', 'unit' => 'yen', 'values' => [300, 500, 700, 1000]],
+        ['label' => 'ボトルバック', 'unit' => 'percent', 'values' => [5, 8, 10, 15, 20]],
+        ['label' => '同伴バック', 'unit' => 'yen', 'values' => [2000, 3000, 4000, 5000]],
+        ['label' => 'フードバック', 'unit' => 'yen', 'values' => [200, 300, 500]],
     ];
 
     private const FEE_OPTIONS = [
-        ['label' => '雑費', 'amounts' => ['500円/日', '1,000円/日', '1,500円/日']],
-        ['label' => 'ヘアメイク', 'amounts' => ['500円', '1,000円', '無料']],
-        ['label' => '衣装代', 'amounts' => ['無料', '500円/日']],
+        ['label' => '雑費', 'unit' => 'yen', 'values' => [500, 1000, 1500], 'per_day' => true],
+        ['label' => 'ヘアメイク', 'unit' => 'yen', 'values' => [500, 1000, 0]], // 0 = 無料
+        ['label' => '衣装代', 'unit' => 'yen', 'values' => [0, 500], 'per_day' => true],
     ];
 
     private const STAFF_NAMES = [
@@ -394,21 +396,23 @@ class StoreSeeder extends Seeder
 
         $wage = [
             'regular' => [
-                'min' => $hourlyMin,
-                'max' => $hourlyMax,
+                'min' => (int) $hourlyMin,
+                'max' => (int) $hourlyMax,
                 'unit' => $unitWageType === '日給' ? 'day' : 'hour',
             ],
             'payroll' => [
                 'type' => $payrollType,
                 'description' => $payrollDescription,
             ],
-            'daily_estimate' => number_format($hourlyMin * 5) . '円〜' . number_format($hourlyMax * 6) . '円',
+            // daily_estimate は number に統一。表示側で range として描画する。
+            'daily_estimate_min' => (int) ($hourlyMin * 5),
+            'daily_estimate_max' => (int) ($hourlyMax * 6),
         ];
 
         if ($this->chance(0.7)) {
             $wage['trial'] = [
-                'hourly' => number_format($hourlyMin) . '円',
-                'avg_hourly' => number_format($hourlyMin + 500) . '円',
+                'hourly_min' => (int) $hourlyMin,
+                'hourly_max' => (int) ($hourlyMin + 500),
                 'days' => rand(1, 3),
             ];
         }
@@ -594,7 +598,8 @@ class StoreSeeder extends Seeder
             $used[] = $option['label'];
             $items[] = [
                 'label' => $option['label'],
-                'amount' => $option['amounts'][array_rand($option['amounts'])],
+                'value' => (int) $option['values'][array_rand($option['values'])],
+                'unit'  => $option['unit'],
             ];
         }
 
@@ -608,9 +613,12 @@ class StoreSeeder extends Seeder
 
         for ($i = 0; $i < $count; $i++) {
             $option = self::FEE_OPTIONS[$i % count(self::FEE_OPTIONS)];
+            $value = (int) $option['values'][array_rand($option['values'])];
             $items[] = [
                 'label' => $option['label'],
-                'amount' => $option['amounts'][array_rand($option['amounts'])],
+                'value' => $value,
+                'unit'  => $value === 0 ? 'free' : $option['unit'],
+                'per_day' => (bool) ($option['per_day'] ?? false),
             ];
         }
 

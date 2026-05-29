@@ -46,13 +46,15 @@ class AiChatController extends Controller
         if (!$setting || !$setting->enabled) {
             return response()->json([
                 'enabled' => false,
-                'suggest_buttons' => [],
+                'suggest_categories' => [],
+                'suggest_display_mode' => 'off',
             ]);
         }
 
         return response()->json([
             'enabled' => true,
-            'suggest_buttons' => $setting->suggest_buttons ?? [],
+            'suggest_categories' => $setting->suggest_categories ?? [],
+            'suggest_display_mode' => $setting->suggest_display_mode ?? 'categorized',
         ]);
     }
 

@@ -33,7 +33,14 @@ class AdminAiChatSettingTest extends TestCase
             'enabled' => true,
             'system_prompt' => 'You are a helpful assistant.',
             'tone' => 'friendly',
-            'suggest_buttons' => ['条件で探したい', '私の適正時給診断'],
+            'suggest_categories' => [
+                [
+                    'id' => 'ask',
+                    'label' => '質問する',
+                    'sub' => 'AIに直接聞いてみる',
+                    'chips' => ['未経験でも大丈夫？', '日払いできる？'],
+                ],
+            ],
         ], $overrides));
     }
 
@@ -54,12 +61,21 @@ class AdminAiChatSettingTest extends TestCase
     {
         $setting = $this->createSetting();
 
+        $newCategories = [
+            [
+                'id' => 'talk',
+                'label' => '状況を話す',
+                'sub' => '自分の状況をAIに伝える',
+                'chips' => ['週2〜3日だけ働きたい', '子育て中でも働ける？'],
+            ],
+        ];
+
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/admin/ai-chat/settings/{$setting->id}", [
                 'enabled' => false,
                 'system_prompt' => 'Updated prompt',
                 'tone' => 'casual',
-                'suggest_buttons' => ['新しいボタン'],
+                'suggest_categories' => $newCategories,
             ]);
 
         $response->assertStatus(200)
@@ -72,6 +88,53 @@ class AdminAiChatSettingTest extends TestCase
         $setting->refresh();
         $this->assertFalse($setting->enabled);
         $this->assertEquals('Updated prompt', $setting->system_prompt);
+        $this->assertEquals($newCategories, $setting->suggest_categories);
+    }
+
+    public function test_admin_can_set_display_mode_to_off(): void
+    {
+        $setting = $this->createSetting();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/ai-chat/settings/{$setting->id}", [
+                'suggest_display_mode' => 'off',
+            ]);
+
+        $response->assertStatus(200);
+
+        $setting->refresh();
+        $this->assertSame('off', $setting->suggest_display_mode);
+    }
+
+    public function test_update_setting_rejects_invalid_display_mode(): void
+    {
+        $setting = $this->createSetting();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/ai-chat/settings/{$setting->id}", [
+                'suggest_display_mode' => 'bogus',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['suggest_display_mode']);
+    }
+
+    public function test_update_setting_rejects_malformed_suggest_categories(): void
+    {
+        $setting = $this->createSetting();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/ai-chat/settings/{$setting->id}", [
+                'suggest_categories' => [
+                    ['label' => 'missing id and chips'],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'suggest_categories.0.id',
+                'suggest_categories.0.chips',
+            ]);
     }
 
     public function test_admin_can_get_ai_chat_stats(): void

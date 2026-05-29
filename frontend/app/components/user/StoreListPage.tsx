@@ -42,7 +42,7 @@ interface Store {
   feature_tags: string[];
   description: string;
   images: (string | { url: string })[];
-  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   reviews_count: number;
   average_rating: number;
@@ -169,13 +169,13 @@ function EditorialStoreCard({
               {store.category}
             </span>
           )}
-          {/* 体入リボン — 即日体入はゴールド、通常体入は控えめ。体入なしはなし。 */}
+          {/* 体入リボン — 体験確約はゴールド、体入可能は控えめ。体入なしはなし。 */}
           {store.trial_type === "same_day" && (
             <span
               className="absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              即日体入
+              体験確約
             </span>
           )}
           {store.trial_type === "normal" && (

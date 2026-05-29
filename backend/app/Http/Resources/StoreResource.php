@@ -52,21 +52,23 @@ class StoreResource extends JsonResource
             'shift_info'      => $schedule['shift_info'] ?? null,
 
             // wage
-            'hourly_min'      => isset($regular['min']) ? (int) $regular['min'] : null,
-            'hourly_max'      => isset($regular['max']) ? (int) $regular['max'] : null,
+            'hourly_min'      => self::toInt($regular['min'] ?? null),
+            'hourly_max'      => self::toInt($regular['max'] ?? null),
             'unit_wage_type'  => self::wageUnitToLabel($regular['unit'] ?? null),
-            'daily_estimate'  => $wage['daily_estimate'] ?? null,
+            // daily_estimate は旧 string と新 min/max の両対応。
+            'daily_estimate'      => self::toInt($wage['daily_estimate'] ?? null), // 後方互換
+            'daily_estimate_min'  => self::toInt($wage['daily_estimate_min'] ?? null),
+            'daily_estimate_max'  => self::toInt($wage['daily_estimate_max'] ?? null),
             // 体入時給は最低/最高の2枠で公開。旧データ (avg_hourly=平均 /
-            // hourly=単一値) は最低=avg, 最高=hourly にフォールバックして
-            // 既存データを表示できるようにする (移行 migration なしの想定)。
-            'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
-            'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly']     ?? null,
+            // hourly=単一値) は最低=avg, 最高=hourly にフォールバック。
+            'trial_hourly_min' => self::toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
+            'trial_hourly_max' => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
             'payroll_system_type'        => $payroll['type']        ?? null,
             'payroll_system_description' => $payroll['description'] ?? null,
 
-            // compensation
-            'back_items'    => $compensation['back']  ?? null,
-            'fee_items'     => $compensation['fees']  ?? null,
+            // compensation — back_items / fee_items は {label, value, unit} の new shape
+            'back_items'    => self::projectAmountItems($compensation['back']  ?? null),
+            'fee_items'     => self::projectAmountItems($compensation['fees']  ?? null),
             'salary_notes'  => $compensation['notes'] ?? null,
 
             // guarantee
@@ -240,6 +242,66 @@ class StoreResource extends JsonResource
     {
         if (!$unit) return null;
         return $unit === 'day' ? '日給' : '時給';
+    }
+
+    /**
+     * 数値文字列 ('1,500円') / int / null を int|null に正規化。
+     * フロントが Number() で受けても落ちないように。
+     */
+    private static function toInt(mixed $v): ?int
+    {
+        if ($v === null || $v === '') return null;
+        if (is_int($v)) return $v;
+        if (is_float($v)) return (int) $v;
+        if (is_string($v)) {
+            $digits = preg_replace('/[^0-9]/u', '', $v);
+            if ($digits === '' || $digits === null) return null;
+            return (int) $digits;
+        }
+        return null;
+    }
+
+    /**
+     * back_items / fee_items を {label, value, unit, per_day?} に整形。
+     * 旧 amount=string も拾う（NormalizeStoreNumerics が走る前の DB 用）。
+     *
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>|null
+     */
+    private static function projectAmountItems(mixed $items): ?array
+    {
+        if (!is_array($items)) return null;
+        return array_values(array_map(function ($it) {
+            if (!is_array($it)) {
+                return ['label' => (string) $it, 'value' => 0, 'unit' => 'free'];
+            }
+            $label = (string) ($it['label'] ?? '');
+            // 既に new shape
+            if (isset($it['value']) && isset($it['unit'])) {
+                $out = [
+                    'label' => $label,
+                    'value' => self::toInt($it['value']) ?? 0,
+                    'unit'  => in_array($it['unit'], ['yen', 'percent', 'free'], true) ? $it['unit'] : 'yen',
+                ];
+                if (array_key_exists('per_day', $it)) $out['per_day'] = (bool) $it['per_day'];
+                return $out;
+            }
+            // 旧 amount=string
+            $raw = (string) ($it['amount'] ?? '');
+            if ($raw === '' || str_contains($raw, '無料')) {
+                return ['label' => $label, 'value' => 0, 'unit' => 'free'];
+            }
+            if (preg_match('/([0-9.]+)\s*%/u', $raw, $m)) {
+                return ['label' => $label, 'value' => (int) round((float) $m[1]), 'unit' => 'percent'];
+            }
+            if (preg_match('/([0-9,]+)/u', $raw, $m)) {
+                $val = self::toInt($m[1]) ?? 0;
+                $out = ['label' => $label, 'value' => $val, 'unit' => 'yen'];
+                if (str_contains($raw, '/日')) $out['per_day'] = true;
+                return $out;
+            }
+            return ['label' => $label, 'value' => 0, 'unit' => 'free'];
+        }, $items));
     }
 
     private static function buildHoursText(?string $start, ?string $end): ?string

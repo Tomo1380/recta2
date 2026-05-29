@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Loader2, ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 import { userApi } from "~/lib/api";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
+import TrendingTopics, { type TrendingItem } from "~/components/user/shared/TrendingTopics";
 import { buildMetaTags } from "~/lib/seo";
 import type {
   ArticleSummary,
@@ -37,6 +38,24 @@ export default function ColumnsPage() {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [consultations, setConsultations] = useState<TrendingItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/home")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { consultations?: { question: string; answer?: string | null; tag?: string; count?: number | string | null }[] } | null) => {
+        const list = (json?.consultations ?? [])
+          .filter((c) => !!c.answer)
+          .map((c) => ({
+            q: c.question,
+            a: c.answer ?? "",
+            tag: c.tag?.replace(/^#/, ""),
+            count: c.count != null ? `${c.count}` : undefined,
+          }));
+        setConsultations(list);
+      })
+      .catch(() => setConsultations([]));
+  }, []);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -319,6 +338,11 @@ export default function ColumnsPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* みんなの相談 — トップから移動 */}
+      <div className="pb-10">
+        <TrendingTopics pool={consultations} />
       </div>
     </div>
   );

@@ -189,7 +189,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
                         className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white"
                         style={{ background: GOLD }}
                       >
-                        即日体入
+                        体験確約
                       </span>
                     )}
                   </div>

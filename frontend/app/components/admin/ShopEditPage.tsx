@@ -626,7 +626,7 @@ export function ShopEditPage() {
   const [trialMaxWage, setTrialMaxWage] = useState("");
   const [interviewStart, setInterviewStart] = useState("");
   const [interviewEnd, setInterviewEnd] = useState("");
-  // 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし)。
+  // 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし)。
   const [sameDayTrial, setSameDayTrial] = useState<"same_day" | "normal" | "none">("normal");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -1324,7 +1324,7 @@ export function ShopEditPage() {
             placeholder="例: 19:00"
           />
         </Field>
-        <Field label="体入の種類" hint="店舗詳細やフィルターで「即日体入OK」リボンの出し分けに使用">
+        <Field label="体入の種類" hint="店舗詳細やフィルターで「体験確約OK」リボンの出し分けに使用">
           <select
             value={sameDayTrial}
             onChange={(e) =>
@@ -1332,8 +1332,8 @@ export function ShopEditPage() {
             }
             className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
           >
-            <option value="same_day">即日体入</option>
-            <option value="normal">通常体入</option>
+            <option value="same_day">体験確約</option>
+            <option value="normal">体入可能</option>
             <option value="none">体入なし</option>
           </select>
         </Field>

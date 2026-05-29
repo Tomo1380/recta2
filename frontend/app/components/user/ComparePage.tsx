@@ -27,7 +27,24 @@ interface StoreImage {
 }
 interface BackItem {
   label: string;
-  amount: number;
+  // 新スキーマ: value (int) + unit。旧 amount (string) は廃止だが既存
+  // フィールド名で来る可能性があるので optional として残しておく。
+  value?: number;
+  unit?: "yen" | "percent" | "free";
+  per_day?: boolean;
+  /** @deprecated 旧 string 形式 */
+  amount?: number | string;
+}
+
+interface StaffPhoto {
+  image_url: string;
+  caption?: string | null;
+  staff_type?: string | null;
+  display_order?: number;
+}
+interface CustomerAgeBand {
+  label: string;
+  ratio: number;
 }
 
 interface ComparableStore {
@@ -35,12 +52,6 @@ interface ComparableStore {
   name: string;
   area?: string;
   category?: string;
-  nearest_station?: string;
-  opening_time?: string;
-  closing_time?: string;
-  business_hours?: string;
-  holidays?: string;
-  shift_info?: string;
   hourly_min?: number;
   hourly_max?: number;
   daily_estimate?: number;
@@ -50,19 +61,24 @@ interface ComparableStore {
   trial_hourly?: number | string | null;
   /** @deprecated 旧キー (フォールバック用) */
   trial_avg_hourly?: number | string | null;
-  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type?: "same_day" | "normal" | "none";
   back_items?: BackItem[];
   norma_info?: string;
   feature_tags?: string[];
   images?: StoreImage[];
   required_documents?: { documents?: string[] } | null;
-  reviews_count?: number;
+  interview_start?: string | null;
+  interview_end?: string | null;
+  recruitment_standards?: string | null;
+  staff_photos?: StaffPhoto[];
   average_rating?: number;
   analysis?: {
     experience_level?: number;
     atmosphere?: number;
     drinking_style?: number;
+    customer_age?: CustomerAgeBand[];
+    cast_style?: { beauty?: number; cute?: number; glamour?: number; natural?: number };
   } | null;
 }
 
@@ -293,6 +309,76 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
       />
       {children}
     </h2>
+  );
+}
+
+/** 各店舗の在籍女性 (staff_photos) を最大 4 枚ずつ並べる行 */
+function CompareStaffPhotos({
+  stores,
+  hasAddSlot,
+}: {
+  stores: ComparableStore[];
+  hasAddSlot: boolean;
+}) {
+  const anyPhotos = stores.some((s) => (s.staff_photos?.length ?? 0) > 0);
+  if (!anyPhotos) return null;
+  return (
+    <div className="mt-4">
+      <SectionTitle>在籍女性の例</SectionTitle>
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `${COL_LABEL_WIDTH}px repeat(${
+            stores.length + (hasAddSlot ? 1 : 0)
+          }, ${COL_STORE_WIDTH}px)`,
+          padding: "4px 0 8px",
+        }}
+      >
+        <div /> {/* 左端の空白カラム */}
+        {stores.map((s) => {
+          const photos = (s.staff_photos ?? []).slice(0, 4);
+          return (
+            <div key={s.id} className="px-1.5">
+              {photos.length === 0 ? (
+                <div
+                  className="rounded-lg flex items-center justify-center"
+                  style={{
+                    aspectRatio: "1 / 1",
+                    background: "rgba(27,37,40,0.04)",
+                    color: "rgba(27,37,40,0.35)",
+                    fontFamily: J,
+                    fontSize: 10.5,
+                  }}
+                >
+                  —
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-1">
+                  {photos.map((p, i) => (
+                    <div
+                      key={i}
+                      className="relative rounded-md overflow-hidden"
+                      style={{
+                        aspectRatio: "1 / 1",
+                        background: "rgba(27,37,40,0.06)",
+                      }}
+                    >
+                      <img
+                        src={p.image_url}
+                        alt={p.caption ?? `${s.name} 在籍キャスト ${i + 1}`}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {hasAddSlot && <div />}
+      </div>
+    </div>
   );
 }
 
@@ -643,25 +729,46 @@ export default function ComparePage({ ids }: ComparePageProps) {
 
     const num = (fn: (s: ComparableStore) => number | undefined) =>
       valid.map(fn);
+    // バック合計: 円のみ加算。% やフリーは合計に含めない (定額換算できないので
+    // 比較行は「+ 10% 等」の補足を別途出す)。
     const backTotal = (s: ComparableStore) =>
-      (s.back_items ?? []).reduce((acc, b) => acc + (b.amount ?? 0), 0);
+      (s.back_items ?? []).reduce((acc, b) => {
+        if (b.unit === "yen" && typeof b.value === "number") return acc + b.value;
+        // 旧データ救済: amount が number / 数字文字列ならそのまま
+        if (typeof b.amount === "number") return acc + b.amount;
+        if (typeof b.amount === "string") {
+          const n = Number(b.amount.replace(/[^0-9]/g, ""));
+          if (Number.isFinite(n) && b.amount.includes("円")) return acc + n;
+        }
+        return acc;
+      }, 0);
+
+    const topCustomerAge = (s: ComparableStore): string => {
+      const bands = s.analysis?.customer_age;
+      if (!bands || bands.length === 0) return "—";
+      const top = [...bands].sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0))[0];
+      return top ? `${top.label}が中心` : "—";
+    };
+    const topCastStyle = (s: ComparableStore): string => {
+      const cs = s.analysis?.cast_style;
+      if (!cs) return "—";
+      const entries: Array<[string, number]> = (
+        [
+          ["美人系", cs.beauty ?? -1],
+          ["可愛い系", cs.cute ?? -1],
+          ["グラマー系", cs.glamour ?? -1],
+          ["ナチュラル系", cs.natural ?? -1],
+        ] as Array<[string, number]>
+      ).filter(([, v]) => v >= 0);
+      if (entries.length === 0) return "—";
+      entries.sort((a, b) => b[1] - a[1]);
+      return entries[0][0];
+    };
 
     return {
       basic: [
         { label: "エリア", values: valid.map((s) => s.area ?? "—"), bestAt: null },
         { label: "カテゴリ", values: valid.map((s) => s.category ?? "—"), bestAt: null },
-        { label: "最寄り駅", values: valid.map((s) => s.nearest_station ?? "—"), bestAt: null },
-        {
-          label: "営業時間",
-          values: valid.map((s) =>
-            s.opening_time && s.closing_time
-              ? `${s.opening_time}〜${s.closing_time}`
-              : s.business_hours ?? "—",
-          ),
-          bestAt: null,
-        },
-        { label: "定休日", values: valid.map((s) => s.holidays ?? "—"), bestAt: null },
-        { label: "シフト", values: valid.map((s) => s.shift_info ?? "—"), bestAt: null },
       ],
       salary: [
         {
@@ -675,9 +782,31 @@ export default function ComparePage({ ids }: ComparePageProps) {
           bestAt: bestIndex(num((s) => s.hourly_min)),
         },
         {
-          label: "日給目安",
-          values: valid.map((s) => formatYen(s.daily_estimate)),
-          bestAt: bestIndex(num((s) => s.daily_estimate)),
+          label: "バック類",
+          values: valid.map((s) => formatYen(backTotal(s))),
+          bestAt: bestIndex(valid.map(backTotal)),
+        },
+        { label: "ノルマ・ペナ", values: valid.map((s) => s.norma_info ?? "—"), bestAt: null },
+        {
+          label: "未経験率",
+          values: valid.map((s) =>
+            s.analysis?.experience_level !== undefined ? `${s.analysis.experience_level}%` : "—",
+          ),
+          // 未経験率は高い方が未経験者にとって安心 → higher 優位
+          bestAt: bestIndex(num((s) => s.analysis?.experience_level)),
+        },
+        {
+          label: "即日体験",
+          values: valid.map((s) => {
+            if (s.trial_type === "same_day") return "即日OK";
+            if (s.trial_type === "normal") return "あり (要予約)";
+            return "なし";
+          }),
+          bestAt: bestIndex(
+            valid.map((s) =>
+              s.trial_type === "same_day" ? 2 : s.trial_type === "normal" ? 1 : 0,
+            ),
+          ),
         },
         {
           // 比較表は 1 値のみ表示できるので、最低額 (新キー or 旧 avg_hourly)
@@ -696,48 +825,44 @@ export default function ComparePage({ ids }: ComparePageProps) {
             }),
           ),
         },
-        {
-          label: "バック合計",
-          values: valid.map((s) => formatYen(backTotal(s))),
-          bestAt: bestIndex(valid.map(backTotal)),
-        },
       ],
       trial: [
         {
-          label: "体入",
-          values: valid.map((s) => {
-            if (s.trial_type === "same_day") return "即日OK";
-            if (s.trial_type === "normal") return "あり";
-            return "なし";
-          }),
-          // best 判定: 即日 > 通常 > なし。0/1/2 にスコア化して max を best に。
-          bestAt: bestIndex(
-            valid.map((s) =>
-              s.trial_type === "same_day" ? 2 : s.trial_type === "normal" ? 1 : 0,
-            ),
-          ),
-        },
-        { label: "ノルマ", values: valid.map((s) => s.norma_info ?? "—"), bestAt: null },
-        {
-          label: "必要書類",
+          label: "面接時間",
           values: valid.map((s) =>
-            s.required_documents?.documents?.length
-              ? `${s.required_documents.documents.length}点`
+            s.interview_start && s.interview_end
+              ? `${s.interview_start}〜${s.interview_end}`
               : "—",
           ),
-          // 必要書類は少ない方が良いので direction=lower
+          bestAt: null,
+        },
+        {
+          label: "必要な身分証",
+          values: valid.map((s) => {
+            const docs = s.required_documents?.documents;
+            if (!docs || docs.length === 0) return "—";
+            return docs.join("・");
+          }),
           bestAt: bestIndex(
             valid.map((s) => s.required_documents?.documents?.length),
             "lower",
           ),
         },
+        {
+          label: "採用基準",
+          values: valid.map((s) => s.recruitment_standards ?? "—"),
+          bestAt: null,
+        },
       ],
       analysis: [
         {
-          label: "経験レベル",
-          values: valid.map((s) =>
-            s.analysis?.experience_level !== undefined ? `${s.analysis.experience_level}%` : "—",
-          ),
+          label: "系統",
+          values: valid.map(topCastStyle),
+          bestAt: null,
+        },
+        {
+          label: "客層",
+          values: valid.map(topCustomerAge),
           bestAt: null,
         },
         {
@@ -747,20 +872,8 @@ export default function ComparePage({ ids }: ComparePageProps) {
           ),
           bestAt: null,
         },
-        {
-          label: "飲み度",
-          values: valid.map((s) =>
-            s.analysis?.drinking_style !== undefined ? `${s.analysis.drinking_style}%` : "—",
-          ),
-          bestAt: null,
-        },
       ],
       community: [
-        {
-          label: "口コミ件数",
-          values: valid.map((s) => `${s.reviews_count ?? 0}件`),
-          bestAt: bestIndex(num((s) => s.reviews_count)),
-        },
         {
           label: "平均評価",
           values: valid.map((s) => (s.average_rating ? s.average_rating.toFixed(1) : "—")),
@@ -949,6 +1062,12 @@ export default function ComparePage({ ids }: ComparePageProps) {
                     <CompareRow key={r.label} {...r} />
                   ))}
                 </div>
+
+                {/* 在籍女性の例 — 各店舗の staff_photos を最大4枚 */}
+                <CompareStaffPhotos
+                  stores={validStores}
+                  hasAddSlot={canAdd}
+                />
               </div>
             </div>
 

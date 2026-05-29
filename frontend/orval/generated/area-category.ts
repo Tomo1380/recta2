@@ -117,7 +117,7 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   /**
- * @summary Upload an image for a category. Stored on the public disk
+ * @summary Upload an image for a category. Stored on S3 (media bucket)
  */
 export const areaCategoryUploadCategoryImage = (
     category: number,

@@ -12,11 +12,14 @@ class AiChatSetting extends Model
         'system_prompt',
         'tone',
         'openai_finetuned_model',
-        'suggest_buttons',
+        'suggest_categories',
+        'suggest_display_mode',
     ];
 
     protected $casts = [
         'enabled' => 'boolean',
-        'suggest_buttons' => 'array',
+        'suggest_categories' => 'array',
     ];
+
+    public const DISPLAY_MODES = ['off', 'chips_only', 'categorized'];
 }

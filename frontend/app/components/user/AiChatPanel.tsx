@@ -2,11 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { openLineFriendAdd } from "~/lib/line";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import {
-  Send,
   Loader2,
   Star,
   MapPin,
-  Sparkles,
   Zap,
   BookOpen,
   Clock,
@@ -16,6 +14,47 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Figma Make 由来のデザイントークン / アイコン
+//   ref: docs/handoff/2026-05-29-chat-ui-figma-align.md
+//   SVG path は Figma Make の src/imports/svg-m4am08uz6h.ts から取得。
+// ---------------------------------------------------------------------------
+
+const AI_AVATAR_BG = "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)";
+
+// Recta AI アバターのロボットアイコン (24x24 viewBox, 白 fill)
+const ROBOT_SVG_PATH =
+  "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a7 7 0 0 1-7 7H9a7 7 0 0 1-7-7H1a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 12 2zm-4 9a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm8 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z";
+
+// 送信ボタンの「円の中に上向き矢印」アイコン (p2a5eb480 / 18.6667 viewBox, stroke)
+const SEND_ARROW_PATH =
+  "M12.6667 9.33333L9.33333 6M9.33333 6L6 9.33333M9.33333 6V12.6667M17.6667 9.33333C17.6667 13.9357 13.9357 17.6667 9.33333 17.6667C4.73096 17.6667 1 13.9357 1 9.33333C1 4.73096 4.73096 1 9.33333 1C13.9357 1 17.6667 4.73096 17.6667 9.33333Z";
+
+/**
+ * Recta AI アバター — ゴールドグラデの角丸 + 白いロボットアイコン。
+ * `ring` を立てると streaming 中を示すゴールドの外周リングを点灯する。
+ */
+function AiAvatar({ size, ring = false }: { size: number; ring?: boolean }) {
+  const iconSize = size * 0.625;
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.44,
+        background: AI_AVATAR_BG,
+        boxShadow: ring ? "0 0 0 3px rgba(212,175,55,0.28)" : undefined,
+        transition: "box-shadow .25s ease",
+      }}
+    >
+      <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d={ROBOT_SVG_PATH} fill="white" />
+      </svg>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Follow-up suggestion generator (client-side, replaces server-side logic)
@@ -70,6 +109,26 @@ interface StoreInfo {
   trial_hourly?: string | number | null;
 }
 
+/**
+ * Single L1 tab → its L2 chips. Mirrors backend `suggest_categories` jsonb shape.
+ *
+ *   { id, label, sub, chips: [...] }
+ */
+export interface SuggestCategory {
+  id: string;
+  label: string;
+  sub?: string | null;
+  chips: string[];
+}
+
+/**
+ * Suggest UI の表示モード。
+ *  - off         : 一切出さない
+ *  - chips_only  : L1 タブを隠して L2 chip だけフラットに並べる
+ *  - categorized : L1 タブ + L2 chip (Figma 標準)
+ */
+export type SuggestDisplayMode = "off" | "chips_only" | "categorized";
+
 interface AiChatPanelProps {
   pageType: "top" | "list" | "detail";
   storeId?: number;
@@ -77,10 +136,12 @@ interface AiChatPanelProps {
   /** Store data for detail page intro summary */
   storeInfo?: StoreInfo;
   className?: string;
-  /** Preview mode: disables API calls, uses provided suggest buttons */
+  /** Preview mode: disables API calls, uses provided suggest categories */
   preview?: boolean;
-  /** Override suggest buttons (used in preview mode) */
-  previewSuggestButtons?: string[];
+  /** Override suggest categories (used in preview mode) */
+  previewSuggestCategories?: SuggestCategory[];
+  /** Override suggest display mode (used in preview mode) */
+  previewSuggestDisplayMode?: SuggestDisplayMode;
 }
 
 interface StoreCard {
@@ -122,7 +183,8 @@ type ChatMode = "agent" | "finetuned";
 
 interface ChatConfigResponse {
   enabled: boolean;
-  suggest_buttons: string[];
+  suggest_categories: SuggestCategory[];
+  suggest_display_mode: SuggestDisplayMode;
 }
 
 interface ChatApiResponse {
@@ -292,33 +354,6 @@ function formatWage(min?: number, max?: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Suggest action buttons data
-// ---------------------------------------------------------------------------
-
-const SUGGEST_ACTIONS = [
-  {
-    title: "質問する",
-    subtitle: "AIに直接聞いてみる",
-    chips: ["未経験でも大丈夫？", "ノルマなしのお店は？", "給与の相場を教えて", "日払いできる？", "昼職と掛け持ちできる？"],
-  },
-  {
-    title: "状況を話す",
-    subtitle: "自分の状況をAIに伝える",
-    chips: ["週2〜3日だけ働きたい", "昼職があって夜も働きたい", "人見知りでも大丈夫？", "子育て中でも働ける？", "体験入店が怖い"],
-  },
-  {
-    title: "不安を解消",
-    subtitle: "本音の心配をそのまま",
-    chips: ["バレないか心配", "安全なお店を探したい", "初日の流れは？", "面接はどんな感じ？", "体験入店って何？"],
-  },
-  {
-    title: "条件で絞る",
-    subtitle: "希望条件をそのまま入力",
-    chips: ["渋谷・恵比寿エリア", "月収50万以上", "送迎あり", "個室あり", "ノルマなし・自由出勤"],
-  },
-];
-
-// ---------------------------------------------------------------------------
 // Intro animation script (per page type)
 // ---------------------------------------------------------------------------
 
@@ -450,12 +485,25 @@ function MetaBadge({ meta }: { meta: MessageMeta }) {
 // Suggest actions carousel (touch-scroll on mobile, arrow buttons on PC)
 // ---------------------------------------------------------------------------
 
+/**
+ * 2-tier suggest carousel.
+ *
+ *   L1: category tabs (label / sub), horizontal-scroll
+ *   L2: chip pills for the selected category, 2-row grid horizontal-scroll
+ *
+ * L1 を切り替えたとき L2 の chip 群を Figma の `chipPop` キーフレームで
+ * stagger 表示する: cubic-bezier(.34,1.56,.64,1), 0.38s, 各 chip i*0.05s 遅延。
+ * カテゴリ ID を grid に `key` として渡し再マウントすることで毎回先頭から
+ * pop し直す。
+ */
 function SuggestActionsCarousel({
-  actions,
+  categories,
+  mode,
   isLoading,
   onSend,
 }: {
-  actions: typeof SUGGEST_ACTIONS;
+  categories: SuggestCategory[];
+  mode: SuggestDisplayMode;
   isLoading: boolean;
   onSend: (text: string) => void;
 }) {
@@ -463,6 +511,11 @@ function SuggestActionsCarousel({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
+
+  // Clamp selectedIdx when categories change (admin edit / preview update).
+  useEffect(() => {
+    if (selectedIdx >= categories.length) setSelectedIdx(0);
+  }, [categories.length, selectedIdx]);
 
   const checkScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -490,23 +543,101 @@ function SuggestActionsCarousel({
     el.scrollBy({ left: direction === "left" ? -150 : 150, behavior: "smooth" });
   };
 
-  const selectedChips = actions[selectedIdx]?.chips ?? [];
+  const selectedCategory = categories[selectedIdx] ?? categories[0];
+  const selectedChips = selectedCategory?.chips ?? [];
+
+  if (mode === "off" || categories.length === 0) return null;
+
+  // chips_only モード: L1 タブを描画せず、全カテゴリの chip をフラット結合。
+  // 同じ chipPop アニメで stagger 表示する (再マウントは「全カテゴリ ID 連結」を
+  // key にすることで管理画面で chips を編集した瞬間に再生する)。
+  if (mode === "chips_only") {
+    const flatChips = categories.flatMap((c) => c.chips);
+    const flatKey = categories.map((c) => c.id).join("|");
+    if (flatChips.length === 0) return null;
+
+    return (
+      <div>
+        <style>{`
+          @keyframes chipPop {
+            0%   { transform: translateY(0)    scale(1);    }
+            50%  { transform: translateY(-5px) scale(1.06); }
+            75%  { transform: translateY(1px)  scale(0.98); }
+            100% { transform: translateY(0)    scale(1);    }
+          }
+          .chip-pop {
+            animation-name: chipPop;
+            animation-duration: 0.38s;
+            animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation-fill-mode: both;
+          }
+        `}</style>
+        <div style={{ padding: "4px 20px 14px" }}>
+          <div
+            key={flatKey}
+            className="flex flex-wrap gap-2"
+          >
+            {flatChips.map((chip, i) => (
+              <button
+                key={`${chip}-${i}`}
+                type="button"
+                onClick={() => onSend(chip)}
+                disabled={isLoading}
+                className="chip-pop flex items-center justify-center rounded-full bg-white transition-all active:scale-95 hover:shadow-md disabled:opacity-50"
+                style={{
+                  height: "30px",
+                  padding: "0 13px",
+                  border: "none",
+                  boxShadow: "0px 1px 4px rgba(27,37,40,0.13), 0px 0px 0px 0.5px rgba(27,37,40,0.07)",
+                  fontSize: "11px",
+                  color: "#1b2528",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  animationDelay: `${i * 0.05}s`,
+                }}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      {/* Category tabs */}
+      {/* chipPop keyframes — scoped via component-level <style>. Single class
+          name (`chip-pop`) so the same animation applies to every chip with
+          per-chip animationDelay from inline style. */}
+      <style>{`
+        .suggest-carousel::-webkit-scrollbar { display: none; }
+        @keyframes chipPop {
+          0%   { transform: translateY(0)    scale(1);    }
+          50%  { transform: translateY(-5px) scale(1.06); }
+          75%  { transform: translateY(1px)  scale(0.98); }
+          100% { transform: translateY(0)    scale(1);    }
+        }
+        .chip-pop {
+          animation-name: chipPop;
+          animation-duration: 0.38s;
+          animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+          animation-fill-mode: both;
+        }
+      `}</style>
+
+      {/* L1: Category tabs */}
       <div className="relative group">
-        <style>{`.suggest-carousel::-webkit-scrollbar { display: none; }`}</style>
         <div
           ref={scrollContainerRef}
           className="suggest-carousel flex gap-2 px-5 pb-2 overflow-x-auto"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {actions.map((action, idx) => {
+          {categories.map((cat, idx) => {
             const active = selectedIdx === idx;
             return (
               <button
-                key={action.title}
+                key={cat.id}
                 type="button"
                 onClick={() => setSelectedIdx(idx)}
                 disabled={isLoading}
@@ -527,23 +658,24 @@ function SuggestActionsCarousel({
                     fontWeight: active ? 500 : 400,
                   }}
                 >
-                  {action.title}
+                  {cat.label}
                 </span>
-                <span
-                  className="text-[9px] leading-tight whitespace-nowrap"
-                  style={{
-                    color: active ? "rgba(27,37,40,0.45)" : "rgba(27,37,40,0.32)",
-                    letterSpacing: "0.18px",
-                  }}
-                >
-                  {action.subtitle}
-                </span>
+                {cat.sub && (
+                  <span
+                    className="text-[9px] leading-tight whitespace-nowrap"
+                    style={{
+                      color: active ? "rgba(27,37,40,0.45)" : "rgba(27,37,40,0.32)",
+                      letterSpacing: "0.18px",
+                    }}
+                  >
+                    {cat.sub}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Left arrow (PC hover) */}
         {canScrollLeft && (
           <button
             type="button"
@@ -555,7 +687,6 @@ function SuggestActionsCarousel({
           </button>
         )}
 
-        {/* Right arrow (PC hover) */}
         {canScrollRight && (
           <button
             type="button"
@@ -567,7 +698,6 @@ function SuggestActionsCarousel({
           </button>
         )}
 
-        {/* Right fade hint */}
         {canScrollRight && (
           <div
             className="pointer-events-none absolute right-0 top-0 bottom-0 w-10"
@@ -575,7 +705,6 @@ function SuggestActionsCarousel({
           />
         )}
 
-        {/* Left fade hint */}
         {canScrollLeft && (
           <div
             className="pointer-events-none absolute left-0 top-0 bottom-0 w-10"
@@ -584,17 +713,20 @@ function SuggestActionsCarousel({
         )}
       </div>
 
-      {/* Chips grid */}
+      {/* L2: Chips grid (re-mounted per category so chipPop replays on switch) */}
       <div style={{ padding: "0 20px 14px" }}>
         <div style={{ overflowX: "auto", overflowY: "visible", scrollbarWidth: "none" as const, padding: "3px", margin: "-3px" }}>
-          <div style={{ display: "grid", gridTemplateRows: "repeat(2, 30px)", gridAutoFlow: "column", gridAutoColumns: "max-content", gap: "8px" }}>
+          <div
+            key={selectedCategory?.id ?? "empty"}
+            style={{ display: "grid", gridTemplateRows: "repeat(2, 30px)", gridAutoFlow: "column", gridAutoColumns: "max-content", gap: "8px" }}
+          >
             {selectedChips.map((chip, i) => (
               <button
                 key={chip}
                 type="button"
                 onClick={() => onSend(chip)}
                 disabled={isLoading}
-                className="flex items-center justify-center rounded-full bg-white transition-all active:scale-95 hover:shadow-md disabled:opacity-50"
+                className="chip-pop flex items-center justify-center rounded-full bg-white transition-all active:scale-95 hover:shadow-md disabled:opacity-50"
                 style={{
                   height: "30px",
                   padding: "0 13px",
@@ -604,6 +736,7 @@ function SuggestActionsCarousel({
                   color: "#1b2528",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
+                  animationDelay: `${i * 0.05}s`,
                 }}
               >
                 {chip}
@@ -627,13 +760,16 @@ export default function AiChatPanel({
   storeInfo,
   className,
   preview = false,
-  previewSuggestButtons,
+  previewSuggestCategories,
+  previewSuggestDisplayMode,
 }: AiChatPanelProps) {
   const introScript = getIntroScript(pageType, storeName, storeInfo);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestButtons, setSuggestButtons] = useState<string[]>([]);
+  const [suggestCategories, setSuggestCategories] = useState<SuggestCategory[]>([]);
+  const [suggestDisplayMode, setSuggestDisplayMode] =
+    useState<SuggestDisplayMode>("categorized");
   const [followUpButtons, setFollowUpButtons] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
   const [mode, setMode] = useState<ChatMode>("agent");
@@ -670,13 +806,19 @@ export default function AiChatPanel({
     fetchConfig(pageType)
       .then((cfg) => {
         setEnabled(cfg.enabled);
-        setSuggestButtons(cfg.suggest_buttons ?? []);
+        setSuggestCategories(cfg.suggest_categories ?? []);
+        setSuggestDisplayMode(cfg.suggest_display_mode ?? "categorized");
       })
       .catch(() => {});
   }, [pageType, preview]);
 
-  // In preview mode, use previewSuggestButtons directly
-  const activeSuggestButtons = preview ? (previewSuggestButtons ?? []) : suggestButtons;
+  // In preview mode, use props directly
+  const activeSuggestCategories = preview
+    ? (previewSuggestCategories ?? [])
+    : suggestCategories;
+  const activeSuggestDisplayMode: SuggestDisplayMode = preview
+    ? (previewSuggestDisplayMode ?? "categorized")
+    : suggestDisplayMode;
 
   // ---- Intro animation: IntersectionObserver ----
   useEffect(() => {
@@ -914,6 +1056,9 @@ export default function AiChatPanel({
   if (!enabled) return null;
 
   const hasMessages = messages.length > 0;
+  // 末尾の AI メッセージが streaming 中か（ヘッダーアバターのリング点灯用）
+  const lastMsg = messages[messages.length - 1];
+  const hasStreamingMsg = lastMsg?.role === "ai" && !!lastMsg.streaming;
   const showIntro =
     !hasMessages &&
     introPhase !== "idle" &&
@@ -925,12 +1070,13 @@ export default function AiChatPanel({
     messages.length > 0 &&
     messages[messages.length - 1]?.role === "ai";
 
-  // Category-chips carousel (the hardcoded "状況を話す / 不安を解消 / 条件で絞る /
-  // 私を診断" 4-card display) is intentionally disabled: the admin-managed
-  // suggest_buttons are the single source of truth for top-page suggestions.
-  // Keeping the SUGGEST_ACTIONS constant in case we want it back as a marketing
-  // splash, but it no longer renders.
-  const showCategoryChips = false;
+  // Suggest carousel: driven by admin-managed `suggest_categories` +
+  // `suggest_display_mode`. Hidden during conversation, when mode=off, or
+  // when no chips exist.
+  const showCategoryChips =
+    !hasMessages &&
+    activeSuggestDisplayMode !== "off" &&
+    activeSuggestCategories.length > 0;
 
   return (
     <div
@@ -947,26 +1093,44 @@ export default function AiChatPanel({
     >
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between px-4 py-3">
+        {/* 左: 金縦バー + 見出し + NEW pill (+ dev用 mode toggle) */}
         <div className="flex items-center gap-2">
-          <div
-            className="flex size-[22px] shrink-0 items-center justify-center rounded-[10px]"
-            style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
-          >
-            <Sparkles className="size-3.5 text-white" />
-          </div>
           <span
-            className="text-[14px] font-bold"
-            style={{ color: "#1b2528", fontFamily: "'Outfit', 'Noto Sans JP', sans-serif" }}
+            aria-hidden
+            className="h-4 w-1 shrink-0 rounded-full"
+            style={{ background: "linear-gradient(180deg, #D4AF37 0%, #c8960c 100%)" }}
+          />
+          <span
+            className="font-bold"
+            style={{
+              color: "#1b2528",
+              fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
+              fontSize: 16,
+              letterSpacing: "-0.02em",
+            }}
           >
-            Recta AI
+            AIに相談する
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Mode toggle */}
+          <span
+            className="shrink-0 rounded-full px-1.5 py-0.5"
+            style={{
+              background: "linear-gradient(135deg, #1b2528 0%, #2c3e46 100%)",
+              border: "1px solid rgba(212,175,55,0.4)",
+              color: "#D4AF37",
+              fontFamily: "'Outfit', sans-serif",
+              fontWeight: 600,
+              fontSize: 8.5,
+              letterSpacing: "0.12em",
+              lineHeight: 1.4,
+            }}
+          >
+            NEW
+          </span>
+          {/* Mode toggle (Recta 固有の開発トグル / Figma には無い) */}
           <button
             type="button"
             onClick={() => setMode(mode === "agent" ? "finetuned" : "agent")}
-            className="rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors"
+            className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors"
             style={{
               backgroundColor: mode === "agent" ? "rgba(212,175,55,0.12)" : "rgba(99,102,241,0.12)",
               color: mode === "agent" ? "#D4AF37" : "#6366f1",
@@ -975,6 +1139,30 @@ export default function AiChatPanel({
           >
             {mode === "agent" ? "Agent" : "FT"}
           </button>
+        </div>
+        {/* 右: Recta AI アバター + テキスト + オンラインドット */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <AiAvatar size={22} ring={hasStreamingMsg} />
+          <span
+            className="font-bold"
+            style={{
+              color: "#1b2528",
+              fontFamily: "'Outfit', 'Noto Sans JP', sans-serif",
+              fontSize: 13,
+            }}
+          >
+            Recta AI
+          </span>
+          <span aria-hidden className="relative ml-0.5 inline-flex size-1.5">
+            <span
+              className="absolute inline-flex h-full w-full rounded-full animate-ping"
+              style={{ backgroundColor: "#D4AF37", opacity: 0.75 }}
+            />
+            <span
+              className="relative inline-flex size-1.5 rounded-full"
+              style={{ backgroundColor: "#D4AF37" }}
+            />
+          </span>
         </div>
       </div>
 
@@ -1021,11 +1209,8 @@ export default function AiChatPanel({
           {/* AI typing dots */}
           {introPhase === "typing-ai" && (
             <div className="flex justify-start">
-              <div
-                className="mr-2 mt-auto flex size-6 shrink-0 items-center justify-center rounded-[10px]"
-                style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
-              >
-                <Sparkles className="size-3.5 text-white" />
+              <div className="mr-2 mt-auto">
+                <AiAvatar size={24} />
               </div>
               <div
                 className="px-3.5 py-2.5 rounded-bl-[18px] rounded-br-[18px] rounded-tl-[4px] rounded-tr-[18px]"
@@ -1042,11 +1227,8 @@ export default function AiChatPanel({
           {/* AI bubble */}
           {(introPhase === "show-ai" || introPhase === "done") && (
             <div className="flex justify-start">
-              <div
-                className="mr-2 mt-auto flex size-6 shrink-0 items-center justify-center rounded-[10px]"
-                style={{ background: "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)" }}
-              >
-                <Sparkles className="size-3.5 text-white" />
+              <div className="mr-2 mt-auto">
+                <AiAvatar size={24} />
               </div>
               <div
                 className="max-w-[80%] px-3.5 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed rounded-bl-[18px] rounded-br-[18px] rounded-tl-[4px] rounded-tr-[18px]"
@@ -1070,39 +1252,15 @@ export default function AiChatPanel({
         </div>
       )}
 
-      {/* ---- Suggest actions (top page only) ---- */}
+      {/* ---- Suggest carousel (admin-managed) ---- */}
       {showCategoryChips && (
         <div className="pt-3">
           <SuggestActionsCarousel
-            actions={SUGGEST_ACTIONS}
+            categories={activeSuggestCategories}
+            mode={activeSuggestDisplayMode}
             isLoading={isLoading}
             onSend={handleSend}
           />
-        </div>
-      )}
-
-      {/* ---- Quick question pills ----
-          管理画面で編集できる suggest_buttons を表示。トップページでも
-          カテゴリチップの下に並べて、編集が画面に反映されるようにする。 */}
-      {!hasMessages && activeSuggestButtons.length > 0 && (
-        <div className="px-5 pt-2 pb-4">
-          <div className="flex flex-wrap gap-2">
-            {activeSuggestButtons.map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => handleSend(q)}
-                disabled={isLoading}
-                className="flex items-center justify-center rounded-full bg-white px-3.5 py-1.5 text-[11px] transition-all hover:shadow-md disabled:opacity-50"
-                style={{
-                  color: "#1b2528",
-                  boxShadow: "0px 1px 4px rgba(27,37,40,0.13), 0px 0px 0px rgba(27,37,40,0.07)",
-                }}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 
@@ -1127,15 +1285,17 @@ export default function AiChatPanel({
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {msg.role === "ai" && (
-                    <div
-                      className="mr-2 mt-auto flex size-6 shrink-0 items-center justify-center rounded-[10px]"
-                      style={{
-                        background: isLimitMsg
-                          ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-                          : "linear-gradient(135deg, #D4AF37 0%, #9a7a20 100%)",
-                      }}
-                    >
-                      {isLimitMsg ? <AlertTriangle className="size-3.5 text-white" /> : <Sparkles className="size-3.5 text-white" />}
+                    <div className="mr-2 mt-auto">
+                      {isLimitMsg ? (
+                        <div
+                          className="flex size-6 shrink-0 items-center justify-center rounded-[10px]"
+                          style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
+                        >
+                          <AlertTriangle className="size-3.5 text-white" />
+                        </div>
+                      ) : (
+                        <AiAvatar size={24} />
+                      )}
                     </div>
                   )}
                   <div
@@ -1426,10 +1586,15 @@ export default function AiChatPanel({
                   style={{ color: input.trim() ? "white" : "rgba(27,37,40,0.35)" }}
                 />
               ) : (
-                <Send
-                  className="size-3.5"
-                  style={{ color: input.trim() && !limitReached ? "white" : "rgba(27,37,40,0.35)" }}
-                />
+                <svg width={14} height={14} viewBox="0 0 18.6667 18.6667" fill="none" aria-hidden>
+                  <path
+                    d={SEND_ARROW_PATH}
+                    stroke={input.trim() && !limitReached ? "white" : "rgba(27,37,40,0.35)"}
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               )}
             </button>
           </div>

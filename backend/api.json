@@ -197,6 +197,26 @@
                     "204": {
                         "description": "No content"
                     },
+                    "409": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "example": ""
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
@@ -295,14 +315,18 @@
                                                 "enabled": {
                                                     "type": "boolean"
                                                 },
-                                                "suggest_buttons": {
+                                                "suggest_categories": {
                                                     "type": "array",
                                                     "items": {}
+                                                },
+                                                "suggest_display_mode": {
+                                                    "type": "string"
                                                 }
                                             },
                                             "required": [
                                                 "enabled",
-                                                "suggest_buttons"
+                                                "suggest_categories",
+                                                "suggest_display_mode"
                                             ]
                                         },
                                         {
@@ -311,7 +335,7 @@
                                                 "enabled": {
                                                     "type": "boolean"
                                                 },
-                                                "suggest_buttons": {
+                                                "suggest_categories": {
                                                     "type": "array",
                                                     "items": {
                                                         "type": "string"
@@ -319,11 +343,16 @@
                                                     "minItems": 0,
                                                     "maxItems": 0,
                                                     "additionalItems": false
+                                                },
+                                                "suggest_display_mode": {
+                                                    "type": "string",
+                                                    "const": "off"
                                                 }
                                             },
                                             "required": [
                                                 "enabled",
-                                                "suggest_buttons"
+                                                "suggest_categories",
+                                                "suggest_display_mode"
                                             ]
                                         }
                                     ]
@@ -404,11 +433,541 @@
                 },
                 "responses": {
                     "200": {
+                        "description": "Fallback to Gemini prompt-embedding mode if OpenAI not configured",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "\u305f\u3060\u3044\u307e\u6df7\u307f\u5408\u3063\u3066\u304a\u308a\u307e\u3059\u3002\u5c11\u3057\u6642\u9593\u3092\u7f6e\u3044\u3066\u304b\u3089\u518d\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002"
+                                                },
+                                                "stores": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0,
+                                                    "additionalItems": false
+                                                },
+                                                "follow_ups": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0,
+                                                    "additionalItems": false
+                                                },
+                                                "meta": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "mode": {},
+                                                        "model": {
+                                                            "type": "string",
+                                                            "const": "error"
+                                                        },
+                                                        "input_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "output_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "response_ms": {
+                                                            "type": "number"
+                                                        },
+                                                        "tool_calls": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "mode",
+                                                        "model",
+                                                        "input_tokens",
+                                                        "output_tokens",
+                                                        "total_tokens",
+                                                        "response_ms",
+                                                        "tool_calls"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "stores",
+                                                "follow_ups",
+                                                "meta"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "null"
+                                                        },
+                                                        {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "object"
+                                                        }
+                                                    ]
+                                                },
+                                                "stores": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "name": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "area": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "category": {
+                                                                        "type": [
+                                                                            "string",
+                                                                            "null"
+                                                                        ]
+                                                                    },
+                                                                    "nearest_station": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "hourly_min": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "hourly_max": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "feature_tags": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "description": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "images": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id",
+                                                                    "name",
+                                                                    "area",
+                                                                    "category",
+                                                                    "nearest_station",
+                                                                    "hourly_min",
+                                                                    "hourly_max",
+                                                                    "feature_tags",
+                                                                    "description",
+                                                                    "images"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                },
+                                                "follow_ups": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0,
+                                                    "additionalItems": false
+                                                },
+                                                "meta": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "mode": {
+                                                            "type": "string",
+                                                            "const": "agent"
+                                                        },
+                                                        "input_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "output_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total_tokens": {
+                                                            "type": "string"
+                                                        },
+                                                        "response_ms": {
+                                                            "type": "number"
+                                                        },
+                                                        "tool_calls": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "mode",
+                                                        "input_tokens",
+                                                        "output_tokens",
+                                                        "total_tokens",
+                                                        "response_ms",
+                                                        "tool_calls"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "stores",
+                                                "follow_ups",
+                                                "meta"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "null"
+                                                        },
+                                                        {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "object"
+                                                        }
+                                                    ]
+                                                },
+                                                "stores": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "name": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "area": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "category": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "nearest_station": {
+                                                                        "type": [
+                                                                            "string",
+                                                                            "null"
+                                                                        ]
+                                                                    },
+                                                                    "hourly_min": {
+                                                                        "type": [
+                                                                            "string",
+                                                                            "null"
+                                                                        ]
+                                                                    },
+                                                                    "hourly_max": {
+                                                                        "type": [
+                                                                            "string",
+                                                                            "null"
+                                                                        ]
+                                                                    },
+                                                                    "description": {
+                                                                        "type": [
+                                                                            "string",
+                                                                            "null"
+                                                                        ]
+                                                                    },
+                                                                    "feature_tags": {
+                                                                        "type": [
+                                                                            "array",
+                                                                            "null"
+                                                                        ],
+                                                                        "items": {}
+                                                                    },
+                                                                    "images": {
+                                                                        "type": [
+                                                                            "array",
+                                                                            "null"
+                                                                        ],
+                                                                        "items": {}
+                                                                    },
+                                                                    "average_rating": {
+                                                                        "type": "number"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id",
+                                                                    "name",
+                                                                    "area",
+                                                                    "category",
+                                                                    "nearest_station",
+                                                                    "hourly_min",
+                                                                    "hourly_max",
+                                                                    "description",
+                                                                    "feature_tags",
+                                                                    "images",
+                                                                    "average_rating"
+                                                                ]
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                "follow_ups": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0,
+                                                    "additionalItems": false
+                                                },
+                                                "meta": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "mode": {
+                                                            "type": "string",
+                                                            "const": "finetuned"
+                                                        },
+                                                        "model": {
+                                                            "type": "string"
+                                                        },
+                                                        "input_tokens": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "integer",
+                                                                    "enum": [
+                                                                        0
+                                                                    ]
+                                                                }
+                                                            ]
+                                                        },
+                                                        "output_tokens": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "integer",
+                                                                    "enum": [
+                                                                        0
+                                                                    ]
+                                                                }
+                                                            ]
+                                                        },
+                                                        "total_tokens": {
+                                                            "type": "string"
+                                                        },
+                                                        "response_ms": {
+                                                            "type": "number"
+                                                        },
+                                                        "tool_calls": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "mode",
+                                                        "model",
+                                                        "input_tokens",
+                                                        "output_tokens",
+                                                        "total_tokens",
+                                                        "response_ms",
+                                                        "tool_calls"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "stores",
+                                                "follow_ups",
+                                                "meta"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "stores": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "follow_ups": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0,
+                                                    "additionalItems": false
+                                                },
+                                                "meta": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "mode": {},
+                                                        "model": {
+                                                            "type": "string",
+                                                            "const": "mock"
+                                                        },
+                                                        "input_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "output_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total_tokens": {
+                                                            "type": "integer"
+                                                        },
+                                                        "response_ms": {
+                                                            "type": "number"
+                                                        },
+                                                        "tool_calls": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "mode",
+                                                        "model",
+                                                        "input_tokens",
+                                                        "output_tokens",
+                                                        "total_tokens",
+                                                        "response_ms",
+                                                        "tool_calls"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "stores",
+                                                "follow_ups",
+                                                "meta"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
                         "description": "",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "\u30c1\u30e3\u30c3\u30c8\u306f\u73fe\u5728\u7121\u52b9\u3067\u3059\u3002"
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "null"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "limit_type": {
+                                                    "type": "string",
+                                                    "const": "ip_daily"
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "limit_type"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "limit_type": {
+                                                    "type": "string",
+                                                    "const": "user_monthly"
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "limit_type"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "limit_type": {
+                                                    "type": "string",
+                                                    "const": "user_daily"
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "limit_type"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "limit_type": {
+                                                    "type": "string",
+                                                    "const": "global_daily"
+                                                }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "limit_type"
+                                            ]
+                                        }
+                                    ]
                                 }
                             }
                         }
@@ -1084,7 +1643,7 @@
         "/admin/categories/{category}/image": {
             "post": {
                 "operationId": "areaCategory.uploadCategoryImage",
-                "summary": "Upload an image for a category. Stored on the public disk",
+                "summary": "Upload an image for a category. Stored on S3 (media bucket)",
                 "tags": [
                     "AreaCategory"
                 ],
@@ -3911,6 +4470,61 @@
                 }
             }
         },
+        "/admin/uploads/{kind}": {
+            "post": {
+                "operationId": "mediaUpload.store",
+                "summary": "POST /admin/uploads/{kind}\n  multipart: image=<file>\n  returns: { url: string }",
+                "tags": [
+                    "MediaUpload"
+                ],
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadMediaRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "url"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/columns": {
             "get": {
                 "operationId": "publicArticle.index",
@@ -4030,6 +4644,154 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/glossary": {
+            "get": {
+                "operationId": "publicGlossary.index",
+                "tags": [
+                    "PublicGlossary"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/glossary/{slug}": {
+            "get": {
+                "operationId": "publicGlossary.show",
+                "tags": [
+                    "PublicGlossary"
+                ],
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/landings/areas/{slug}": {
+            "get": {
+                "operationId": "publicLanding.area",
+                "tags": [
+                    "PublicLanding"
+                ],
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/landings/categories/{slug}": {
+            "get": {
+                "operationId": "publicLanding.category",
+                "tags": [
+                    "PublicLanding"
+                ],
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/landings/areas/{areaSlug}/categories/{categorySlug}": {
+            "get": {
+                "operationId": "publicLanding.areaCategory",
+                "tags": [
+                    "PublicLanding"
+                ],
+                "parameters": [
+                    {
+                        "name": "areaSlug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "categorySlug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4371,13 +5133,20 @@
                                                             },
                                                             "category": {
                                                                 "type": "string"
+                                                            },
+                                                            "image_url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
                                                             }
                                                         },
                                                         "required": [
                                                             "id",
                                                             "name",
                                                             "area",
-                                                            "category"
+                                                            "category",
+                                                            "image_url"
                                                         ]
                                                     },
                                                     "user": {
@@ -4452,10 +5221,10 @@
                     {
                         "name": "sort",
                         "in": "query",
-                        "description": "\u4f53\u9a13\u78ba\u7d04\u30d5\u30e9\u30b0\u3067\u306e\u7d5e\u308a\u8fbc\u307f\u3002\u30d5\u30ed\u30f3\u30c8\u306e\u300c\u4f53\u9a13\u78ba\u7d04\u300d\u30bf\u30d6 (BUG-E09)\n \u304c `sort=experience_guaranteed` \u3092\u6295\u3052\u308b\u304c\u3001\u3053\u308c\u306f\u4e26\u3073\u66ff\u3048\u3067\u306f\u306a\u304f\n \u7d5e\u308a\u8fbc\u307f\u3002\u30ea\u30dc\u30f3\u3092\u51fa\u3057\u3066\u3044\u308b\u6761\u4ef6 (guarantee.same_day_trial=true)\n \u3068\u4e00\u81f4\u3055\u305b\u308b\u3002",
+                        "description": "\u4f53\u9a13\u78ba\u7d04\u30d5\u30e9\u30b0\u3067\u306e\u7d5e\u308a\u8fbc\u307f\u3002\u30d5\u30ed\u30f3\u30c8\u306e\u300c\u5f53\u65e5\u4f53\u5165\u300d\u30bf\u30d6 (BUG-E09)\n \u304c `sort=experience_guaranteed` \u3092\u6295\u3052\u308b\u304c\u3001\u3053\u308c\u306f\u4e26\u3073\u66ff\u3048\u3067\u306f\u306a\u304f\n \u7d5e\u308a\u8fbc\u307f\u3002\u300c\u4f53\u9a13\u78ba\u7d04\u300d\u30ea\u30dc\u30f3\u3092\u51fa\u3057\u3066\u3044\u308b\u5e97\u8217\u3092\u62bd\u51fa\u3002\n \u30c7\u30d5\u30a9\u30eb\u30c8\u306f\u8868\u793a\u512a\u5148\u5ea6\u9806 (\u904b\u55b6\u304c priority \u3092\u4e0a\u3052\u305f\u5e97\u8217\u3092\u4e0a\u4f4d\u306b)\u3002",
                         "schema": {
                             "type": "string",
-                            "default": "newest"
+                            "default": "priority"
                         }
                     },
                     {
@@ -4481,21 +5250,21 @@
                 }
             }
         },
-        "/stores/{store}": {
+        "/stores/{slugOrId}": {
             "get": {
                 "operationId": "publicStore.show",
+                "description": "URL param \u306f slug \u307e\u305f\u306f ID\u3002\u6570\u5024\u30aa\u30f3\u30ea\u30fc\u306a\u3089 ID \u3068\u3057\u3066 fallback \u3067\u5f15\u304f\u3002\n\u65e7 ID URL \u304b\u3089\u306e\u30a2\u30af\u30bb\u30b9\u3092\u8a31\u5bb9\u3057\u3064\u3064\u3001\u65b0\u898f\u6d41\u5165\u306f slug \u30d9\u30fc\u30b9\u306b\u7d71\u4e00\u3059\u308b\u3002",
                 "summary": "Store detail",
                 "tags": [
                     "PublicStore"
                 ],
                 "parameters": [
                     {
-                        "name": "store",
+                        "name": "slugOrId",
                         "in": "path",
                         "required": true,
-                        "description": "The store ID",
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 ],
@@ -5184,30 +5953,36 @@
                                             "draft"
                                         ]
                                     },
+                                    "priority": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": -1000,
+                                        "maximum": 1000
+                                    },
+                                    "slug": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "description": "slug: lowercase / digit / hyphen \u306e\u307f\u3002store \u81ea\u8eab\u3092\u9664\u3044\u3066 unique\u3002",
+                                        "pattern": "^[a-z0-9](?:[a-z0-9\\-]*[a-z0-9])?$",
+                                        "maxLength": 160
+                                    },
+                                    "seo_meta_description": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 500
+                                    },
                                     "schedule": {
                                         "type": [
                                             "array",
                                             "null"
                                         ],
                                         "description": "JSONB columns (free-form arrays)",
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "wage": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "compensation": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
                                         "items": {
                                             "type": "string"
                                         }
@@ -5311,6 +6086,159 @@
                                             "type": "string"
                                         }
                                     },
+                                    "wage": {
+                                        "type": "object",
+                                        "description": "wage \u306f freeform array \u3060\u304c\u3001\u91d1\u984d\u30ad\u30fc\u306f number \u5f37\u5236 (string \u3067\n\u300c1,500\u5186\u300d\u304c\u6df7\u5165\u3059\u308b\u3068\u6bd4\u8f03\u30da\u30fc\u30b8\u7b49\u3067\u8a08\u7b97\u304c\u7834\u7dbb\u3059\u308b)\u3002",
+                                        "properties": {
+                                            "daily_estimate_min": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ],
+                                                "minimum": 0
+                                            },
+                                            "daily_estimate_max": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ],
+                                                "minimum": 0
+                                            },
+                                            "regular": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "min": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "max": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "unit": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "enum": [
+                                                            "hour",
+                                                            "day"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "trial": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "hourly_min": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "hourly_max": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "days": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "compensation": {
+                                        "type": "object",
+                                        "description": "compensation.back / fees \u306f {label, value:int, unit:'yen'|'percent'|'free'} \u69cb\u9020\u3002",
+                                        "properties": {
+                                            "back": {
+                                                "type": [
+                                                    "array",
+                                                    "null"
+                                                ],
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "label": {
+                                                            "type": "string",
+                                                            "maxLength": 60
+                                                        },
+                                                        "value": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ],
+                                                            "minimum": 0
+                                                        },
+                                                        "unit": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ],
+                                                            "enum": [
+                                                                "yen",
+                                                                "percent",
+                                                                "free"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "fees": {
+                                                "type": [
+                                                    "array",
+                                                    "null"
+                                                ],
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "label": {
+                                                            "type": "string",
+                                                            "maxLength": 60
+                                                        },
+                                                        "value": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ],
+                                                            "minimum": 0
+                                                        },
+                                                        "unit": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ],
+                                                            "enum": [
+                                                                "yen",
+                                                                "percent",
+                                                                "free"
+                                                            ]
+                                                        },
+                                                        "per_day": {
+                                                            "type": [
+                                                                "boolean",
+                                                                "null"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
                                     "feature_tags": {
                                         "type": [
                                             "array",
@@ -5392,13 +6320,13 @@
                                             "array",
                                             "null"
                                         ],
-                                        "description": "store_videos \u306e\u540c\u671f\u306b\u4f7f\u3046\u30da\u30a4\u30ed\u30fc\u30c9\u3002\u914d\u5217\u3067\u53d7\u3051\u53d6\u308a\u3001\ncontroller \u5074\u3067\u9806\u5e8f\u30fb\u5dee\u5206\u3092\u89e3\u6c7a\u3057\u3066 store_videos \u30c6\u30fc\u30d6\u30eb\u306b\u53cd\u6620\u3059\u308b\u3002 URL \u306f `url` validation \u3067\u306f\u306a\u304f regex \u3067\u300chttp(s) \u3082\u3057\u304f\u306f\u5185\u90e8 storage \u30d1\u30b9\u300d\n\u306e\u307f\u8a31\u5bb9\u3059\u308b\u3002`url` \u3060\u3068 `javascript:` \u3084 `data:` \u3082\u901a\u3059\u30d6\u30e9\u30a6\u30b6\u304c\u3042\u308b\u305f\u3081\u3002",
+                                        "description": "store_videos \u306e\u540c\u671f\u306b\u4f7f\u3046\u30da\u30a4\u30ed\u30fc\u30c9\u3002\u914d\u5217\u3067\u53d7\u3051\u53d6\u308a\u3001\ncontroller \u5074\u3067\u9806\u5e8f\u30fb\u5dee\u5206\u3092\u89e3\u6c7a\u3057\u3066 store_videos \u30c6\u30fc\u30d6\u30eb\u306b\u53cd\u6620\u3059\u308b\u3002 URL \u306f `url` validation \u3067\u306f\u306a\u304f regex \u3067\u300chttp(s) \u3082\u3057\u304f\u306f\u5185\u90e8 storage \u30d1\u30b9\u300d\n\u306e\u307f\u8a31\u5bb9\u3059\u308b (`url` \u3060\u3068 javascript: \u3084 data: \u3082\u901a\u3059\u30d6\u30e9\u30a6\u30b6\u304c\u3042\u308b\u305f\u3081)\u3002\nNOTE: Laravel \u306f rule \u3092\u6587\u5b57\u5217\u3067\u66f8\u304f\u3068 `|` \u3067\u5206\u5272\u3059\u308b\u306e\u3067\u3001regex \u306e\u4e2d\u306b\nalternation \u306e `|` \u3092\u542b\u3081\u308b\u3068 pattern \u304c\u58ca\u308c\u308b (\"No ending delimiter '#' found\")\u3002\nregex \u30eb\u30fc\u30eb\u306f\u5fc5\u305a array \u5f62\u5f0f\u3067\u66f8\u304f\u3002",
                                         "items": {
                                             "type": "object",
                                             "properties": {
                                                 "video_url": {
                                                     "type": "string",
-                                                    "pattern": "#^(https?://",
+                                                    "pattern": "#^(https?://|/storage/)#",
                                                     "maxLength": 500
                                                 },
                                                 "label": {
@@ -5419,7 +6347,7 @@
                                                         "string",
                                                         "null"
                                                     ],
-                                                    "pattern": "#^(https?://",
+                                                    "pattern": "#^(https?://|/storage/)#",
                                                     "maxLength": 500
                                                 }
                                             }
@@ -5436,7 +6364,7 @@
                                             "properties": {
                                                 "image_url": {
                                                     "type": "string",
-                                                    "pattern": "#^(https?://",
+                                                    "pattern": "#^(https?://|/storage/)#",
                                                     "maxLength": 500
                                                 },
                                                 "caption": {
@@ -5665,25 +6593,30 @@
                                             "draft"
                                         ]
                                     },
+                                    "priority": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": -1000,
+                                        "maximum": 1000
+                                    },
+                                    "slug": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "pattern": "^[a-z0-9](?:[a-z0-9\\-]*[a-z0-9])?$",
+                                        "maxLength": 160
+                                    },
+                                    "seo_meta_description": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 500
+                                    },
                                     "schedule": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "wage": {
-                                        "type": [
-                                            "array",
-                                            "null"
-                                        ],
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "compensation": {
                                         "type": [
                                             "array",
                                             "null"
@@ -5874,8 +6807,13 @@
                                     },
                                     "same_day_trial": {
                                         "type": [
-                                            "boolean",
+                                            "string",
                                             "null"
+                                        ],
+                                        "enum": [
+                                            "same_day",
+                                            "normal",
+                                            "none"
                                         ]
                                     },
                                     "trial_avg_hourly": {
@@ -5886,6 +6824,20 @@
                                         "maxLength": 255
                                     },
                                     "trial_hourly": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    },
+                                    "trial_hourly_min": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    },
+                                    "trial_hourly_max": {
                                         "type": [
                                             "string",
                                             "null"
@@ -5933,6 +6885,157 @@
                                         ],
                                         "items": {
                                             "type": "string"
+                                        }
+                                    },
+                                    "wage": {
+                                        "type": "object",
+                                        "properties": {
+                                            "daily_estimate_min": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ],
+                                                "minimum": 0
+                                            },
+                                            "daily_estimate_max": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ],
+                                                "minimum": 0
+                                            },
+                                            "regular": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "min": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "max": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "unit": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "enum": [
+                                                            "hour",
+                                                            "day"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "trial": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "hourly_min": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "hourly_max": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    },
+                                                    "days": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "minimum": 0
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "compensation": {
+                                        "type": "object",
+                                        "properties": {
+                                            "back": {
+                                                "type": [
+                                                    "array",
+                                                    "null"
+                                                ],
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "label": {
+                                                            "type": "string",
+                                                            "maxLength": 60
+                                                        },
+                                                        "value": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ],
+                                                            "minimum": 0
+                                                        },
+                                                        "unit": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ],
+                                                            "enum": [
+                                                                "yen",
+                                                                "percent",
+                                                                "free"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "fees": {
+                                                "type": [
+                                                    "array",
+                                                    "null"
+                                                ],
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "label": {
+                                                            "type": "string",
+                                                            "maxLength": 60
+                                                        },
+                                                        "value": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ],
+                                                            "minimum": 0
+                                                        },
+                                                        "unit": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ],
+                                                            "enum": [
+                                                                "yen",
+                                                                "percent",
+                                                                "free"
+                                                            ]
+                                                        },
+                                                        "per_day": {
+                                                            "type": [
+                                                                "boolean",
+                                                                "null"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     },
                                     "feature_tags": {
@@ -6021,7 +7124,7 @@
                                             "properties": {
                                                 "video_url": {
                                                     "type": "string",
-                                                    "pattern": "#^(https?://",
+                                                    "pattern": "#^(https?://|/storage/)#",
                                                     "maxLength": 500
                                                 },
                                                 "label": {
@@ -6042,7 +7145,7 @@
                                                         "string",
                                                         "null"
                                                     ],
-                                                    "pattern": "#^(https?://",
+                                                    "pattern": "#^(https?://|/storage/)#",
                                                     "maxLength": 500
                                                 }
                                             }
@@ -6058,7 +7161,7 @@
                                             "properties": {
                                                 "image_url": {
                                                     "type": "string",
-                                                    "pattern": "#^(https?://",
+                                                    "pattern": "#^(https?://|/storage/)#",
                                                     "maxLength": 500
                                                 },
                                                 "caption": {
@@ -6188,7 +7291,6 @@
         "/admin/stores/{store}/images": {
             "post": {
                 "operationId": "store.uploadImage",
-                "summary": "Upload an image for a store.\nAccepts multipart form data with an 'image' file field.\nStores to storage/app/public/stores/ and returns the URL",
                 "tags": [
                     "Store"
                 ],
@@ -6208,18 +7310,7 @@
                     "content": {
                         "multipart/form-data": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "image": {
-                                        "type": "string",
-                                        "format": "binary",
-                                        "contentMediaType": "application/octet-stream",
-                                        "maxLength": 5120
-                                    }
-                                },
-                                "required": [
-                                    "image"
-                                ]
+                                "$ref": "#/components/schemas/UploadStoreImageRequest"
                             }
                         }
                     }
@@ -6248,14 +7339,14 @@
                             }
                         }
                     },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -6263,7 +7354,6 @@
         "/admin/stores/{store}/images/{index}": {
             "delete": {
                 "operationId": "store.deleteImage",
-                "summary": "Delete an image from a store by index",
                 "tags": [
                     "Store"
                 ],
@@ -6292,7 +7382,10 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ],
                                     "properties": {
                                         "images": {
                                             "type": "array",
@@ -7066,13 +8159,6 @@
                             "null"
                         ]
                     },
-                    "suggest_buttons": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
                     "created_at": {
                         "type": [
                             "string",
@@ -7086,6 +8172,16 @@
                             "null"
                         ],
                         "format": "date-time"
+                    },
+                    "suggest_categories": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    },
+                    "suggest_display_mode": {
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -7095,9 +8191,10 @@
                     "system_prompt",
                     "tone",
                     "openai_finetuned_model",
-                    "suggest_buttons",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "suggest_categories",
+                    "suggest_display_mode"
                 ],
                 "title": "AiChatSetting"
             },
@@ -8430,14 +9527,56 @@
                             "friendly"
                         ]
                     },
-                    "suggest_buttons": {
+                    "suggest_display_mode": {
+                        "type": "string",
+                        "description": "off          : \u30b5\u30b8\u30a7\u30b9\u30c8\u975e\u8868\u793a\nchips_only   : L2 chip \u306e\u307f\u4e26\u3079\u308b (label/sub \u975e\u8868\u793a)\ncategorized  : L1 \u30bf\u30d6 + L2 chip",
+                        "enum": [
+                            "off",
+                            "chips_only",
+                            "categorized"
+                        ]
+                    },
+                    "suggest_categories": {
                         "type": [
                             "array",
                             "null"
                         ],
+                        "description": "suggest_categories: [{id, label, sub, chips: string[]}]",
                         "items": {
-                            "type": "string"
-                        }
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "maxLength": 32
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                },
+                                "sub": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 60
+                                },
+                                "chips": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "maxLength": 80
+                                    },
+                                    "minItems": 1,
+                                    "maxItems": 10
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "label",
+                                "chips"
+                            ]
+                        },
+                        "maxItems": 6
                     }
                 },
                 "title": "UpdateAiChatSettingRequest"
@@ -8836,6 +9975,37 @@
                     "image"
                 ],
                 "title": "UploadCategoryImageRequest"
+            },
+            "UploadMediaRequest": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "description": "5MB \u4e0a\u9650\u306f\u30d5\u30ed\u30f3\u30c8\u306e\u5727\u7e2e\u30ed\u30b8\u30c3\u30af\u6b21\u7b2c\u3067\u898b\u76f4\u3059\u3002\u3068\u308a\u3042\u3048\u305a 10MB \u306b\u3002",
+                        "maxLength": 10240
+                    }
+                },
+                "required": [
+                    "image"
+                ],
+                "title": "UploadMediaRequest"
+            },
+            "UploadStoreImageRequest": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "maxLength": 5120
+                    }
+                },
+                "required": [
+                    "image"
+                ],
+                "title": "UploadStoreImageRequest"
             },
             "User": {
                 "type": "object",

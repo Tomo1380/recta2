@@ -33,7 +33,14 @@ class AiChatTest extends TestCase
             'enabled' => true,
             'system_prompt' => 'test prompt',
             'tone' => 'friendly',
-            'suggest_buttons' => ['条件で探したい'],
+            'suggest_categories' => [
+                [
+                    'id' => 'ask',
+                    'label' => '質問する',
+                    'sub' => 'AIに直接聞いてみる',
+                    'chips' => ['未経験でも大丈夫？'],
+                ],
+            ],
         ], $overrides));
     }
 

@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { LUXE } from "~/lib/luxe-tokens";
+import { LINE_ADD_FRIEND_URL } from "~/lib/line";
 
 interface FooterProps {
   className?: string;
@@ -10,6 +11,23 @@ const footerLinks = [
   { label: "プライバシーポリシー", to: "/privacy" },
   { label: "運営会社", to: "/company" },
   { label: "お問い合わせ", to: "/contact" },
+];
+
+/**
+ * フッターのソーシャルリンク。`href` が設定されているものだけ表示される。
+ * X / Instagram / TikTok 等のアカウントを開設したら、ここに `href` 付きで
+ * 追加すれば自動的にアイコンが出る（href が無いものは描画しない）。
+ */
+const socialLinks: { label: string; href: string; icon: React.ReactNode }[] = [
+  {
+    label: "LINE公式アカウント",
+    href: LINE_ADD_FRIEND_URL,
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,.4)">
+        <path d="M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+      </svg>
+    ),
+  },
 ];
 
 const GOLD = LUXE.gold;
@@ -88,33 +106,17 @@ export default function Footer({ className }: FooterProps) {
         <div style={{ height: 1, background: "rgba(255,255,255,.08)", marginBottom: 16 }} />
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {/* LINE */}
-            <SocialIconBox>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,.4)">
-                <path d="M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-              </svg>
-            </SocialIconBox>
-            {/* X */}
-            <SocialIconBox>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,.4)">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-            </SocialIconBox>
-            {/* Instagram */}
-            <SocialIconBox>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(255,255,255,.4)"
-                strokeWidth="1.5"
+            {socialLinks.map((social) => (
+              <a
+                key={social.label}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={social.label}
               >
-                <rect x="2" y="2" width="20" height="20" rx="5" />
-                <circle cx="12" cy="12" r="5" />
-                <circle cx="17.5" cy="6.5" r="1.5" fill="rgba(255,255,255,.4)" stroke="none" />
-              </svg>
-            </SocialIconBox>
+                <SocialIconBox>{social.icon}</SocialIconBox>
+              </a>
+            ))}
           </div>
           <div className="flex items-center gap-2">
             <span

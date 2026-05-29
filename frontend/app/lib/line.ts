@@ -32,6 +32,7 @@ export type LineCtaSource =
   | "store-detail:map-card"
   | "store-detail:bottom-card"
   | "store-detail:floating"
+  | "fab:line"
   | "store-detail:compare-result"
   | "store-detail:chat-end"
   | "column:end"

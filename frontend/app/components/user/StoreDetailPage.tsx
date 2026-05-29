@@ -59,14 +59,21 @@ import { useUserAuthSafe } from "~/lib/user-auth";
 
 interface BackItem {
   label: string;
-  // バックは「500円」「10%」「5,000〜10,000円」のように単位込みで運営が
-  // 入力するため文字列で扱う。表示はそのまま render。
-  amount: string | number;
+  // 新スキーマ: value (int) + unit。
+  value?: number;
+  unit?: "yen" | "percent" | "free";
+  per_day?: boolean;
+  /** @deprecated 旧 string 形式 */
+  amount?: string | number;
 }
 
 interface FeeItem {
   label: string;
-  amount: string | number;
+  value?: number;
+  unit?: "yen" | "percent" | "free";
+  per_day?: boolean;
+  /** @deprecated 旧 string 形式 */
+  amount?: string | number;
 }
 
 interface StoreImage {
@@ -274,7 +281,7 @@ export interface StoreDetailStore {
   interview_hours: string;
   interview_start: string | null;
   interview_end: string | null;
-  /** 体入タイプ: 'same_day' (即日体入) / 'normal' (通常体入) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   feature_tags: string[];
   description: string;
@@ -413,6 +420,24 @@ function toAmountString(v: number | string | null | undefined): string | null {
   // 数字のみ "0" は未入力扱い
   if (/^0+$/.test(s)) return null;
   return s;
+}
+
+/**
+ * back/fee items の {value, unit} を表示用文字列に変換。
+ * 旧 amount (string|number) もフォールバックで処理。
+ */
+function formatAmountItem(item: { value?: number; unit?: string; per_day?: boolean; amount?: string | number }): string {
+  if (item.unit === "free" || (item.unit === "yen" && item.value === 0)) return "無料";
+  if (typeof item.value === "number") {
+    const text = item.unit === "percent" ? `${item.value}%` : `¥${item.value.toLocaleString()}`;
+    return item.per_day ? `${text}/日` : text;
+  }
+  // 旧データフォールバック
+  if (item.amount != null) {
+    if (typeof item.amount === "number") return `¥${item.amount.toLocaleString()}`;
+    return String(item.amount);
+  }
+  return "—";
 }
 
 function formatCurrency(amount: number | string): string {
@@ -866,7 +891,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                         className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
                         style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
                       >
-                        即日体入OK
+                        体験確約OK
                       </span>
                     );
                   }
@@ -876,7 +901,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                         className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
                         style={{ border: "1px solid rgba(212,175,55,0.4)", color: "rgba(168,130,20,0.9)", background: "rgba(212,175,55,0.06)" }}
                       >
-                        通常体入あり
+                        体入可能あり
                       </span>
                     );
                   }
@@ -1047,7 +1072,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     <ul className="space-y-0.5">
                       {(store.back_items ?? []).map((item) => (
                         <li key={item.label} className="text-sm">
-                          {item.label}: {formatCurrency(item.amount)}
+                          {item.label}: {formatAmountItem(item)}
                         </li>
                       ))}
                     </ul>
@@ -1061,7 +1086,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     <ul className="space-y-0.5">
                       {(store.fee_items ?? []).map((item) => (
                         <li key={item.label} className="text-sm">
-                          {item.label}: {formatCurrency(item.amount)}
+                          {item.label}: {formatAmountItem(item)}
                         </li>
                       ))}
                     </ul>
@@ -1518,58 +1543,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
 
       </div>
 
-      {/* Floating LINE 相談 — 右下固定。プレビュー時は非表示。 */}
-      {!previewData && <LineFloatingButton />}
     </>
-  );
-}
-
-// Floating LINE 相談 button — 画面右下コーナーにアタッチ。
-// 「浮いてる」ではなく「画面端から生えている」見せ方 (Intercom / Zendesk 系)。
-// 右端と下端はピッタリ画面に張り付き、左上角だけ 16px R で「コーナーから
-// 切り取られた」シルエットを作る。ホバーは -translate-y ではなく内側の
-// ゴールド輪郭が明るくなる微小フィードバックで「壁から離さない」。
-function LineFloatingButton() {
-  return (
-    <button
-      type="button"
-      onClick={() => openLineFriendAdd("store-detail:floating")}
-      aria-label="LINE で相談"
-      className="group fixed z-40 inline-flex items-center gap-2.5 px-4 py-3 text-[13px] font-bold text-white transition-all active:scale-[0.98]"
-      style={{
-        right: 0,
-        bottom: 0,
-        // 端は直線、左上角だけ大きめに丸める。コーナーから「切り出された」シルエット。
-        borderTopLeftRadius: 18,
-        borderTopRightRadius: 0,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        paddingRight: "calc(env(safe-area-inset-right, 0px) + 16px)",
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
-        background: "linear-gradient(135deg, #1b2528 0%, #0f1618 100%)",
-        // 接合辺 (右辺・下辺) には border を出さず、外側を向く左辺・上辺だけに
-        // ゴールドのヘアラインを出して「壁から生えてる」シルエットを際立たせる。
-        borderTop: "1px solid rgba(212,175,55,0.55)",
-        borderLeft: "1px solid rgba(212,175,55,0.55)",
-        // 影は左上方向に出す (右下は画面端なので影が出ても切れる)。
-        boxShadow:
-          "-6px -6px 20px rgba(0,0,0,0.18), -1px -1px 0 rgba(212,175,55,0.08), inset 1px 1px 0 rgba(212,175,55,0.12)",
-        fontFamily: "'Noto Sans JP', sans-serif",
-        letterSpacing: "0.02em",
-      }}
-    >
-      {/* LINE アイコン枠 — LINE 緑バッジ */}
-      <span
-        className="relative inline-flex size-7 shrink-0 items-center justify-center rounded-full"
-        style={{
-          background: "linear-gradient(135deg, #06D660 0%, #06C755 100%)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
-        }}
-      >
-        <LineIcon size={16} fill="white" />
-      </span>
-      <span className="whitespace-nowrap">LINEで相談</span>
-    </button>
   );
 }
 
@@ -1826,7 +1800,7 @@ function LuxeHero({
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              即日体入OK
+              体験確約OK
             </span>
           )}
           {trialType === "normal" && (
@@ -3352,21 +3326,20 @@ function SalarySimulatorSection({
   const baseSales = 200_000;
   const baseNominations = 0;
 
-  // back_rate: infer from store back_items if any are expressed as percentage
-  // values (≤ 100), otherwise a sensible 30%.
-  // amount は string (例: "10%") か number ("500") のどちらもあり得る。
+  // back_rate: 新スキーマで unit="percent" の項目があればそれを採用、
+  // なければ旧 amount=string "10%" もフォールバック、最後はデフォ 30%。
   const inferredBackRate = (() => {
     for (const b of backItems ?? []) {
+      if (b.unit === "percent" && typeof b.value === "number" && b.value > 0 && b.value <= 100) {
+        return b.value / 100;
+      }
+      // 旧データ救済 (amount=string)
       const raw = typeof b.amount === "number" ? String(b.amount) : b.amount;
-      // "10%" "15 %" のようなパターンは％として採用
       const pct = /^\s*(\d+(?:\.\d+)?)\s*%\s*$/.exec(raw ?? "");
       if (pct) {
         const n = Number(pct[1]);
         if (n > 0 && n <= 100) return n / 100;
       }
-      // 数値のみで 0 < n ≤ 100 のときも %（旧データ互換）として扱う
-      const n = Number(raw);
-      if (Number.isFinite(n) && n > 0 && n <= 100) return n / 100;
     }
     return 0.3;
   })();

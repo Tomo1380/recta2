@@ -13,7 +13,6 @@ import {
   Legend,
 } from "recharts";
 import {
-  GripVertical,
   Plus,
   X,
   Save,
@@ -26,10 +25,15 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AiChatSetting, AiChatStats } from "~/lib/types";
-import AiChatPanel from "~/components/user/AiChatPanel";
+import AiChatPanel, {
+  type SuggestCategory,
+  type SuggestDisplayMode,
+} from "~/components/user/AiChatPanel";
 import { FineTuningQaPage } from "./FineTuningQaPage";
 import { FineTuningQaEditPage } from "./FineTuningQaEditPage";
 
@@ -213,37 +217,101 @@ export function AIChatSettingsPage() {
   };
 
   const [suggestSubTab, setSuggestSubTab] = useState<PageKey>("top");
-  const [suggestButtons, setSuggestButtons] = useState<
-    Record<PageKey, string[]>
+  const [suggestCategories, setSuggestCategories] = useState<
+    Record<PageKey, SuggestCategory[]>
   >({
     top: [],
     list: [],
     detail: [],
   });
+  const [suggestDisplayModes, setSuggestDisplayModes] = useState<
+    Record<PageKey, SuggestDisplayMode>
+  >({
+    top: "categorized",
+    list: "categorized",
+    detail: "categorized",
+  });
 
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-
-  const updateButtons = (page: PageKey, newButtons: string[]) => {
-    setSuggestButtons((prev) => ({ ...prev, [page]: newButtons }));
+  const updateDisplayMode = (page: PageKey, mode: SuggestDisplayMode) => {
+    setSuggestDisplayModes((prev) => ({ ...prev, [page]: mode }));
   };
 
-  const handleDragStart = (idx: number) => {
-    setDragIdx(idx);
+  const updateCategories = (
+    page: PageKey,
+    next: SuggestCategory[],
+  ) => {
+    setSuggestCategories((prev) => ({ ...prev, [page]: next }));
   };
 
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) return;
-    const page = suggestSubTab;
-    const items = [...suggestButtons[page]];
-    const [removed] = items.splice(dragIdx, 1);
-    items.splice(idx, 0, removed);
-    updateButtons(page, items);
-    setDragIdx(idx);
+  const updateCategoryAt = (
+    page: PageKey,
+    idx: number,
+    patch: Partial<SuggestCategory>,
+  ) => {
+    const cats = suggestCategories[page];
+    const next = cats.map((c, i) => (i === idx ? { ...c, ...patch } : c));
+    updateCategories(page, next);
   };
 
-  const handleDragEnd = () => {
-    setDragIdx(null);
+  // Generate a stable-ish category id from current state. Backend caps id at
+  // 32 chars; we use a short prefix + timestamp tail.
+  const newCategoryId = () =>
+    `cat${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+
+  const addCategory = (page: PageKey) => {
+    const cats = suggestCategories[page];
+    if (cats.length >= 6) return; // backend max:6
+    updateCategories(page, [
+      ...cats,
+      {
+        id: newCategoryId(),
+        label: "新しいカテゴリ",
+        sub: "",
+        chips: [""],
+      },
+    ]);
+  };
+
+  const removeCategoryAt = (page: PageKey, idx: number) => {
+    const cats = suggestCategories[page];
+    updateCategories(
+      page,
+      cats.filter((_, i) => i !== idx),
+    );
+  };
+
+  const moveCategory = (page: PageKey, idx: number, dir: -1 | 1) => {
+    const cats = [...suggestCategories[page]];
+    const target = idx + dir;
+    if (target < 0 || target >= cats.length) return;
+    [cats[idx], cats[target]] = [cats[target], cats[idx]];
+    updateCategories(page, cats);
+  };
+
+  const addChip = (page: PageKey, catIdx: number) => {
+    const cats = suggestCategories[page];
+    const cat = cats[catIdx];
+    if (!cat || cat.chips.length >= 10) return; // backend max:10
+    updateCategoryAt(page, catIdx, { chips: [...cat.chips, ""] });
+  };
+
+  const updateChip = (
+    page: PageKey,
+    catIdx: number,
+    chipIdx: number,
+    value: string,
+  ) => {
+    const cat = suggestCategories[page][catIdx];
+    if (!cat) return;
+    const chips = cat.chips.map((c, i) => (i === chipIdx ? value : c));
+    updateCategoryAt(page, catIdx, { chips });
+  };
+
+  const removeChip = (page: PageKey, catIdx: number, chipIdx: number) => {
+    const cat = suggestCategories[page][catIdx];
+    if (!cat) return;
+    const chips = cat.chips.filter((_, i) => i !== chipIdx);
+    updateCategoryAt(page, catIdx, { chips });
   };
 
   // Limits state (connected to API)
@@ -306,7 +374,7 @@ export function AIChatSettingsPage() {
   } | null>(null);
 
   const currentPrompt = promptConfigs[promptSubTab];
-  const currentButtons = suggestButtons[suggestSubTab];
+  const currentCategories = suggestCategories[suggestSubTab];
 
   // --- Fetch settings on mount ---
   const fetchSettings = useCallback(async () => {
@@ -322,10 +390,15 @@ export function AIChatSettingsPage() {
         list: { id: 0, enabled: true, prompt: "", tone: "カジュアル" },
         detail: { id: 0, enabled: true, prompt: "", tone: "フォーマル" },
       };
-      const newButtons: Record<PageKey, string[]> = {
+      const newCategories: Record<PageKey, SuggestCategory[]> = {
         top: [],
         list: [],
         detail: [],
+      };
+      const newModes: Record<PageKey, SuggestDisplayMode> = {
+        top: "categorized",
+        list: "categorized",
+        detail: "categorized",
       };
 
       for (const s of settings) {
@@ -336,11 +409,21 @@ export function AIChatSettingsPage() {
           prompt: s.system_prompt ?? "",
           tone: TONE_TO_LABEL[s.tone as keyof typeof TONE_TO_LABEL] ?? "フレンドリー",
         };
-        newButtons[key] = (s.suggest_buttons ?? []) as string[];
+        // Backend types suggest_categories as unknown[] (jsonb). At runtime
+        // it is always [{id,label,sub,chips:string[]}] when set via this
+        // same admin UI / seeder.
+        newCategories[key] = (s.suggest_categories ?? []) as SuggestCategory[];
+
+        const raw = (s as { suggest_display_mode?: string }).suggest_display_mode;
+        newModes[key] =
+          raw === "off" || raw === "chips_only" || raw === "categorized"
+            ? raw
+            : "categorized";
       }
 
       setPromptConfigs(newConfigs);
-      setSuggestButtons(newButtons);
+      setSuggestCategories(newCategories);
+      setSuggestDisplayModes(newModes);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "設定の取得に失敗しました";
@@ -596,15 +679,30 @@ export function AIChatSettingsPage() {
     }
   };
 
-  // --- Save suggest buttons ---
-  const saveSuggestButtons = async (page: PageKey) => {
+  // --- Save suggest categories ---
+  const saveSuggestCategories = async (page: PageKey) => {
     const config = promptConfigs[page];
     if (!config.id) return;
+
+    // Strip empty chips before POSTing — the backend validates
+    // chips.* required|string, so blank rows would 422.
+    const cleaned: SuggestCategory[] = suggestCategories[page]
+      .map((cat) => ({
+        ...cat,
+        sub: cat.sub?.trim() ? cat.sub.trim() : null,
+        chips: cat.chips.map((c) => c.trim()).filter((c) => c.length > 0),
+      }))
+      .filter((cat) => cat.label.trim() && cat.chips.length > 0);
+
     try {
       setSaving(true);
       await api.put(`/admin/ai-chat/settings/${config.id}`, {
-        suggest_buttons: suggestButtons[page],
+        suggest_categories: cleaned,
+        suggest_display_mode: suggestDisplayModes[page],
       });
+      // Reflect the cleaned shape locally so subsequent edits don't keep
+      // empty rows around.
+      updateCategories(page, cleaned);
       showToast("保存しました");
     } catch (err) {
       const message = err instanceof Error ? err.message : "保存に失敗しました";
@@ -829,9 +927,13 @@ export function AIChatSettingsPage() {
                   <AiChatPanel
                     pageType={promptSubTab}
                     preview
-                    previewSuggestButtons={suggestButtons[promptSubTab].filter(
-                      (b) => b.trim(),
-                    )}
+                    previewSuggestCategories={suggestCategories[promptSubTab]
+                      .map((c) => ({
+                        ...c,
+                        chips: c.chips.filter((chip) => chip.trim()),
+                      }))
+                      .filter((c) => c.label.trim() && c.chips.length > 0)}
+                    previewSuggestDisplayMode={suggestDisplayModes[promptSubTab]}
                     className="max-w-sm mx-auto"
                   />
                 </div>
@@ -992,66 +1094,249 @@ export function AIChatSettingsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[13px]">サジェストボタン</label>
+                  <label className="block text-[13px]">表示モード</label>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    ドラッグで並び替え可能
+                    このページのチャットでサジェスト UI をどう出すか
                   </p>
+                  <div className="mt-2 flex gap-2">
+                    {(
+                      [
+                        {
+                          value: "categorized",
+                          label: "タブあり",
+                          desc: "L1 タブ + L2 チップ",
+                        },
+                        {
+                          value: "chips_only",
+                          label: "チップのみ",
+                          desc: "タブを隠してチップだけ並べる",
+                        },
+                        {
+                          value: "off",
+                          label: "非表示",
+                          desc: "サジェストを出さない",
+                        },
+                      ] as const
+                    ).map((opt) => {
+                      const active =
+                        suggestDisplayModes[suggestSubTab] === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() =>
+                            updateDisplayMode(suggestSubTab, opt.value)
+                          }
+                          className={`flex-1 px-3 py-2 rounded-lg border text-[12px] text-left transition ${
+                            active
+                              ? "border-indigo-400 bg-indigo-50 text-indigo-900"
+                              : "border-border bg-white text-foreground hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="font-medium">{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {opt.desc}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  {currentButtons.map((btn, i) => (
+                {suggestDisplayModes[suggestSubTab] !== "off" && (
+                  <div>
+                    <label className="block text-[13px]">
+                      サジェストカテゴリ
+                    </label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {suggestDisplayModes[suggestSubTab] === "categorized"
+                        ? "L1: カテゴリタブ(label/sub) → L2: 質問チップ。最大 6 カテゴリ・各 10 チップまで。"
+                        : "チップのみモード。label/sub はユーザー画面に表示されません (将来タブありに戻す場合のために保持してください)。"}
+                    </p>
+                  </div>
+                )}
+
+                {suggestDisplayModes[suggestSubTab] !== "off" && (
+                <div className="space-y-3">
+                  {currentCategories.map((cat, catIdx) => (
                     <div
-                      key={`${suggestSubTab}-${i}`}
-                      draggable
-                      onDragStart={() => handleDragStart(i)}
-                      onDragOver={(e) => handleDragOver(e, i)}
-                      onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-2 group ${
-                        dragIdx === i ? "opacity-50" : ""
-                      }`}
+                      key={`${suggestSubTab}-${catIdx}`}
+                      className="border border-border rounded-lg bg-white"
                     >
-                      <div className="cursor-grab active:cursor-grabbing text-stone-300 hover:text-stone-500 p-0.5">
-                        <GripVertical className="w-3.5 h-3.5" />
+                      {/* Category header (label / sub / move / delete) */}
+                      <div className="flex items-center gap-2 p-3 border-b border-border">
+                        <div className="flex flex-col gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              moveCategory(suggestSubTab, catIdx, -1)
+                            }
+                            disabled={catIdx === 0}
+                            className="text-stone-300 hover:text-stone-600 disabled:opacity-30"
+                            aria-label="上へ"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              moveCategory(suggestSubTab, catIdx, 1)
+                            }
+                            disabled={catIdx === currentCategories.length - 1}
+                            className="text-stone-300 hover:text-stone-600 disabled:opacity-30"
+                            aria-label="下へ"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] text-muted-foreground mb-0.5">
+                              タブ表示名 (label)
+                              {suggestDisplayModes[suggestSubTab] ===
+                                "chips_only" && (
+                                <span className="ml-1 text-[9px] text-muted-foreground">
+                                  (非表示モード中)
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              value={cat.label}
+                              onChange={(e) =>
+                                updateCategoryAt(suggestSubTab, catIdx, {
+                                  label: e.target.value,
+                                })
+                              }
+                              maxLength={40}
+                              placeholder="例: 質問する"
+                              className={`w-full px-3 py-1.5 rounded-lg border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 ${
+                                suggestDisplayModes[suggestSubTab] ===
+                                "chips_only"
+                                  ? "bg-muted/40 text-muted-foreground"
+                                  : "bg-white"
+                              }`}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-muted-foreground mb-0.5">
+                              サブテキスト (sub) — 任意
+                              {suggestDisplayModes[suggestSubTab] ===
+                                "chips_only" && (
+                                <span className="ml-1 text-[9px] text-muted-foreground">
+                                  (非表示モード中)
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              value={cat.sub ?? ""}
+                              onChange={(e) =>
+                                updateCategoryAt(suggestSubTab, catIdx, {
+                                  sub: e.target.value,
+                                })
+                              }
+                              maxLength={60}
+                              placeholder="例: AIに直接聞いてみる"
+                              className={`w-full px-3 py-1.5 rounded-lg border border-border text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 ${
+                                suggestDisplayModes[suggestSubTab] ===
+                                "chips_only"
+                                  ? "bg-muted/40 text-muted-foreground"
+                                  : "bg-white"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeCategoryAt(suggestSubTab, catIdx)
+                          }
+                          className="p-1 text-stone-300 hover:text-red-500"
+                          aria-label="カテゴリを削除"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <span className="text-[11px] text-muted-foreground w-4 text-center shrink-0">
-                        {i + 1}
-                      </span>
-                      <input
-                        value={btn}
-                        onChange={(e) => {
-                          const updated = [...currentButtons];
-                          updated[i] = e.target.value;
-                          updateButtons(suggestSubTab, updated);
-                        }}
-                        className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
-                      />
-                      <button
-                        onClick={() =>
-                          updateButtons(
-                            suggestSubTab,
-                            currentButtons.filter((_, idx) => idx !== i),
-                          )
-                        }
-                        className="p-1 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+
+                      {/* Chips list */}
+                      <div className="p-3 space-y-1.5">
+                        <p className="text-[10px] text-muted-foreground">
+                          質問チップ ({cat.chips.length}/10)
+                        </p>
+                        {cat.chips.map((chip, chipIdx) => (
+                          <div
+                            key={`${suggestSubTab}-${catIdx}-${chipIdx}`}
+                            className="flex items-center gap-2 group"
+                          >
+                            <span className="text-[11px] text-muted-foreground w-4 text-center shrink-0">
+                              {chipIdx + 1}
+                            </span>
+                            <input
+                              value={chip}
+                              onChange={(e) =>
+                                updateChip(
+                                  suggestSubTab,
+                                  catIdx,
+                                  chipIdx,
+                                  e.target.value,
+                                )
+                              }
+                              maxLength={80}
+                              placeholder="例: 未経験でも大丈夫？"
+                              className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeChip(suggestSubTab, catIdx, chipIdx)
+                              }
+                              className="p-1 text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                              aria-label="チップを削除"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addChip(suggestSubTab, catIdx)}
+                          disabled={cat.chips.length >= 10}
+                          className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition disabled:opacity-40"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          チップを追加
+                        </button>
+                      </div>
                     </div>
                   ))}
+
+                  {currentCategories.length === 0 && (
+                    <p className="text-[12px] text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
+                      まだカテゴリが登録されていません。「カテゴリを追加」から作成してください。
+                    </p>
+                  )}
                 </div>
+                )}
+
+                {suggestDisplayModes[suggestSubTab] !== "off" && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => addCategory(suggestSubTab)}
+                    disabled={currentCategories.length >= 6}
+                    className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground transition disabled:opacity-40"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    カテゴリを追加
+                  </button>
+                  <span className="text-[11px] text-muted-foreground">
+                    ({currentCategories.length}/6)
+                  </span>
+                </div>
+                )}
 
                 <button
-                  onClick={() =>
-                    updateButtons(suggestSubTab, [...currentButtons, ""])
-                  }
-                  className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  追加
-                </button>
-
-                <button
-                  onClick={() => saveSuggestButtons(suggestSubTab)}
+                  type="button"
+                  onClick={() => saveSuggestCategories(suggestSubTab)}
                   disabled={saving}
                   className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
                 >
@@ -1067,7 +1352,13 @@ export function AIChatSettingsPage() {
                 <AiChatPanel
                   pageType={suggestSubTab}
                   preview
-                  previewSuggestButtons={currentButtons.filter((b) => b.trim())}
+                  previewSuggestCategories={currentCategories
+                    .map((c) => ({
+                      ...c,
+                      chips: c.chips.filter((chip) => chip.trim()),
+                    }))
+                    .filter((c) => c.label.trim() && c.chips.length > 0)}
+                  previewSuggestDisplayMode={suggestDisplayModes[suggestSubTab]}
                   className="max-w-sm mx-auto"
                 />
               </div>
