@@ -48,6 +48,19 @@ export async function loader({ params }: LoaderFunctionArgs): Promise<StoreDetai
 }
 
 /**
+ * 店舗画像の先頭 URL を取り出す。API/Resource により images は
+ * 文字列配列 (["https://.../x.jpg"]) または {url} 配列のどちらでも来うるため、
+ * 両形に対応する。OGP/Twitter カードや preload に使う。
+ */
+function firstStoreImage(store: unknown): string | null {
+  const imgs = (store as { images?: Array<string | { url?: string }> | null } | undefined)
+    ?.images;
+  const first = imgs?.[0];
+  if (!first) return null;
+  return typeof first === "string" ? first : (first.url ?? null);
+}
+
+/**
  * Hero 画像 (1 枚目) を rel=preload で SSR レスポンスに含めることで LCP を改善。
  * 同じ画像は LuxeHero でも表示されるが、preload で並列ダウンロードが先行する。
  */
@@ -56,8 +69,7 @@ export const links: LinksFunction = ({
 }: {
   data?: StoreDetailResponse | null;
 } = {}) => {
-  const hero = (data?.store as { images?: { url: string }[] | null } | undefined)
-    ?.images?.[0]?.url;
+  const hero = firstStoreImage(data?.store);
   if (!hero) return [];
   return [
     {
@@ -93,7 +105,7 @@ export function meta({
   const desc =
     (store as { meta_description?: string | null }).meta_description?.trim() ||
     fallbackDesc;
-  const ogImage = (store as { images?: { url: string }[] | null }).images?.[0]?.url ?? null;
+  const ogImage = firstStoreImage(store);
   return buildMetaTags({
     title,
     description: desc,
@@ -114,8 +126,7 @@ export default function StoreDetail() {
   let schemaJson: string | null = null;
   if (store) {
     const canonical = absoluteUrl(`/stores/${store.slug ?? store.id}`);
-    const image =
-      (store as { images?: { url: string }[] | null }).images?.[0]?.url ?? null;
+    const image = firstStoreImage(store);
     const description =
       ((store as { meta_description?: string | null }).meta_description?.trim() as string | undefined) ||
       ((store as { features_text?: string | null }).features_text?.trim() as string | undefined) ||
