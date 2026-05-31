@@ -24,6 +24,14 @@ export const SITE_URL: string = (() => {
   return raw.replace(/\/$/, "");
 })();
 
+// VITE_NOINDEX=true でビルドすると全ページを noindex,nofollow にする。
+// dev/staging 環境を本番ドメインと別に立てたとき、検索インデックスの重複を
+// 防ぐために dev 側ビルドでだけ true にする想定 (本番ビルドでは未設定=false)。
+export const SITE_NOINDEX: boolean = (() => {
+  const env = (import.meta as { env?: { VITE_NOINDEX?: string } }).env;
+  return env?.VITE_NOINDEX?.trim().toLowerCase() === "true";
+})();
+
 export const SITE_NAME = "Recta";
 // default OG 画像: 既存のヒーロー画像を流用 (1200×630 の専用 OG 画像は後日差し替え)。
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/hero-top.jpg`;
@@ -112,7 +120,7 @@ export function buildMetaTags(input: MetaTagsInput): MetaTag[] {
     { name: "twitter:image", content: ogImage },
   ];
 
-  if (noindex) {
+  if (noindex || SITE_NOINDEX) {
     tags.push({ name: "robots", content: "noindex,nofollow" });
   }
 

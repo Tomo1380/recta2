@@ -32,6 +32,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4055
+      # SSR loader が内部ネットワーク経由で API へ到達するための絶対URL。
+      # 未設定だと各 route の resolveApiBase が prod 分岐で空文字/throw になり、
+      # 店舗詳細・コラム・用語集・LP の OGP/meta が SSR されない。
+      - INTERNAL_API_BASE_URL=http://nginx:80
     networks:
       - recta2
 

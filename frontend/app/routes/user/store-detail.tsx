@@ -20,9 +20,8 @@ function resolveApiBase(): string {
   if (typeof window !== "undefined") return "";
   const fromEnv = process.env.INTERNAL_API_BASE_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  if (process.env.NODE_ENV === "production") {
-    return "";
-  }
+  // server-side は内部ネットワーク経由で nginx に到達する (相対URLだと
+  // node の fetch が失敗し、SSR meta/OGP が出ない)。env 未設定時の保険。
   return "http://nginx:80";
 }
 
@@ -77,7 +76,7 @@ export function meta({
   params,
 }: {
   data: StoreDetailResponse | null | undefined;
-  params: { id?: string };
+  params: { slugOrId?: string };
 }) {
   const store = data?.store;
   if (!store) {
@@ -85,7 +84,7 @@ export function meta({
       title: "店舗詳細 - Recta",
       description:
         "Recta はキャバクラ・ラウンジ・クラブの求人情報をまとめた、安心して相談できるマッチングサービスです。",
-      path: `/stores/${params.id ?? ""}`,
+      path: `/stores/${params.slugOrId ?? ""}`,
     });
   }
   const area = store.area ? `（${store.area}）` : "";
