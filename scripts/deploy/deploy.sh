@@ -40,6 +40,14 @@ fi
 
 docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
+# nginx の default.conf は volume mount。`up -d` は mount ファイルの変更だけでは
+# コンテナを作り直さないため、CSP / セキュリティヘッダ等の設定変更が反映されない。
+# 設定を確実に効かせるため毎回 reload する (graceful, ダウンタイム無し)。
+# reload が失敗 (起動直後等) したら restart にフォールバック。
+echo "=== Reloading nginx (mounted config) ==="
+docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload \
+  || docker compose -f docker-compose.prod.yml restart nginx
+
 echo "=== Running migrations ==="
 docker compose -f docker-compose.prod.yml exec -T laravel php artisan migrate --force
 
