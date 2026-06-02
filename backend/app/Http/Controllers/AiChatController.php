@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ChatRequest;
 use App\Models\AiChatLimit;
 use App\Models\AiChatLog;
 use App\Models\AiChatSetting;
@@ -63,17 +64,8 @@ class AiChatController extends Controller
      * Handle chat message — supports agent mode (Function Calling) and
      * fine-tuned mode, selectable via `mode` parameter.
      */
-    public function chat(Request $request): JsonResponse
+    public function chat(ChatRequest $request): JsonResponse
     {
-        $request->validate([
-            'message' => 'required|string|max:1000',
-            'page_type' => 'required|in:top,list,detail',
-            'store_id' => 'nullable|integer',
-            'history' => 'nullable|array|max:20',
-            'mode' => 'nullable|in:agent,finetuned',
-            'user_area' => 'nullable|string|max:100',
-        ]);
-
         $ip = $request->ip();
         $pageType = $request->input('page_type');
         $userMessage = $request->input('message');
@@ -101,8 +93,19 @@ class AiChatController extends Controller
 
         $apiKey = config('services.gemini.api_key');
         if (!$apiKey) {
-            // Dev fallback — mock response when API key is not configured
-            \Log::warning('AiChat: GEMINI_API_KEY not set, returning mock response');
+            // 本番で API キー未設定はミスコンフィグ。モックを出すと利用者に偽の
+            // 案内をしてしまうので、混雑時と同じ丁寧なエラーを返して気付けるよう
+            // error ログを残す。dev のみモックで UI を動かせるようにする。
+            if (app()->environment('production')) {
+                \Log::error('AiChat: GEMINI_API_KEY not set in production');
+                return response()->json([
+                    'message' => 'ただいまAIチャットをご利用いただけません。お手数ですがLINEから直接ご相談ください。',
+                    'stores' => [],
+                    'follow_ups' => [],
+                    'meta' => ['mode' => $mode, 'model' => 'unavailable'],
+                ], 503);
+            }
+            \Log::warning('AiChat: GEMINI_API_KEY not set, returning mock response (non-production)');
             return $this->mockResponse($userMessage, $pageType, $storeId, $mode);
         }
 
@@ -267,8 +270,45 @@ class AiChatController extends Controller
             $contents[] = ['role' => 'user', 'parts' => $functionResponseParts];
         }
 
-        // Max iterations reached — return whatever we have
-        throw new \Exception('Agent loop exceeded max iterations');
+        // Max iterations reached. 以前はここで例外を投げ、収集済みの店舗候補も
+        // 含めて汎用エラーにフォールバックしていた。せっかく検索できた店舗を捨てて
+        // しまうのは UX/誘導の観点で損なので、集めた店舗を活かした正常応答を返す
+        // (これは 200 完了扱いなので、フロントの LINE 誘導 CTA も表示される)。
+        \Log::info('AiChat: agent loop hit max iterations, returning collected stores', [
+            'tool_calls' => count($toolCalls),
+        ]);
+
+        $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls);
+        $fallbackText = !empty($recommendedStores)
+            ? 'ご希望に近いお店をいくつかご紹介します。気になるお店があれば、LINEから気軽にご相談くださいね。'
+            : 'うまくお探しできませんでした。条件を変えて試すか、LINEから直接ご相談ください。スタッフが一緒にお店探しをお手伝いします。';
+        $elapsed = round((microtime(true) - $startTime) * 1000);
+
+        AiChatLog::create([
+            'user_id' => $userId,
+            'ip_address' => $ip,
+            'page_type' => $pageType,
+            'user_message' => $userMessage,
+            'ai_response' => $fallbackText,
+            'input_tokens' => $totalInputTokens,
+            'output_tokens' => $totalOutputTokens,
+            'mode' => 'agent',
+        ]);
+
+        return response()->json([
+            'message' => $fallbackText,
+            'stores' => $recommendedStores,
+            'follow_ups' => [],
+            'meta' => [
+                'mode' => 'agent',
+                'input_tokens' => $totalInputTokens,
+                'output_tokens' => $totalOutputTokens,
+                'total_tokens' => $totalInputTokens + $totalOutputTokens,
+                'response_ms' => $elapsed,
+                'tool_calls' => count($toolCalls),
+                'max_iterations_reached' => true,
+            ],
+        ]);
     }
 
     /**
@@ -748,17 +788,8 @@ class AiChatController extends Controller
     // 代わりにツール段階ごとに status を、最終回答は短いチャンクに分けて
     // **擬似タイプライター** として配信する。これでも体感速度は大きく向上する。
 
-    public function chatStream(Request $request)
+    public function chatStream(ChatRequest $request)
     {
-        $request->validate([
-            'message' => 'required|string|max:1000',
-            'page_type' => 'required|in:top,list,detail',
-            'store_id' => 'nullable|integer',
-            'history' => 'nullable|array|max:20',
-            'mode' => 'nullable|in:agent,finetuned',
-            'user_area' => 'nullable|string|max:100',
-        ]);
-
         $ip = $request->ip();
         $pageType = $request->input('page_type');
         $userMessage = $request->input('message');
@@ -810,6 +841,11 @@ class AiChatController extends Controller
 
                 $apiKey = config('services.gemini.api_key');
                 if (!$apiKey) {
+                    if (app()->environment('production')) {
+                        \Log::error('AiChat(stream): GEMINI_API_KEY not set in production');
+                        $send('error', ['message' => 'ただいまAIチャットをご利用いただけません。お手数ですがLINEから直接ご相談ください。']);
+                        return;
+                    }
                     // Dev fallback — stream a mock so the UI can be exercised offline.
                     $self->streamMock($send, $userMessage, $pageType, $storeId, $mode);
                     return;
@@ -888,6 +924,12 @@ class AiChatController extends Controller
         $send('status', ['label' => 'AIが考えています…']);
 
         for ($i = 0; $i < $maxIterations; $i++) {
+            // クライアントが離脱していれば、これ以上 Gemini を呼ばずに打ち切る
+            // (PHP-FPM ワーカー占有・トークン浪費を防ぐ)。
+            if (connection_aborted()) {
+                return;
+            }
+
             $payload = [
                 'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
                 'contents' => $contents,
@@ -967,7 +1009,43 @@ class AiChatController extends Controller
             $contents[] = ['role' => 'user', 'parts' => $functionResponseParts];
         }
 
-        throw new \Exception('Agent loop exceeded max iterations');
+        // Max iterations reached. 非ストリーム版と同様、収集済みの店舗候補を捨てず、
+        // それらを活かした正常な done を返す (LINE 誘導 CTA も表示される)。
+        \Log::info('AiChat(stream): agent loop hit max iterations, returning collected stores', [
+            'tool_calls' => count($toolCalls),
+        ]);
+
+        $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls);
+        $fallbackText = !empty($recommendedStores)
+            ? 'ご希望に近いお店をいくつかご紹介します。気になるお店があれば、LINEから気軽にご相談くださいね。'
+            : 'うまくお探しできませんでした。条件を変えて試すか、LINEから直接ご相談ください。スタッフが一緒にお店探しをお手伝いします。';
+        $elapsed = round((microtime(true) - $startTime) * 1000);
+
+        AiChatLog::create([
+            'user_id' => $userId,
+            'ip_address' => $ip,
+            'page_type' => $pageType,
+            'user_message' => $userMessage,
+            'ai_response' => $fallbackText,
+            'input_tokens' => $totalInputTokens,
+            'output_tokens' => $totalOutputTokens,
+            'mode' => 'agent',
+        ]);
+
+        $this->streamTextAsTypewriter($send, $fallbackText);
+        $send('done', [
+            'stores' => $recommendedStores,
+            'follow_ups' => [],
+            'meta' => [
+                'mode' => 'agent',
+                'input_tokens' => $totalInputTokens,
+                'output_tokens' => $totalOutputTokens,
+                'total_tokens' => $totalInputTokens + $totalOutputTokens,
+                'response_ms' => $elapsed,
+                'tool_calls' => count($toolCalls),
+                'max_iterations_reached' => true,
+            ],
+        ]);
     }
 
     /**
@@ -1002,6 +1080,10 @@ class AiChatController extends Controller
         $chunkSize = 12;
         $delayUs = 25_000;
         for ($i = 0; $i < $len; $i += $chunkSize) {
+            // クライアントが離脱したらタイプライター送出を即停止 (無駄な sleep/CPU を防ぐ)。
+            if (connection_aborted()) {
+                return;
+            }
             $delta = mb_substr($text, $i, $chunkSize);
             $send('text', ['delta' => $delta]);
             // Avoid sleeping on the very last chunk.

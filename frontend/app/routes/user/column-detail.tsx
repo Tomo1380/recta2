@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Link, useParams, useLoaderData } from "react-router";
+import { Link, useParams, useLoaderData, isRouteErrorResponse, useRouteError } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { FileText, ChevronRight } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
@@ -116,6 +116,36 @@ function formatDate(s: string | null): string {
  *
  * Also strips any inline <script> tags that snuck in (defensive).
  */
+/**
+ * loader が 404 / 503 等を throw した場合に表示する route 単位の ErrorBoundary。
+ * 404 は記事専用の ColumnNotFound、それ以外は通信エラー表示にして、
+ * 英語のグローバル 404 に落ちないようにする。
+ */
+export function ErrorBoundary() {
+  const error = useRouteError();
+  if (isRouteErrorResponse(error) && error.status === 404) {
+    return <ColumnNotFound />;
+  }
+  return (
+    <div
+      style={{ background: "#faf9f5", minHeight: "60vh", padding: "60px 20px" }}
+      className="flex flex-col items-center justify-center text-center gap-3"
+    >
+      <FileText className="w-8 h-8 text-stone-300" />
+      <p style={{ fontFamily: J, color: DARK, fontSize: "14px" }}>
+        記事を読み込めませんでした。時間をおいて再度お試しください。
+      </p>
+      <Link
+        to="/columns"
+        className="px-4 py-2 rounded-lg"
+        style={{ fontFamily: J, background: DARK, color: "white", fontSize: "13px", textDecoration: "none" }}
+      >
+        コラム一覧へ
+      </Link>
+    </div>
+  );
+}
+
 function ColumnNotFound() {
   return (
     <div

@@ -2,6 +2,19 @@ import { useCallback, useState } from "react";
 import { api, ApiError } from "~/lib/api";
 
 /**
+ * サーバの images は {url, order} オブジェクトと生 URL 文字列が混在しうるため、
+ * 管理画面が扱う URL 文字列配列に正規化する。
+ */
+function toUrlList(images: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+  return images
+    .map((img) =>
+      typeof img === "string" ? img : ((img as { url?: string })?.url ?? ""),
+    )
+    .filter((u): u is string => typeof u === "string" && u !== "");
+}
+
+/**
  * ShopEditPage の店舗写真 (images JSONB) アップロード/削除を集約。
  *
  * Phase 3-1 で ShopEditPage から切り出し。
@@ -19,7 +32,8 @@ import { api, ApiError } from "~/lib/api";
 export interface UseShopImagesResult {
   images: string[];
   setImages: (images: string[]) => void;
-  upload: (files: FileList) => Promise<void>;
+  /** FileList (input) でも File[] (トリミング後) でも受け取れる。 */
+  upload: (files: FileList | File[]) => Promise<void>;
   remove: (index: number) => Promise<void>;
   uploading: boolean;
   error: string | null;
@@ -32,7 +46,7 @@ export function useShopImages(storeId: number | string | null): UseShopImagesRes
   const [error, setError] = useState<string | null>(null);
 
   const upload = useCallback(
-    async (files: FileList) => {
+    async (files: FileList | File[]) => {
       if (!storeId) {
         setError("画像をアップロードするには、まず店舗を保存してください。");
         return;
@@ -43,11 +57,11 @@ export function useShopImages(storeId: number | string | null): UseShopImagesRes
         for (const file of Array.from(files)) {
           const formData = new FormData();
           formData.append("image", file);
-          const res = await api.upload<{ url: string; images: string[] }>(
+          const res = await api.upload<{ url: string; images: unknown[] }>(
             `/admin/stores/${storeId}/images`,
             formData,
           );
-          setImages(res.images);
+          setImages(toUrlList(res.images));
         }
       } catch (err) {
         setError(extractMessage(err, "画像のアップロードに失敗しました"));
@@ -62,10 +76,10 @@ export function useShopImages(storeId: number | string | null): UseShopImagesRes
     async (index: number) => {
       if (!storeId) return;
       try {
-        const res = await api.delete<{ images: string[] }>(
+        const res = await api.delete<{ images: unknown[] }>(
           `/admin/stores/${storeId}/images/${index}`,
         );
-        setImages(res.images);
+        setImages(toUrlList(res.images));
       } catch (err) {
         setError(extractMessage(err, "画像の削除に失敗しました"));
       }

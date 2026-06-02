@@ -5,9 +5,13 @@
  * Bot基本ID（@xxx）は LINE Developers 管理画面の Messaging API チャネルで確認可能。
  */
 
-// TODO: LINE Developers管理画面からBot基本IDを取得して設定する
-// Messaging API チャネル → チャネル基本設定 → Bot情報 → Bot基本ID
-const LINE_OFFICIAL_ACCOUNT_ID = "@043uxuen";
+// Bot基本ID（@xxx）は LINE Developers の Messaging API チャネル
+// → チャネル基本設定 → Bot情報 → Bot基本ID で確認可能。
+// ビルド時に Vite が VITE_LINE_OFFICIAL_ACCOUNT_ID を inline する。
+// 未設定時は本番アカウント (@043uxuen) にフォールバック。
+const LINE_OFFICIAL_ACCOUNT_ID =
+  ((import.meta as { env?: { VITE_LINE_OFFICIAL_ACCOUNT_ID?: string } }).env
+    ?.VITE_LINE_OFFICIAL_ACCOUNT_ID?.trim()) || "@043uxuen";
 
 /**
  * LINE公式アカウント友だち追加URL

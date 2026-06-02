@@ -66,7 +66,10 @@ class PublicStoreController extends Controller
         // reviews_count は popular/newest 問わず一覧の評価表示で要るので、
         // switch の外で一度だけ呼ぶ。switch 内でも withCount すると重複 SELECT
         // で空が返るバグになっていた (BUG-E02)。
-        $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
+        // average_rating も withAvg で同時に sub-select し、StoreResource が
+        // 店舗ごとに averageRating() を呼ぶ N+1 を防ぐ。
+        $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
+            ->withAvg(['reviews as reviews_avg_rating' => fn ($q) => $q->where('status', 'published')], 'rating');
 
         // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
         // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
@@ -162,6 +165,7 @@ class PublicStoreController extends Controller
                   ->orWhere('category', $store->category);
             })
             ->withCount(['reviews' => fn($q) => $q->where('status', 'published')])
+            ->withAvg(['reviews as reviews_avg_rating' => fn ($q) => $q->where('status', 'published')], 'rating')
             ->limit(6)
             ->get();
 
@@ -210,7 +214,10 @@ class PublicStoreController extends Controller
 
         // Pickup shops with store data
         $pickups = PickupShop::where('visible', true)
-            ->with('store')
+            // reviews_count / average_rating を store ごとに都度クエリせず eager-load。
+            ->with(['store' => fn ($q) => $q
+                ->withCount(['reviews' => fn ($r) => $r->where('status', 'published')])
+                ->withAvg(['reviews as reviews_avg_rating' => fn ($r) => $r->where('status', 'published')], 'rating')])
             ->orderBy('sort_order')
             ->get()
             ->filter(fn($p) => $p->store && $p->store->publish_status === 'published')
@@ -227,8 +234,8 @@ class PublicStoreController extends Controller
                     'feature_tags' => $store->feature_tags,
                     'images' => $store->images,
                     'is_pr' => $pickup->is_pr,
-                    'reviews_count' => $store->reviewCount(),
-                    'average_rating' => round($store->averageRating(), 1),
+                    'reviews_count' => (int) ($store->reviews_count ?? 0),
+                    'average_rating' => round((float) ($store->reviews_avg_rating ?? 0), 1),
                 ];
             })
             ->values();

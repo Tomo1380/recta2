@@ -33,7 +33,9 @@ class StoreImageService
         $url = MediaStorage::upload($file, 'stores');
 
         $images = $store->images ?? [];
-        $images[] = $url;
+        // フロント / StoreResource が前提とする {url, order} 形で保存する
+        // (以前は生の URL 文字列で保存しており、店舗詳細に画像が出ない不具合の原因だった)。
+        $images[] = ['url' => $url, 'order' => count($images)];
         $store->update(['images' => $images]);
 
         return [

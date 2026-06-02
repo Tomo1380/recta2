@@ -10,6 +10,9 @@ COPY ./frontend .
 ARG VITE_GOOGLE_MAPS_API_KEY=""
 ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
 
+ARG VITE_LINE_OFFICIAL_ACCOUNT_ID="@043uxuen"
+ENV VITE_LINE_OFFICIAL_ACCOUNT_ID=$VITE_LINE_OFFICIAL_ACCOUNT_ID
+
 # t3.small (RAM 2GB) で vite の rendering chunks フェーズが OOM Killer に
 # 落とされるのを防ぐ。Node の old generation を 1.5GB に cap して GC を
 # 頻繁化し、ピーク memory を抑える。

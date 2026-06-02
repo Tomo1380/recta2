@@ -100,15 +100,39 @@ export async function apiUpload<T = unknown>(
   return res.json();
 }
 
+/**
+ * 同一ミューテーション (method + path + body) の多重送信ガード。
+ *
+ * 保存/更新ボタンの連打や、state 反映前の同期的ダブルクリックで二重 POST/PUT/DELETE
+ * が飛ぶのを防ぐ。実行中の同一リクエストがあれば、その Promise を使い回す
+ * (新たにネットワークへは投げない)。完了 (成功/失敗どちらも) でキーを解放するので、
+ * 失敗後の再送信や、内容を変えた次の保存は正常に通る。
+ *
+ * upload (multipart) は対象外 — 同一エンドポイントへ別ファイルを連続アップロード
+ * する正当なケースがあり、body をキー化できないため。
+ */
+const inFlightMutations = new Map<string, Promise<unknown>>();
+
+function dedupeMutation<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const existing = inFlightMutations.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+  const p = run().finally(() => inFlightMutations.delete(key));
+  inFlightMutations.set(key, p);
+  return p;
+}
+
 // Convenience methods (admin)
 export const api = {
   get: <T = unknown>(path: string) => apiFetch<T>(path),
   post: <T = unknown>(path: string, body?: unknown) =>
-    apiFetch<T>(path, { method: "POST", body: JSON.stringify(body) }),
+    dedupeMutation(`a:POST:${path}:${JSON.stringify(body)}`, () =>
+      apiFetch<T>(path, { method: "POST", body: JSON.stringify(body) })),
   put: <T = unknown>(path: string, body?: unknown) =>
-    apiFetch<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+    dedupeMutation(`a:PUT:${path}:${JSON.stringify(body)}`, () =>
+      apiFetch<T>(path, { method: "PUT", body: JSON.stringify(body) })),
   delete: <T = unknown>(path: string) =>
-    apiFetch<T>(path, { method: "DELETE" }),
+    dedupeMutation(`a:DELETE:${path}`, () =>
+      apiFetch<T>(path, { method: "DELETE" })),
   upload: <T = unknown>(path: string, formData: FormData) =>
     apiUpload<T>(path, formData),
 };
@@ -169,9 +193,12 @@ export const userApi = {
   get: <T = unknown>(path: string, token?: string) =>
     userApiFetch<T>(path, {}, token),
   post: <T = unknown>(path: string, body?: unknown, token?: string) =>
-    userApiFetch<T>(path, { method: "POST", body: JSON.stringify(body) }, token),
+    dedupeMutation(`u:POST:${path}:${JSON.stringify(body)}`, () =>
+      userApiFetch<T>(path, { method: "POST", body: JSON.stringify(body) }, token)),
   put: <T = unknown>(path: string, body?: unknown, token?: string) =>
-    userApiFetch<T>(path, { method: "PUT", body: JSON.stringify(body) }, token),
+    dedupeMutation(`u:PUT:${path}:${JSON.stringify(body)}`, () =>
+      userApiFetch<T>(path, { method: "PUT", body: JSON.stringify(body) }, token)),
   delete: <T = unknown>(path: string, token?: string) =>
-    userApiFetch<T>(path, { method: "DELETE" }, token),
+    dedupeMutation(`u:DELETE:${path}`, () =>
+      userApiFetch<T>(path, { method: "DELETE" }, token)),
 };

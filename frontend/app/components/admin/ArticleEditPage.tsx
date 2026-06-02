@@ -4,6 +4,7 @@ import { ArrowLeft, Eye, ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
 import { ApiError, api } from "~/lib/api";
 import type { Article } from "~/lib/types";
 import { ArticleEditor } from "./ArticleEditor";
+import { ImageCropDialog } from "./ImageCropDialog";
 import { FloatingPreview } from "./shared/FloatingPreview";
 import { ColumnArticleView } from "~/routes/user/column-detail";
 
@@ -56,6 +57,7 @@ export function ArticleEditPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [pendingThumb, setPendingThumb] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // プレビュー用の article オブジェクト。フォーム値と editor の bodyHtml から
@@ -404,10 +406,22 @@ export function ArticleEditPage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleThumbnailUpload(f);
+                if (f) setPendingThumb(f);
                 if (fileRef.current) fileRef.current.value = "";
               }}
             />
+            {pendingThumb && (
+              <ImageCropDialog
+                file={pendingThumb}
+                aspect={16 / 9}
+                title="サムネイルをトリミング"
+                onCancel={() => setPendingThumb(null)}
+                onCropped={async (cropped) => {
+                  setPendingThumb(null);
+                  await handleThumbnailUpload(cropped);
+                }}
+              />
+            )}
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading || isNew}

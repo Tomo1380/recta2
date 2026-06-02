@@ -27,7 +27,7 @@ class AuthController extends Controller
 
         $admin->update(['last_login_at' => now()]);
 
-        $token = $admin->createToken('admin-token')->plainTextToken;
+        $token = $admin->createToken('admin-token', ['admin'])->plainTextToken;
 
         return response()->json([
             'token' => $token,

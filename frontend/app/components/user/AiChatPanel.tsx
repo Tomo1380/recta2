@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "react-router";
 import { openLineFriendAdd } from "~/lib/line";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import {
@@ -146,6 +147,7 @@ interface AiChatPanelProps {
 
 interface StoreCard {
   id: number;
+  slug?: string | null;
   name: string;
   area?: string;
   category?: string;
@@ -274,6 +276,10 @@ async function streamMessage(
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buf = "";
+  // done / error の終端イベントを受け取ったか。サーバが done を送らずに
+  // 接続を閉じた場合 (FPM タイムアウト・ネットワーク断等) でも placeholder が
+  // 永久に streaming 状態 (カーソル点滅) で固まらないよう、ループ終了後に補完する。
+  let terminated = false;
 
   // SSE フレームは "\n\n" 区切り。`event:` と `data:` 行をペアで取り出す。
   const handleFrame = (frame: string) => {
@@ -304,6 +310,7 @@ async function streamMessage(
         if (typeof payload.delta === "string") handlers.onDelta(payload.delta);
         break;
       case "done":
+        terminated = true;
         handlers.onDone({
           stores: (payload.stores ?? []) as ChatApiResponse["stores"],
           follow_ups: (payload.follow_ups ?? []) as ChatApiResponse["follow_ups"],
@@ -311,6 +318,7 @@ async function streamMessage(
         });
         break;
       case "error": {
+        terminated = true;
         const err = new Error(String(payload.message ?? "stream error")) as Error & { limitType?: string };
         if (typeof payload.limit_type === "string") err.limitType = payload.limit_type;
         throw err;
@@ -341,6 +349,12 @@ async function streamMessage(
       reader.releaseLock();
     } catch {
       // 既に解放済みなら無視
+    }
+    // done を受け取らないままストリームが閉じた場合の取りこぼし補完。
+    // abort 時は terminated=false のまま reader.read() が reject して上の
+    // catch には行かず finally に来るが、その際はメッセージ側を finalize する。
+    if (!terminated && !signal.aborted) {
+      handlers.onDone({ stores: [], follow_ups: [], meta: undefined });
     }
   }
 }
@@ -1038,10 +1052,12 @@ export default function AiChatPanel({
           const errContent = isLimit
             ? error.message
             : "申し訳ございません。エラーが発生しました。もう一度お試しください。";
+          // 上限到達時は、チャットが使えなくなる最重要局面なので必ず LINE 誘導 CTA を出す
+          // (サービスの本質は LINE 友だち追加への誘導)。
           if (last?.role === "ai" && last.streaming) {
-            next[next.length - 1] = { role: "ai", content: errContent };
+            next[next.length - 1] = { role: "ai", content: errContent, showLineCta: isLimit };
           } else {
-            next.push({ role: "ai", content: errContent });
+            next.push({ role: "ai", content: errContent, showLineCta: isLimit });
           }
           return next;
         });
@@ -1268,6 +1284,10 @@ export default function AiChatPanel({
       {hasMessages && (
         <div
           ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          aria-label="AIチャットの会話"
           className="max-h-[360px] overflow-y-auto"
           style={{
             scrollBehavior: "smooth",
@@ -1378,9 +1398,9 @@ export default function AiChatPanel({
                     {(msg.stores ?? []).slice(0, 3).map((store) => {
                       const imgUrl = store.images?.[0]?.url;
                       return (
-                        <a
+                        <Link
                           key={store.id}
-                          href={`/stores/${store.id}`}
+                          to={`/stores/${store.slug ?? store.id}`}
                           className="flex gap-3 rounded-[10px] p-2.5 transition-all hover:shadow-sm"
                           style={{
                             border: "1px solid rgba(27,37,40,0.1)",
@@ -1448,7 +1468,7 @@ export default function AiChatPanel({
                               </p>
                             )}
                           </div>
-                        </a>
+                        </Link>
                       );
                     })}
                   </div>
@@ -1556,6 +1576,7 @@ export default function AiChatPanel({
                 handleSend();
               }}
               placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください…"}
+              aria-label="AIチャットへのメッセージ入力"
               disabled={isLoading || limitReached}
               rows={1}
               // iOS Safari は font-size が 16px 未満だとフォーカス時に

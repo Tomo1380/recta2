@@ -12,6 +12,39 @@ format: [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) 簡略版。
 
 ## Unreleased
 
+### セキュリティ (リリース前ハードニング 2026-06-02)
+- **[Critical] admin/user 認証境界を強制**: LINE ログインの User トークンで
+  管理画面 API を叩ける権限昇格を `user.type` middleware + token abilities で遮断。
+  クロス認証防止テスト追加。
+- **[High] LINE OAuth state を HttpOnly cookie + hash_equals 化** (IP キー Cache 廃止)。
+  共有 NAT/CGNAT でのログイン失敗・login CSRF を解消。
+- **[High] 店舗 `website_url` の scheme 検証**で格納型 XSS を遮断。
+- **[High] AI チャットが非公開店舗情報を漏らさないよう** detail context を published 限定に。
+- **[High] `.dockerignore` で `backend/.env` 除外** (本番イメージへの秘密焼き込み防止)。
+- LINE callback の **トークン受け渡しを単回使用の交換コード方式**へ (URL 漏洩面の縮小)。
+- LINE 認証/Webhook に throttle、terraform の SSH を `0.0.0.0/0` から限定 ingress へ。
+- 詳細は [security-audit-2026-05-29.md](security-audit-2026-05-29.md) の「追補: 2026-06-02」。
+
+### 機能 (管理画面 / 設定)
+- **画像アップロードにトリミング機能を追加** (`ImageCropDialog` + react-easy-crop)。
+  店舗ギャラリー写真 (4:3)、在籍女性ギャラリー (3:4)、コラムサムネ (16:9)、
+  カテゴリ画像 (260:320) でアップロード前にドラッグ + ズームで切り抜き可能に。
+- **デフォルト OG 画像**を 1200×630 の専用画像 (`/og-default.jpg`) に差し替え。
+- **LINE 公式アカウント Bot基本ID** を `VITE_LINE_OFFICIAL_ACCOUNT_ID` で環境変数化
+  (ハードコード解消。未設定時は @043uxuen にフォールバック)。
+
+### 改善 (UX / SEO / a11y / 堅牢性)
+- AI チャット: **上限到達時に LINE CTA を必ず表示**、maxIterations 超過でも収集済み
+  店舗を返す、SSE 取りこぼし時の固まり防止、クライアント切断検知、本番 API キー未設定時の
+  丁寧なフォールバック。
+- 店舗一覧: **取得失敗を「0 件」と区別**し再読み込み導線を表示。一覧画像 lazy-load。
+- グローバル/コラムの **404・エラー画面を日本語ブランド化** (ErrorBoundary 整備)。
+- 空のエリア×業態 LP を **noindex + sitemap から除外**、canonical 末尾スラッシュ統一、
+  店舗詳細 loader 失敗時 noindex。
+- 平均評価の **N+1 を `withAvg` で解消** (一覧/関連/ピックアップ)。口コミ重複を DB ユニーク制約で保証。
+- a11y: チャット入力ラベル / メッセージ aria-live / アコーディオン aria-expanded /
+  ヒーロー画像 LCP 属性、ログインの規約リンク修正。
+
 ### 改善 (内部リファクタリング、ユーザー向け挙動変更なし)
 - **負債解消スプリント** `refactor/debt-cleanup` ブランチで AI 主導で書かれた
   fat ファイルの整理を実施。ユーザーから見える挙動は不変。

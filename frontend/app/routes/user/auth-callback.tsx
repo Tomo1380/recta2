@@ -19,8 +19,10 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (!token) {
+    // バックエンドはトークンを URL に直接載せず、単回使用の交換コードを渡す。
+    // ここで /api/auth/line/exchange に投げて実トークンを受け取る。
+    const code = searchParams.get("code");
+    if (!code) {
       setError(true);
       setTimeout(() => navigate("/login"), 2000);
       return;
@@ -37,14 +39,24 @@ export default function AuthCallbackPage() {
     const candidate = returnFromQuery || returnFromStorage || "/mypage";
     const target = candidate.startsWith("/") && !candidate.startsWith("//") ? candidate : "/mypage";
 
-    login(token)
-      .then(() => {
+    const fail = () => {
+      setError(true);
+      setTimeout(() => navigate("/login"), 2000);
+    };
+
+    fetch("/api/auth/line/exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ code }),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("exchange failed");
+        const data = (await res.json()) as { token?: string };
+        if (!data.token) throw new Error("no token");
+        await login(data.token);
         navigate(target);
       })
-      .catch(() => {
-        setError(true);
-        setTimeout(() => navigate("/login"), 2000);
-      });
+      .catch(fail);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

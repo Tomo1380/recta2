@@ -27,6 +27,8 @@ services:
       # frontend doesn't need its own .env file.
       - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-}
       - VITE_APP_NAME=${VITE_APP_NAME:-Recta2}
+      # LINE 公式アカウントの Bot基本ID (@xxx)。友だち追加 URL に使う。
+      - VITE_LINE_OFFICIAL_ACCOUNT_ID=${VITE_LINE_OFFICIAL_ACCOUNT_ID:-@043uxuen}
     networks:
       - recta2
 

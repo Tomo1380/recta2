@@ -126,3 +126,60 @@ describe("api client", () => {
     expect(err.message).toBe("Validation failed");
   });
 });
+
+/**
+ * 連打 / state 反映前の同期ダブルクリックによる二重送信ガード
+ * (api.ts の dedupeMutation)。実行中の同一ミューテーションは fetch 1 本に集約し、
+ * 内容が違う場合や完了後は通常どおり送信する。
+ */
+describe("api mutation de-duplication", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    fetchMock.mockReset();
+    localStorage.clear();
+  });
+
+  function resolveLater(value: unknown, delay = 20) {
+    return new Promise((resolve) =>
+      setTimeout(
+        () => resolve(new Response(JSON.stringify(value), { status: 200 })),
+        delay,
+      ),
+    );
+  }
+
+  it("同一 POST の同時連打は fetch 1 回に集約される", async () => {
+    fetchMock.mockImplementation(() => resolveLater({ id: 1 }));
+
+    const results = await Promise.all([
+      api.post("/admin/stores", { name: "X" }),
+      api.post("/admin/stores", { name: "X" }),
+      api.post("/admin/stores", { name: "X" }),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(results).toEqual([{ id: 1 }, { id: 1 }, { id: 1 }]);
+  });
+
+  it("body が異なれば別リクエストとして通す", async () => {
+    fetchMock.mockImplementation(() => resolveLater({ ok: true }));
+
+    await Promise.all([
+      api.post("/admin/stores", { name: "A" }),
+      api.post("/admin/stores", { name: "B" }),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("完了後は同一内容でも再送信できる (キーが解放される)", async () => {
+    fetchMock.mockImplementation(() => resolveLater({ ok: true }, 1));
+
+    await api.put("/admin/stores/1", { name: "A" });
+    await api.put("/admin/stores/1", { name: "A" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

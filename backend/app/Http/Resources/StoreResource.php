@@ -117,11 +117,33 @@ class StoreResource extends JsonResource
         if (isset($this->resource->reviews_count)) {
             $merged['reviews_count'] = (int) $this->resource->reviews_count;
         }
-        if (method_exists($this->resource, 'averageRating')) {
+        // average_rating は controller 側で withAvg('reviews_avg_rating') を
+        // 事前ロードしていればそれを使い (N+1 回避)、無ければ method で都度計算。
+        if (array_key_exists('reviews_avg_rating', $this->resource->getAttributes())) {
+            $merged['average_rating'] = round((float) $this->resource->reviews_avg_rating, 1);
+        } elseif (method_exists($this->resource, 'averageRating')) {
             $merged['average_rating'] = round($this->resource->averageRating(), 1);
         }
         if ($this->resource->relationLoaded('reviews')) {
             $merged['reviews'] = $this->resource->reviews;
+        }
+
+        // images JSONB は履歴的に 2 形式が混在する:
+        //   - seed / 旧データ: {url, order} オブジェクト
+        //   - アップロード経由 (StoreImageService): 生の URL 文字列
+        // フロント (StoreDetailPage 等) は {url, order} を前提に order でソートし
+        // url を描画するため、文字列のままだと店舗詳細に画像が出ない不具合になる。
+        // ここで常に {url, order} に正規化して契約を一本化する。
+        if (isset($merged['images']) && is_array($merged['images'])) {
+            $normalized = [];
+            foreach (array_values($merged['images']) as $i => $img) {
+                if (is_string($img) && $img !== '') {
+                    $normalized[] = ['url' => $img, 'order' => $i];
+                } elseif (is_array($img) && !empty($img['url'])) {
+                    $normalized[] = ['url' => $img['url'], 'order' => $img['order'] ?? $i];
+                }
+            }
+            $merged['images'] = $normalized;
         }
 
         return $merged;

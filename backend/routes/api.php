@@ -62,14 +62,21 @@ Route::get('/sitemap', [SeoController::class, 'sitemap']);
 Route::get('/robots', [SeoController::class, 'robots']);
 
 // ========== LINE認証 ==========
-Route::get('/auth/line', [LineAuthController::class, 'redirect']);
-Route::get('/auth/line/callback', [LineAuthController::class, 'callback']);
+// state cookie / 交換コードを扱うため、ブルートフォース・濫用を防ぐ throttle を付与。
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('/auth/line', [LineAuthController::class, 'redirect']);
+    Route::get('/auth/line/callback', [LineAuthController::class, 'callback']);
+    // 交換コード → 実トークン (単回使用・60秒)
+    Route::post('/auth/line/exchange', [LineAuthController::class, 'exchange']);
+});
 
 // ========== LINE Webhook (公開、署名検証あり) ==========
-Route::post('/webhook/line', [LineWebhookController::class, 'handle']);
+Route::post('/webhook/line', [LineWebhookController::class, 'handle'])
+    ->middleware('throttle:60,1');
 
 // ========== ユーザー（エンドユーザー） ==========
-Route::middleware('auth:sanctum')->prefix('user')->group(function () {
+// user.type:user で AdminUser トークンによる流用を遮断 (認証境界)。
+Route::middleware(['auth:sanctum', 'user.type:user'])->prefix('user')->group(function () {
     Route::get('/me', [UserProfileController::class, 'me']);
     Route::put('/profile', [UserProfileController::class, 'update']);
     Route::post('/logout', [UserProfileController::class, 'logout']);
@@ -77,15 +84,16 @@ Route::middleware('auth:sanctum')->prefix('user')->group(function () {
 });
 
 // ========== 口コミ投稿・削除（エンドユーザー） ==========
-Route::middleware('auth:sanctum')->post('/stores/{store}/reviews', [PublicReviewController::class, 'store'])->whereNumber('store');
-Route::middleware('auth:sanctum')->delete('/user/reviews/{review}', [PublicReviewController::class, 'destroy']);
+Route::middleware(['auth:sanctum', 'user.type:user'])->post('/stores/{store}/reviews', [PublicReviewController::class, 'store'])->whereNumber('store');
+Route::middleware(['auth:sanctum', 'user.type:user'])->delete('/user/reviews/{review}', [PublicReviewController::class, 'destroy']);
 
 // ========== 管理画面 ==========
 Route::prefix('admin')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:10,10');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // user.type:admin で LINE ログインの User トークンによる管理API流用を遮断 (権限昇格防止)。
+    Route::middleware(['auth:sanctum', 'user.type:admin'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
 

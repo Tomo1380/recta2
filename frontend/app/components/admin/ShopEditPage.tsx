@@ -4,6 +4,7 @@ import { api } from "~/lib/api";
 import { useShopImages } from "~/hooks/useShopImages";
 import { useStepProgression } from "~/hooks/useStepProgression";
 import { useFileUpload } from "~/hooks/useFileUpload";
+import { ImageCropDialog } from "~/components/admin/ImageCropDialog";
 import { formToPayload, storeToForm, type ShopForm } from "~/hooks/useShopForm";
 import type { Store } from "~/lib/types";
 import {
@@ -726,6 +727,14 @@ export function ShopEditPage() {
     error: shopImageError,
   } = useShopImages(isNew ? null : (id ?? null));
 
+  // 店舗ギャラリー画像: アップロード前にトリミングする。選択/ドロップされた
+  // 複数ファイルをキューに積み、1 枚ずつ ImageCropDialog で切り抜いて upload。
+  const [galleryCropQueue, setGalleryCropQueue] = useState<File[]>([]);
+  const enqueueGalleryFiles = useCallback((files: FileList | File[]) => {
+    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (imgs.length > 0) setGalleryCropQueue(imgs);
+  }, []);
+
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
   // エリア/業種カテゴリのマスタ。マスタテーブルと options が乖離するとSelectの復元が壊れる
   // (BUG-001) ので、ハードコードせず API から取得する。
@@ -1250,7 +1259,7 @@ export function ShopEditPage() {
           {storeImages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {storeImages.map((url, idx) => (
-                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-square">
+                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-video">
                   <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
                   {idx === 0 && (
                     <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
@@ -1268,10 +1277,22 @@ export function ShopEditPage() {
             </div>
           )}
           <ImageUploadZone
-            onUpload={uploadShopImages}
+            onUpload={enqueueGalleryFiles}
             uploading={uploadingImage}
             disabled={isNew}
           />
+          {galleryCropQueue.length > 0 && (
+            <ImageCropDialog
+              file={galleryCropQueue[0]}
+              aspect={16 / 9}
+              title={`店舗写真をトリミング（残り ${galleryCropQueue.length} 枚）`}
+              onCancel={() => setGalleryCropQueue([])}
+              onCropped={async (cropped) => {
+                await uploadShopImages([cropped]);
+                setGalleryCropQueue((q) => q.slice(1));
+              }}
+            />
+          )}
         </Field>
         <Field label="動画（複数登録可）">
           <VideoListEditor videos={videos} onChange={setVideos} />
@@ -3036,6 +3057,8 @@ function StaffPhotosEditor({
   onChange: (next: { image_url: string; caption: string; instagram_url: string; staff_type: string }[]) => void;
 }) {
   const { uploadFile, uploading, error: uploadError } = useFileUpload("staff-photo");
+  // トリミング待ちの選択ファイル (どの行か + File)
+  const [pendingCrop, setPendingCrop] = useState<{ index: number; file: File } | null>(null);
 
   const update = (
     i: number,
@@ -3160,9 +3183,9 @@ function StaffPhotosEditor({
                     accept="image/*"
                     className="hidden"
                     disabled={uploading}
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) await handlePick(i, file);
+                      if (file) setPendingCrop({ index: i, file });
                       e.target.value = ""; // 同じファイル再選択を許可
                     }}
                   />
@@ -3216,6 +3239,20 @@ function StaffPhotosEditor({
         <Plus className="size-3.5" />
         在籍女性の写真を追加
       </button>
+
+      {pendingCrop && (
+        <ImageCropDialog
+          file={pendingCrop.file}
+          aspect={3 / 4}
+          title="スタッフ写真をトリミング"
+          onCancel={() => setPendingCrop(null)}
+          onCropped={async (cropped) => {
+            const idx = pendingCrop.index;
+            setPendingCrop(null);
+            await handlePick(idx, cropped);
+          }}
+        />
+      )}
     </div>
   );
 }

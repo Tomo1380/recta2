@@ -28,6 +28,7 @@ import { useUserAuth } from "~/lib/user-auth";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { buildMetaTags } from "~/lib/seo";
+import { formatDateJa } from "~/lib/date";
 import { userApi } from "~/lib/api";
 import type { Review } from "~/lib/types";
 
@@ -220,7 +221,13 @@ export default function MyPage() {
               </Button>
               {saveMessage && (
                 <span
-                  className={`text-sm ${saveMessage.includes("失敗") ? "text-destructive" : "text-green-600"}`}
+                  role="status"
+                  aria-live="polite"
+                  className={`rounded-full px-3 py-1 text-sm font-medium ${
+                    saveMessage.includes("失敗")
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-green-100 text-green-700"
+                  }`}
                 >
                   {saveMessage}
                 </span>
@@ -295,9 +302,7 @@ export default function MyPage() {
                             />
                           ))}
                           <span className="ml-2 text-xs text-muted-foreground">
-                            {new Date(review.created_at).toLocaleDateString(
-                              "ja-JP",
-                            )}
+                            {formatDateJa(review.created_at)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">
