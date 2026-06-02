@@ -50,7 +50,8 @@ class StoreImageServiceTest extends TestCase
         $this->assertArrayHasKey('url', $result);
         $this->assertStringContainsString('/storage/stores/', $result['url']);
         $this->assertCount(1, $result['images']);
-        $this->assertEquals($result['url'], $result['images'][0]);
+        // フロント / StoreResource が前提とする {url, order} 形で保存される。
+        $this->assertSame(['url' => $result['url'], 'order' => 0], $result['images'][0]);
 
         $store->refresh();
         $this->assertCount(1, $store->images);

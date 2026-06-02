@@ -128,6 +128,24 @@ class StoreResource extends JsonResource
             $merged['reviews'] = $this->resource->reviews;
         }
 
+        // images JSONB は履歴的に 2 形式が混在する:
+        //   - seed / 旧データ: {url, order} オブジェクト
+        //   - アップロード経由 (StoreImageService): 生の URL 文字列
+        // フロント (StoreDetailPage 等) は {url, order} を前提に order でソートし
+        // url を描画するため、文字列のままだと店舗詳細に画像が出ない不具合になる。
+        // ここで常に {url, order} に正規化して契約を一本化する。
+        if (isset($merged['images']) && is_array($merged['images'])) {
+            $normalized = [];
+            foreach (array_values($merged['images']) as $i => $img) {
+                if (is_string($img) && $img !== '') {
+                    $normalized[] = ['url' => $img, 'order' => $i];
+                } elseif (is_array($img) && !empty($img['url'])) {
+                    $normalized[] = ['url' => $img['url'], 'order' => $img['order'] ?? $i];
+                }
+            }
+            $merged['images'] = $normalized;
+        }
+
         return $merged;
     }
 
