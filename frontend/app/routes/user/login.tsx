@@ -89,11 +89,11 @@ export default function LoginPage() {
 
           <p className="text-center text-xs text-muted-foreground">
             ログインすることで、
-            <Link to="#" className="underline">
+            <Link to="/terms" className="underline">
               利用規約
             </Link>
             および
-            <Link to="#" className="underline">
+            <Link to="/privacy" className="underline">
               プライバシーポリシー
             </Link>
             に同意したものとみなされます。

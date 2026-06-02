@@ -19,7 +19,8 @@ import { api, ApiError } from "~/lib/api";
 export interface UseShopImagesResult {
   images: string[];
   setImages: (images: string[]) => void;
-  upload: (files: FileList) => Promise<void>;
+  /** FileList (input) でも File[] (トリミング後) でも受け取れる。 */
+  upload: (files: FileList | File[]) => Promise<void>;
   remove: (index: number) => Promise<void>;
   uploading: boolean;
   error: string | null;
@@ -32,7 +33,7 @@ export function useShopImages(storeId: number | string | null): UseShopImagesRes
   const [error, setError] = useState<string | null>(null);
 
   const upload = useCallback(
-    async (files: FileList) => {
+    async (files: FileList | File[]) => {
       if (!storeId) {
         setError("画像をアップロードするには、まず店舗を保存してください。");
         return;

@@ -33,8 +33,9 @@ export const SITE_NOINDEX: boolean = (() => {
 })();
 
 export const SITE_NAME = "Recta";
-// default OG 画像: 既存のヒーロー画像を流用 (1200×630 の専用 OG 画像は後日差し替え)。
-export const DEFAULT_OG_IMAGE = `${SITE_URL}/hero-top.jpg`;
+// default OG 画像: 1200×630 の専用画像 (Figma デザインのヒーロー + サイトと同じ
+// ダークグラデを焼き込み)。SNS シェア時のサムネに使う。
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-default.jpg`;
 
 /**
  * 相対パス (`/stores/1` 等) を絶対 URL に変換する。

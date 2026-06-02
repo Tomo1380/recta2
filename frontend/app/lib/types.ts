@@ -34,6 +34,7 @@ export interface UserShowResponse {
 
 export interface Store {
   id: number;
+  slug?: string | null;
   name: string;
   area: string;
   address: string | null;

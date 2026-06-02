@@ -34,6 +34,7 @@ import {
   areaCategoryUploadCategoryImage,
 } from "../../../orval/generated/area-category";
 import type { AreaResource, CategoryResource } from "../../../orval/generated/api.schemas";
+import { ImageCropDialog } from "./ImageCropDialog";
 
 // 既存コードが Area/Category 名で書かれているので、生成型に local alias する。
 type Area = AreaResource;
@@ -56,6 +57,8 @@ export function AreaCategoryPage() {
   const [editingArea, setEditingArea] = useState<number | null>(null);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
   const [uploadingCategoryId, setUploadingCategoryId] = useState<number | null>(null);
+  // カテゴリ画像のトリミング待ち (どのカテゴリか + File)
+  const [pendingCategoryCrop, setPendingCategoryCrop] = useState<{ cat: Category; file: File } | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
 
   // Hidden file input refs per category
@@ -622,7 +625,7 @@ export function AreaCategoryPage() {
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                handleUploadCategoryImage(cat, file);
+                                setPendingCategoryCrop({ cat, file });
                               }
                               // reset so same file can be re-selected
                               e.target.value = "";
@@ -753,6 +756,20 @@ export function AreaCategoryPage() {
             </p>
           </div>
         </div>
+      )}
+
+      {pendingCategoryCrop && (
+        <ImageCropDialog
+          file={pendingCategoryCrop.file}
+          aspect={260 / 320}
+          title="カテゴリ画像をトリミング"
+          onCancel={() => setPendingCategoryCrop(null)}
+          onCropped={async (cropped) => {
+            const cat = pendingCategoryCrop.cat;
+            setPendingCategoryCrop(null);
+            await handleUploadCategoryImage(cat, cropped);
+          }}
+        />
       )}
     </div>
   );

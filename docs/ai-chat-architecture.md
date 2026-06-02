@@ -182,9 +182,28 @@ sequenceDiagram
 │ global_daily    │ 10,000/日  │ 全ユーザー合計          │
 │ user_daily      │ 50/日      │ 認証済みユーザー        │
 │ user_monthly    │ 500/月     │ 認証済みユーザー        │
-│ ip_daily        │ 10/日      │ 未認証ユーザー (IP単位)  │
+│ ip_daily        │ 30/日      │ 未認証ユーザー (IP単位)  │
 └─────────────────┴───────────┴───────────────────────┘
 ```
+
+> デフォルト値は `AiChatLimit::current()` (`app/Models/AiChatLimit.php`) が
+> SSoT。`ip_daily` は 10 → 30 に引き上げ済み (未ログイン体験を緩和)。
+> 集計クエリ高速化のため `ai_chat_logs(ip_address, created_at)` に index を付与。
+
+---
+
+## 堅牢性・エラーハンドリング (2026-06-02 ハードニング)
+
+利用者が多い前提で、AI チャットの失敗時にも「LINE 誘導」を切らさないことを重視。
+
+| 局面 | 挙動 |
+|---|---|
+| **利用上限到達 (429)** | フロントは上限メッセージに **LINE 友だち追加 CTA を必ず表示** (最重要動線)。 |
+| **agent ループが maxIterations 超過** | 例外で全破棄せず、**収集済みの店舗候補を活かした正常応答**を返す (200/done 扱いなので CTA も出る)。stream/非 stream 両系統で対応。 |
+| **SSE が `done` 無しで切断** | フロントは終端フラグで補完し、placeholder が **streaming のまま固まらない**ようにする。 |
+| **クライアント切断** | サーバは `connection_aborted()` を typewriter ループと agent ループで確認し、**以降の Gemini 呼び出し・送出を打ち切る** (FPM ワーカー占有・トークン浪費の防止)。 |
+| **本番で `GEMINI_API_KEY` 未設定** | モックを返さず **503 + LINE 誘導メッセージ** + error ログ (ミスコンフィグに気付けるように)。dev のみモック。 |
+| **入力検証** | `chat` / `chat/stream` は `App\Http\Requests\ChatRequest` に集約 (inline validate 廃止)。 |
 
 ---
 

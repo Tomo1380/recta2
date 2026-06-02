@@ -66,30 +66,64 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  const isNotFound = isRouteErrorResponse(error) && error.status === 404;
+
+  let heading = "エラーが発生しました";
+  let description =
+    "申し訳ございません。予期しないエラーが発生しました。時間をおいて再度お試しください。";
+  let code = "";
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
-    details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
-    details = error.message;
+    code = String(error.status);
+    if (isNotFound) {
+      heading = "ページが見つかりません";
+      description =
+        "お探しのページは移動または削除された可能性があります。URL をご確認ください。";
+    } else {
+      heading = "エラーが発生しました";
+      description =
+        error.statusText ||
+        "申し訳ございません。時間をおいて再度お試しください。";
+    }
+  } else if (import.meta.env.DEV && error instanceof Error) {
+    description = error.message;
     stack = error.stack;
   }
 
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
-      {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
-          <code>{stack}</code>
-        </pre>
-      )}
+    <main
+      className="flex min-h-[60vh] flex-1 items-center justify-center px-6 py-16"
+      style={{ backgroundColor: "#f7f6f3" }}
+    >
+      <div className="flex max-w-md flex-col items-center gap-4 text-center">
+        {code && (
+          <span
+            className="text-sm font-bold tracking-widest"
+            style={{ color: "#c8960c" }}
+          >
+            {code}
+          </span>
+        )}
+        <h1 className="text-xl font-bold" style={{ color: "#1b2528" }}>
+          {heading}
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+        <a
+          href="/"
+          className="mt-2 inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+          style={{ background: "linear-gradient(180deg, #D4AF37 0%, #c8960c 100%)" }}
+        >
+          トップページに戻る
+        </a>
+        {stack && (
+          <pre className="mt-4 w-full overflow-x-auto rounded-lg bg-black/80 p-4 text-left text-xs text-white">
+            <code>{stack}</code>
+          </pre>
+        )}
+      </div>
     </main>
   );
 }

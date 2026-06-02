@@ -164,8 +164,64 @@ private function ensureSuperAdmin(Request $request): void
 4. Policy + Gate で AdminUser RBAC をより厳密に
 5. Refresh token rotation の検討
 
+---
+
+# 追補: 2026-06-02 リリース前ハードニング (多観点レビュー)
+
+商用リリース直前に、セキュリティ / UX / 不具合 / LINE 導線 / SEO / a11y /
+パフォーマンス / データ運用の多観点で全コードを再レビューし、確定した指摘を
+敵対的検証のうえ修正した。本セクションは実装に反映済みの内容を記録する。
+
+## Critical
+
+- **admin/user トークン境界の欠如を修正**
+  - 事象: AdminUser と User が同一 `personal_access_tokens` を共有し、admin API は
+    `auth:sanctum` のみで tokenable 種別を検証していなかった。LINE ログインの
+    User トークンで管理画面 API 全権限 (店舗 CRUD / 全 PII / 口コミ改ざん /
+    LINE 一斉配信) を実行可能だった。
+  - 対策: `EnsureUserType` middleware (`user.type:admin` / `user.type:user`) を
+    追加し、admin/user 各ルートグループで tokenable モデル種別を強制。トークンに
+    abilities (`admin` / `user`) も付与 (defense-in-depth)。
+    `tests/Feature/AuthBoundaryTest.php` でクロス認証 403 を保証。
+
+## High
+
+- **LINE OAuth state を IP キー Cache → HttpOnly+SameSite=Lax cookie + hash_equals** に変更
+  (`LineAuthController`)。共有 NAT/CGNAT 配下での state 上書きによるログイン失敗・
+  login CSRF を解消。「次フェーズ項目 1」を実装。
+- **店舗 `website_url` の scheme 検証**を追加 (`StoreController`、`regex:#^https?://#i`)。
+  `javascript:`/`data:` を href に出す格納型 XSS を遮断。
+- **AI チャットの非公開店舗漏洩を修正** (`PromptBuilder::buildStoreContext` を
+  `publish_status=published` 限定に)。
+- **`.dockerignore` で `backend/.env` を除外** (`**/.env`)。本番 PHP イメージへの
+  秘密情報焼き込みを防止。
+- **空のエリア×業態 LP を noindex + JSON-LD 抑制**、sitemap も公開店舗が存在する
+  組み合わせのみ収録 (薄い/虚偽ページの index 回避)。
+
+## Medium (主なもの)
+
+- LINE OAuth callback の **トークン URL 受け渡しを単回使用の交換コード方式へ**
+  (`/api/auth/line/exchange`)。履歴・Referer 経由のトークン漏洩を防止。
+- AI チャット履歴の IP 紐づけ窓を **24h → 30 分**に短縮 (共有 IP での他人履歴混入を低減)。
+- 口コミ重複投稿の **競合状態を部分ユニークインデックスで DB 保証**
+  (`reviews_user_store_active_unique`) + 競合時の 422 ハンドリング。
+- LINE 認証 / Webhook エンドポイントに **throttle** を付与。
+- terraform: **SSH を `0.0.0.0/0` から「許可 CIDR 指定時のみ ingress 作成」へ**
+  (デフォルトは 22 番ポート閉)。
+- ai_chat_logs に `(ip_address, created_at)` インデックス追加 (上限集計のスキャン回避)。
+
+## 次フェーズ項目の進捗
+
+1. ✅ LINE OAuth state を cookie + random ベースへ (本追補で実装)
+2. ⬜ Admin login throttle `5,15` (現状 `10,10`、要検討)
+3. ⬜ Sanctum を SPA cookie モードへ (今回は交換コードでトークン漏洩面を縮小)
+4. 🔸 Policy + Gate での AdminUser RBAC (今回は middleware + abilities で境界を強制。
+   Policy 化は継続課題)
+5. ⬜ Refresh token rotation
+
 ## 監査者・実施日
 
-- 監査者: Claude Code (Opus 4.7) + 人手レビュー
-- 実施日: 2026-05-29
+- 監査者: Claude Code (Opus 4.8) + 人手レビュー
+- 初回監査: 2026-05-29 (`feat/qa-2026-05-29`)
+- リリース前ハードニング: 2026-06-02 (`feat/seo-security-hardening`)
 - 関連ブランチ: `feat/qa-2026-05-29`

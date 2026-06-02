@@ -77,7 +77,9 @@ class StoreController extends Controller
             'lng' => 'nullable|numeric|between:-180,180',
             'nearest_station' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:255',
-            'website_url' => 'nullable|string|max:2048',
+            // href に直接出力されるため http(s) scheme を強制 (javascript:/data: による
+            // 格納型 XSS を防ぐ。videos 等と同じ方針で regex は array 形式で書く)。
+            'website_url' => ['nullable', 'string', 'max:2048', 'regex:#^https?://#i'],
             'description' => 'nullable|string',
             'features_text' => 'nullable|string',
             'recent_hires_summary' => 'nullable|string|max:255',

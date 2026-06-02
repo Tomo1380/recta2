@@ -51,8 +51,9 @@ class SeoController extends Controller
     {
         $urls = [];
 
-        // Top
-        $urls[] = ['loc' => $base . '/', 'priority' => '1.0', 'changefreq' => 'daily'];
+        // Top — フロントの canonical (absoluteUrl("/") = 末尾スラッシュ無し) と
+        // 一致させるため、トップも末尾スラッシュ無しの $base を loc にする。
+        $urls[] = ['loc' => $base, 'priority' => '1.0', 'changefreq' => 'daily'];
         // Lists
         $urls[] = ['loc' => $base . '/stores', 'priority' => '0.9', 'changefreq' => 'daily'];
         $urls[] = ['loc' => $base . '/columns', 'priority' => '0.8', 'changefreq' => 'weekly'];
@@ -90,10 +91,23 @@ class SeoController extends Controller
             });
 
         // SEO ランディング: エリア LP / 業態 LP / エリア × 業態 LP
-        $visibleAreas = Area::where('visible', true)->get(['slug']);
-        $visibleCategories = Category::where('visible', true)->get(['slug']);
+        // 公開店舗が 1 件も無い組み合わせは「掲載 0 件」の薄い/空ページになり、
+        // フロント側でも noindex にしている。sitemap にも載せない (実在する
+        // 公開店舗の area / category / その組み合わせのみ収録する)。
+        $visibleAreas = Area::where('visible', true)->get(['slug', 'name']);
+        $visibleCategories = Category::where('visible', true)->get(['slug', 'name']);
+
+        // 公開店舗が存在する area 名 / category 名 / (area,category) ペアを 1 クエリずつで集計。
+        $publishedAreas = Store::where('publish_status', 'published')
+            ->distinct()->pluck('area')->filter()->flip();
+        $publishedCategories = Store::where('publish_status', 'published')
+            ->distinct()->pluck('category')->filter()->flip();
+        $publishedPairs = Store::where('publish_status', 'published')
+            ->select('area', 'category')->distinct()->get()
+            ->mapWithKeys(fn ($s) => [$s->area . "\0" . $s->category => true]);
 
         foreach ($visibleAreas as $area) {
+            if (! $publishedAreas->has($area->name)) continue;
             $urls[] = [
                 'loc' => $base . '/jobs/areas/' . $area->slug,
                 'priority' => '0.8',
@@ -102,6 +116,7 @@ class SeoController extends Controller
         }
 
         foreach ($visibleCategories as $cat) {
+            if (! $publishedCategories->has($cat->name)) continue;
             $urls[] = [
                 'loc' => $base . '/jobs/categories/' . $cat->slug,
                 'priority' => '0.8',
@@ -111,6 +126,7 @@ class SeoController extends Controller
 
         foreach ($visibleAreas as $area) {
             foreach ($visibleCategories as $cat) {
+                if (! $publishedPairs->has($area->name . "\0" . $cat->name)) continue;
                 $urls[] = [
                     'loc' => $base . '/jobs/areas/' . $area->slug . '/categories/' . $cat->slug,
                     'priority' => '0.75',

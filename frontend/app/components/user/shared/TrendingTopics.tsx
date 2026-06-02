@@ -210,7 +210,10 @@ export default function TrendingTopics({ pool }: { pool: TrendingItem[] }) {
                 }}
               >
                 <button
+                  type="button"
                   onClick={() => setOpenIdx((prev) => (prev === i ? null : i))}
+                  aria-expanded={isOpen}
+                  aria-controls={`trending-answer-${i}`}
                   className="flex items-center gap-3 px-4 w-full"
                   style={{ background: "transparent", border: "none", height: "52px", cursor: "pointer" }}
                 >
@@ -229,7 +232,7 @@ export default function TrendingTopics({ pool }: { pool: TrendingItem[] }) {
                   </svg>
                 </button>
 
-                <div style={{ height: isOpen ? `${answerHeights[i] ?? 0}px` : "0px", overflow: "hidden", transition: "height .3s cubic-bezier(.4,0,.2,1)" }}>
+                <div id={`trending-answer-${i}`} role="region" style={{ height: isOpen ? `${answerHeights[i] ?? 0}px` : "0px", overflow: "hidden", transition: "height .3s cubic-bezier(.4,0,.2,1)" }}>
                   <div ref={(el) => { answerRefs.current[i] = el; }} style={{ padding: "0 16px 14px" }}>
                     <div style={{ borderTop: "1px solid rgba(27,37,40,.06)", paddingTop: "12px" }}>
                       <div className="flex gap-2.5" style={{ marginLeft: "4px" }}>

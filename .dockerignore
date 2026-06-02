@@ -12,10 +12,15 @@ dist
 .git
 .gitignore
 
-# Environment
+# Environment — ルート直下だけでなく backend/.env 等の nested も必ず除外する
+# (素の `.env` はルートのみ matcher。`COPY backend/ ./` で backend/.env が
+#  本番イメージに焼き込まれるのを防ぐため `**/.env` を併記)
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
 
 # IDE / Editor
 .vscode

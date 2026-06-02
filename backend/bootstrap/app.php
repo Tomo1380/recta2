@@ -12,6 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // トークンの tokenable モデル種別 (AdminUser / User) を検証するガード。
+        // admin/user が同一 personal_access_tokens テーブルを共有するため、
+        // auth:sanctum だけでは認証境界が成立しない。詳細は EnsureUserType 参照。
+        $middleware->alias([
+            'user.type' => \App\Http\Middleware\EnsureUserType::class,
+        ]);
+
         // Authenticate ミドルウェアが未認証時に route('login') へ redirect
         // しようとすると、SPA 構成では `login` 名前付きルートが無いので
         // RouteNotFoundException → 500 になる。redirectGuestsTo に null 返り

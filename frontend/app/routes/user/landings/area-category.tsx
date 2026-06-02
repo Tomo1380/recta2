@@ -47,6 +47,8 @@ export function meta({
       title: "エリア × 業態の求人 | Recta",
       description: "Recta のエリア × 業態組み合わせ求人ページです。",
       path: `/jobs/areas/${areaSlug}/categories/${categorySlug}`,
+      // 該当データが無い組み合わせはインデックスさせない (薄いページ防止)。
+      noindex: true,
     });
   }
   const { area, category, stats } = data;
@@ -54,6 +56,8 @@ export function meta({
     title: `${area.name}の${category.name}求人[${stats.count}件]・体入・体験入店 | Recta`,
     description: `${area.name}の${category.name}求人を ${stats.count} 件掲載。平均時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜、体験確約 OK の店舗も。LINE で 24h 相談 OK。`,
     path: `/jobs/areas/${area.slug}/categories/${category.slug}`,
+    // 掲載 0 件の空ページはインデックスさせない (虚偽の件数・薄いコンテンツ回避)。
+    noindex: stats.count === 0,
   });
 }
 
@@ -67,7 +71,9 @@ export default function AreaCategoryLanding() {
     );
   }
 
-  const schemaJson = data.area && data.category
+  // 掲載 0 件のときは JSON-LD を出さない (ItemList が空・FAQ が「0件」と
+  // 虚偽になり構造化データの品質を下げるため)。
+  const schemaJson = data.area && data.category && data.stats.count > 0
     ? buildLandingSchema(data)
     : null;
 

@@ -145,6 +145,10 @@ function EditorialStoreCard({
             <img
               src={imageUrl}
               alt={store.name}
+              loading="lazy"
+              decoding="async"
+              width={96}
+              height={96}
               className="h-full w-full object-cover"
             />
           ) : (
@@ -605,6 +609,9 @@ export default function StoreListPage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  // API 取得失敗 (ネットワーク/サーバエラー) を「0 件」と区別するためのフラグ。
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // 比較トレイ。localStorage と同期し、SelectionBar とカードのチェック状態の SSoT。
   const [compareTray, setCompareTray] = useState<CompareTrayItem[]>([]);
 
@@ -636,8 +643,12 @@ export default function StoreListPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     fetch(buildStoreApiUrl(searchParams))
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data: PaginatedResponse) => {
         if (!cancelled) {
           setStores(data);
@@ -645,10 +656,11 @@ export default function StoreListPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) { setStores(null); setLoading(false); }
+        // 取得失敗は「0 件」ではなくエラーとして扱い、専用表示・再試行を出す。
+        if (!cancelled) { setStores(null); setLoadError(true); setLoading(false); }
       });
     return () => { cancelled = true; };
-  }, [searchParams]);
+  }, [searchParams, reloadKey]);
 
   const updateParam = useCallback(
     (key: string, value: string, resetPage = true) => {
@@ -678,7 +690,7 @@ export default function StoreListPage() {
 
   const total = stores?.total ?? 0;
   const storeList = stores?.data ?? [];
-  const isEmpty = !loading && storeList.length === 0;
+  const isEmpty = !loading && !loadError && storeList.length === 0;
 
   const areaName = areas.find((a) => a.slug === currentArea)?.name;
   const categoryName = categories.find((c) => c.slug === currentCategory)?.name;
@@ -868,6 +880,28 @@ export default function StoreListPage() {
             {Array.from({ length: 6 }).map((_, i) => (
               <EditorialCardSkeleton key={i} />
             ))}
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div
+              className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ backgroundColor: "rgba(212,175,55,0.1)" }}
+            >
+              <SearchIcon className="size-7" style={{ color: "#D4AF37" }} />
+            </div>
+            <p className="mb-2 text-base font-bold" style={{ color: "#1b2528" }}>
+              お店の情報を取得できませんでした
+            </p>
+            <p className="mb-6 text-xs" style={{ color: "rgba(27,37,40,0.5)" }}>
+              通信環境をご確認のうえ、再度お試しください
+            </p>
+            <button
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="rounded-full px-6 py-2.5 text-sm font-semibold text-white"
+              style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
+            >
+              再読み込み
+            </button>
           </div>
         ) : isEmpty ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">

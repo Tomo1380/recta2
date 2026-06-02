@@ -45,8 +45,20 @@ class AdminReviewTest extends TestCase
 
     private function createReview(array $overrides = []): Review
     {
+        // 「1 ユーザー 1 店舗につき口コミ 1 件」を DB の部分ユニークインデックスで
+        // 保証するようになったため、明示指定が無い限り口コミごとに別ユーザーを作る
+        // (= 実際の運用と同じ状態)。
+        static $counter = 0;
+        $counter++;
+
+        $userId = $overrides['user_id'] ?? User::create([
+            'line_user_id' => 'UR' . str_pad((string) $counter, 9, '0', STR_PAD_LEFT),
+            'line_display_name' => "Reviewer {$counter}",
+            'status' => 'active',
+        ])->id;
+
         return Review::create(array_merge([
-            'user_id' => $this->user->id,
+            'user_id' => $userId,
             'store_id' => $this->store->id,
             'rating' => 4,
             'body' => 'Good place to work!',

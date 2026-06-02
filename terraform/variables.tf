@@ -35,9 +35,11 @@ variable "subdomain" {
 }
 
 variable "ssh_allowed_cidrs" {
-  description = "CIDR blocks allowed to SSH to the EC2 instance"
+  # SSH を全世界に開放しない。運用元の固定 IP (例: ["203.0.113.10/32"]) を
+  # tfvars で必ず明示する。空のままだと SSH 用 ingress は作成されない設計。
+  description = "CIDR blocks allowed to SSH to the EC2 instance. 本番では運用拠点の固定IPに限定すること (空なら SSH ポートを開けない)。"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []
 }
 
 variable "github_repo" {

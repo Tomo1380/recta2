@@ -43,15 +43,23 @@ class PublicReviewController extends Controller
             ], 422);
         }
 
-        $review = Review::create([
-            'user_id' => $request->user()->id,
-            'store_id' => $store->id,
-            'rating' => $validated['rating'],
-            'body' => $validated['body'],
-            'tweet_id' => $tweetId,
-            'tweet_author_screen_name' => $tweetAuthor,
-            'status' => 'published',
-        ]);
+        try {
+            $review = Review::create([
+                'user_id' => $request->user()->id,
+                'store_id' => $store->id,
+                'rating' => $validated['rating'],
+                'body' => $validated['body'],
+                'tweet_id' => $tweetId,
+                'tweet_author_screen_name' => $tweetAuthor,
+                'status' => 'published',
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // 並行リクエストで exists() チェックをすり抜けた二重投稿は
+            // 部分ユニークインデックス (reviews_user_store_active_unique) が弾く。
+            return response()->json([
+                'message' => 'この店舗には既に口コミを投稿済みです',
+            ], 422);
+        }
 
         $review->load('store:id,name');
         return new ReviewResource($review);

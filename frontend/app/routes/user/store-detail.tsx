@@ -97,6 +97,9 @@ export function meta({
       description:
         "Recta はキャバクラ・ラウンジ・クラブの求人情報をまとめた、安心して相談できるマッチングサービスです。",
       path: `/stores/${params.slugOrId ?? ""}`,
+      // 店舗が取得できない (404/通信失敗) 場合は、ID 付き self-canonical の薄い
+      // ページをインデックスさせないよう noindex にする。
+      noindex: true,
     });
   }
   const area = store.area ? `（${store.area}）` : "";

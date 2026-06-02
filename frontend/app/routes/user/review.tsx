@@ -106,7 +106,9 @@ export default function ReviewPage() {
         body,
         tweet_url: tweetUrl || undefined,
       });
-      navigate(`/stores/${storeId}`);
+      // 店舗詳細の canonical は slug 版。ID で戻ると 301 で二重遷移するので
+      // slug があれば slug へ戻す。
+      navigate(`/stores/${store?.slug ?? storeId}`);
     } catch {
       setError("投稿に失敗しました。もう一度お試しください。");
     } finally {

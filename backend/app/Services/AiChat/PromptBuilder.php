@@ -279,7 +279,9 @@ class PromptBuilder
             return '';
         }
 
-        $store = Store::find($storeId);
+        // 公開店舗のみ context に含める。下書き/非公開店舗の詳細ページが
+        // 何らかの経路で開かれても、未公開情報を AI が漏らさないようにする。
+        $store = Store::where('publish_status', 'published')->find($storeId);
         if (!$store) {
             return '';
         }

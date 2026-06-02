@@ -117,7 +117,11 @@ class StoreResource extends JsonResource
         if (isset($this->resource->reviews_count)) {
             $merged['reviews_count'] = (int) $this->resource->reviews_count;
         }
-        if (method_exists($this->resource, 'averageRating')) {
+        // average_rating は controller 側で withAvg('reviews_avg_rating') を
+        // 事前ロードしていればそれを使い (N+1 回避)、無ければ method で都度計算。
+        if (array_key_exists('reviews_avg_rating', $this->resource->getAttributes())) {
+            $merged['average_rating'] = round((float) $this->resource->reviews_avg_rating, 1);
+        } elseif (method_exists($this->resource, 'averageRating')) {
             $merged['average_rating'] = round($this->resource->averageRating(), 1);
         }
         if ($this->resource->relationLoaded('reviews')) {

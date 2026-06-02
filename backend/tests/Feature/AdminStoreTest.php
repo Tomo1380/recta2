@@ -87,6 +87,33 @@ class AdminStoreTest extends TestCase
         ]);
     }
 
+    public function test_create_store_rejects_javascript_scheme_website_url(): void
+    {
+        // 公開ページの <a href> に直接出るため、javascript:/data: scheme は拒否する (格納型XSS防止)。
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'XSS Store',
+                'area' => '六本木',
+                'category' => 'ラウンジ',
+                'website_url' => 'javascript:alert(document.cookie)',
+            ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('website_url');
+    }
+
+    public function test_create_store_accepts_https_website_url(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'OK Store',
+                'area' => '六本木',
+                'category' => 'ラウンジ',
+                'website_url' => 'https://example.com/shop',
+            ]);
+
+        $response->assertStatus(201);
+    }
+
     public function test_admin_can_show_store(): void
     {
         $store = $this->createStore();
