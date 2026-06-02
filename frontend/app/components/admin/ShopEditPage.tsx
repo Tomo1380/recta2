@@ -48,7 +48,6 @@ import { ShopPhonePreview } from "./ShopPhonePreview";
 import StoreMap from "~/components/shared/StoreMap";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
-import BottomTabBar from "~/components/user/shared/BottomTabBar";
 
 // --- Step Definitions ---
 interface StepConfig {
@@ -2643,10 +2642,10 @@ export function ShopEditPage() {
               } satisfies StoreDetailResponse}
             />
                 </div>
-                {/* Bottom tab bar — pinned inside the iPhone shell, not the viewport */}
-                <div className="shrink-0">
-                  <BottomTabBar inline />
-                </div>
+                {/* 実サイトはボトムタブバー (トップ/一覧/LINEで相談) を撤去し
+                    右下フローティング (UserFab) に移行済み。プレビューでも旧
+                    BottomTabBar は描画せず、実際の見た目に合わせる
+                    (フローティング fab は viewport 固定要素のため mock 内では再現しない)。 */}
                 {/* Home indicator */}
                 <div className="h-6 flex items-center justify-center shrink-0">
                   <div className="w-[120px] h-[4px] bg-gray-300 rounded-full" />
