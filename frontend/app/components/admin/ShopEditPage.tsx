@@ -1259,7 +1259,7 @@ export function ShopEditPage() {
           {storeImages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {storeImages.map((url, idx) => (
-                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-square">
+                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-video">
                   <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
                   {idx === 0 && (
                     <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
@@ -1284,7 +1284,7 @@ export function ShopEditPage() {
           {galleryCropQueue.length > 0 && (
             <ImageCropDialog
               file={galleryCropQueue[0]}
-              aspect={4 / 3}
+              aspect={16 / 9}
               title={`店舗写真をトリミング（残り ${galleryCropQueue.length} 枚）`}
               onCancel={() => setGalleryCropQueue([])}
               onCropped={async (cropped) => {
