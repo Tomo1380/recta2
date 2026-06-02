@@ -28,6 +28,7 @@ import { useUserAuth } from "~/lib/user-auth";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { buildMetaTags } from "~/lib/seo";
+import { formatDateJa } from "~/lib/date";
 import { userApi } from "~/lib/api";
 import type { Review } from "~/lib/types";
 
@@ -301,9 +302,7 @@ export default function MyPage() {
                             />
                           ))}
                           <span className="ml-2 text-xs text-muted-foreground">
-                            {new Date(review.created_at).toLocaleDateString(
-                              "ja-JP",
-                            )}
+                            {formatDateJa(review.created_at)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground">

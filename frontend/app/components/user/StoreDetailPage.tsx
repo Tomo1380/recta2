@@ -51,6 +51,7 @@ import CompareToggle from "~/components/user/shared/CompareToggle";
 import StoreMap from "~/components/shared/StoreMap";
 import LuxeCard from "~/components/user/shared/LuxeCard";
 import { pushViewedStore } from "~/lib/viewed-stores";
+import { formatDateJa } from "~/lib/date";
 import { useUserAuthSafe } from "~/lib/user-auth";
 
 // ---------------------------------------------------------------------------
@@ -4007,7 +4008,7 @@ function ReviewItem({ review }: { review: Review }) {
           <div className="flex items-center gap-2">
             {renderStars(review.rating ?? 0, 12)}
             <span className="text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
-              {review.created_at ? new Date(review.created_at).toLocaleDateString("ja-JP") : ""}
+              {formatDateJa(review.created_at)}
             </span>
           </div>
         </div>
