@@ -1805,7 +1805,7 @@ export type PublicStoreHome200 = {
 
 export type PublicStoreIndexParams = {
 /**
- * 体験確約フラグでの絞り込み。フロントの「当日体入」タブ (BUG-E09)
+ * 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
  *  が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
  *  絞り込み。「体験確約」リボンを出している店舗を抽出。
  *  デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
