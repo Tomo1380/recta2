@@ -842,6 +842,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     videos={restVideos}
                     fallbackPosterUrl={sortedImages[0]?.url}
                     controller={stickyController}
+                    startIndex={firstVideo.length}
                   />
                 )}
               </>
@@ -1936,10 +1937,16 @@ function StoreVideosBlock({
   videos,
   fallbackPosterUrl,
   controller,
+  startIndex = 0,
 }: {
   videos: StoreVideo[];
   fallbackPosterUrl?: string;
   controller: StickyVideoController;
+  /** Global offset for this block's videos so the sticky-controller id stays
+   *  unique across multiple StoreVideosBlock instances on the same page.
+   *  Without it, the "first video" block and the "rest" block both start at
+   *  idx 0 → id collision → tapping video #1 also activates video #2. */
+  startIndex?: number;
 }) {
   if (videos.length === 0) return null;
   const showNumber = videos.length > 1;
@@ -1947,9 +1954,9 @@ function StoreVideosBlock({
   return (
     <div className="space-y-4">
       {videos.map((v, idx) => (
-        <LuxeCard key={`${v.video_url}-${idx}`} className="overflow-hidden">
+        <LuxeCard key={`${v.video_url}-${startIndex + idx}`} className="overflow-hidden">
           <StoreVideoSection
-            id={`video-${idx}`}
+            id={`video-${startIndex + idx}`}
             videoUrl={v.video_url}
             posterUrl={v.poster_url ?? fallbackPosterUrl ?? undefined}
             controller={controller}
