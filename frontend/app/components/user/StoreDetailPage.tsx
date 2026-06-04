@@ -23,7 +23,6 @@ import {
   Navigation,
   Sparkles,
   Map as MapIcon,
-  Wine,
   Heart,
   Calculator,
   Wallet,
@@ -3251,22 +3250,26 @@ function TransferMapSection({
               </div>
             );
           })()}
-          {/* 距離別料金の下に送りの説明を箇条書き的に表示 (BUG: ゾーン設定時に
-              説明が消えていた不具合の修正)。何時から送り出てるか等。 */}
+        </div>
+      )}
+
+      {/* 送り距離・送りの説明は足代テーブルの有無に関わらず、入力があれば表示する
+          (どちらか一方しか出ない制限を撤廃。BUG: ゾーン設定時に送り距離/説明が
+          消えていた不具合の修正)。 */}
+      {(fallbackKm || fallbackDescription) && (
+        <div className={`space-y-1 ${hasZones ? "mt-3" : ""}`}>
+          {fallbackKm && (
+            <p className="text-sm" style={{ color: "rgba(27,37,40,0.7)" }}>
+              <span style={{ color: "rgba(27,37,40,0.45)" }}>送り距離: </span>
+              {fallbackKm}
+            </p>
+          )}
           {fallbackDescription && (
-            <p className="mt-1 text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
+            <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
               {fallbackDescription}
             </p>
           )}
         </div>
-      )}
-
-      {!hasZones && hasFallback && (
-        <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
-          {fallbackKm
-            ? `${fallbackDescription ?? "送りあり"}（${fallbackKm}以内）`
-            : fallbackDescription}
-        </p>
       )}
     </SectionCard>
   );
@@ -3310,7 +3313,7 @@ function ChampagnePricesSection({
       {/* Custom dark slab — we bypass SectionCard's white surface because the
           editorial menu vibe depends on the whole panel being dark. */}
       <div
-        className="relative px-5 py-7"
+        className="relative px-4 py-4"
         style={{
           // ベースは深い緑黒。元は ambient gold orb を右上に重ねていたが、
           // orb の bounding-box 右端と下端で透明境界が直線になって「黒と
@@ -3329,9 +3332,9 @@ function ChampagnePricesSection({
             {/* Title — Japanese-primary because this is for job seekers
                 gauging per-bottle revenue (= potential bottle-back commission),
                 not a customer-facing wine list. */}
-            <div className="relative mb-5 text-center">
+            <div className="relative mb-3 text-center">
               <h3
-                className="m-0 text-[19px] font-bold leading-tight"
+                className="m-0 text-[17px] font-bold leading-tight"
                 style={{
                   color: "#f7d976",
                   fontFamily: "'Noto Sans JP','Outfit',sans-serif",
@@ -3348,7 +3351,7 @@ function ChampagnePricesSection({
                 上に明示的なテキストブロックを置く。 */}
             {fallback && (
               <p
-                className="relative mb-5 whitespace-pre-line text-center text-sm leading-relaxed"
+                className="relative mb-3 whitespace-pre-line text-center text-[13px] leading-relaxed"
                 style={{
                   color: "rgba(255,255,255,0.82)",
                   fontFamily: "'Noto Sans JP', sans-serif",
@@ -3360,18 +3363,20 @@ function ChampagnePricesSection({
 
             {/* 2x2 グリッド — 画像主体。ローマ字(筆記体)は廃止し、ボトル画像を
                 大きく見せてシャンパン名＋価格だけ添える。 */}
-            <ul className="relative grid grid-cols-2 gap-3">
+            <ul className="relative grid grid-cols-2 gap-2">
               {visible.map(({ tpl, item }) => {
                 const src = item!.image_url || tpl.defaultImage;
                 return (
                   <li
                     key={tpl.key}
-                    className="relative flex flex-col items-center gap-1.5 rounded-xl px-3 py-4"
+                    className="relative flex flex-col items-center gap-0.5 rounded-xl px-2 py-2"
                     style={{
                       background: "rgba(255,255,255,0.04)",
                       border: "1px solid rgba(212,175,55,0.18)",
                     }}
                   >
+                    {/* 画像サイズは維持 (h-96/maxWidth72)。周囲の余白だけ詰めて
+                        セクション全体の高さを抑える。 */}
                     <img
                       src={src}
                       alt={tpl.kanaName}
@@ -3387,7 +3392,7 @@ function ChampagnePricesSection({
                       }}
                     />
                     <p
-                      className="mt-1 text-center text-[13px] font-semibold leading-tight"
+                      className="text-center text-[12px] font-semibold leading-tight"
                       style={{
                         color: "#f7d976",
                         fontFamily: "'Noto Sans JP', sans-serif",
@@ -3396,14 +3401,14 @@ function ChampagnePricesSection({
                       {tpl.kanaName}
                     </p>
                     <p
-                      className="tabular-nums text-[13px] font-semibold"
+                      className="tabular-nums text-[12px] font-semibold leading-tight"
                       style={{ fontFamily: "'Outfit', sans-serif", color: "#ffe066" }}
                     >
                       ¥{formatYen(item!.amount)}
                     </p>
                     {item!.note && (
                       <p
-                        className="text-center text-[9.5px]"
+                        className="text-center text-[9.5px] leading-tight"
                         style={{
                           color: "rgba(255,255,255,0.45)",
                           fontFamily: "'Noto Sans JP', sans-serif",
@@ -3417,30 +3422,11 @@ function ChampagnePricesSection({
               })}
             </ul>
 
-            {/* Footer ornament */}
-            <div className="relative mt-5 flex items-center justify-center gap-2">
-              <span
-                aria-hidden
-                style={{
-                  width: 32,
-                  height: 1,
-                  background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.7))",
-                }}
-              />
-              <Wine size={11} style={{ color: "rgba(212,175,55,0.85)" }} aria-hidden />
-              <span
-                aria-hidden
-                style={{
-                  width: 32,
-                  height: 1,
-                  background: "linear-gradient(90deg, rgba(212,175,55,0.7), transparent)",
-                }}
-              />
-            </div>
+            {/* Footer ornament は高さ削減のため撤去 (運営要望: セクションを短く)。 */}
             {/* Disclaimer — make it obvious these numbers are reference values
                 so users don't take them as the venue's actual current menu. */}
             <p
-              className="relative mt-2 text-center text-[10px] leading-relaxed"
+              className="relative mt-2.5 text-center text-[10px] leading-relaxed"
               style={{
                 color: "rgba(255,255,255,0.45)",
                 fontFamily: "'Noto Sans JP', sans-serif",
