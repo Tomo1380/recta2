@@ -1884,7 +1884,7 @@ export function ShopEditPage() {
             />
           </Field>
           {/* バックは月本数で変わる複雑な体系もそのまま書けるようフリーテキスト。 */}
-          <Field label="バック" hint="同伴/本指名/場内など。改行して自由に記載できます（公開ページにも改行が反映されます）">
+          <Field label="バック" hint="同伴/本指名/場内など、自由に記載できます">
             <TextArea
               value={backText}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBackText(e.target.value)}
@@ -2182,7 +2182,7 @@ export function ShopEditPage() {
     <div className="space-y-6">
       <SectionCard title="面接・採用" icon={UserCheck} previewAnchor="interview" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          <Field label="採用基準" hint="改行して2〜3行で書けます（公開ページにも改行が反映されます）">
+          <Field label="採用基準" hint="採用時に重視するポイントを記載">
             <TextArea
               value={hiringCriteria}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -2539,7 +2539,7 @@ export function ShopEditPage() {
       <SectionCard title="店舗まとめ" icon={FileText} previewAnchor="summary" onFocusEnter={handlePreviewFocus}>
         <Field
           label="まとめ本文"
-          hint="改行と [表示文字](/columns/xxx) 形式の内部リンクが使えます（公開ページの「【店名】まとめ」に表示）"
+          hint="入力すると公開ページに店舗まとめとして表示されます（空欄なら非表示）"
         >
           <TextArea
             value={summaryText}
@@ -2554,7 +2554,7 @@ export function ShopEditPage() {
         <div className="space-y-5">
           {/* OK例/NG例は廃止し「説明＋ドレス例画像」に簡素化。黒やロングがNGか等は
               説明に書き、スナイデル/シーン等の参考写真は画像で掲載する。 */}
-          <Field label="ドレスコード説明" hint="例: 黒・ロングはNG / 明るめのミニドレス推奨 / 貸し出しあり（改行可）">
+          <Field label="ドレスコード説明" hint="例: 黒・ロングはNG / 明るめのミニドレス推奨 / 貸し出しあり">
             <TextArea
               value={dressCodeDescription}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
