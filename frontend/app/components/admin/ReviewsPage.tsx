@@ -262,7 +262,11 @@ export function ReviewsPage() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between">
-            <p className="text-[12px] text-muted-foreground">{total} 件</p>
+            <p className="text-[13px] text-muted-foreground">
+              {total === 0
+                ? "0 件"
+                : `全 ${total} 件中 ${(page - 1) * 20 + 1}–${(page - 1) * 20 + reviews.length} 件`}
+            </p>
             <div className="flex items-center gap-0.5">
               <button
                 className="p-1.5 rounded-md hover:bg-muted transition disabled:opacity-30"

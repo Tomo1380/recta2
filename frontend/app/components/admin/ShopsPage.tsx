@@ -124,13 +124,19 @@ export function ShopsPage() {
           <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}>店舗管理</h2>
           <p className="text-[13px] text-muted-foreground mt-0.5">登録店舗の一覧と管理</p>
         </div>
-        <button
-          onClick={() => navigate("/admin/shops/new")}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          新規作成
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] text-muted-foreground flex items-center gap-1.5">
+            <Star className="w-4 h-4" />
+            全 {totalCount} 件
+          </span>
+          <button
+            onClick={() => navigate("/admin/shops/new")}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            新規作成
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -271,7 +277,11 @@ export function ShopsPage() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-[12px] text-muted-foreground">{totalCount} 件</p>
+        <p className="text-[13px] text-muted-foreground">
+          {totalCount === 0
+            ? "0 件"
+            : `全 ${totalCount} 件中 ${(page - 1) * 20 + 1}–${(page - 1) * 20 + stores.length} 件`}
+        </p>
         <div className="flex items-center gap-0.5">
           <button
             disabled={page <= 1}
