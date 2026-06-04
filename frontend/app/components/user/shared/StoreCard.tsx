@@ -111,7 +111,7 @@ export default function StoreCard({
         {/* Price overlay on bottom of image */}
         {(hourly_min || hourly_max) && (
           <div className="absolute bottom-2 left-2.5 text-[13px] font-semibold text-white">
-            時給 {formatHourly(hourly_min)}〜{formatHourly(hourly_max)}
+            体入時給 {formatHourly(hourly_min)}〜{formatHourly(hourly_max)}
           </div>
         )}
       </div>

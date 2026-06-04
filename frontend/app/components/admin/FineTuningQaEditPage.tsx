@@ -151,9 +151,9 @@ export function FineTuningQaEditPage({
         : store.area;
       const wage =
         store.hourly_min && store.hourly_max
-          ? `時給${store.hourly_min.toLocaleString()}〜${store.hourly_max.toLocaleString()}円`
+          ? `体入時給${store.hourly_min.toLocaleString()}〜${store.hourly_max.toLocaleString()}円`
           : store.hourly_min
-            ? `時給${store.hourly_min.toLocaleString()}円〜`
+            ? `体入時給${store.hourly_min.toLocaleString()}円〜`
             : "";
       const line = `\n・[STORE:${store.id}] ${store.name}（${stationPart}）${wage}`;
       return { ...f, answer: f.answer.trimEnd() + line };
@@ -498,7 +498,7 @@ export function FineTuningQaEditPage({
                         {store.area}
                         {store.nearest_station ? ` / ${store.nearest_station}` : ""}
                         {store.hourly_min || store.hourly_max
-                          ? ` / 時給${(store.hourly_min ?? 0).toLocaleString()}〜${(store.hourly_max ?? 0).toLocaleString()}円`
+                          ? ` / 体入時給${(store.hourly_min ?? 0).toLocaleString()}〜${(store.hourly_max ?? 0).toLocaleString()}円`
                           : ""}
                       </div>
                     )}
@@ -592,7 +592,7 @@ export function FineTuningQaEditPage({
                             {s.area}
                             {s.nearest_station ? ` / ${s.nearest_station}` : ""}
                             {s.hourly_min || s.hourly_max
-                              ? ` / 時給${(s.hourly_min ?? 0).toLocaleString()}〜${(s.hourly_max ?? 0).toLocaleString()}円`
+                              ? ` / 体入時給${(s.hourly_min ?? 0).toLocaleString()}〜${(s.hourly_max ?? 0).toLocaleString()}円`
                               : ""}
                           </div>
                         </div>

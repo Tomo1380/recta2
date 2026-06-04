@@ -62,8 +62,10 @@ class AdminStoreTest extends TestCase
             'area' => '六本木',
             'category' => 'ラウンジ',
             'publish_status' => 'draft',
-            'hourly_min' => 3000,
-            'hourly_max' => 8000,
+            // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+            // フロントは体入時給を文字列で送る (BUG-013)。
+            'trial_hourly_min' => '3000',
+            'trial_hourly_max' => '8000',
             'description' => 'A nice lounge',
             'feature_tags' => ['未経験歓迎', 'ノルマなし'],
         ];
@@ -77,8 +79,11 @@ class AdminStoreTest extends TestCase
                 'area' => '六本木',
                 'category' => 'ラウンジ',
                 'publish_status' => 'draft',
+                // hourly_min/max は体入時給のエイリアス。
                 'hourly_min' => 3000,
                 'hourly_max' => 8000,
+                'trial_hourly_min' => 3000,
+                'trial_hourly_max' => 8000,
             ]);
 
         $this->assertDatabaseHas('stores', [
@@ -159,13 +164,16 @@ class AdminStoreTest extends TestCase
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/admin/stores/{$store->id}", [
                 'name' => 'Updated Store',
-                'hourly_min' => 5000,
+                // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+                'trial_hourly_min' => '5000',
             ]);
 
         $response->assertStatus(200)
             ->assertJson([
                 'name' => 'Updated Store',
+                // hourly_min は体入時給のエイリアス。
                 'hourly_min' => 5000,
+                'trial_hourly_min' => 5000,
             ]);
 
         $this->assertDatabaseHas('stores', [

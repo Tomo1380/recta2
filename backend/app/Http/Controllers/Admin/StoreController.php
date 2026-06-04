@@ -100,9 +100,7 @@ class StoreController extends Controller
             // wage は freeform array だが、金額キーは number 強制 (string で
             // 「1,500円」が混入すると比較ページ等で計算が破綻する)。
             'wage' => 'nullable|array',
-            'wage.regular.min' => 'nullable|integer|min:0',
-            'wage.regular.max' => 'nullable|integer|min:0',
-            'wage.regular.unit' => 'nullable|string|in:hour,day',
+            // 通常時給 (wage.regular) は廃止。給与は体入時給 (wage.trial) に一本化。
             'wage.trial.hourly_min' => 'nullable|integer|min:0',
             'wage.trial.hourly_max' => 'nullable|integer|min:0',
             'wage.trial.days' => 'nullable|integer|min:0',
@@ -353,7 +351,7 @@ class StoreController extends Controller
     {
         return [
             'business_hours', 'opening_time', 'closing_time', 'holidays', 'shift_info',
-            'hourly_min', 'hourly_max', 'daily_estimate',
+            'daily_estimate',
             'back_items', 'fee_items', 'salary_notes', 'back_text',
             'pay_system_types', 'pay_system_note',
             'guarantee_period', 'guarantee_details', 'norma_info', 'same_day_trial',
@@ -374,8 +372,6 @@ class StoreController extends Controller
             'closing_time' => 'nullable|string|max:10',
             'holidays' => 'nullable|string|max:255',
             'shift_info' => 'nullable|string|max:255',
-            'hourly_min' => 'nullable|integer|min:0',
-            'hourly_max' => 'nullable|integer|min:0',
             'daily_estimate' => 'nullable|string|max:255',
             'back_items' => 'nullable|array',
             'back_items.*.label' => 'required|string',
@@ -441,12 +437,8 @@ class StoreController extends Controller
             $data['schedule'] = $schedule;
         }
 
-        // wage
+        // wage — 通常時給 (regular) は廃止。給与は体入時給 (trial) に一本化。
         $wage = $data['wage'] ?? [];
-        $regular = $wage['regular'] ?? [];
-        if (array_key_exists('hourly_min', $legacy)) $regular['min'] = $legacy['hourly_min'];
-        if (array_key_exists('hourly_max', $legacy)) $regular['max'] = $legacy['hourly_max'];
-        if (!empty($regular)) $wage['regular'] = $regular;
 
         $trial = $wage['trial'] ?? [];
         // 新キー優先で書き込み。旧キーが来た場合は最低=avg, 最高=hourly に

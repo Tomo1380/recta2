@@ -844,7 +844,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 営業
               </div>
-              <div className="mt-0.5 text-[10.5px] font-semibold leading-tight" style={{ color: "#1b2528" }}>
+              <div className="mt-0.5 text-[12px] font-bold tabular-nums leading-[1.15]" style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}>
                 {store.opening_time && store.closing_time
                   ? `${store.opening_time}〜${store.closing_time}`
                   : store.business_hours || "—"}
@@ -3804,7 +3804,7 @@ function SalarySimulatorSection({
         {/* Sliders — ClaudeDesign style with custom gold thumb */}
         <div className="space-y-4 pt-1">
           <LuxeSimSlider
-            label="時給"
+            label="体入時給"
             value={hourly}
             min={1500}
             max={Math.max(hourlyMaxBound, 10000)}
@@ -3841,7 +3841,7 @@ function SalarySimulatorSection({
           }}
         >
           <SimBreakdownRow
-            label={`時給×時間（${hoursPerDay}h × ${daysPerMonth}日）`}
+            label={`体入時給×時間（${hoursPerDay}h × ${daysPerMonth}日）`}
             value={`¥${wage.toLocaleString()}`}
           />
           <SimBreakdownRow
@@ -4163,7 +4163,7 @@ function RelatedStoresSection({
                   className="mt-0.5 text-[10px]"
                   style={{ color: GOLD_HEX, fontWeight: 600 }}
                 >
-                  時給 {formatWageRange(s.hourly_min, s.hourly_max) ?? "—"}
+                  体入時給 {formatWageRange(s.hourly_min, s.hourly_max) ?? "—"}
                 </p>
               )}
             </div>

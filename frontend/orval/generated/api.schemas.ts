@@ -1927,34 +1927,9 @@ export const StoresStoreBodyPublishStatus = {
   draft: 'draft',
 } as const;
 
-/**
- * @nullable
- */
-export type StoresStoreBodyWageRegularUnit = typeof StoresStoreBodyWageRegularUnit[keyof typeof StoresStoreBodyWageRegularUnit] | null;
-
-
-export const StoresStoreBodyWageRegularUnit = {
-  hour: 'hour',
-  day: 'day',
-} as const;
-
-export type StoresStoreBodyWageRegular = {
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  min?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  max?: number | null;
-  /** @nullable */
-  unit?: StoresStoreBodyWageRegularUnit;
-};
-
 export type StoresStoreBodyWageTrial = {
   /**
+     * 通常時給 (wage.regular) は廃止。給与は体入時給 (wage.trial) に一本化。
      * @minimum 0
      * @nullable
      */
@@ -1986,7 +1961,6 @@ export type StoresStoreBodyWage = {
      * @nullable
      */
   daily_estimate_max?: number | null;
-  regular?: StoresStoreBodyWageRegular;
   trial?: StoresStoreBodyWageTrial;
 };
 
@@ -2308,32 +2282,6 @@ export const StoresUpdateBodySameDayTrial = {
   none: 'none',
 } as const;
 
-/**
- * @nullable
- */
-export type StoresUpdateBodyWageRegularUnit = typeof StoresUpdateBodyWageRegularUnit[keyof typeof StoresUpdateBodyWageRegularUnit] | null;
-
-
-export const StoresUpdateBodyWageRegularUnit = {
-  hour: 'hour',
-  day: 'day',
-} as const;
-
-export type StoresUpdateBodyWageRegular = {
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  min?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  max?: number | null;
-  /** @nullable */
-  unit?: StoresUpdateBodyWageRegularUnit;
-};
-
 export type StoresUpdateBodyWageTrial = {
   /**
      * @minimum 0
@@ -2363,7 +2311,6 @@ export type StoresUpdateBodyWage = {
      * @nullable
      */
   daily_estimate_max?: number | null;
-  regular?: StoresUpdateBodyWageRegular;
   trial?: StoresUpdateBodyWageTrial;
 };
 
@@ -2646,16 +2593,6 @@ export type StoresUpdateBody = {
      * @nullable
      */
   shift_info?: string | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  hourly_min?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  hourly_max?: number | null;
   /**
      * @maxLength 255
      * @nullable

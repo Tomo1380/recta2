@@ -83,7 +83,7 @@ class PromptBuilder
             "パイプ区切り（|）で各店舗の情報が並んでいます。カラムの意味:\n" .
             "- ID: 店舗ID（[STORE:ID]マーカーに使用）\n" .
             "- 店名/エリア/最寄り駅/カテゴリ: 基本情報\n" .
-            "- 時給MIN/時給MAX: 時給範囲（円）。「高時給」「稼ぎたい」→ 時給MAXが高い店を優先\n" .
+            "- 体入時給MIN/体入時給MAX: 体入時給範囲（円）。「高時給」「稼ぎたい」→ 体入時給MAXが高い店を優先\n" .
             "- 開始時刻/終了時刻: 営業時間。「○時まで働きたい」→ 終了時刻が条件を満たす店のみ紹介。LASTは閉店時刻不定（深夜対応）\n" .
             "- 日払い体系: 給与支払い方法（全額日払い/日払い可/月2回等）。「日払い」→ 全額日払いか日払い可の店\n" .
             "- 体入: 体入の可否と時給（当日OK/体入○○円等）\n" .
@@ -99,7 +99,7 @@ class PromptBuilder
 
             "【店舗データの参照方法】\n" .
             "- 店舗を紹介する時は、必ず[STORE:ID]マーカーを店名の直前に付ける\n" .
-            "- 例: [STORE:12] Club Lumière（六本木/六本木駅）時給5,000円〜\n" .
+            "- 例: [STORE:12] Club Lumière（六本木/六本木駅）体入時給5,000円〜\n" .
             "- マーカーがあると、ユーザーの画面に店舗カードが自動表示される\n" .
             "- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）\n" .
             "- 店舗データに載っていないお店は紹介してはいけない\n\n" .
@@ -128,7 +128,7 @@ class PromptBuilder
             "7. 枕営業・性的サービスへの誘導と受け取られる回答は禁止\n\n" .
 
             "【給与・待遇に関する詳細ルール】\n" .
-            "- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
+            "- 体入時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）\n" .
             "- バック率・日給は「目安」「実績による」等の注釈を付ける\n" .
             "- 保証期間がある場合は積極的に言及する（安心材料になる）\n" .
             "- 体入の有無と体入時給も重要情報として紹介する\n" .
@@ -166,15 +166,15 @@ class PromptBuilder
             "- 店舗紹介は1店舗あたり1〜2行で簡潔に\n" .
             "- 全体で300〜500文字程度が目安\n" .
             "- 各店舗は以下の形式で紹介:\n" .
-            "  ・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜\n" .
+            "  ・[STORE:ID] 店名（エリア/最寄り駅）体入時給○,○○○円〜\n" .
             "    [1行で特徴やおすすめポイント]\n\n" .
 
             "【回答例】\n" .
             "ユーザー: 未経験で働けるお店ある？\n\n" .
             "回答: 未経験でも安心して始められるお店を探してみました！\n\n" .
-            "・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜\n" .
+            "・[STORE:5] Lounge Étoile（六本木/六本木駅）体入時給4,000円〜\n" .
             "  研修制度が充実していて未経験でも安心。保証期間もあります\n\n" .
-            "・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜\n" .
+            "・[STORE:8] Lounge Brilliance（銀座/銀座駅）体入時給3,500円〜\n" .
             "  ノルマなしで気楽に働ける環境。体験確約OK・全額日払いです\n\n" .
             "体入で雰囲気を確かめてから決めるのがおすすめです！\n\n" .
             "もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
@@ -249,7 +249,7 @@ class PromptBuilder
             "【回答フォーマット（店舗紹介時）】\n" .
             "①共感の1文（「未経験でも安心して始められるお店を探してみました！」等）\n" .
             "②店舗カード 2〜3件（必ず[STORE:ID]マーカー付き）\n" .
-            "  ・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜\n" .
+            "  ・[STORE:ID] 店名（エリア/最寄り駅）体入時給○,○○○円〜\n" .
             "   [特徴1行]\n" .
             "③選び方のヒント（「体入で雰囲気を確かめてから決めるのがおすすめです」等）\n" .
             "④LINE誘導（必須・省略禁止）: もっと詳しく知りたい方は、LINEで担当者に直接相談できます！\n\n" .
@@ -290,18 +290,20 @@ class PromptBuilder
         $wage        = is_array($store->wage)         ? $store->wage         : [];
         $compensation= is_array($store->compensation) ? $store->compensation : [];
         $guarantee   = is_array($store->guarantee)    ? $store->guarantee    : [];
-        $regular     = $wage['regular'] ?? [];
         $trial       = $wage['trial']   ?? [];
 
-        $hourlyMin = $regular['min'] ?? '';
-        $hourlyMax = $regular['max'] ?? '';
+        // 通常時給は廃止。給与は体入時給に一本化 (旧キーはフォールバック)。
+        $hourlyMin = $trial['hourly_min'] ?? $trial['avg_hourly'] ?? '';
+        $hourlyMax = $trial['hourly_max'] ?? $trial['hourly'] ?? '';
         $businessHours = $schedule['hours_text'] ?? '';
         $holidays = $schedule['holidays'] ?? '';
         $dailyEstimate = $wage['daily_estimate'] ?? null;
         $norma = $guarantee['norma'] ?? null;
         $guaranteePeriod = $guarantee['period'] ?? null;
         $guaranteeDetails = $guarantee['details'] ?? '';
-        $sameDayTrial = (bool) ($guarantee['same_day_trial'] ?? false);
+        // same_day_trial は enum string ('same_day' | 'normal' | 'none')。
+        // 旧 boolean ではなくなったため (bool) キャスト禁止 ('none' が真になる)。
+        $trialType = $guarantee['same_day_trial'] ?? 'none';
         // 体入時給は最低/最高の2枠。旧データ (hourly 単一) もフォールバック。
         // プロンプトには 1 値だけ載せれば十分なので最低額を優先。
         $trialHourly = $trial['hourly_min']
@@ -311,8 +313,9 @@ class PromptBuilder
             ?? '';
 
         $tags = implode(', ', $store->feature_tags ?? []);
+        // back item は新 shape {label, value, unit}。旧 'amount' もフォールバック。
         $backs = collect($compensation['back'] ?? [])
-            ->map(fn ($b) => ($b['label'] ?? '') . ':' . ($b['amount'] ?? ''))
+            ->map(fn ($b) => ($b['label'] ?? '') . ':' . ($b['value'] ?? $b['amount'] ?? ''))
             ->filter(fn ($b) => $b !== ':')
             ->implode(', ');
 
@@ -320,7 +323,7 @@ class PromptBuilder
             "店名: {$store->name}\n" .
             "エリア: {$store->area}（{$store->nearest_station}）\n" .
             "カテゴリ: {$store->category}\n" .
-            "時給: {$hourlyMin}〜{$hourlyMax}円\n" .
+            "体入時給: {$hourlyMin}〜{$hourlyMax}円\n" .
             "営業時間: {$businessHours}\n" .
             "定休日: {$holidays}\n";
 
@@ -328,7 +331,8 @@ class PromptBuilder
         if ($backs) $context .= "バック: {$backs}\n";
         if ($norma) $context .= "ノルマ: {$norma}\n";
         if ($guaranteePeriod) $context .= "保証: {$guaranteePeriod} {$guaranteeDetails}\n";
-        if ($sameDayTrial) $context .= "体験確約: OK（体入時給: {$trialHourly}）\n";
+        if ($trialType === 'same_day') $context .= "体験確約: OK（体入時給: {$trialHourly}）\n";
+        elseif ($trialType === 'normal') $context .= "体入: 可能（体入時給: {$trialHourly}）\n";
         if ($tags) $context .= "特徴: {$tags}\n";
         $context .= "説明: {$store->description}\n";
         if ($store->features_text) $context .= "詳細特徴: {$store->features_text}\n";
@@ -342,10 +346,10 @@ class PromptBuilder
      */
     public function buildPipeDelimitedStoreData(): string
     {
-        return Cache::remember('public_stores_pipe_v3', 600, function () {
+        return Cache::remember('public_stores_pipe_v4', 600, function () {
             $stores = Store::where('publish_status', 'published')->get();
 
-            $header = "ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|開始時刻|終了時刻|日払い体系|体入|保証|ノルマ|ランク|わいわい度|ゆるさ度|ドレスコード|送り|特徴タグ|説明";
+            $header = "ID|店名|エリア|最寄り駅|カテゴリ|体入時給MIN|体入時給MAX|開始時刻|終了時刻|日払い体系|体入|保証|ノルマ|ランク|わいわい度|ゆるさ度|ドレスコード|送り|特徴タグ|説明";
             $lines = [$header];
 
             foreach ($stores as $s) {
@@ -354,15 +358,21 @@ class PromptBuilder
                 $guarantee   = is_array($s->guarantee)    ? $s->guarantee    : [];
                 $castProfile = is_array($s->cast_profile) ? $s->cast_profile : [];
                 $dressCodeArr= is_array($s->dress_code)   ? $s->dress_code   : [];
-                $regular     = $wage['regular'] ?? [];
                 $trialArr    = $wage['trial']   ?? [];
                 $payrollArr  = $wage['payroll'] ?? [];
 
+                // 通常時給は廃止。体入時給 (最低/最高) を列に出す。
+                $trialMin = $trialArr['hourly_min'] ?? $trialArr['avg_hourly'] ?? '';
+                $trialMax = $trialArr['hourly_max'] ?? $trialArr['hourly'] ?? '';
+
                 $tags = implode(',', $s->feature_tags ?? []);
                 $payroll = $payrollArr['type'] ?? '';
-                $trialHourly = $trialArr['hourly'] ?? '';
-                $sameDay = (bool) ($guarantee['same_day_trial'] ?? false);
-                $trial = $sameDay ? "当日OK({$trialHourly})" : ($trialHourly ? "体入{$trialHourly}" : '');
+                $trialHourly = $trialArr['hourly_min'] ?? $trialArr['avg_hourly'] ?? $trialArr['hourly'] ?? '';
+                // same_day_trial は enum string ('same_day'|'normal'|'none')。
+                $trialType = $guarantee['same_day_trial'] ?? 'none';
+                $trial = $trialType === 'same_day'
+                    ? "当日OK({$trialHourly})"
+                    : ($trialType === 'normal' ? ($trialHourly ? "体入{$trialHourly}" : '体入あり') : '');
                 $guaranteeStr = $guarantee['period'] ?? '';
                 $norma = mb_substr(str_replace('|', '/', $guarantee['norma'] ?? ''), 0, 30);
                 $rank = $s->rank ?? '';
@@ -378,7 +388,7 @@ class PromptBuilder
                 $lines[] = implode('|', [
                     $s->id, $s->name, $s->area, $s->nearest_station ?? '',
                     $s->category ?? '',
-                    $regular['min'] ?? '', $regular['max'] ?? '',
+                    $trialMin, $trialMax,
                     $schedule['open']  ?? '', $schedule['close'] ?? '',
                     $payroll, $trial, $guaranteeStr, $norma, $rank,
                     $waiwai, $loose, $dressCodeStr, $transfer, $tags, $desc,

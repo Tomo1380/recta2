@@ -510,7 +510,7 @@ export default function TopPage({
                     {(store.hourly_min || store.hourly_max) && (
                       <div className="absolute bottom-2.5 left-2.5 right-2.5">
                         <p style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "13px", color: "white", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>
-                          時給 {store.hourly_min?.toLocaleString()}〜{store.hourly_max?.toLocaleString()}円
+                          体入時給 {store.hourly_min?.toLocaleString()}〜{store.hourly_max?.toLocaleString()}円
                         </p>
                       </div>
                     )}

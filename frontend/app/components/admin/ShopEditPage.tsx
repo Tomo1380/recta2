@@ -831,8 +831,7 @@ export function ShopEditPage() {
   // 施設写真（トイレ/更衣室/セット場所 等）の編集 state。
   type FacilityPhotoDraft = { image_url: string; caption: string };
   const [facilityPhotos, setFacilityPhotos] = useState<FacilityPhotoDraft[]>([]);
-  const [minWage, setMinWage] = useState("");
-  const [maxWage, setMaxWage] = useState("");
+  // 通常時給 (minWage/maxWage) は廃止。給与は体入時給 (trialMinWage/Max) に一本化。
   const [dailyPay, setDailyPay] = useState("");
   const [paySystemTypes, setPaySystemTypes] = useState<string[]>([]);
   const [paySystemNote, setPaySystemNote] = useState("");
@@ -1071,8 +1070,6 @@ export function ShopEditPage() {
     if (f.videos !== undefined) setVideos(f.videos);
     if (f.staffPhotos !== undefined) setStaffPhotos(f.staffPhotos);
     if (f.facilityPhotos !== undefined) setFacilityPhotos(f.facilityPhotos);
-    if (f.minWage !== undefined) setMinWage(f.minWage);
-    if (f.maxWage !== undefined) setMaxWage(f.maxWage);
     if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
     if (f.paySystemTypes !== undefined) setPaySystemTypes(f.paySystemTypes);
     if (f.paySystemNote !== undefined) setPaySystemNote(f.paySystemNote);
@@ -1220,7 +1217,7 @@ export function ShopEditPage() {
       shopName, area, address, lat, lng, station, category,
       openingTime, closingTime, holiday, phone, website,
       videos, staffPhotos, facilityPhotos,
-      minWage, maxWage, dailyPay,
+      dailyPay,
       paySystemTypes, paySystemNote, backText,
       payrollCycle, payrollPayDay, dailyPayLimit,
       backItems, feeItems, salaryNote,
@@ -1245,7 +1242,7 @@ export function ShopEditPage() {
     shopName, area, address, lat, lng, station, category,
     openingTime, closingTime, holiday, phone, website,
     videos, staffPhotos,
-    minWage, maxWage, dailyPay,
+    dailyPay,
     paySystemTypes, paySystemNote, backText,
     payrollCycle, payrollPayDay, dailyPayLimit,
     backItems, feeItems, salaryNote,
@@ -1433,8 +1430,8 @@ export function ShopEditPage() {
     !!(shopName && area && category && station && address && openingTime && closingTime),
     // Step2: 画像・動画
     storeImages.length > 0 || videos.length > 0 || staffPhotos.length > 0,
-    // Step3: 報酬・体入
-    !!(minWage && maxWage),
+    // Step3: 報酬・体入 (通常時給は廃止。体入時給の入力で完了とみなす)
+    !!(trialMinWage && trialMaxWage),
     // Step4: 分析・面接
     !!(hiringCriteria || interviewDialog.length > 0 || expLevel > 0 || atmosphere > 0),
     // Step5: 価格・サービス
@@ -3023,8 +3020,10 @@ export function ShopEditPage() {
                   shift_info: shiftInfo || null,
                   phone: phone,
                   website_url: website,
-                  hourly_min: minWage ? Number(minWage) : null,
-                  hourly_max: maxWage ? Number(maxWage) : null,
+                  // 通常時給は廃止。hourly_min/max は体入時給のエイリアス
+                  // (給与シミュレータ等の後方互換)。プレビューも体入時給を流す。
+                  hourly_min: trialMinWage ? Number(trialMinWage) : null,
+                  hourly_max: trialMaxWage ? Number(trialMaxWage) : null,
                   daily_estimate: dailyPay || null,
                   back_items: backItems
                     .filter((b) => b.label)

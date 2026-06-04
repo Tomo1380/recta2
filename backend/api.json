@@ -6271,35 +6271,6 @@
                                                 ],
                                                 "minimum": 0
                                             },
-                                            "regular": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "min": {
-                                                        "type": [
-                                                            "integer",
-                                                            "null"
-                                                        ],
-                                                        "minimum": 0
-                                                    },
-                                                    "max": {
-                                                        "type": [
-                                                            "integer",
-                                                            "null"
-                                                        ],
-                                                        "minimum": 0
-                                                    },
-                                                    "unit": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ],
-                                                        "enum": [
-                                                            "hour",
-                                                            "day"
-                                                        ]
-                                                    }
-                                                }
-                                            },
                                             "trial": {
                                                 "type": "object",
                                                 "properties": {
@@ -6308,6 +6279,7 @@
                                                             "integer",
                                                             "null"
                                                         ],
+                                                        "description": "\u901a\u5e38\u6642\u7d66 (wage.regular) \u306f\u5ec3\u6b62\u3002\u7d66\u4e0e\u306f\u4f53\u5165\u6642\u7d66 (wage.trial) \u306b\u4e00\u672c\u5316\u3002",
                                                         "minimum": 0
                                                     },
                                                     "hourly_max": {
@@ -6967,20 +6939,6 @@
                                         ],
                                         "maxLength": 255
                                     },
-                                    "hourly_min": {
-                                        "type": [
-                                            "integer",
-                                            "null"
-                                        ],
-                                        "minimum": 0
-                                    },
-                                    "hourly_max": {
-                                        "type": [
-                                            "integer",
-                                            "null"
-                                        ],
-                                        "minimum": 0
-                                    },
                                     "daily_estimate": {
                                         "type": [
                                             "string",
@@ -7144,35 +7102,6 @@
                                                     "null"
                                                 ],
                                                 "minimum": 0
-                                            },
-                                            "regular": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "min": {
-                                                        "type": [
-                                                            "integer",
-                                                            "null"
-                                                        ],
-                                                        "minimum": 0
-                                                    },
-                                                    "max": {
-                                                        "type": [
-                                                            "integer",
-                                                            "null"
-                                                        ],
-                                                        "minimum": 0
-                                                    },
-                                                    "unit": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ],
-                                                        "enum": [
-                                                            "hour",
-                                                            "day"
-                                                        ]
-                                                    }
-                                                }
                                             },
                                             "trial": {
                                                 "type": "object",

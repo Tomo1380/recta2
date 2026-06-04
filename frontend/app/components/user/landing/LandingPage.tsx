@@ -118,7 +118,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
         <div className="grid grid-cols-3 gap-3 text-center">
           <Stat label="掲載店舗" value={`${stats.count}`} suffix="店" />
           <Stat
-            label="時給レンジ"
+            label="体入時給レンジ"
             value={
               stats.hourly_min && stats.hourly_max
                 ? `¥${formatYen(stats.hourly_min)}〜¥${formatYen(stats.hourly_max)}`
@@ -126,7 +126,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
             }
           />
           <Stat
-            label="平均最低時給"
+            label="平均最低体入時給"
             value={stats.avg_hourly_min ? `¥${formatYen(stats.avg_hourly_min)}` : "-"}
           />
         </div>
@@ -170,7 +170,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
                     </p>
                     {store.hourly_min && (
                       <p className="mt-1 text-[12px] tabular-nums" style={{ color: GOLD, fontWeight: 600 }}>
-                        時給 ¥{formatYen(store.hourly_min)}
+                        体入時給 ¥{formatYen(store.hourly_min)}
                         {store.hourly_max ? `〜¥${formatYen(store.hourly_max)}` : "〜"}
                       </p>
                     )}

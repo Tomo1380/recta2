@@ -21,9 +21,9 @@ const DARK = "#1b2528";
 
 function formatHourly(min?: number, max?: number): string | null {
   if (!min && !max) return null;
-  if (min && max) return `時給 ¥${min.toLocaleString()}〜¥${max.toLocaleString()}`;
-  if (min) return `時給 ¥${min.toLocaleString()}〜`;
-  return `時給 〜¥${max!.toLocaleString()}`;
+  if (min && max) return `体入時給 ¥${min.toLocaleString()}〜¥${max.toLocaleString()}`;
+  if (min) return `体入時給 ¥${min.toLocaleString()}〜`;
+  return `体入時給 〜¥${max!.toLocaleString()}`;
 }
 
 export default function RecentlyViewedStores({

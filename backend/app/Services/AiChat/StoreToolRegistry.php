@@ -30,7 +30,7 @@ class StoreToolRegistry
         return [
             [
                 'name' => 'search_stores',
-                'description' => '条件に合うナイトワーク求人を検索する。エリア・カテゴリ・時給・特徴タグ・最寄り駅・体入・保証制度などで絞り込み可能。条件が曖昧な場合はkeywordでフリーワード検索を使う。必ず何かしらの検索を実行すること。',
+                'description' => '条件に合うナイトワーク求人を検索する。エリア・カテゴリ・体入時給・特徴タグ・最寄り駅・体入・保証制度などで絞り込み可能。条件が曖昧な場合はkeywordでフリーワード検索を使う。必ず何かしらの検索を実行すること。',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
@@ -44,11 +44,11 @@ class StoreToolRegistry
                         ],
                         'min_hourly' => [
                             'type' => 'integer',
-                            'description' => '最低時給の下限（例: 3000 → 時給3000円以上のお店）',
+                            'description' => '体入時給の下限（例: 3000 → 体入時給3000円以上のお店）',
                         ],
                         'max_hourly' => [
                             'type' => 'integer',
-                            'description' => '時給の上限（例: 5000 → 時給5000円以下のお店。初心者向けなど）',
+                            'description' => '体入時給の上限（例: 5000 → 体入時給5000円以下のお店。初心者向けなど）',
                         ],
                         'tags' => [
                             'type' => 'array',
@@ -74,7 +74,7 @@ class StoreToolRegistry
                         'sort' => [
                             'type' => 'string',
                             'enum' => ['newest', 'hourly_desc', 'hourly_asc', 'popular'],
-                            'description' => 'ソート順（newest: 新着順, hourly_desc: 時給高い順, hourly_asc: 時給低い順, popular: 人気順）',
+                            'description' => 'ソート順（newest: 新着順, hourly_desc: 体入時給高い順, hourly_asc: 体入時給低い順, popular: 人気順）',
                         ],
                         'limit' => [
                             'type' => 'integer',
@@ -85,7 +85,7 @@ class StoreToolRegistry
             ],
             [
                 'name' => 'get_store_detail',
-                'description' => '特定の店舗の全詳細情報を取得する。時給・バック・ノルマ・保証・体入・雰囲気・営業時間・スタッフコメントなど。search_storesの結果から店舗IDを指定。比較質問やより詳しい情報が必要な場合に使う。',
+                'description' => '特定の店舗の全詳細情報を取得する。体入時給・バック・ノルマ・保証・体入・雰囲気・営業時間・スタッフコメントなど。search_storesの結果から店舗IDを指定。比較質問やより詳しい情報が必要な場合に使う。',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
@@ -160,11 +160,15 @@ class StoreToolRegistry
         if (!empty($args['category'])) {
             $query->where('category', 'ilike', "%{$args['category']}%");
         }
+        // 時給絞り込みは「体入時給」基準 (通常時給は廃止)。新キー hourly_min を
+        // 優先し、旧キー avg_hourly にフォールバック。単位付き文字列 ("5,000円")
+        // も拾えるよう数字以外を除去してから数値比較する。
+        $trialMinExpr = "NULLIF(regexp_replace(COALESCE(wage->'trial'->>'hourly_min', wage->'trial'->>'avg_hourly', ''), '[^0-9]', '', 'g'), '')::numeric";
         if (!empty($args['min_hourly'])) {
-            $query->where('wage->regular->min', '>=', (int) $args['min_hourly']);
+            $query->whereRaw("{$trialMinExpr} >= ?", [(int) $args['min_hourly']]);
         }
         if (!empty($args['max_hourly'])) {
-            $query->where('wage->regular->min', '<=', (int) $args['max_hourly']);
+            $query->whereRaw("{$trialMinExpr} <= ?", [(int) $args['max_hourly']]);
         }
         if (!empty($args['nearest_station'])) {
             $query->where('nearest_station', 'ilike', "%{$args['nearest_station']}%");
@@ -203,10 +207,13 @@ class StoreToolRegistry
             }
         }
 
+        // 並び替えも体入時給基準。最高額は hourly_max→hourly→hourly_min→avg_hourly、
+        // 最低額は hourly_min→avg_hourly の順でフォールバック。
+        $trialMaxExpr = "NULLIF(regexp_replace(COALESCE(wage->'trial'->>'hourly_max', wage->'trial'->>'hourly', wage->'trial'->>'hourly_min', wage->'trial'->>'avg_hourly', ''), '[^0-9]', '', 'g'), '')::numeric";
         $sort = $args['sort'] ?? 'newest';
         match ($sort) {
-            'hourly_desc' => $query->orderBy('wage->regular->max', 'desc'),
-            'hourly_asc' => $query->orderBy('wage->regular->min', 'asc'),
+            'hourly_desc' => $query->orderByRaw("{$trialMaxExpr} DESC NULLS LAST"),
+            'hourly_asc' => $query->orderByRaw("{$trialMinExpr} ASC NULLS LAST"),
             'popular' => $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])->orderByDesc('reviews_count'),
             default => $query->orderByDesc('created_at'),
         };
@@ -238,7 +245,6 @@ class StoreToolRegistry
         $interview   = is_array($store->interview)    ? $store->interview    : [];
         $castProfile = is_array($store->cast_profile) ? $store->cast_profile : [];
         $dressCode   = is_array($store->dress_code)   ? $store->dress_code   : [];
-        $regular     = $wage['regular']  ?? [];
         $trial       = $wage['trial']    ?? [];
         $payroll     = $wage['payroll']  ?? [];
 
@@ -251,8 +257,9 @@ class StoreToolRegistry
             'category' => $store->category,
             'business_hours' => $schedule['hours_text'] ?? null,
             'holidays' => $schedule['holidays'] ?? null,
-            'hourly_min' => $regular['min'] ?? null,
-            'hourly_max' => $regular['max'] ?? null,
+            // 通常時給は廃止。hourly_min/max は体入時給のエイリアス (表示後方互換)。
+            'hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+            'hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
             'daily_estimate' => $wage['daily_estimate'] ?? null,
             'back_items' => $compensation['back'] ?? null,
             'fee_items' => $compensation['fees'] ?? null,
@@ -281,9 +288,6 @@ class StoreToolRegistry
             'age_point' => $castProfile['age'] ?? null,
             'waiwai_point' => $castProfile['waiwai'] ?? null,
             'cute_point' => $castProfile['cute'] ?? null,
-            'unit_wage_type' => isset($regular['unit'])
-                ? ($regular['unit'] === 'day' ? '日給' : '時給')
-                : null,
             'payroll_system_type' => $payroll['type'] ?? null,
             'payroll_system_description' => $payroll['description'] ?? null,
             'dress_code' => $dressCode['description'] ?? null,
@@ -428,7 +432,6 @@ class StoreToolRegistry
         $schedule  = is_array($s->schedule) ? $s->schedule : [];
         $wage      = is_array($s->wage) ? $s->wage : [];
         $guarantee = is_array($s->guarantee) ? $s->guarantee : [];
-        $regular   = $wage['regular'] ?? [];
         $trial     = $wage['trial'] ?? [];
         $payroll   = $wage['payroll'] ?? [];
         $dressCode = is_array($s->dress_code) ? $s->dress_code : [];
@@ -439,8 +442,9 @@ class StoreToolRegistry
             'area' => $s->area,
             'category' => $s->category,
             'nearest_station' => $s->nearest_station,
-            'hourly_min' => $regular['min'] ?? null,
-            'hourly_max' => $regular['max'] ?? null,
+            // 通常時給は廃止。hourly_min/max は体入時給のエイリアス (表示後方互換)。
+            'hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+            'hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
             'daily_estimate' => $wage['daily_estimate'] ?? null,
             // 体入タイプ: 'same_day' | 'normal' | 'none' (enum string)
             'trial_type' => in_array($guarantee['same_day_trial'] ?? null, ['same_day', 'normal', 'none'], true)

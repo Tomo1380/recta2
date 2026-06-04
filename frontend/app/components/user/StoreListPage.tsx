@@ -258,7 +258,7 @@ function EditorialStoreCard({
               ように読まれるので、ラベル以外は同じ色・同じウェイトで揃える。 */}
           {(store.hourly_min || store.hourly_max) && (
             <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>時給</span>
+              <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>体入時給</span>
               {store.hourly_min ? (
                 <span
                   className="text-[14px] font-bold tabular-nums leading-none"

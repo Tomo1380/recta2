@@ -385,7 +385,7 @@ function getIntroScript(
     const s = storeInfo;
     const hourly =
       s.hourly_min && s.hourly_max
-        ? `時給${formatCurrencyShort(s.hourly_min)}〜${formatCurrencyShort(s.hourly_max)}円`
+        ? `体入時給${formatCurrencyShort(s.hourly_min)}〜${formatCurrencyShort(s.hourly_max)}円`
         : "";
     const location = [s.area, s.nearest_station].filter(Boolean).join("・");
     const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
@@ -1443,7 +1443,7 @@ export default function AiChatPanel({
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
                               {(store.hourly_min != null || store.hourly_max != null) && (
                                 <span className="font-medium" style={{ color: "#D4AF37" }}>
-                                  {formatWage(store.hourly_min, store.hourly_max)}
+                                  体入 {formatWage(store.hourly_min, store.hourly_max)}
                                 </span>
                               )}
                               {store.nearest_station && (

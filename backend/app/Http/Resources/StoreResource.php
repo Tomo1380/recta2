@@ -36,7 +36,6 @@ class StoreResource extends JsonResource
         $interview    = $this->pickArray('interview');
         $dressCode    = $this->pickArray('dress_code');
 
-        $regular = $wage['regular'] ?? [];
         $trial   = $wage['trial'] ?? [];
         $payroll = $wage['payroll'] ?? [];
 
@@ -51,18 +50,20 @@ class StoreResource extends JsonResource
             'holidays'        => $schedule['holidays']   ?? null,
             'shift_info'      => $schedule['shift_info'] ?? null,
 
-            // wage
-            'hourly_min'      => self::toInt($regular['min'] ?? null),
-            'hourly_max'      => self::toInt($regular['max'] ?? null),
-            'unit_wage_type'  => self::wageUnitToLabel($regular['unit'] ?? null),
+            // wage — 通常時給 (wage.regular) は廃止。サイトの「時給」は体入時給に一本化した。
+            // 体入時給は最低/最高の2枠。旧データ (avg_hourly=平均 / hourly=単一値) は
+            // 最低=avg, 最高=hourly にフォールバック。
+            'trial_hourly_min' => self::toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
+            'trial_hourly_max' => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
+            // hourly_min/max は「サイトで表示する時給」= 体入時給 のエイリアス。
+            // 旧 wage.regular は読まない (通常時給は廃止)。一覧カード/ランディング/
+            // 給与シミュレータ等、既存の hourly_min/max 参照箇所の後方互換のため残す。
+            'hourly_min'      => self::toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
+            'hourly_max'      => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
             // daily_estimate は旧 string と新 min/max の両対応。
             'daily_estimate'      => self::toInt($wage['daily_estimate'] ?? null), // 後方互換
             'daily_estimate_min'  => self::toInt($wage['daily_estimate_min'] ?? null),
             'daily_estimate_max'  => self::toInt($wage['daily_estimate_max'] ?? null),
-            // 体入時給は最低/最高の2枠で公開。旧データ (avg_hourly=平均 /
-            // hourly=単一値) は最低=avg, 最高=hourly にフォールバック。
-            'trial_hourly_min' => self::toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
-            'trial_hourly_max' => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
             'payroll_system_type'        => $payroll['type']        ?? null,
             'payroll_system_description' => $payroll['description'] ?? null,
             // 給与サイクル/給料日/日払い上限 (旧 payroll_system_type は後方互換で残置)
@@ -109,7 +110,7 @@ class StoreResource extends JsonResource
             // 済むよう resolved 結果も meta フィールドとして同梱する。
             //   - seo_meta_description: 運営入力の生値 (null 可)
             //   - meta_description: 表示用 (常に文字列)
-            'meta_description' => self::resolveMetaDescription($this->resource, $regular, $trial),
+            'meta_description' => self::resolveMetaDescription($this->resource, $trial),
         ];
 
         $merged = array_merge($base, $flat);
@@ -211,10 +212,9 @@ class StoreResource extends JsonResource
      * 「【エリア】のカテゴリ・店名。時給◯◯円〜、体入可。features_text 先頭60字」
      * の形で自動生成する。140 字以内を目安に丸める。
      *
-     * @param  array<string, mixed>  $regular
      * @param  array<string, mixed>  $trial
      */
-    private static function resolveMetaDescription(Store $store, array $regular, array $trial): string
+    private static function resolveMetaDescription(Store $store, array $trial): string
     {
         $manual = trim((string) ($store->seo_meta_description ?? ''));
         if ($manual !== '') {
@@ -236,17 +236,13 @@ class StoreResource extends JsonResource
             $parts[] = $head . '。';
         }
 
-        $hourlyMin = $regular['min'] ?? null;
-        $hourlyMax = $regular['max'] ?? null;
-        if ($hourlyMin || $hourlyMax) {
-            $lo = $hourlyMin ? number_format((int) $hourlyMin) . '円' : '';
-            $hi = $hourlyMax ? number_format((int) $hourlyMax) . '円' : '';
-            $parts[] = '時給' . ($lo !== '' && $hi !== '' ? "{$lo}〜{$hi}" : $lo . $hi) . '。';
-        }
-
-        $trialHourly = $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null;
-        if ($trialHourly) {
-            $parts[] = '体入時給' . number_format((int) $trialHourly) . '円〜。';
+        // 通常時給は廃止。給与は体入時給 (最低〜最高) に一本化。
+        $trialMin = $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null;
+        $trialMax = $trial['hourly_max'] ?? $trial['hourly'] ?? null;
+        if ($trialMin || $trialMax) {
+            $lo = $trialMin ? number_format((int) $trialMin) . '円' : '';
+            $hi = $trialMax ? number_format((int) $trialMax) . '円' : '';
+            $parts[] = '体入時給' . ($lo !== '' && $hi !== '' ? "{$lo}〜{$hi}" : $lo . $hi) . '。';
         }
 
         $features = trim((string) ($store->features_text ?? $store->description ?? ''));

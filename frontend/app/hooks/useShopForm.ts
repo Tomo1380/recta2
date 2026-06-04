@@ -79,9 +79,7 @@ export interface ShopForm {
   /** 施設写真 (トイレ/更衣室/セット場所 等) */
   facilityPhotos: FacilityPhotoDraft[];
 
-  // 給与・待遇
-  minWage: string;
-  maxWage: string;
+  // 給与・待遇 (通常時給 minWage/maxWage は廃止。給与は体入時給 trialMinWage/Max に一本化)
   dailyPay: string;
   /** 給料システム (複数選択: 完全時給制 / 時給+バック など) */
   paySystemTypes: string[];
@@ -195,7 +193,7 @@ export const INITIAL_FORM: ShopForm = {
   shopName: "", area: "", address: "", lat: null, lng: null, station: "",
   category: "", openingTime: "", closingTime: "", holiday: "", phone: "", website: "",
   videos: [], staffPhotos: [], facilityPhotos: [],
-  minWage: "", maxWage: "", dailyPay: "",
+  dailyPay: "",
   paySystemTypes: [], paySystemNote: "",
   backText: "", backItems: [], feeItems: [], salaryNote: "",
   payrollCycle: "", payrollPayDay: "", dailyPayLimit: "",
@@ -449,8 +447,6 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     videos,
     staffPhotos,
     facilityPhotos,
-    minWage: store.hourly_min?.toString() ?? "",
-    maxWage: store.hourly_max?.toString() ?? "",
     dailyPay: store.daily_estimate ?? "",
     paySystemTypes: Array.isArray(store.pay_system_types) ? store.pay_system_types : [],
     paySystemNote: store.pay_system_note ?? "",
@@ -631,10 +627,8 @@ export function formToPayload(
         image_url: p.image_url.trim(),
         caption: p.caption.trim() || null,
       })),
-    hourly_min: form.minWage ? Number(form.minWage) : null,
-    hourly_max: form.maxWage ? Number(form.maxWage) : null,
-    // 日給目安は手入力を廃止し「体入時給 × 1日4時間」で自動算出する
-    // (体入日給)。通常時給の項目を撤去したため、計算元は体入時給に一本化。
+    // 通常時給 (hourly_min/max) は廃止したため payload に含めない。
+    // 日給目安は手入力を廃止し「体入時給 × 1日4時間」で自動算出する (体入日給)。
     daily_estimate: trialDailyEstimate(form.trialMinWage, form.trialMaxWage),
     back_text: form.backText.trim() || null,
     pay_system_types: form.paySystemTypes,
