@@ -811,7 +811,7 @@ export default function ComparePage({ ids }: ComparePageProps) {
         {
           // 比較表は 1 値のみ表示できるので、最低額 (新キー or 旧 avg_hourly)
           // を優先。空ならフォールバック (旧 trial_hourly → 最高額)。
-          label: "体験時給",
+          label: "体入時給",
           values: valid.map((s) => {
             const v = s.trial_hourly_min ?? s.trial_avg_hourly ?? s.trial_hourly_max ?? s.trial_hourly;
             const n = v != null && v !== "" ? Number(v) : undefined;

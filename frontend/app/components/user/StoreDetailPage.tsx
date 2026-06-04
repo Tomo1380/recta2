@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import { Link } from "react-router";
+import { trialDailyEstimate } from "~/lib/wage";
 
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -346,6 +347,56 @@ interface StoreDetailPageProps {
  * 明示するため、もう片方を空白にする (¥0 とは表示しない)。
  * 両方空なら null を返す (呼び出し側で EmptyValue にフォールバック)。
  */
+/**
+ * 店舗の特徴テキストを表示する。SEO 目的で長文＆改行ありを想定。
+ * - 改行をそのまま反映 (whitespace-pre-line)
+ * - `[表示文字](URL)` 記法をリンク化（回遊用にコラム等へ内部リンクを貼れる）
+ *   - "/" 始まりは同一サイト内リンク → React Router <Link>
+ *   - http(s):// などは外部リンク → 新規タブ
+ */
+const FEATURE_LINK_RE = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+
+function FeatureText({ text }: { text: string }) {
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  for (const m of text.matchAll(FEATURE_LINK_RE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) nodes.push(text.slice(last, idx));
+    const [whole, label, url] = m;
+    const linkClass = "text-primary underline underline-offset-2 hover:opacity-80";
+    if (url.startsWith("/")) {
+      nodes.push(
+        <Link key={key++} to={url} className={linkClass}>
+          {label}
+        </Link>,
+      );
+    } else {
+      nodes.push(
+        <a
+          key={key++}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          {label}
+        </a>,
+      );
+    }
+    last = idx + whole.length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return (
+    <p
+      className="text-sm leading-relaxed whitespace-pre-line"
+      style={{ color: "rgba(27,37,40,0.65)" }}
+    >
+      {nodes}
+    </p>
+  );
+}
+
 function formatWageRange(
   min: number | string | null | undefined,
   max: number | string | null | undefined,
@@ -733,13 +784,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               border: "1px solid rgba(27,37,40,0.06)",
             }}
           >
-            {/* 体験時給・時給は「最低〜最高」のレンジで表示。片方欠けてたら
+            {/* 体入時給・体入日給は「最低〜最高」のレンジで表示。片方欠けてたら
                 「¥8,000〜」「〜¥10,000」のように見せる (空欄であることを明示)。
                 4 セル横並びで桁が多いと 1 行に収まらないので、レンジは 2 行
-                ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。 */}
+                ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。
+                通常時給 (本入店後) は表示せず、体入日給 (体入時給×4時間) を出す。 */}
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                体験時給
+                体入時給
               </div>
               <QuickRangeValue
                 min={store.trial_hourly_min ?? store.trial_avg_hourly}
@@ -749,13 +801,22 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                時給
+                体入日給
               </div>
-              <QuickRangeValue
-                min={store.hourly_min}
-                max={store.hourly_max}
-                color="#1b2528"
-              />
+              {(() => {
+                // 体入日給 = 体入時給 × 1日4時間 (lib/wage.ts と同じ計算元)。
+                const x4 = (v: number | string | null | undefined): number | null => {
+                  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
+                  return Number.isFinite(n) && n > 0 ? n * 4 : null;
+                };
+                return (
+                  <QuickRangeValue
+                    min={x4(store.trial_hourly_min ?? store.trial_avg_hourly)}
+                    max={x4(store.trial_hourly_max ?? store.trial_hourly)}
+                    color="#1b2528"
+                  />
+                );
+              })()}
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
@@ -869,7 +930,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 const display = formatWageRange(min, max);
                 return (
                   <InfoRow
-                    label="体験時給"
+                    label="体入時給"
                     value={display ?? <EmptyValue />}
                   />
                 );
@@ -988,9 +1049,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             previewAnchor="shop-info"
           >
             {store.features_text && (
-              <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.65)" }}>
-                {store.features_text}
-              </p>
+              <FeatureText text={store.features_text} />
             )}
 
             {/* Feature tags — 管理画面 STEP3 で入力された特徴タグ (BUG-008) */}
@@ -1020,20 +1079,15 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               <InfoRow label="業種" value={store.category} />
               <InfoRow label="エリア" value={store.area} />
               <InfoRow label="最寄り駅" value={store.nearest_station} />
-              {/* いくら */}
+              {/* いくら: 本入店後の通常時給は表示しない。給与は体入時給を起点に
+                  「体入日給 = 体入時給 × 1日4時間」で算出した値だけ出す
+                  (計算元は lib/wage.ts に一本化)。 */}
               {(() => {
-                const range = formatWageRange(store.hourly_min, store.hourly_max);
-                return range ? <InfoRow label="時給" value={range} /> : null;
-              })()}
-              {(() => {
-                const raw = store.daily_estimate;
-                const isEmpty =
-                  raw == null ||
-                  (typeof raw === "string" && raw.trim() === "") ||
-                  (typeof raw === "number" && raw <= 0);
-                return isEmpty ? null : (
-                  <InfoRow label="日給目安" value={formatCurrency(raw)} />
+                const daily = trialDailyEstimate(
+                  store.trial_hourly_min ?? store.trial_avg_hourly,
+                  store.trial_hourly_max ?? store.trial_hourly,
                 );
+                return daily ? <InfoRow label="体入日給" value={daily} /> : null;
               })()}
               {/* いつ */}
               <InfoRow

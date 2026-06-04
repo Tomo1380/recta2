@@ -7,6 +7,7 @@ import { useFileUpload } from "~/hooks/useFileUpload";
 import { ImageCropDialog } from "~/components/admin/ImageCropDialog";
 import { formToPayload, storeToForm, type ShopForm } from "~/hooks/useShopForm";
 import type { Store } from "~/lib/types";
+import { trialDailyEstimate } from "~/lib/wage";
 import {
   ArrowLeft,
   ArrowRight,
@@ -187,6 +188,15 @@ function Field({
   );
 }
 
+/**
+ * HEIC/HEIF (iPhone 標準形式) かどうか。ブラウザは HEIC を canvas で描画できず
+ * クライアント側トリミングが失敗するため、これらは生のままアップロードして
+ * サーバ側で JPEG 変換させる (= トリミングを迂回する) 判定に使う。
+ */
+function isHeicFile(f: File): boolean {
+  return /\.(heic|heif)$/i.test(f.name) || /hei[cf]/i.test(f.type);
+}
+
 function TextInput({
   placeholder = "",
   value = "",
@@ -258,6 +268,43 @@ function SelectInput({
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * 入力もできるドロップダウン (combobox)。候補は datalist で出しつつ、
+ * 候補にない値も自由入力できる。営業時間・面接時間など「だいたい決まった
+ * 選択肢だが例外も許したい」項目に使う。listId は datalist の id として
+ * ページ内で一意である必要がある。
+ */
+function ComboInput({
+  value = "",
+  onChange,
+  options,
+  placeholder = "",
+  listId,
+}: {
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  options: string[];
+  placeholder?: string;
+  listId: string;
+}) {
+  return (
+    <>
+      <input
+        list={listId}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/50"
+      />
+      <datalist id={listId}>
+        {options.map((o: string) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
+    </>
   );
 }
 
@@ -440,10 +487,64 @@ function SliderField({
  * 返ってきた public URL を value に流す。
  * StaffPhotosEditor / DressCode OK・NG など複数箇所で再利用。
  */
-// ImageUrlInput (URL 入力 + 「画像を選択」ボタン) は元々ドレスコード
-// OK/NG / 在籍女性ギャラリー /etc の単一画像 URL フィールドで使っていた。
-// ドレスコード OK/NG の画像を廃止した結果 consumer が無くなったので削除。
-// 必要になったら git history から取り戻せる。
+// ImageUrlInput (URL 入力 + 「画像を選択」ボタン)。URL 直貼りだけでなく、
+// その場でファイルを選んでアップロードもできる単一画像 URL フィールド。
+// レクタ経由エピソードの写真など「URL 欄しかなくて貼りにくい」箇所で使う。
+// HEIC/HEIF (iPhone) も選択でき、サーバ側で JPEG に変換される。
+function ImageUrlInput({
+  value,
+  onChange,
+  kind,
+  placeholder = "https://...",
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  kind: string;
+  placeholder?: string;
+}) {
+  const { uploadFile, uploading, error } = useFileUpload(kind);
+  return (
+    <div>
+      <div className="flex gap-2 items-start">
+        <div className="flex-1">
+          <TextInput
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+          />
+        </div>
+        <label
+          className="shrink-0 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-border bg-white text-[12px] cursor-pointer hover:bg-accent transition"
+          aria-disabled={uploading}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          {uploading ? "アップ中..." : "画像を選択"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif"
+            className="hidden"
+            disabled={uploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              const url = await uploadFile(file);
+              if (url) onChange(url);
+            }}
+          />
+        </label>
+      </div>
+      {value && (
+        <img
+          src={value}
+          alt=""
+          className="mt-2 h-20 w-20 rounded-lg object-cover border border-border"
+        />
+      )}
+      {error && <p className="mt-1 text-[11px] text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 function ImageUploadZone({
   onUpload,
@@ -471,7 +572,7 @@ function ImageUploadZone({
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif"
         multiple
         className="hidden"
         onChange={(e) => {
@@ -492,7 +593,7 @@ function ImageUploadZone({
         {uploading ? "アップロード中..." : disabled ? "先に店舗を保存してください" : "ドラッグ&ドロップまたはクリックしてアップロード"}
       </p>
       <p className="text-xs text-muted-foreground/60 mt-1.5">
-        PNG, JPG, WEBP（最大5MB）
+        PNG, JPG, WEBP, HEIC（最大5MB / iPhoneの写真もOK）
       </p>
     </div>
   );
@@ -509,7 +610,7 @@ function ImageUpload() {
         ドラッグ&ドロップまたはクリックしてアップロード
       </p>
       <p className="text-xs text-muted-foreground/60 mt-1.5">
-        PNG, JPG, WEBP（最大5MB）
+        PNG, JPG, WEBP, HEIC（最大5MB / iPhoneの写真もOK）
       </p>
     </div>
   );
@@ -726,13 +827,60 @@ export function ShopEditPage() {
     error: shopImageError,
   } = useShopImages(isNew ? null : (id ?? null));
 
-  // 店舗ギャラリー画像: アップロード前にトリミングする。選択/ドロップされた
-  // 複数ファイルをキューに積み、1 枚ずつ ImageCropDialog で切り抜いて upload。
+  // 店舗ギャラリー画像。通常はアップロード前にブラウザでトリミングするが、
+  // HEIC/HEIF (iPhone 標準) はブラウザが canvas で描画できずトリミングできない
+  // ため、生のままサーバへ送って JPEG 変換してもらう (= サーバ側変換)。
   const [galleryCropQueue, setGalleryCropQueue] = useState<File[]>([]);
-  const enqueueGalleryFiles = useCallback((files: FileList | File[]) => {
-    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imgs.length > 0) setGalleryCropQueue(imgs);
-  }, []);
+
+  // 新規店舗 (まだ id がない) では店舗紐付けの画像エンドポイントが使えないため、
+  // 親非依存の汎用アップロード (useFileUpload) で URL を取得し storeImages に積む。
+  // 保存時に payload の images として店舗本体と一緒に作成する。
+  const { uploadFile: uploadGalleryFile, uploading: uploadingGalleryNew } =
+    useFileUpload("store-extra");
+
+  // 既存店舗はフックの remove (サーバ側 images を更新)、新規店舗はまだ保存前なので
+  // ローカル state から取り除くだけ。
+  const handleRemoveShopImage = useCallback(
+    (idx: number) => {
+      if (isNew) {
+        setStoreImages(storeImages.filter((_, i) => i !== idx));
+      } else {
+        removeShopImage(idx);
+      }
+    },
+    [isNew, storeImages, setStoreImages, removeShopImage],
+  );
+
+  // 1 枚アップロードする共通ハンドラ。新規/既存でアップロード先が違うだけで、
+  // 結果は storeImages に反映される。トリミング済み JPEG でも生 HEIC でも使える。
+  const uploadGalleryImage = useCallback(
+    async (file: File) => {
+      if (isNew) {
+        const url = await uploadGalleryFile(file);
+        if (url) setStoreImages((prev) => [...prev, url]);
+      } else {
+        await uploadShopImages([file]);
+      }
+    },
+    [isNew, uploadGalleryFile, setStoreImages, uploadShopImages],
+  );
+
+  const enqueueGalleryFiles = useCallback(
+    (files: FileList | File[]) => {
+      const arr = Array.from(files);
+      // HEIC はトリミングできないので即サーバへ (サーバで JPEG 変換)。
+      const heic = arr.filter(isHeicFile);
+      // それ以外でブラウザが画像と認識できるものだけトリミングキューへ。
+      const cropable = arr.filter(
+        (f) => !isHeicFile(f) && f.type.startsWith("image/"),
+      );
+      if (cropable.length > 0) setGalleryCropQueue(cropable);
+      heic.forEach((f) => {
+        void uploadGalleryImage(f);
+      });
+    },
+    [uploadGalleryImage],
+  );
 
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
   // エリア/業種カテゴリのマスタ。マスタテーブルと options が乖離するとSelectの復元が壊れる
@@ -965,7 +1113,13 @@ export function ShopEditPage() {
     try {
       const payload = buildPayload();
       if (isNew) {
-        const created = await api.post<Store>("/admin/stores", payload);
+        // 新規作成では保存前にアップロード済みの画像 URL を images として
+        // 店舗本体と一緒に永続化する (既存店舗は別エンドポイントで管理済み)。
+        const createPayload = {
+          ...payload,
+          images: storeImages.map((url, order) => ({ url, order })),
+        };
+        const created = await api.post<Store>("/admin/stores", createPayload);
         setSaveSuccess(true);
         setTimeout(() => navigate(`/admin/shops/${created.id}/edit`, { replace: true }), 1000);
       } else {
@@ -979,7 +1133,7 @@ export function ShopEditPage() {
       setSaving(false);
     }
   }, [
-    isNew, id, buildPayload, navigate,
+    isNew, id, buildPayload, navigate, storeImages,
     shopName, area, category, station, address, openingTime, closingTime,
     stepFlow,
   ]);
@@ -1159,17 +1313,21 @@ export function ShopEditPage() {
               }
             />
           </Field>
-          <Field label="営業時間（開始）" required>
-            <TextInput
+          <Field label="営業時間（開始）" required hint="候補から選択、または直接入力できます">
+            <ComboInput
+              listId="opening-time-options"
               value={openingTime}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setOpeningTime(e.target.value)}
+              onChange={(e) => setOpeningTime(e.target.value)}
+              options={["19:00", "20:00", "21:00"]}
               placeholder="例: 20:00"
             />
           </Field>
-          <Field label="営業時間（終了）" required>
-            <TextInput
+          <Field label="営業時間（終了）" required hint="候補から選択、または直接入力できます">
+            <ComboInput
+              listId="closing-time-options"
               value={closingTime}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setClosingTime(e.target.value)}
+              onChange={(e) => setClosingTime(e.target.value)}
+              options={["1:00", "LAST"]}
               placeholder="例: 1:00 / LAST"
             />
           </Field>
@@ -1196,32 +1354,10 @@ export function ShopEditPage() {
               />
             </Field>
           </div>
-          {/* 時給/日給目安/シフト は管理画面上「店舗情報」の一部として扱う。
-              ユーザー画面の店舗情報カードにも同じ並びで出る。詳細な給与
-              (バック / 控除 / 保証 / ノルマ等) は STEP2「報酬・待遇」へ。 */}
-          <Field label="時給の最低額（円）">
-            <TextInput
-              type="number"
-              value={minWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMinWage(e.target.value)}
-              placeholder="4000"
-            />
-          </Field>
-          <Field label="時給の最高額（円）">
-            <TextInput
-              type="number"
-              value={maxWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMaxWage(e.target.value)}
-              placeholder="8000"
-            />
-          </Field>
-          <Field label="日給目安">
-            <TextInput
-              value={dailyPay}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPay(e.target.value)}
-              placeholder="例: 30000〜60000"
-            />
-          </Field>
+          {/* 給与は「体入時給(最低/最高)」と、そこから自動算出する「体入日給」に
+              一本化した (本入店後の通常時給は撤去)。入力欄は下の「体入(体験入店)
+              情報」セクションに集約している。シフト/詳細給与 (バック/控除/保証/
+              ノルマ等) は STEP2「報酬・待遇」へ。 */}
           <div className="md:col-span-2">
             <Field label="シフト">
               <TextArea
@@ -1253,7 +1389,7 @@ export function ShopEditPage() {
       <div className="space-y-5">
         <Field
           label="店舗画像"
-          hint={isNew ? "店舗を保存した後に画像をアップロードできます。" : "最大10枚まで。1枚目がサムネイルになります。"}
+          hint="最大10枚まで。1枚目がサムネイルになります。スマホの写真もそのままアップロードできます。"
         >
           {storeImages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -1266,7 +1402,7 @@ export function ShopEditPage() {
                     </span>
                   )}
                   <button
-                    onClick={() => removeShopImage(idx)}
+                    onClick={() => handleRemoveShopImage(idx)}
                     className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -1277,8 +1413,7 @@ export function ShopEditPage() {
           )}
           <ImageUploadZone
             onUpload={enqueueGalleryFiles}
-            uploading={uploadingImage}
-            disabled={isNew}
+            uploading={uploadingImage || uploadingGalleryNew}
           />
           {galleryCropQueue.length > 0 && (
             <ImageCropDialog
@@ -1287,7 +1422,7 @@ export function ShopEditPage() {
               title={`店舗写真をトリミング（残り ${galleryCropQueue.length} 枚）`}
               onCancel={() => setGalleryCropQueue([])}
               onCropped={async (cropped) => {
-                await uploadShopImages([cropped]);
+                await uploadGalleryImage(cropped);
                 setGalleryCropQueue((q) => q.slice(1));
               }}
             />
@@ -1330,18 +1465,36 @@ export function ShopEditPage() {
             placeholder="例: 6000"
           />
         </Field>
-        <Field label="面接可能時間(開始)">
-          <TextInput
+        {/* 体入日給は手入力せず「体入時給 × 1日4時間」で自動算出する (表示のみ)。
+            体入時給を入れると即座に反映される。計算元は lib/wage.ts に一本化。 */}
+        <Field
+          label="体入日給（自動計算）"
+          hint="体入時給 × 1日4時間で自動算出されます（入力不要）"
+        >
+          <div className="w-full px-3 py-2 rounded-lg border border-dashed border-border bg-muted/40 text-[13px] text-foreground/80 min-h-[38px] flex items-center">
+            {trialDailyEstimate(trialMinWage, trialMaxWage) ?? (
+              <span className="text-muted-foreground/60">
+                体入時給を入力すると表示されます
+              </span>
+            )}
+          </div>
+        </Field>
+        <Field label="面接可能時間(開始)" hint="候補から選択、または直接入力できます">
+          <ComboInput
+            listId="interview-start-options"
             value={interviewStart}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewStart(e.target.value)}
-            placeholder="例: 14:00"
+            onChange={(e) => setInterviewStart(e.target.value)}
+            options={["17:00", "17:30", "18:00"]}
+            placeholder="例: 17:00"
           />
         </Field>
-        <Field label="面接可能時間(終了)">
-          <TextInput
+        <Field label="面接可能時間(終了)" hint="候補から選択、または直接入力できます">
+          <ComboInput
+            listId="interview-end-options"
             value={interviewEnd}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewEnd(e.target.value)}
-            placeholder="例: 19:00"
+            onChange={(e) => setInterviewEnd(e.target.value)}
+            options={["20:00", "21:00", "22:00", "23:00"]}
+            placeholder="例: 21:00"
           />
         </Field>
         <Field label="体入の種類" hint="店舗詳細やフィルターで「体験確約OK」リボンの出し分けに使用">
@@ -1372,7 +1525,7 @@ export function ShopEditPage() {
       <div className="space-y-5">
         <Field
           label="特徴タグ"
-          hint="Enterキーでタグを追加できます"
+          hint="日本語変換を確定したあと、もう一度Enterで追加されます"
         >
           <div className="flex flex-wrap gap-2 mb-3">
             {tags.map((tag, i) => (
@@ -1396,7 +1549,14 @@ export function ShopEditPage() {
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && tagInput.trim()) {
+              // IME 変換確定の Enter ではタグ登録しない (isComposing で判定)。
+              // 日本語入力中は1回目の Enter = 変換確定、2回目の Enter = 登録、
+              // となり「Enter1回で勝手に登録される」誤爆を防ぐ。
+              if (
+                e.key === "Enter" &&
+                !e.nativeEvent.isComposing &&
+                tagInput.trim()
+              ) {
                 e.preventDefault();
                 setTags([...tags, tagInput.trim()]);
                 setTagInput("");
@@ -2068,15 +2228,16 @@ export function ShopEditPage() {
                   />
                 </Field>
               </div>
-              <Field label="写真URL（任意）">
-                <TextInput
+              <Field label="写真（URL貼り付け or アップロード・任意）">
+                <ImageUrlInput
+                  kind="store-extra"
                   value={ep.photo_url}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                  placeholder="https://... または「画像を選択」"
+                  onChange={(url) => {
                     const next = [...rectaEpisodes];
-                    next[i] = { ...next[i], photo_url: e.target.value };
+                    next[i] = { ...next[i], photo_url: url };
                     setRectaEpisodes(next);
                   }}
-                  placeholder="https://..."
                 />
               </Field>
               <Field label="エピソード">
@@ -3004,16 +3165,8 @@ function VideoListEditor({
                 placeholder="例: https://youtube.com/watch?v=... または https://example.com/video.mp4"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-                ラベル（任意・例: 店内ツアー / 店長インタビュー）
-              </label>
-              <TextInput
-                value={video.label}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { label: e.target.value })}
-                placeholder="動画の見出しになります（空でも可）"
-              />
-            </div>
+            {/* 動画ラベル欄は運用上不要 (レクタ経由などは別枠管理) のため撤去。
+                既存データの label は保持され、保存時もそのまま送られる。 */}
             <div>
               <label className="block text-[11px] font-medium text-muted-foreground mb-1">
                 説明テキスト（任意・動画の下に表示）
@@ -3179,13 +3332,20 @@ function StaffPhotosEditor({
                   {uploading ? "アップ中..." : "画像を選択"}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     className="hidden"
                     disabled={uploading}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) setPendingCrop({ index: i, file });
                       e.target.value = ""; // 同じファイル再選択を許可
+                      if (!file) return;
+                      // HEIC はブラウザでトリミングできないので生のままアップロード
+                      // (サーバで JPEG 変換)。それ以外はトリミングダイアログへ。
+                      if (isHeicFile(file)) {
+                        void handlePick(i, file);
+                      } else {
+                        setPendingCrop({ index: i, file });
+                      }
                     }}
                   />
                 </label>

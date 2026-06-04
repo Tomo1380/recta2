@@ -16,8 +16,11 @@ class UploadStoreImageRequest extends FormRequest
      */
     public function rules(): array
     {
+        // HEIC/HEIF (iPhone 標準) も受け付ける。`image` ルールは getimagesize()
+        // ベースで HEIC を画像と認識せず弾いてしまうため使わず、mimes で許可する
+        // (HEIC はアップロード後に MediaStorage が JPEG へ変換する)。
         return [
-            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'image' => 'required|file|mimes:jpg,jpeg,png,webp,heic,heif|max:5120',
         ];
     }
 }

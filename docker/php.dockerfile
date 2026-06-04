@@ -5,6 +5,10 @@ RUN apk add --no-cache \
     libzip-dev \
     oniguruma-dev \
     linux-headers \
+    imagemagick \
+    imagemagick-libs \
+    imagemagick-dev \
+    libheif \
     $PHPIZE_DEPS \
     && docker-php-ext-install \
     pdo \
@@ -14,8 +18,8 @@ RUN apk add --no-cache \
     bcmath \
     sockets \
     pcntl \
-    && pecl install redis \
-    && docker-php-ext-enable redis
+    && pecl install redis imagick \
+    && docker-php-ext-enable redis imagick
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 

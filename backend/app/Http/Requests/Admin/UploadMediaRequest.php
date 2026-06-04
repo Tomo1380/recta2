@@ -18,7 +18,9 @@ class UploadMediaRequest extends FormRequest
     {
         return [
             // 5MB 上限はフロントの圧縮ロジック次第で見直す。とりあえず 10MB に。
-            'image' => 'required|image|mimes:jpeg,jpg,png,webp,gif|max:10240',
+            // HEIC/HEIF (iPhone 標準) も許可。`image` ルールは getimagesize() が
+            // HEIC 非対応で弾くため使わず、mimes で受けて MediaStorage で JPEG 変換。
+            'image' => 'required|file|mimes:jpeg,jpg,png,webp,gif,heic,heif|max:10240',
         ];
     }
 }

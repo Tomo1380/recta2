@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useReducer } from "react";
 import type { Store } from "~/lib/types";
+import { trialDailyEstimate } from "~/lib/wage";
 
 /**
  * ShopEditPage / ShopCreatePage の店舗フォーム state を集約する hook。
@@ -547,7 +548,9 @@ export function formToPayload(
       })),
     hourly_min: form.minWage ? Number(form.minWage) : null,
     hourly_max: form.maxWage ? Number(form.maxWage) : null,
-    daily_estimate: form.dailyPay || null,
+    // 日給目安は手入力を廃止し「体入時給 × 1日4時間」で自動算出する
+    // (体入日給)。通常時給の項目を撤去したため、計算元は体入時給に一本化。
+    daily_estimate: trialDailyEstimate(form.trialMinWage, form.trialMaxWage),
     back_items: form.backItems
       .filter((i) => i.label)
       .map((i) => ({ label: i.label, amount: i.value })),

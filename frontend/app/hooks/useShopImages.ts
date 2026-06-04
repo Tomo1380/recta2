@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import { api, ApiError } from "~/lib/api";
 
 /**
@@ -31,7 +31,7 @@ function toUrlList(images: unknown): string[] {
  */
 export interface UseShopImagesResult {
   images: string[];
-  setImages: (images: string[]) => void;
+  setImages: Dispatch<SetStateAction<string[]>>;
   /** FileList (input) でも File[] (トリミング後) でも受け取れる。 */
   upload: (files: FileList | File[]) => Promise<void>;
   remove: (index: number) => Promise<void>;

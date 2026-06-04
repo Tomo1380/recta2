@@ -3,6 +3,13 @@ node_modules
 frontend/node_modules
 backend/vendor
 
+# Laravel runtime artifacts — テスト実行でコンテナ (root) が作る一時ディレクトリ
+# (storage/framework/testing/disks 等) はビルドコンテキストから読めず build を
+# 壊す。ログ/キャッシュ実体も image に焼く必要はない (実行時に再生成される)。
+backend/storage/framework/testing
+backend/storage/framework/cache/data
+backend/storage/logs/*.log
+
 # Build output
 frontend/build
 frontend/.react-router
