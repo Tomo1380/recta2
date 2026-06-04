@@ -694,6 +694,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
       image_url: firstImage,
       hourly_min: s.hourly_min ?? undefined,
       hourly_max: s.hourly_max ?? undefined,
+      trial_hourly_min: s.trial_hourly_min ?? s.trial_avg_hourly ?? null,
+      trial_hourly_max: s.trial_hourly_max ?? s.trial_hourly ?? null,
     });
   }, [data?.store, previewData]);
 

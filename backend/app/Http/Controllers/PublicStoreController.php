@@ -231,6 +231,8 @@ class PublicStoreController extends Controller
                     'category' => $store->category,
                     'hourly_min' => $full['hourly_min'] ?? null,
                     'hourly_max' => $full['hourly_max'] ?? null,
+                    'trial_hourly_min' => $full['trial_hourly_min'] ?? null,
+                    'trial_hourly_max' => $full['trial_hourly_max'] ?? null,
                     'feature_tags' => $store->feature_tags,
                     'images' => $store->images,
                     'is_pr' => $pickup->is_pr,
