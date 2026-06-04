@@ -1957,14 +1957,15 @@ export function ShopEditPage() {
               })}
             </div>
           </Field>
+          {/* 公開ページ (AnalysisSection 飲み度) のラベルと揃える。 */}
           <SliderField
             label="客層の飲み方"
             value={drinkStyle}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setDrinkStyle(Number(e.target.value))
             }
-            leftLabel="落ち着き"
-            rightLabel="盛り上がり"
+            leftLabel="飲まなくてOK"
+            rightLabel="飲める方が◎"
           />
         </div>
       </SectionCard>
