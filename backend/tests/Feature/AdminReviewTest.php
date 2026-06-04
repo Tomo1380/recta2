@@ -168,6 +168,59 @@ class AdminReviewTest extends TestCase
         $this->assertEquals(1, $response->json('total'));
     }
 
+    public function test_admin_can_search_reviews_by_user_name(): void
+    {
+        $taro = User::create([
+            'line_user_id' => 'USEARCH0001',
+            'line_display_name' => '田中タロウ',
+            'status' => 'active',
+        ]);
+        $this->createReview(['user_id' => $taro->id]);
+        $this->createReview(); // 別ユーザー (Reviewer N)
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/reviews?search=' . urlencode('田中'));
+
+        $response->assertStatus(200);
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertEquals($taro->id, $response->json('data.0.user_id'));
+    }
+
+    public function test_admin_can_search_reviews_by_store_name(): void
+    {
+        $bene = Store::create([
+            'name' => 'ベネ系列の店',
+            'area' => '銀座',
+            'category' => 'ラウンジ',
+            'publish_status' => 'published',
+        ]);
+        $this->createReview(['store_id' => $bene->id]);
+        $this->createReview(['store_id' => $this->store->id]); // Test Store
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/reviews?search=' . urlencode('ベネ'));
+
+        $response->assertStatus(200);
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertEquals($bene->id, $response->json('data.0.store_id'));
+    }
+
+    public function test_admin_can_sort_reviews_by_updated_at_asc(): void
+    {
+        $first = $this->createReview();
+        $second = $this->createReview();
+        // updated_at を明示的にずらす (created とは別軸で並ぶことを確認)。
+        $first->forceFill(['updated_at' => now()->addMinute()])->save();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/reviews?sort=updated_at&order=asc');
+
+        $response->assertStatus(200);
+        // 昇順なので、後から更新した $first が最後に来る。
+        $ids = array_column($response->json('data'), 'id');
+        $this->assertEquals($first->id, end($ids));
+    }
+
     public function test_update_review_status_validates_input(): void
     {
         $review = $this->createReview();

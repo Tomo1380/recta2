@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\Concerns\SortsListByDate;
 use App\Http\Requests\Admin\ReorderStoreImagesRequest;
 use App\Http\Requests\Admin\UploadStoreImageRequest;
 use App\Http\Resources\StoreResource;
@@ -18,6 +19,8 @@ use Illuminate\Support\Str;
 
 class StoreController extends Controller
 {
+    use SortsListByDate;
+
     public function __construct(
         private StoreImageService $images,
     ) {}
@@ -46,8 +49,8 @@ class StoreController extends Controller
             $query->where('publish_status', $status);
         }
 
-        $stores = $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
-            ->orderBy('updated_at', 'desc')
+        $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
+        $stores = $this->applyListSort($query, $request, ['created_at', 'updated_at'], 'updated_at')
             ->paginate($request->input('per_page', 20));
 
         return response()->json(PaginatorWithResource::map($stores, StoreResource::class));

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight, Eye, EyeOff, Trash2, MessageSquare, Star, Loader2 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { Review, Paginated } from "~/lib/types";
+import { SortControl, type SortState } from "~/components/admin/shared/SortControl";
 
 const STATUS_FILTER_MAP: Record<string, string | undefined> = {
   "全て": undefined,
@@ -25,6 +26,7 @@ function formatDate(iso: string): string {
 export function ReviewsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("全て");
+  const [sortState, setSortState] = useState<SortState>({ sort: "created_at", order: "desc" });
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,8 @@ export function ReviewsPage() {
       if (search) params.set("search", search);
       const apiStatus = STATUS_FILTER_MAP[statusFilter];
       if (apiStatus) params.set("status", apiStatus);
+      params.set("sort", sortState.sort);
+      params.set("order", sortState.order);
 
       const res = await api.get<Paginated<Review>>(`/admin/reviews?${params.toString()}`);
       setReviews(res.data);
@@ -52,7 +56,7 @@ export function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, sortState]);
 
   useEffect(() => {
     fetchReviews();
@@ -61,7 +65,7 @@ export function ReviewsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, sortState]);
 
   const handleToggleVisibility = async (review: Review) => {
     const newStatus = review.status === "published" ? "unpublished" : "published";
@@ -125,6 +129,7 @@ export function ReviewsPage() {
             </button>
           ))}
         </div>
+        <SortControl value={sortState} onChange={setSortState} />
       </div>
 
       {loading ? (

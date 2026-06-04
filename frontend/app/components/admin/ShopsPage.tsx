@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Search, Plus, ChevronLeft, ChevronRight, Star, Loader2 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { Store, Paginated } from "~/lib/types";
+import { SortControl, type SortState } from "~/components/admin/shared/SortControl";
 
 const STATUS_MAP: Record<string, string> = {
   published: "公開",
@@ -33,6 +34,7 @@ export function ShopsPage() {
   const [search, setSearch] = useState("");
   const [areaFilter, setAreaFilter] = useState("全て");
   const [statusFilter, setStatusFilter] = useState("全て");
+  const [sortState, setSortState] = useState<SortState>({ sort: "updated_at", order: "desc" });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<Store[]>([]);
@@ -62,6 +64,8 @@ export function ShopsPage() {
         const apiStatus = STATUS_REVERSE[statusFilter];
         if (apiStatus) params.set("publish_status", apiStatus);
       }
+      params.set("sort", sortState.sort);
+      params.set("order", sortState.order);
       const res = await api.get<Paginated<Store>>(`/admin/stores?${params.toString()}`);
       setStores(res.data);
       setTotalCount(res.total);
@@ -71,7 +75,7 @@ export function ShopsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, areaFilter, statusFilter]);
+  }, [page, search, areaFilter, statusFilter, sortState]);
 
   useEffect(() => {
     fetchStores();
@@ -80,7 +84,7 @@ export function ShopsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, areaFilter, statusFilter]);
+  }, [search, areaFilter, statusFilter, sortState]);
 
   const statusLabel = (s: Store) => STATUS_MAP[s.publish_status] || s.publish_status;
 
@@ -155,6 +159,7 @@ export function ShopsPage() {
         >
           {statuses.map((s) => <option key={s}>{s}</option>)}
         </select>
+        <SortControl value={sortState} onChange={setSortState} />
       </div>
 
       {/* Table */}

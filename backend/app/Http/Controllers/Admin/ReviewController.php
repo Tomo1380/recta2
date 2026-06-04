@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\Concerns\SortsListByDate;
 use App\Http\Requests\Admin\UpdateReviewStatusRequest;
 use App\Http\Resources\ReviewResource;
 use App\Models\Review;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
+    use SortsListByDate;
+
     /**
      * @response array{
      *   data: ReviewResource[],
@@ -37,8 +40,19 @@ class ReviewController extends Controller
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
+        // フリーワード検索: ユーザー名 (LINE表示名 / ニックネーム) または店舗名。
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', function ($u) use ($search) {
+                    $u->where('line_display_name', 'ilike', "%{$search}%")
+                      ->orWhere('nickname', 'ilike', "%{$search}%");
+                })->orWhereHas('store', function ($s) use ($search) {
+                    $s->where('name', 'ilike', "%{$search}%");
+                });
+            });
+        }
 
-        $reviews = $query->orderBy('created_at', 'desc')
+        $reviews = $this->applyListSort($query, $request)
             ->paginate($request->input('per_page', 20));
 
         return response()->json(PaginatorWithResource::map($reviews, ReviewResource::class));
