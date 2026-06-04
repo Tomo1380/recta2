@@ -282,6 +282,30 @@ class AdminStoreTest extends TestCase
     }
 
     /**
+     * 第2弾グループ4: ドレスコードの説明＋ドレス例画像 (dress_code.photos) が
+     * dress_code_detail として返ること。
+     */
+    public function test_create_store_with_dress_photos(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Dress Photo Store',
+                'area' => '銀座',
+                'category' => 'ラウンジ',
+                'dress_code' => [
+                    'description' => "明るめのミニドレス推奨。\n黒・ロングはNG。",
+                    'photos' => [
+                        ['image_url' => 'https://example.com/dress1.jpg', 'caption' => 'スナイデル'],
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertCount(1, $response->json('dress_code_detail.photos'));
+        $this->assertSame('スナイデル', $response->json('dress_code_detail.photos.0.caption'));
+    }
+
+    /**
      * 第2弾グループ3: 面接で聞かれることリスト (interview_info.questions) が
      * 格納され Resource で返ること。
      */

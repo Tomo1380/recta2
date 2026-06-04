@@ -222,6 +222,34 @@ const PAYROLL_CYCLES_WITH_PAYDAY = ["月末締め翌月払い", "月1回", "月2
 /** 客層年齢の固定ラベル。運営は割合(%)だけ入力すればよい。 */
 const CLIENT_AGE_LABELS = ["20代", "30代", "40代", "50代以降"];
 
+/**
+ * セット料金のコピペ取込パーサ。
+ * 「項目名／単位」行のあとに「金額」行が続く書式を想定し、項目化する。
+ *   セット／60分        → label
+ *   15,000円           → amount
+ *   延長／30分          → label
+ *   7,500円／メイン      → amount (複数行は " / " で連結)
+ *   25,000円／VIP        → amount
+ * 金額行 = ¥や「数字+円/%」を含む行。それ以外を新しい項目名(ラベル)とみなす。
+ */
+function parseSetFeeText(text: string): { label: string; amount: string; note: string }[] {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const isAmountLine = (l: string) =>
+    /[¥￥]/.test(l) || /[\d０-９][\d０-９,，]*\s*(円|%|％)/.test(l) || /^[¥￥]?\s*[\d０-９]/.test(l);
+  const items: { label: string; amount: string; note: string }[] = [];
+  let cur: { label: string; amount: string; note: string } | null = null;
+  for (const line of lines) {
+    if (isAmountLine(line) && cur) {
+      cur.amount = cur.amount ? `${cur.amount} / ${line}` : line;
+    } else {
+      if (cur) items.push(cur);
+      cur = { label: line, amount: "", note: "" };
+    }
+  }
+  if (cur) items.push(cur);
+  return items.filter((it) => it.label);
+}
+
 /** 直近採用の相対月スロット。絶対月(◯年◯月)だと更新コストが高いため固定。
  *  運営は各月の採用人数だけ入れればよい (基本5ヶ月前まで、新店は3ヶ月前まで等)。 */
 const RELATIVE_HIRE_LABELS = ["1ヶ月前", "2ヶ月前", "3ヶ月前", "4ヶ月前", "5ヶ月前"];
@@ -838,10 +866,13 @@ export function ShopEditPage() {
   // 画像 (image_url) は廃止し note のみ。型は将来の互換のため optional 拡張可。
   const [dressCodeOk, setDressCodeOk] = useState<{ note: string }[]>([]);
   const [dressCodeNg, setDressCodeNg] = useState<{ note: string }[]>([]);
+  // ドレス例画像（OK/NGを廃止し説明＋画像に簡素化）。
+  const [dressPhotos, setDressPhotos] = useState<{ image_url: string; caption: string }[]>([]);
   const [setFeeList, setSetFeeList] = useState<
     { label: string; amount: string; note: string }[]
   >([]);
   const [setFeeNotes, setSetFeeNotes] = useState("");
+  const [setFeePaste, setSetFeePaste] = useState("");
   const [rectaEpisodes, setRectaEpisodes] = useState<
     { name: string; comment: string; instagram_url: string; photo_url: string }[]
   >([]);
@@ -1007,6 +1038,7 @@ export function ShopEditPage() {
     if (f.dressCodeDescription !== undefined) setDressCodeDescription(f.dressCodeDescription);
     if (f.dressCodeOk !== undefined) setDressCodeOk(f.dressCodeOk);
     if (f.dressCodeNg !== undefined) setDressCodeNg(f.dressCodeNg);
+    if (f.dressPhotos !== undefined) setDressPhotos(f.dressPhotos);
     if (f.setFeeList !== undefined) setSetFeeList(f.setFeeList);
     if (f.setFeeNotes !== undefined) setSetFeeNotes(f.setFeeNotes);
     if (f.rectaEpisodes !== undefined) setRectaEpisodes(f.rectaEpisodes);
@@ -1110,7 +1142,7 @@ export function ShopEditPage() {
       documents, docNote, shiftInfo, hiringEntries, hiringTotal,
       transferDescription, transferKm, transferZones, relatedStoreIds,
       champagneDescription, champagnePrices,
-      dressCodeDescription, dressCodeOk, dressCodeNg,
+      dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
       setFeeList, setFeeNotes, rectaEpisodes, qaItems,
       staffName, staffRole, staffComment, supportItems,
       seoMetaDescription,
@@ -1135,7 +1167,7 @@ export function ShopEditPage() {
     documents, docNote, shiftInfo, hiringEntries, hiringTotal,
     transferDescription, transferKm, transferZones, relatedStoreIds,
     champagneDescription, champagnePrices,
-    dressCodeDescription, dressCodeOk, dressCodeNg,
+    dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
     setFeeList, setFeeNotes, rectaEpisodes, qaItems,
     staffName, staffRole, staffComment, supportItems,
     seoMetaDescription,
@@ -2050,7 +2082,7 @@ export function ShopEditPage() {
           </Field>
           <Field
             label="足代テーブル（高級店向け）"
-            hint="距離別の足代を設定。空のままなら詳細ページに表示されません。"
+            hint="距離別の足代を設定。色は自動で割り当てられます。空のままなら詳細ページに表示されません。"
           >
             <div className="space-y-2">
               {transferZones.map((z, i) => (
@@ -2058,8 +2090,9 @@ export function ShopEditPage() {
                   key={i}
                   className="grid grid-cols-12 gap-2 items-center rounded-lg border border-border bg-muted/20 p-2"
                 >
+                  {/* 色は公開ページで距離区分の index 順に自動割り当て (運営の色選択を撤去)。 */}
                   <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    className="col-span-4 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="ラベル (例: 都内)"
                     value={z.label}
                     onChange={(e) => {
@@ -2079,22 +2112,12 @@ export function ShopEditPage() {
                     }}
                   />
                   <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    className="col-span-4 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="足代 ¥"
                     value={z.fee}
                     onChange={(e) => {
                       const next = [...transferZones];
                       next[i] = { ...next[i], fee: e.target.value };
-                      setTransferZones(next);
-                    }}
-                  />
-                  <input
-                    type="color"
-                    className="col-span-2 h-8 w-full cursor-pointer rounded border border-input bg-background"
-                    value={z.color || "#D4AF37"}
-                    onChange={(e) => {
-                      const next = [...transferZones];
-                      next[i] = { ...next[i], color: e.target.value };
                       setTransferZones(next);
                     }}
                   />
@@ -2113,7 +2136,7 @@ export function ShopEditPage() {
                 onClick={() =>
                   setTransferZones([
                     ...transferZones,
-                    { label: "", radius_km: "", fee: "", color: "#D4AF37" },
+                    { label: "", radius_km: "", fee: "", color: "" },
                   ])
                 }
                 className="text-xs text-primary hover:underline"
@@ -2193,6 +2216,42 @@ export function ShopEditPage() {
 
       <SectionCard title="セット料金" icon={DollarSign} previewAnchor="set-fee" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
+          {/* コピペ取込: 記事等から「項目名／単位」「金額」が並んだテキストを貼って
+              「取り込む」を押すと自動で項目化される。1項目ずつ入力する手間を省く。 */}
+          <Field
+            label="まとめて貼り付け（コピペ取込）"
+            hint="「セット／60分」「15,000円」のように項目名と金額が並んだテキストを貼って「取り込む」"
+          >
+            <TextArea
+              value={setFeePaste}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSetFeePaste(e.target.value)}
+              rows={5}
+              placeholder={"例:\nセット／60分\n15,000円\n延長／30分\n7,500円／メイン\n25,000円／VIP\n指名料／60分\n3,000円"}
+            />
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const parsed = parseSetFeeText(setFeePaste);
+                  if (parsed.length > 0) {
+                    // 既存が空なら置換、入っていれば末尾に追記。
+                    setSetFeeList((prev) => {
+                      const hasContent = prev.some((p) => p.label.trim() || p.amount.trim());
+                      return hasContent ? [...prev, ...parsed] : parsed;
+                    });
+                    setSetFeePaste("");
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition disabled:opacity-50"
+                disabled={!setFeePaste.trim()}
+              >
+                <Plus className="w-3.5 h-3.5" /> 取り込む
+              </button>
+              <span className="text-[11px] text-muted-foreground">
+                取り込んだ後、下のリストで微調整できます
+              </span>
+            </div>
+          </Field>
           <Field
             label="セット料金項目"
             hint="ボトル代・席料・チャージなど、項目ごとに金額を登録してください"
@@ -2262,29 +2321,20 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="ドレスコード（OK / NG）" icon={Star} previewAnchor="dress-code" onFocusEnter={handlePreviewFocus}>
+      <SectionCard title="ドレスコード" icon={Star} previewAnchor="dress-code" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
+          {/* OK例/NG例は廃止し「説明＋ドレス例画像」に簡素化。黒やロングがNGか等は
+              説明に書き、スナイデル/シーン等の参考写真は画像で掲載する。 */}
+          <Field label="ドレスコード説明" hint="例: 黒・ロングはNG / 明るめのミニドレス推奨 / 貸し出しあり（改行可）">
             <TextArea
               value={dressCodeDescription}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
               rows={3}
-              placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
+              placeholder="例: 明るめのミニドレス推奨。黒・ロング丈はNG。ドレス貸し出しあり。"
             />
           </Field>
-          <Field label="OKな例" hint="OKな服装の説明をテキストで列挙してください">
-            <DynamicTextList
-              items={dressCodeOk.map((d) => d.note)}
-              setItems={(notes) => setDressCodeOk(notes.map((n) => ({ note: n })))}
-              placeholder="例: 明るめのカラードレス"
-            />
-          </Field>
-          <Field label="NGな例" hint="NGな服装の説明をテキストで列挙してください">
-            <DynamicTextList
-              items={dressCodeNg.map((d) => d.note)}
-              setItems={(notes) => setDressCodeNg(notes.map((n) => ({ note: n })))}
-              placeholder="例: 黒ドレス・ビジュー付き"
-            />
+          <Field label="ドレスの例画像" hint="ブランド例（スナイデル/シーン等）の写真を掲載できます">
+            <FacilityPhotosEditor photos={dressPhotos} onChange={setDressPhotos} />
           </Field>
         </div>
       </SectionCard>
@@ -2773,6 +2823,9 @@ export function ShopEditPage() {
                       staff_type: p.staff_type.trim() || null,
                       display_order: i,
                     })),
+                  facility_photos: facilityPhotos
+                    .filter((p) => p.image_url.trim() !== "")
+                    .map((p) => ({ image_url: p.image_url.trim(), caption: p.caption.trim() || null })),
                   analysis: {
                     experience_level: expLevel,
                     atmosphere: atmosphere,
@@ -2788,7 +2841,7 @@ export function ShopEditPage() {
                     })),
                     drinking_style: drinkStyle,
                   },
-                  interview_info: dressAdvice || dressTips.length > 0 || interviewDialog.length > 0
+                  interview_info: dressAdvice || dressTips.length > 0 || interviewDialog.length > 0 || interviewQuestions.length > 0 || hiringCriteria
                     ? {
                         dress_advice: dressAdvice,
                         tips: dressTips,
@@ -2806,6 +2859,9 @@ export function ShopEditPage() {
                                 ? "user"
                                 : d.label,
                         })),
+                        questions: interviewQuestions
+                          .filter((q) => q.label.trim())
+                          .map((q) => ({ question: q.label.trim(), answer: q.value.trim() })),
                       }
                     : null,
                   required_documents: documents.length > 0 || docNote
@@ -2850,18 +2906,22 @@ export function ShopEditPage() {
                       color: z.color.trim() || null,
                     })),
                   unit_wage_type: null,
-                  dress_code: dressCodeDescription || dressCodeOk.length > 0 || dressCodeNg.length > 0
+                  dress_code: dressCodeDescription || dressPhotos.some((p) => p.image_url.trim())
                     ? {
                         description: dressCodeDescription || undefined,
-                        // 画像 (image_url) は廃止。note のみ。
-                        ok_examples: dressCodeOk
-                          .filter((e) => e.note)
-                          .map((e) => ({ note: e.note })),
-                        ng_examples: dressCodeNg
-                          .filter((e) => e.note)
-                          .map((e) => ({ note: e.note })),
+                        ok_examples: [],
+                        ng_examples: [],
+                        photos: dressPhotos
+                          .filter((p) => p.image_url.trim())
+                          .map((p) => ({ image_url: p.image_url.trim(), caption: p.caption.trim() || null })),
                       }
                     : null,
+                  back_text: backText || null,
+                  pay_system_types: paySystemTypes,
+                  pay_system_note: paySystemNote || null,
+                  payroll_cycle: payrollCycle || null,
+                  payroll_pay_day: payrollPayDay || null,
+                  daily_pay_limit: dailyPayLimit || null,
                   payroll_system_type: payrollSystemType || null,
                   payroll_system_description: payrollSystemDescription || null,
                   champagne_description: champagneDescription || null,

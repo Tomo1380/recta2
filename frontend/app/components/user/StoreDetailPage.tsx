@@ -193,6 +193,8 @@ export interface DressCodeObject {
   description?: string;
   ok_examples?: DressExample[];
   ng_examples?: DressExample[];
+  /** ドレス例画像 (OK/NGを廃止し説明＋画像に簡素化) */
+  photos?: { image_url: string; caption?: string | null }[] | null;
 }
 
 export interface ChampagnePriceItem {
@@ -1278,10 +1280,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             const dressDetail = store.dress_code_detail
               ?? (typeof store.dress_code === "object" ? (store.dress_code as DressCodeObject | null) : null);
             const dressFallbackString = typeof store.dress_code === "string" ? store.dress_code : null;
+            const dressPhotos = (dressDetail?.photos ?? []).filter((p) => p.image_url);
             const hasDress = !!(
               dressDetail?.description
-              || (dressDetail?.ok_examples ?? []).length > 0
-              || (dressDetail?.ng_examples ?? []).length > 0
+              || dressPhotos.length > 0
               || dressFallbackString
             );
             const showSection = !!(store.interview_info || store.required_documents || hasDress);
@@ -1456,15 +1458,29 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                       ドレスコード
                     </h3>
                     {(dressDetail?.description || dressFallbackString) && (
-                      <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+                      <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
                         {dressDetail?.description || dressFallbackString}
                       </p>
                     )}
-                    {(dressDetail?.ok_examples ?? []).length > 0 && (
-                      <DressExampleList items={dressDetail?.ok_examples ?? []} variant="ok" />
-                    )}
-                    {(dressDetail?.ng_examples ?? []).length > 0 && (
-                      <DressExampleList items={dressDetail?.ng_examples ?? []} variant="ng" />
+                    {/* OK/NG例は廃止。ドレスの例画像を掲載 (スナイデル/シーン等)。 */}
+                    {dressPhotos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {dressPhotos.map((p, i) => (
+                          <figure key={i} className="overflow-hidden rounded-lg" style={{ border: "1px solid rgba(27,37,40,0.06)" }}>
+                            <img
+                              src={p.image_url}
+                              alt={p.caption ?? `ドレス例 ${i + 1}`}
+                              className="w-full aspect-[3/4] object-cover"
+                              loading="lazy"
+                            />
+                            {p.caption && (
+                              <figcaption className="px-1.5 py-1 text-[11px]" style={{ color: "rgba(27,37,40,0.6)" }}>
+                                {p.caption}
+                              </figcaption>
+                            )}
+                          </figure>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -3054,6 +3070,10 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
 
 const GOLD_HEX = "#D4AF37";
 
+/** 足代ゾーンの自動カラーパレット。運営が色を選ばなくても距離区分ごとに
+ *  見分けがつくよう、index 順にこの色を割り当てる。 */
+const ZONE_PALETTE = ["#D4AF37", "#5BA89A", "#7C9CBF", "#E8956B", "#9D4B5C", "#6FB37D"];
+
 function toAmountNumber(value: number | string | undefined): number | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -3126,7 +3146,11 @@ function TransferMapSection({
   fallbackDescription?: string | null;
   fallbackKm?: string | null;
 }) {
-  const zoneList = zones ?? [];
+  // 色未設定のゾーンには自動でパレット色を割り当てる (運営の色選択を不要に)。
+  const zoneList = (zones ?? []).map((z, i) => ({
+    ...z,
+    color: z.color || ZONE_PALETTE[i % ZONE_PALETTE.length],
+  }));
   const hasZones = zoneList.length > 0;
   const hasFallback = !!(fallbackDescription || fallbackKm);
   const canShowMap = hasZones && typeof lat === "number" && typeof lng === "number";
@@ -3215,11 +3239,18 @@ function TransferMapSection({
               </div>
             );
           })()}
+          {/* 距離別料金の下に送りの説明を箇条書き的に表示 (BUG: ゾーン設定時に
+              説明が消えていた不具合の修正)。何時から送り出てるか等。 */}
+          {fallbackDescription && (
+            <p className="mt-1 text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
+              {fallbackDescription}
+            </p>
+          )}
         </div>
       )}
 
       {!hasZones && hasFallback && (
-        <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+        <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
           {fallbackKm
             ? `${fallbackDescription ?? "送りあり"}（${fallbackKm}以内）`
             : fallbackDescription}
@@ -3298,16 +3329,6 @@ function ChampagnePricesSection({
               >
                 ボトル目安価格
               </h3>
-              <p
-                className="mt-1 text-[9.5px] font-medium uppercase"
-                style={{
-                  color: "rgba(212,175,55,0.65)",
-                  fontFamily: "'Outfit', sans-serif",
-                  letterSpacing: "0.32em",
-                }}
-              >
-                Champagne Price
-              </p>
             </div>
 
             {/* 説明文 (運営入力) — 改行を反映。価格表とは別ブロックで上に。
@@ -3325,14 +3346,15 @@ function ChampagnePricesSection({
               </p>
             )}
 
-            {/* 2x2 グリッド — 縦に長い zigzag を廃止して、カード型でコンパクトに */}
-            <ul className="relative grid grid-cols-2 gap-2.5">
+            {/* 2x2 グリッド — 画像主体。ローマ字(筆記体)は廃止し、ボトル画像を
+                大きく見せてシャンパン名＋価格だけ添える。 */}
+            <ul className="relative grid grid-cols-2 gap-3">
               {visible.map(({ tpl, item }) => {
                 const src = item!.image_url || tpl.defaultImage;
                 return (
                   <li
                     key={tpl.key}
-                    className="relative flex items-center gap-2 rounded-xl px-2.5 py-2"
+                    className="relative flex flex-col items-center gap-1.5 rounded-xl px-3 py-4"
                     style={{
                       background: "rgba(255,255,255,0.04)",
                       border: "1px solid rgba(212,175,55,0.18)",
@@ -3343,58 +3365,41 @@ function ChampagnePricesSection({
                       alt={tpl.kanaName}
                       loading="lazy"
                       decoding="async"
-                      className="h-[44px] w-auto shrink-0 object-contain"
+                      className="h-[96px] w-auto object-contain"
                       style={{
-                        filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
-                        maxWidth: 28,
+                        filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.55))",
+                        maxWidth: 72,
                       }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.visibility = "hidden";
                       }}
                     />
-                    <div className="min-w-0 flex-1">
+                    <p
+                      className="mt-1 text-center text-[13px] font-semibold leading-tight"
+                      style={{
+                        color: "#f7d976",
+                        fontFamily: "'Noto Sans JP', sans-serif",
+                      }}
+                    >
+                      {tpl.kanaName}
+                    </p>
+                    <p
+                      className="tabular-nums text-[13px] font-semibold"
+                      style={{ fontFamily: "'Outfit', sans-serif", color: "#ffe066" }}
+                    >
+                      ¥{formatYen(item!.amount)}
+                    </p>
+                    {item!.note && (
                       <p
-                        className="m-0 truncate"
+                        className="text-center text-[9.5px]"
                         style={{
-                          fontFamily: "'Great Vibes', cursive",
-                          fontSize: 20,
-                          lineHeight: 1.1,
-                          color: "#f7d976",
-                          textShadow: "0 1px 4px rgba(0,0,0,0.4)",
-                        }}
-                      >
-                        {tpl.scriptName}
-                      </p>
-                      <p
-                        className="mt-0.5 truncate text-[10px]"
-                        style={{
-                          color: "rgba(255,255,255,0.55)",
+                          color: "rgba(255,255,255,0.45)",
                           fontFamily: "'Noto Sans JP', sans-serif",
                         }}
                       >
-                        {tpl.kanaName}
+                        {item!.note}
                       </p>
-                      <p
-                        className="mt-0.5 tabular-nums text-[12px] font-semibold"
-                        style={{
-                          fontFamily: "'Outfit', sans-serif",
-                          color: "#ffe066",
-                        }}
-                      >
-                        ¥{formatYen(item!.amount)}
-                      </p>
-                      {item!.note && (
-                        <p
-                          className="mt-0.5 truncate text-[9.5px]"
-                          style={{
-                            color: "rgba(255,255,255,0.4)",
-                            fontFamily: "'Noto Sans JP', sans-serif",
-                          }}
-                        >
-                          {item!.note}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </li>
                 );
               })}
@@ -3429,7 +3434,7 @@ function ChampagnePricesSection({
                 fontFamily: "'Noto Sans JP', sans-serif",
               }}
             >
-              ※ 価格は参考目安です。詳細は店舗にお問い合わせください。
+              ※時期によって変動するケースございます
             </p>
           </>
         ) : (
@@ -3449,16 +3454,6 @@ function ChampagnePricesSection({
               >
                 ボトル目安価格
               </h3>
-              <p
-                className="mt-1 text-[9.5px] font-medium uppercase"
-                style={{
-                  color: "rgba(212,175,55,0.65)",
-                  fontFamily: "'Outfit', sans-serif",
-                  letterSpacing: "0.32em",
-                }}
-              >
-                Champagne Price
-              </p>
             </div>
             <p
               className="relative whitespace-pre-line text-sm leading-relaxed text-center"

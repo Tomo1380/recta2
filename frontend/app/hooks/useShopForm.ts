@@ -153,6 +153,8 @@ export interface ShopForm {
   dressCodeDescription: string;
   dressCodeOk: DressExampleDraft[];
   dressCodeNg: DressExampleDraft[];
+  /** ドレス例画像 (OK/NGを廃止し、説明＋画像に簡素化) */
+  dressPhotos: FacilityPhotoDraft[];
   setFeeList: LabelValueNote[];
   setFeeNotes: string;
   rectaEpisodes: RectaEpisodeDraft[];
@@ -208,7 +210,7 @@ export const INITIAL_FORM: ShopForm = {
   hiringEntries: [], hiringTotal: "",
   transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
-  dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [],
+  dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [], dressPhotos: [],
   setFeeList: [], setFeeNotes: "",
   rectaEpisodes: [], qaItems: [],
   staffName: "", staffRole: "", staffComment: "", supportItems: [],
@@ -406,6 +408,9 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
   const dressCodeNg: DressExampleDraft[] = (dressDetail?.ng_examples ?? []).map(
     (e: AnyStore) => ({ note: e?.note ?? "" }),
   );
+  const dressPhotos: FacilityPhotoDraft[] = (dressDetail?.photos ?? []).map(
+    (p: AnyStore) => ({ image_url: p?.image_url ?? "", caption: p?.caption ?? "" }),
+  );
 
   const sf = store.set_fee ?? {};
   const setFeeList: LabelValueNote[] = (sf.items ?? []).map((it: AnyStore) => ({
@@ -541,6 +546,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     dressCodeDescription,
     dressCodeOk,
     dressCodeNg,
+    dressPhotos,
     setFeeList,
     setFeeNotes,
     rectaEpisodes: (store.recta_episodes ?? []).map((ep: AnyStore) => ({
@@ -741,17 +747,25 @@ export function formToPayload(
     })(),
     dress_code:
       form.dressCodeDescription.trim() ||
+      form.dressPhotos.some((p) => p.image_url.trim()) ||
       form.dressCodeOk.length > 0 ||
       form.dressCodeNg.length > 0
         ? {
             description: form.dressCodeDescription.trim() || undefined,
-            // 画像 (image_url) は廃止。note のみを送る。
+            // OK/NG例は廃止し「説明＋ドレス例画像」に簡素化。旧データ保持のため
+            // ok/ng は送り続けるが、UI/公開からは出さない。
             ok_examples: form.dressCodeOk
               .filter((e) => e.note.trim())
               .map((e) => ({ note: e.note.trim() })),
             ng_examples: form.dressCodeNg
               .filter((e) => e.note.trim())
               .map((e) => ({ note: e.note.trim() })),
+            photos: form.dressPhotos
+              .filter((p) => p.image_url.trim())
+              .map((p) => ({
+                image_url: p.image_url.trim(),
+                caption: p.caption.trim() || null,
+              })),
           }
         : null,
     set_fee:
