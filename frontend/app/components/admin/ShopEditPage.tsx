@@ -2537,10 +2537,7 @@ export function ShopEditPage() {
 
       {/* 店舗まとめ — セット料金の直後。SEO/回遊目的の長文フリーテキスト。 */}
       <SectionCard title="店舗まとめ" icon={FileText} previewAnchor="summary" onFocusEnter={handlePreviewFocus}>
-        <Field
-          label="まとめ本文"
-          hint="入力すると公開ページに店舗まとめとして表示されます（空欄なら非表示）"
-        >
+        <Field label="まとめ本文">
           <TextArea
             value={summaryText}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSummaryText(e.target.value)}
