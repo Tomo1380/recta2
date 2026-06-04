@@ -799,6 +799,7 @@ export function ShopEditPage() {
   const [tagInput, setTagInput] = useState("");
   const [description, setDescription] = useState("");
   const [featureText, setFeatureText] = useState("");
+  const [summaryText, setSummaryText] = useState("");
   const [expLevel, setExpLevel] = useState(50);
   const [atmosphere, setAtmosphere] = useState(50);
   // BUG-Live-03 (続き): 新規作成時に prefill 値があると、未編集のまま保存して
@@ -1010,6 +1011,7 @@ export function ShopEditPage() {
     if (f.tags !== undefined) setTags(f.tags);
     if (f.description !== undefined) setDescription(f.description);
     if (f.featureText !== undefined) setFeatureText(f.featureText);
+    if (f.summaryText !== undefined) setSummaryText(f.summaryText);
     if (f.expLevel !== undefined) setExpLevel(f.expLevel);
     if (f.atmosphere !== undefined) setAtmosphere(f.atmosphere);
     if (f.castBijin !== undefined) setCastBijin(f.castBijin);
@@ -1135,7 +1137,7 @@ export function ShopEditPage() {
       guaranteePeriod, guaranteeDetail, normaInfo,
       trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
       payrollSystemType, payrollSystemDescription,
-      tags, description, featureText, expLevel, atmosphere,
+      tags, description, featureText, summaryText, expLevel, atmosphere,
       castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
       interviewQuestions,
@@ -1160,7 +1162,7 @@ export function ShopEditPage() {
     guaranteePeriod, guaranteeDetail, normaInfo,
     trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
     payrollSystemType, payrollSystemDescription,
-    tags, description, featureText, expLevel, atmosphere,
+    tags, description, featureText, summaryText, expLevel, atmosphere,
     castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
     dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
     interviewQuestions,
@@ -2321,6 +2323,21 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
+      {/* 店舗まとめ — セット料金の直後。SEO/回遊目的の長文フリーテキスト。 */}
+      <SectionCard title="店舗まとめ" icon={FileText} previewAnchor="summary" onFocusEnter={handlePreviewFocus}>
+        <Field
+          label="まとめ本文"
+          hint="改行と [表示文字](/columns/xxx) 形式の内部リンクが使えます（公開ページの「【店名】まとめ」に表示）"
+        >
+          <TextArea
+            value={summaryText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSummaryText(e.target.value)}
+            rows={8}
+            placeholder={"例: 未経験から銀座エリアのラウンジで働きたい方におすすめ。\n\n21時までの同伴で小計30%バック…\n\n系列の[ベネ系列の店](/columns/bene)もチェック。"}
+          />
+        </Field>
+      </SectionCard>
+
       <SectionCard title="ドレスコード" icon={Star} previewAnchor="dress-code" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
           {/* OK例/NG例は廃止し「説明＋ドレス例画像」に簡素化。黒やロングがNGか等は
@@ -2565,15 +2582,16 @@ export function ShopEditPage() {
           </Field>
           <Field
             label="表示優先度"
-            hint="一覧の「おすすめ順」で並べる際の優先度。値が大きいほど上位に表示されます。範囲: -1000〜1000。デフォルト 0。"
+            hint="一覧の「おすすめ順」で並べる際の優先度。1〜10で設定（大きいほど上位）。"
           >
             <input
               type="number"
-              min={-1000}
-              max={1000}
-              step={10}
+              min={1}
+              max={10}
+              step={1}
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
+              placeholder="1〜10"
               className="w-32 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all tabular-nums"
             />
           </Field>
@@ -2802,6 +2820,7 @@ export function ShopEditPage() {
                   feature_tags: tags,
                   description: description,
                   features_text: featureText,
+                  summary_text: summaryText || null,
                   images: storeImages.length > 0 ? storeImages.map((url, i) => ({ url, order: i })) : null,
                   // Preview consumes the same `videos` shape as the public API.
                   videos: videos

@@ -120,6 +120,8 @@ export interface ShopForm {
   tags: string[];
   description: string;
   featureText: string;
+  /** 店舗まとめ (例「六本木ポセイドンまとめ」)。改行＋内部リンク対応のフリーテキスト。 */
+  summaryText: string;
   expLevel: number;
   atmosphere: number;
   castBijin: string;
@@ -200,7 +202,7 @@ export const INITIAL_FORM: ShopForm = {
   trialMinWage: "", trialMaxWage: "",
   interviewStart: "", interviewEnd: "", sameDayTrial: "normal",
   payrollSystemType: "", payrollSystemDescription: "",
-  tags: [], description: "", featureText: "",
+  tags: [], description: "", featureText: "", summaryText: "",
   expLevel: 50, atmosphere: 50,
   castBijin: "", castKawaii: "", castGlamour: "", castNatural: "",
   clientAge: [], drinkStyle: 50,
@@ -494,6 +496,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     tags: store.feature_tags ?? [],
     description: store.description ?? "",
     featureText: store.features_text ?? "",
+    summaryText: store.summary_text ?? "",
     expLevel: analysis.experience_level ?? analysis.exp_level ?? 50,
     atmosphere: analysis.atmosphere ?? 50,
     castBijin: (castStyle.beauty ?? analysis.cast_bijin)?.toString() ?? "",
@@ -654,6 +657,7 @@ export function formToPayload(
     feature_tags: form.tags,
     description: form.description,
     features_text: form.featureText,
+    summary_text: form.summaryText.trim() || null,
     required_documents: {
       documents: form.documents.filter(Boolean),
       notes: form.docNote,

@@ -302,6 +302,8 @@ export interface StoreDetailStore {
   feature_tags: string[];
   description: string;
   features_text: string;
+  /** 店舗まとめ (改行＋内部リンク対応のフリーテキスト) */
+  summary_text?: string | null;
   dress_code: string | DressCodeObject | null;
   images: StoreImage[] | null;
   /** Legacy single-video URL — still emitted by the API as the first videos[] entry. Prefer `videos`. */
@@ -1595,7 +1597,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   </div>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
-                      {name || "—"} / Recta キャリアアドバイザー
+                      {name || "—"}
                     </p>
                     {role && (
                       <p className="text-xs" style={{ color: "rgba(27,37,40,0.45)" }}>
@@ -1715,6 +1717,16 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           {/* 15b. Set fee (セット料金) — アクセスの直下 (運営要望) */}
           {/* ============================================================ */}
           <SetFeeSection setFee={store.set_fee} />
+
+          {/* 店舗まとめ — セット料金の直後 (運営要望)。改行＋内部リンク対応。 */}
+          {store.summary_text && store.summary_text.trim() !== "" && (
+            <SectionCard
+              icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
+              title={`${store.name}まとめ`}
+            >
+              <FeatureText text={store.summary_text} />
+            </SectionCard>
+          )}
 
           {/* ============================================================ */}
           {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}

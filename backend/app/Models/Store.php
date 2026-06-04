@@ -17,7 +17,7 @@ class Store extends Model
         'phone', 'website_url',
         'schedule',
         'wage', 'compensation', 'guarantee', 'interview',
-        'feature_tags', 'description', 'features_text',
+        'feature_tags', 'description', 'features_text', 'summary_text',
         'images', 'facility_photos',
         'analysis', 'required_documents',
         'recent_hires', 'recent_hires_summary',
