@@ -17,7 +17,8 @@ class UploadCategoryImageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'image' => 'required|image|max:5120',
+            // max は 15MB。画像アップロードの上限を全 endpoint で統一 (nginx/PHP 20M 内)。
+            'image' => 'required|image|max:15360',
         ];
     }
 }

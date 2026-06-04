@@ -2295,7 +2295,12 @@ export function ShopEditPage() {
                       setTransferZones(next);
                     }}
                   />
+                  {/* 半径は km 単位。0.5km 刻みで微調整できるよう step=0.5。 */}
                   <input
+                    type="number"
+                    inputMode="decimal"
+                    step={0.5}
+                    min={0}
                     className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="半径 km"
                     value={z.radius_km}
@@ -2305,7 +2310,12 @@ export function ShopEditPage() {
                       setTransferZones(next);
                     }}
                   />
+                  {/* 足代は円。1,000 円刻み。 */}
                   <input
+                    type="number"
+                    inputMode="numeric"
+                    step={1000}
+                    min={0}
                     className="col-span-4 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="足代 ¥"
                     value={z.fee}
