@@ -358,10 +358,11 @@ class StoreController extends Controller
             'daily_estimate' => 'nullable|string|max:255',
             'back_items' => 'nullable|array',
             'back_items.*.label' => 'required|string',
-            'back_items.*.amount' => 'required|string',
+            // 金額は任意 (画面ラベルが「任意」)。項目名だけで金額空でも保存可。
+            'back_items.*.amount' => 'nullable|string',
             'fee_items' => 'nullable|array',
             'fee_items.*.label' => 'required|string',
-            'fee_items.*.amount' => 'required|string',
+            'fee_items.*.amount' => 'nullable|string',
             'salary_notes' => 'nullable|string',
             'guarantee_period' => 'nullable|string|max:255',
             'guarantee_details' => 'nullable|string',

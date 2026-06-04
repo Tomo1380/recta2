@@ -82,8 +82,9 @@ function buildStoreApiUrl(params: URLSearchParams): string {
 
 function getImageUrl(image: string | { url: string } | undefined): string | undefined {
   if (!image) return undefined;
-  if (typeof image === "string") return image;
-  return image.url;
+  const url = typeof image === "string" ? image : image.url;
+  // 空白のみ / 空文字は未設定扱いにし、フォールバックを出す。
+  return url && url.trim() !== "" ? url : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,9 @@ function EditorialStoreCard({
   tray: CompareTrayItem[];
 }) {
   const imageUrl = store.images && store.images.length > 0 ? getImageUrl(store.images[0]) : undefined;
+  // src が壊れて読めない場合 (ファイル削除済み等) も頭文字フォールバックへ退避。
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImage = imageUrl && !imgFailed;
   const rating = store.average_rating ?? 0;
   const fullStars = Math.floor(rating);
   const hasHalf = rating - fullStars >= 0.5;
@@ -141,7 +145,7 @@ function EditorialStoreCard({
       <div className="flex flex-1 gap-3 p-2.5">
         {/* Poster */}
         <div className="relative size-[96px] shrink-0 overflow-hidden rounded-lg">
-          {imageUrl ? (
+          {showImage ? (
             <img
               src={imageUrl}
               alt={store.name}
@@ -150,6 +154,7 @@ function EditorialStoreCard({
               width={96}
               height={96}
               className="h-full w-full object-cover"
+              onError={() => setImgFailed(true)}
             />
           ) : (
             <div

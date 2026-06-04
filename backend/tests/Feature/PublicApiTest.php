@@ -91,6 +91,9 @@ class PublicApiTest extends TestCase
     {
         Area::create(['name' => 'Visible', 'slug' => 'visible', 'visible' => true, 'sort_order' => 0]);
         Area::create(['name' => 'Hidden', 'slug' => 'hidden', 'visible' => false, 'sort_order' => 1]);
+        // 公開店舗が無いエリアはトップから除外される (空振り防止) ので、
+        // visible 判定を検証するため Visible に公開店舗を 1 件置く。
+        Store::create(['name' => 'V Store', 'area' => 'Visible', 'category' => 'クラブ', 'publish_status' => 'published']);
 
         $response = $this->getJson('/api/home');
 
@@ -98,6 +101,24 @@ class PublicApiTest extends TestCase
         $areas = $response->json('areas');
         $this->assertCount(1, $areas);
         $this->assertEquals('Visible', $areas[0]['name']);
+    }
+
+    public function test_home_excludes_areas_with_no_published_stores(): void
+    {
+        // visible だが公開店舗ゼロ → トップに出すと「中洲 0」のような空振りに
+        // なるため除外する。
+        Area::create(['name' => 'Populated', 'slug' => 'populated', 'visible' => true, 'sort_order' => 0]);
+        Area::create(['name' => 'Empty', 'slug' => 'empty', 'visible' => true, 'sort_order' => 1]);
+        Store::create(['name' => 'P Store', 'area' => 'Populated', 'category' => 'クラブ', 'publish_status' => 'published']);
+        // Empty には下書きのみ (公開ゼロ)
+        Store::create(['name' => 'Draft', 'area' => 'Empty', 'category' => 'クラブ', 'publish_status' => 'draft']);
+
+        $response = $this->getJson('/api/home');
+
+        $response->assertStatus(200);
+        $names = array_column($response->json('areas'), 'name');
+        $this->assertContains('Populated', $names);
+        $this->assertNotContains('Empty', $names);
     }
 
     public function test_home_only_returns_published_pickup_stores(): void

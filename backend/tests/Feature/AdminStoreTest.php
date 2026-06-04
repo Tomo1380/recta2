@@ -280,4 +280,51 @@ class AdminStoreTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+    /**
+     * 金額＋％の複合バック項目は {value,unit} 1組では表現できないため、
+     * 入力文字列をそのまま amount に保持して忠実に表示する (金額が消えない)。
+     */
+    public function test_compound_back_item_preserves_amount(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Compound Back',
+                'area' => '銀座',
+                'category' => 'クラブ',
+                'back_items' => [
+                    ['label' => '指名バック', 'amount' => '1,000円 / 10%'],
+                    ['label' => '同伴バック', 'amount' => '15%'],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        // 複合は raw 文字列を保持 (10% だけに潰れない)
+        $this->assertSame('1,000円 / 10%', $response->json('back_items.0.amount'));
+        // ％単体は従来どおり {value,unit} に正規化
+        $this->assertSame(15, $response->json('back_items.1.value'));
+        $this->assertSame('percent', $response->json('back_items.1.unit'));
+    }
+
+    /**
+     * 項目名だけで金額が空でも保存できる (画面ラベルが「任意」)。
+     * 空金額は「無料」と誤表示せず value/unit を付けない。
+     */
+    public function test_back_item_amount_is_optional(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Empty Amount',
+                'area' => '銀座',
+                'category' => 'クラブ',
+                'back_items' => [
+                    ['label' => '応相談バック', 'amount' => ''],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertSame('応相談バック', $response->json('back_items.0.label'));
+        $this->assertNull($response->json('back_items.0.value'));
+        $this->assertNull($response->json('back_items.0.unit'));
+    }
 }

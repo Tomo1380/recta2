@@ -258,14 +258,18 @@ class PublicStoreController extends Controller
             ->groupBy('category')
             ->pluck('c', 'category');
 
-        // Areas for quick navigation
+        // Areas for quick navigation。
+        // 公開店舗が 0 件のエリアはトップに出すと空振り (クリックしても
+        // 遷移先が空) になるため除外する。
         $areas = Area::where('visible', true)
             ->orderBy('sort_order')
             ->get(['id', 'name', 'slug'])
             ->map(function ($a) use ($areaCounts) {
                 $a->store_count = (int) ($areaCounts[$a->name] ?? 0);
                 return $a;
-            });
+            })
+            ->filter(fn ($a) => $a->store_count > 0)
+            ->values();
 
         // Categories
         $categories = Category::where('visible', true)

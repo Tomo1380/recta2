@@ -24,7 +24,10 @@ class AreaCategoryController extends Controller
     {
         $areas = Area::orderBy('sort_order')->get();
         $areas->each(function ($area) {
-            $area->shop_count = Store::where('area', $area->name)->count();
+            // 公開店舗のみカウント (トップ /home と基準を統一)。
+            $area->shop_count = Store::where('area', $area->name)
+                ->where('publish_status', 'published')
+                ->count();
         });
 
         return AreaResource::collection($areas);
@@ -52,7 +55,10 @@ class AreaCategoryController extends Controller
     {
         $categories = Category::orderBy('sort_order')->get();
         $categories->each(function ($category) {
-            $category->shop_count = Store::where('category', $category->name)->count();
+            // 公開店舗のみカウント (トップ /home と基準を統一)。
+            $category->shop_count = Store::where('category', $category->name)
+                ->where('publish_status', 'published')
+                ->count();
         });
 
         return CategoryResource::collection($categories);

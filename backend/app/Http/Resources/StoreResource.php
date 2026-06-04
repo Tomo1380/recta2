@@ -309,12 +309,25 @@ class StoreResource extends JsonResource
                 return $out;
             }
             // 旧 amount=string
-            $raw = (string) ($it['amount'] ?? '');
-            if ($raw === '' || str_contains($raw, '無料')) {
+            $raw = trim((string) ($it['amount'] ?? ''));
+            if (str_contains($raw, '無料')) {
                 return ['label' => $label, 'value' => 0, 'unit' => 'free'];
             }
-            if (preg_match('/([0-9.]+)\s*%/u', $raw, $m)) {
-                return ['label' => $label, 'value' => (int) round((float) $m[1]), 'unit' => 'percent'];
+            // 金額未入力 (項目名だけ)。「無料」とは区別し、value/unit を付けずに
+            // 返すことで表示側は「—」になる (誤って「無料」表示しない)。
+            if ($raw === '') {
+                return ['label' => $label];
+            }
+            $hasPercent = preg_match('/([0-9.]+)\s*%/u', $raw, $pm);
+            $hasYen = preg_match('/([0-9,]+)\s*円/u', $raw) || str_contains($raw, '¥')
+                || str_contains($raw, '￥');
+            // 「1,000円 / 10%」のような金額＋％の複合は {value,unit} 1組では
+            // 表現できないため、入力文字列をそのまま保持して忠実に表示する。
+            if ($hasPercent && $hasYen) {
+                return ['label' => $label, 'amount' => $raw];
+            }
+            if ($hasPercent) {
+                return ['label' => $label, 'value' => (int) round((float) $pm[1]), 'unit' => 'percent'];
             }
             if (preg_match('/([0-9,]+)/u', $raw, $m)) {
                 $val = self::toInt($m[1]) ?? 0;
@@ -322,7 +335,8 @@ class StoreResource extends JsonResource
                 if (str_contains($raw, '/日')) $out['per_day'] = true;
                 return $out;
             }
-            return ['label' => $label, 'value' => 0, 'unit' => 'free'];
+            // 数値を含まない自由記述 (例: 「応相談」) はそのまま表示。
+            return ['label' => $label, 'amount' => $raw];
         }, $items));
     }
 
