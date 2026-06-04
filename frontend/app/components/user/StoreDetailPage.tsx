@@ -242,8 +242,8 @@ export interface RelatedStoreLite {
   area?: string;
   category?: string;
   image_url?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number | string | null;
+  trial_hourly_max?: number | string | null;
 }
 
 export interface StoreDetailStore {
@@ -263,8 +263,6 @@ export interface StoreDetailStore {
   shift_info: string | null;
   phone: string;
   website_url: string;
-  hourly_min: number | null;
-  hourly_max: number | null;
   /** 日給目安。Resource は文字列 (例: "30,000円〜60,000円") を返す想定だが、
       過去データは number のこともある。表示側で両対応する。 */
   daily_estimate: number | string | null;
@@ -297,7 +295,7 @@ export interface StoreDetailStore {
   interview_hours: string;
   interview_start: string | null;
   interview_end: string | null;
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   feature_tags: string[];
   description: string;
@@ -712,8 +710,6 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
       area: s.area,
       category: s.category,
       image_url: firstImage,
-      hourly_min: s.hourly_min ?? undefined,
-      hourly_max: s.hourly_max ?? undefined,
       trial_hourly_min: s.trial_hourly_min ?? s.trial_avg_hourly ?? null,
       trial_hourly_max: s.trial_hourly_max ?? s.trial_hourly ?? null,
     });
@@ -904,8 +900,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     area: store.area,
                     category: store.category,
                     nearest_station: store.nearest_station,
-                    hourly_min: store.hourly_min ?? undefined,
-                    hourly_max: store.hourly_max ?? undefined,
+                    trial_hourly_min: toAmountNumberSafe(store.trial_hourly_min ?? store.trial_avg_hourly) ?? undefined,
+                    trial_hourly_max: toAmountNumberSafe(store.trial_hourly_max ?? store.trial_hourly) ?? undefined,
                     feature_tags: store.feature_tags,
                     description: store.description,
                     business_hours: store.business_hours,
@@ -976,7 +972,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                         className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
                         style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
                       >
-                        体験確約OK
+                        体入確約OK
                       </span>
                     );
                   }
@@ -1531,12 +1527,12 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               テキストだけに簡素化)。独立 SectionCard は廃止。 */}
 
           {/* ============================================================ */}
-          {/* 11e. Salary simulator (interactive, derived from hourly_min/max) */}
+          {/* 11e. Salary simulator (interactive, derived from 体入時給 + back_items) */}
           {/* ============================================================ */}
           <SalarySimulatorSection
             backItems={store.back_items}
-            hourlyMin={store.hourly_min ?? undefined}
-            hourlyMax={store.hourly_max ?? undefined}
+            hourlyMin={toAmountNumberSafe(store.trial_hourly_min ?? store.trial_avg_hourly) ?? undefined}
+            hourlyMax={toAmountNumberSafe(store.trial_hourly_max ?? store.trial_hourly) ?? undefined}
           />
 
           {/* ============================================================ */}
@@ -2027,7 +2023,7 @@ function LuxeHero({
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              体験確約OK
+              体入確約OK
             </span>
           )}
           {trialType === "normal" && (
@@ -4097,8 +4093,8 @@ function RelatedStoresSection({
           area: s.area,
           category: s.category,
           image_url: firstImage,
-          hourly_min: s.hourly_min,
-          hourly_max: s.hourly_max,
+          trial_hourly_min: s.trial_hourly_min ?? null,
+          trial_hourly_max: s.trial_hourly_max ?? null,
         });
       }
       setResolved(items);
@@ -4158,12 +4154,12 @@ function RelatedStoresSection({
                   {s.category ? ` / ${s.category}` : ""}
                 </p>
               )}
-              {(s.hourly_min || s.hourly_max) && (
+              {(s.trial_hourly_min || s.trial_hourly_max) && (
                 <p
                   className="mt-0.5 text-[10px]"
                   style={{ color: GOLD_HEX, fontWeight: 600 }}
                 >
-                  体入時給 {formatWageRange(s.hourly_min, s.hourly_max) ?? "—"}
+                  体入時給 {formatWageRange(s.trial_hourly_min, s.trial_hourly_max) ?? "—"}
                 </p>
               )}
             </div>
@@ -4312,7 +4308,7 @@ function ReviewsSection({
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-semibold" style={{ color: "#1b2528" }}>
-                ログインで残り{Math.max(reviewsCount - visible.length, 1)}件の口コミを表示
+                ログインで残りの口コミを表示
               </div>
               <div className="mt-0.5 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
                 LINEで30秒・無料

@@ -50,7 +50,7 @@ export function meta({
   const count = data.stats.count;
   return buildMetaTags({
     title: `${categoryName}求人[${count}件]・体入・高時給 | Recta`,
-    description: `${categoryName}の求人を ${count} 件掲載。体験確約・未経験 OK・高時給の店舗をエリア横断で一覧比較できます。LINE で気軽に相談可能。`,
+    description: `${categoryName}の求人を ${count} 件掲載。体入確約・未経験 OK・高時給の店舗をエリア横断で一覧比較できます。LINE で気軽に相談可能。`,
     path: `/jobs/categories/${data.category.slug}`,
   });
 }

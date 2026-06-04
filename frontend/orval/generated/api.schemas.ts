@@ -1144,8 +1144,8 @@ export type AiChatChat200 = {
   /** @nullable */
   category: string | null;
   nearest_station: string;
-  hourly_min: string;
-  hourly_max: string;
+  trial_hourly_min: string;
+  trial_hourly_max: string;
   feature_tags: string;
   description: string;
   images: string;
@@ -1173,8 +1173,8 @@ export type AiChatChat200 = {
   /** @nullable */
   category: string | null;
   nearest_station: string;
-  hourly_min: string;
-  hourly_max: string;
+  trial_hourly_min: string;
+  trial_hourly_max: string;
   feature_tags: string;
   description: string;
   images: string;
@@ -1201,10 +1201,13 @@ export type AiChatChat200 = {
   category: string;
   /** @nullable */
   nearest_station: string | null;
+  /**
+     * 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+     * @nullable
+     */
+  trial_hourly_min: string | null;
   /** @nullable */
-  hourly_min: string | null;
-  /** @nullable */
-  hourly_max: string | null;
+  trial_hourly_max: string | null;
   /** @nullable */
   description: string | null;
   /** @nullable */
@@ -1799,8 +1802,6 @@ export type PublicStoreHome200PickupShopsItem = {
   name: string;
   area: string;
   category: string;
-  hourly_min: unknown;
-  hourly_max: unknown;
   trial_hourly_min: unknown;
   trial_hourly_max: unknown;
   /** @nullable */
@@ -1863,9 +1864,9 @@ export type PublicStoreHome200 = {
 
 export type PublicStoreIndexParams = {
 /**
- * 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+ * 体入確約フラグでの絞り込み。フロントの「体入確約」タブ (BUG-E09)
  *  が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
- *  絞り込み。「体験確約」リボンを出している店舗を抽出。
+ *  絞り込み。「体入確約」リボンを出している店舗を抽出。
  *  デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
  */
 sort?: string;

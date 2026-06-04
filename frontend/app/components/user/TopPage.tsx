@@ -27,8 +27,8 @@ interface PickupShop {
   name: string;
   area?: string;
   category?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number;
+  trial_hourly_max?: number;
   feature_tags?: string[];
   images?: (string | { url: string })[];
   is_pr?: boolean;
@@ -507,10 +507,10 @@ export default function TopPage({
                         <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "10px", color: "white" }}>1</span>
                       </div>
                     )}
-                    {(store.hourly_min || store.hourly_max) && (
+                    {(store.trial_hourly_min || store.trial_hourly_max) && (
                       <div className="absolute bottom-2.5 left-2.5 right-2.5">
                         <p style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "13px", color: "white", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>
-                          体入時給 {store.hourly_min?.toLocaleString()}〜{store.hourly_max?.toLocaleString()}円
+                          体入時給 {store.trial_hourly_min?.toLocaleString()}〜{store.trial_hourly_max?.toLocaleString()}円
                         </p>
                       </div>
                     )}

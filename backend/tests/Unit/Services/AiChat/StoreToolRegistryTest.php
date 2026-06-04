@@ -83,9 +83,7 @@ class StoreToolRegistryTest extends TestCase
         $result = $this->tools->getStoreDetail(['store_id' => $store->id]);
 
         $this->assertEquals('Lounge X', $result['name']);
-        // hourly_min/max は体入時給のエイリアス。
-        $this->assertEquals(4000, $result['hourly_min']);
-        $this->assertEquals(8000, $result['hourly_max']);
+        // 通常時給は廃止。給与は体入時給に一本化。
         $this->assertEquals(4000, $result['trial_hourly_min']);
         $this->assertEquals(8000, $result['trial_hourly_max']);
         $this->assertEquals('20-LAST', $result['business_hours']);

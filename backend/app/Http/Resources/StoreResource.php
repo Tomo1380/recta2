@@ -52,14 +52,9 @@ class StoreResource extends JsonResource
 
             // wage — 通常時給 (wage.regular) は廃止。サイトの「時給」は体入時給に一本化した。
             // 体入時給は最低/最高の2枠。旧データ (avg_hourly=平均 / hourly=単一値) は
-            // 最低=avg, 最高=hourly にフォールバック。
+            // 最低=avg, 最高=hourly にフォールバック。フロントは trial_hourly_* のみ参照する。
             'trial_hourly_min' => self::toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
             'trial_hourly_max' => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
-            // hourly_min/max は「サイトで表示する時給」= 体入時給 のエイリアス。
-            // 旧 wage.regular は読まない (通常時給は廃止)。一覧カード/ランディング/
-            // 給与シミュレータ等、既存の hourly_min/max 参照箇所の後方互換のため残す。
-            'hourly_min'      => self::toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
-            'hourly_max'      => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
             // daily_estimate は旧 string と新 min/max の両対応。
             'daily_estimate'      => self::toInt($wage['daily_estimate'] ?? null), // 後方互換
             'daily_estimate_min'  => self::toInt($wage['daily_estimate_min'] ?? null),

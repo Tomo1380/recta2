@@ -6,8 +6,8 @@ interface StoreCardProps {
   name: string;
   area?: string;
   category?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number;
+  trial_hourly_max?: number;
   feature_tags?: string[];
   images?: (string | { url: string })[];
   average_rating?: number;
@@ -34,8 +34,8 @@ export default function StoreCard({
   name,
   area,
   category,
-  hourly_min,
-  hourly_max,
+  trial_hourly_min,
+  trial_hourly_max,
   feature_tags,
   images,
   average_rating,
@@ -109,9 +109,9 @@ export default function StoreCard({
         )}
 
         {/* Price overlay on bottom of image */}
-        {(hourly_min || hourly_max) && (
+        {(trial_hourly_min || trial_hourly_max) && (
           <div className="absolute bottom-2 left-2.5 text-[13px] font-semibold text-white">
-            体入時給 {formatHourly(hourly_min)}〜{formatHourly(hourly_max)}
+            体入時給 {formatHourly(trial_hourly_min)}〜{formatHourly(trial_hourly_max)}
           </div>
         )}
       </div>

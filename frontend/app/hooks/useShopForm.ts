@@ -106,7 +106,7 @@ export interface ShopForm {
   trialMaxWage: string;
   interviewStart: string;
   interviewEnd: string;
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし)。
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし)。
       フォーム内ではそのまま日本語ラベルを使わず enum string で持ち、表示時に
       ラベル変換する。 */
   sameDayTrial: "same_day" | "normal" | "none";

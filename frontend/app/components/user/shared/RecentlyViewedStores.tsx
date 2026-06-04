@@ -19,7 +19,16 @@ interface RecentlyViewedStoresProps {
 const GOLD = "#D4AF37";
 const DARK = "#1b2528";
 
-function formatHourly(min?: number, max?: number): string | null {
+// 体入時給は number / "5,000円" / null が混在しうるので数値化してから整形する。
+function toNum(v?: number | string | null): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function formatHourly(minRaw?: number | string | null, maxRaw?: number | string | null): string | null {
+  const min = toNum(minRaw);
+  const max = toNum(maxRaw);
   if (!min && !max) return null;
   if (min && max) return `体入時給 ¥${min.toLocaleString()}〜¥${max.toLocaleString()}`;
   if (min) return `体入時給 ¥${min.toLocaleString()}〜`;
@@ -179,7 +188,7 @@ export default function RecentlyViewedStores({
       <div className="px-5 pb-5">
         <div className="flex gap-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {filtered.map((store) => {
-            const wage = formatHourly(store.hourly_min, store.hourly_max);
+            const wage = formatHourly(store.trial_hourly_min, store.trial_hourly_max);
             return (
               <Link
                 key={store.id}

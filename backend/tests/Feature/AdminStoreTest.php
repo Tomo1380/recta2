@@ -79,9 +79,7 @@ class AdminStoreTest extends TestCase
                 'area' => '六本木',
                 'category' => 'ラウンジ',
                 'publish_status' => 'draft',
-                // hourly_min/max は体入時給のエイリアス。
-                'hourly_min' => 3000,
-                'hourly_max' => 8000,
+                // 通常時給は廃止。給与は体入時給に一本化。
                 'trial_hourly_min' => 3000,
                 'trial_hourly_max' => 8000,
             ]);
@@ -171,8 +169,7 @@ class AdminStoreTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'name' => 'Updated Store',
-                // hourly_min は体入時給のエイリアス。
-                'hourly_min' => 5000,
+                // 通常時給は廃止。給与は体入時給に一本化。
                 'trial_hourly_min' => 5000,
             ]);
 

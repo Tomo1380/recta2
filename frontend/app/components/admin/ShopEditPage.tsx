@@ -853,7 +853,7 @@ export function ShopEditPage() {
   const [trialMaxWage, setTrialMaxWage] = useState("");
   const [interviewStart, setInterviewStart] = useState("");
   const [interviewEnd, setInterviewEnd] = useState("");
-  // 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし)。
+  // 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし)。
   const [sameDayTrial, setSameDayTrial] = useState<"same_day" | "normal" | "none">("normal");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -1691,7 +1691,7 @@ export function ShopEditPage() {
 
   // 体入（体験入店）情報。元 STEP3 にあったが、求職者目線ではユーザー画面
   // 上部に出る情報なので STEP1「店舗情報」末尾に同居させる。中身: 体入時給
-  // (最低/最高)、面接可能時間 (開始/終了)、体験確約可否。
+  // (最低/最高)、面接可能時間 (開始/終了)、体入確約可否。
   const sectionTrial = () => (
     <SectionCard title="体入（体験入店）情報" icon={Sparkles} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1750,7 +1750,7 @@ export function ShopEditPage() {
             placeholder="例: 21:00"
           />
         </Field>
-        <Field label="体入の種類" hint="店舗詳細やフィルターで「体験確約OK」リボンの出し分けに使用">
+        <Field label="体入の種類" hint="店舗詳細やフィルターで「体入確約OK」リボンの出し分けに使用">
           <select
             value={sameDayTrial}
             onChange={(e) =>
@@ -1758,7 +1758,7 @@ export function ShopEditPage() {
             }
             className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
           >
-            <option value="same_day">体験確約</option>
+            <option value="same_day">体入確約</option>
             <option value="normal">体入可能</option>
             <option value="none">体入なし</option>
           </select>
@@ -3020,10 +3020,7 @@ export function ShopEditPage() {
                   shift_info: shiftInfo || null,
                   phone: phone,
                   website_url: website,
-                  // 通常時給は廃止。hourly_min/max は体入時給のエイリアス
-                  // (給与シミュレータ等の後方互換)。プレビューも体入時給を流す。
-                  hourly_min: trialMinWage ? Number(trialMinWage) : null,
-                  hourly_max: trialMaxWage ? Number(trialMaxWage) : null,
+                  // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
                   daily_estimate: dailyPay || null,
                   back_items: backItems
                     .filter((b) => b.label)

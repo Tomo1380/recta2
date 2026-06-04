@@ -52,8 +52,7 @@ interface ComparableStore {
   name: string;
   area?: string;
   category?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
   daily_estimate?: number;
   trial_hourly_min?: number | string | null;
   trial_hourly_max?: number | string | null;
@@ -61,7 +60,7 @@ interface ComparableStore {
   trial_hourly?: number | string | null;
   /** @deprecated 旧キー (フォールバック用) */
   trial_avg_hourly?: number | string | null;
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type?: "same_day" | "normal" | "none";
   back_items?: BackItem[];
   norma_info?: string;

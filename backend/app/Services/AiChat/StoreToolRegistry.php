@@ -257,9 +257,7 @@ class StoreToolRegistry
             'category' => $store->category,
             'business_hours' => $schedule['hours_text'] ?? null,
             'holidays' => $schedule['holidays'] ?? null,
-            // 通常時給は廃止。hourly_min/max は体入時給のエイリアス (表示後方互換)。
-            'hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
-            'hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
+            // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
             'daily_estimate' => $wage['daily_estimate'] ?? null,
             'back_items' => $compensation['back'] ?? null,
             'fee_items' => $compensation['fees'] ?? null,
@@ -442,9 +440,7 @@ class StoreToolRegistry
             'area' => $s->area,
             'category' => $s->category,
             'nearest_station' => $s->nearest_station,
-            // 通常時給は廃止。hourly_min/max は体入時給のエイリアス (表示後方互換)。
-            'hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
-            'hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
+            // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
             'daily_estimate' => $wage['daily_estimate'] ?? null,
             // 体入タイプ: 'same_day' | 'normal' | 'none' (enum string)
             'trial_type' => in_array($guarantee['same_day_trial'] ?? null, ['same_day', 'normal', 'none'], true)

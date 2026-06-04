@@ -48,8 +48,7 @@ export interface Store {
   shift_info: string | null;     // 例: "週2日〜OK。シフト自由制。"
   phone: string | null;
   website_url: string | null;
-  hourly_min: number | null;
-  hourly_max: number | null;
+  // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
   daily_estimate: string | null;
   back_items: { label: string; amount: string }[] | null;
   fee_items: { label: string; amount: string }[] | null;
@@ -72,7 +71,7 @@ export interface Store {
   interview_hours: string | null;
   interview_start: string | null; // 例: "14:00"
   interview_end: string | null;   // 例: "19:00"
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   feature_tags: string[] | null;
   description: string | null;

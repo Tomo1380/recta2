@@ -36,13 +36,13 @@ interface Store {
   nearest_station: string;
   category: string;
   business_hours: string;
-  hourly_min: number;
-  hourly_max: number;
+  trial_hourly_min: number | null;
+  trial_hourly_max: number | null;
   daily_estimate: number;
   feature_tags: string[];
   description: string;
   images: (string | { url: string })[];
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   reviews_count: number;
   average_rating: number;
@@ -178,13 +178,13 @@ function EditorialStoreCard({
               {store.category}
             </span>
           )}
-          {/* 体入リボン — 体験確約はゴールド、体入可能は控えめ。体入なしはなし。 */}
+          {/* 体入リボン — 体入確約はゴールド、体入可能は控えめ。体入なしはなし。 */}
           {store.trial_type === "same_day" && (
             <span
               className="absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              体験確約
+              体入確約
             </span>
           )}
           {store.trial_type === "normal" && (
@@ -256,29 +256,29 @@ function EditorialStoreCard({
               空白にしてレンジ「〜¥6,000」「¥4,000〜」を表現する。最低額と
               最高額で色/サイズが違うと「片方が安そう」「片方が強調されてる」
               ように読まれるので、ラベル以外は同じ色・同じウェイトで揃える。 */}
-          {(store.hourly_min || store.hourly_max) && (
+          {(store.trial_hourly_min || store.trial_hourly_max) && (
             <div className="mt-1 flex items-baseline gap-1.5">
               <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>体入時給</span>
-              {store.hourly_min ? (
+              {store.trial_hourly_min ? (
                 <span
                   className="text-[14px] font-bold tabular-nums leading-none"
                   style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
                 >
-                  ¥{store.hourly_min.toLocaleString()}
+                  ¥{store.trial_hourly_min.toLocaleString()}
                 </span>
               ) : null}
-              {store.hourly_max && store.hourly_max !== store.hourly_min && (
+              {store.trial_hourly_max && store.trial_hourly_max !== store.trial_hourly_min && (
                 <>
                   <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.35)" }}>〜</span>
                   <span
                     className="text-[14px] font-bold tabular-nums leading-none"
                     style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}
                   >
-                    ¥{store.hourly_max.toLocaleString()}
+                    ¥{store.trial_hourly_max.toLocaleString()}
                   </span>
                 </>
               )}
-              {store.hourly_min && !store.hourly_max && (
+              {store.trial_hourly_min && !store.trial_hourly_max && (
                 <span className="text-[9.5px]" style={{ color: "rgba(27,37,40,0.35)" }}>〜</span>
               )}
             </div>
@@ -593,7 +593,7 @@ function SheetChip({
 
 const SORT_TABS = [
   { id: "priority", label: "おすすめ順" },
-  { id: "experience_guaranteed", label: "体験確約" },
+  { id: "experience_guaranteed", label: "体入確約" },
   { id: "hourly_desc", label: "時給順" },
   { id: "popular", label: "評価順" },
   { id: "newest", label: "新着" },

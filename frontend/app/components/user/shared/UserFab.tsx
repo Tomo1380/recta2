@@ -43,7 +43,7 @@ type SheetMode = null | "line" | "compare";
 
 // LINE ボタン左に常時出す吹き出しキャッチコピー。
 // 求職者の不安「面接めんどう」を解消する 1 行で押下率を上げる。
-const LINE_HINT_TEXT = "たった1分で体験確約";
+const LINE_HINT_TEXT = "たった1分で体入確約";
 
 interface AddCandidate {
   id: number;
@@ -200,7 +200,7 @@ export default function UserFab() {
               1
             </span>
             <span style={{ fontWeight: 700, fontSize: 11, color: GOLD }}>分</span>
-            <span style={{ fontWeight: 800, fontSize: 12.5 }}>で体験確約</span>
+            <span style={{ fontWeight: 800, fontSize: 12.5 }}>で体入確約</span>
           </span>
           {/* 右端: LINE 緑円アイコン (認知用アクセント) */}
           <span

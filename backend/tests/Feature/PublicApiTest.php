@@ -204,7 +204,7 @@ class PublicApiTest extends TestCase
 
         $response->assertStatus(200);
         $data = $response->json('data');
-        $this->assertGreaterThanOrEqual($data[1]['hourly_max'], $data[0]['hourly_max']);
+        $this->assertGreaterThanOrEqual($data[1]['trial_hourly_max'], $data[0]['trial_hourly_max']);
     }
 
     public function test_can_filter_stores_by_min_hourly(): void
@@ -217,7 +217,7 @@ class PublicApiTest extends TestCase
         $response->assertStatus(200);
         $data = $response->json('data');
         $this->assertCount(1, $data);
-        $this->assertGreaterThanOrEqual(4000, $data[0]['hourly_min']);
+        $this->assertGreaterThanOrEqual(4000, $data[0]['trial_hourly_min']);
     }
 
     // ========== Store Detail ==========

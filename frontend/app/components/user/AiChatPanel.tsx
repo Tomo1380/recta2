@@ -101,8 +101,8 @@ interface StoreInfo {
   area?: string;
   category?: string;
   nearest_station?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number;
+  trial_hourly_max?: number;
   feature_tags?: string[];
   description?: string;
   business_hours?: string;
@@ -152,8 +152,8 @@ interface StoreCard {
   area?: string;
   category?: string;
   nearest_station?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number;
+  trial_hourly_max?: number;
   description?: string;
   images?: { url: string; order?: number }[];
 }
@@ -384,8 +384,8 @@ function getIntroScript(
   if (pageType === "detail" && storeInfo) {
     const s = storeInfo;
     const hourly =
-      s.hourly_min && s.hourly_max
-        ? `体入時給${formatCurrencyShort(s.hourly_min)}〜${formatCurrencyShort(s.hourly_max)}円`
+      s.trial_hourly_min && s.trial_hourly_max
+        ? `体入時給${formatCurrencyShort(s.trial_hourly_min)}〜${formatCurrencyShort(s.trial_hourly_max)}円`
         : "";
     const location = [s.area, s.nearest_station].filter(Boolean).join("・");
     const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
@@ -1441,9 +1441,9 @@ export default function AiChatPanel({
                               {store.name}
                             </div>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
-                              {(store.hourly_min != null || store.hourly_max != null) && (
+                              {(store.trial_hourly_min != null || store.trial_hourly_max != null) && (
                                 <span className="font-medium" style={{ color: "#D4AF37" }}>
-                                  体入 {formatWage(store.hourly_min, store.hourly_max)}
+                                  体入 {formatWage(store.trial_hourly_min, store.trial_hourly_max)}
                                 </span>
                               )}
                               {store.nearest_station && (

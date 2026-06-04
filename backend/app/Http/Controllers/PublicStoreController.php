@@ -73,9 +73,9 @@ class PublicStoreController extends Controller
         $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
             ->withAvg(['reviews as reviews_avg_rating' => fn ($q) => $q->where('status', 'published')], 'rating');
 
-        // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+        // 体入確約フラグでの絞り込み。フロントの「体入確約」タブ (BUG-E09)
         // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
-        // 絞り込み。「体験確約」リボンを出している店舗を抽出。
+        // 絞り込み。「体入確約」リボンを出している店舗を抽出。
         // デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
         $sort = $request->input('sort', 'priority');
         if ($sort === 'experience_guaranteed') {
@@ -233,9 +233,7 @@ class PublicStoreController extends Controller
                     'name' => $store->name,
                     'area' => $store->area,
                     'category' => $store->category,
-                    // hourly_min/max は体入時給のエイリアス (通常時給は廃止)。
-                    'hourly_min' => $full['hourly_min'] ?? null,
-                    'hourly_max' => $full['hourly_max'] ?? null,
+                    // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
                     'trial_hourly_min' => $full['trial_hourly_min'] ?? null,
                     'trial_hourly_max' => $full['trial_hourly_max'] ?? null,
                     'feature_tags' => $store->feature_tags,
