@@ -8,7 +8,11 @@ RUN apk add --no-cache \
     imagemagick \
     imagemagick-libs \
     imagemagick-dev \
+    imagemagick-jpeg \
+    imagemagick-webp \
+    imagemagick-heic \
     libheif \
+    font-noto-cjk \
     $PHPIZE_DEPS \
     && docker-php-ext-install \
     pdo \

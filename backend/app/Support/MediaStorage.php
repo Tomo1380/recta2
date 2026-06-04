@@ -111,6 +111,43 @@ class MediaStorage
     }
 
     /**
+     * 生バイナリを「固定の相対キー」で put して public URL を返す。
+     *
+     * upload() が uuid 採番で都度 key を変えるのに対し、こちらは呼び出し側が
+     * 指定した相対キー (例: "og/home.jpg") にそのまま上書き保存する。OG 画像の
+     * ように「常に同じ URL で最新版を配りたい」用途に使う。
+     *
+     * @param  string  $relativeKey  prefix を含まない相対キー (例 "og/home.jpg")
+     */
+    public static function putBytes(string $contents, string $relativeKey, string $contentType): string
+    {
+        $key = self::prefix() . ltrim($relativeKey, '/');
+
+        self::disk()->put($key, $contents, [
+            'ContentType' => $contentType,
+            // 固定 URL で上書きするので長期 immutable にはせず、SNS 再クロールで
+            // 更新が拾える程度の短めキャッシュにする。
+            'CacheControl' => 'public, max-age=300',
+        ]);
+
+        return self::disk()->url($key);
+    }
+
+    /**
+     * putBytes() で保存した固定キーの内容を取り出す。無ければ null。
+     *
+     * @param  string  $relativeKey  prefix を含まない相対キー
+     */
+    public static function getBytes(string $relativeKey): ?string
+    {
+        $key = self::prefix() . ltrim($relativeKey, '/');
+        if (!self::disk()->exists($key)) {
+            return null;
+        }
+        return self::disk()->get($key);
+    }
+
+    /**
      * URL から object key を逆引きして削除。bucket/prefix が一致する URL
      * だけが対象。外部 URL や別 prefix は何もしない (返り値は false)。
      */

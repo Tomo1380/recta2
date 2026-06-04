@@ -21,6 +21,9 @@ class UpdateBannerSettingsRequest extends FormRequest
             'hero_subtitle' => 'nullable|string',
             'hero_badge' => 'nullable|string',
             'hero_ai_label' => 'nullable|string',
+            // ヒーロー背景画像。フロントが先に汎用 upload endpoint へ送って得た
+            // S3 URL をここで保存する (この endpoint 自体はファイルを受けない)。
+            'hero_image_url' => 'nullable|string|max:2048',
         ];
     }
 }

@@ -6,6 +6,8 @@
  */
 import type {
   LineAuthCallbackParams,
+  LineAuthExchange200,
+  LineAuthExchangeBody,
   LineAuthRedirectParams
 } from './api.schemas';
 
@@ -38,5 +40,19 @@ export const lineAuthCallback = (
     },
       );
     }
+  /**
+ * @summary 交換コードを実トークンに引き換える (単回使用)。
+ */
+export const lineAuthExchange = (
+    lineAuthExchangeBody?: LineAuthExchangeBody,
+ ) => {
+      return rectaMutator<LineAuthExchange200>(
+      {url: `/auth/line/exchange`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: lineAuthExchangeBody
+    },
+      );
+    }
   export type LineAuthRedirectResult = NonNullable<Awaited<ReturnType<typeof lineAuthRedirect>>>
 export type LineAuthCallbackResult = NonNullable<Awaited<ReturnType<typeof lineAuthCallback>>>
+export type LineAuthExchangeResult = NonNullable<Awaited<ReturnType<typeof lineAuthExchange>>>

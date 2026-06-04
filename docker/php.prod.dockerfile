@@ -19,7 +19,11 @@ RUN apk add --no-cache \
     linux-headers \
     imagemagick \
     imagemagick-libs \
+    imagemagick-jpeg \
+    imagemagick-webp \
+    imagemagick-heic \
     libheif \
+    font-noto-cjk \
     && apk add --no-cache --virtual .build-deps \
     imagemagick-dev \
     $PHPIZE_DEPS \

@@ -61,6 +61,10 @@ Route::get('/columns/{slug}', [PublicArticleController::class, 'show']);
 Route::get('/sitemap', [SeoController::class, 'sitemap']);
 Route::get('/robots', [SeoController::class, 'robots']);
 
+// OG 画像 (トップ/一覧/汎用ページ共通の og:image)。管理画面のヒーロー設定を
+// 焼き込んだ 1200x630 を配信する。frontend の seo.ts が DEFAULT_OG_IMAGE として参照。
+Route::get('/og-image', [\App\Http\Controllers\OgImageController::class, 'show']);
+
 // ========== LINE認証 ==========
 // state cookie / 交換コードを扱うため、ブルートフォース・濫用を防ぐ throttle を付与。
 Route::middleware('throttle:20,1')->group(function () {

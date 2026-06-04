@@ -205,7 +205,7 @@ class PublicStoreController extends Controller
     public function home(): JsonResponse
     {
         // Banner settings
-        $bannerKeys = ['hero_tagline', 'hero_subtitle', 'hero_badge', 'hero_ai_label'];
+        $bannerKeys = ['hero_tagline', 'hero_subtitle', 'hero_badge', 'hero_ai_label', 'hero_image_url'];
         $banner = [];
         foreach ($bannerKeys as $key) {
             $setting = SiteSetting::where('key', $key)->first();

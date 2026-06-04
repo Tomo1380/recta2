@@ -45,6 +45,7 @@ class MediaUploadController extends Controller
             'dress-code' => 'dress-code',
             'article-body' => 'articles/body',
             'store-extra' => 'stores/extra',
+            'hero' => 'site/hero',
             default => 'misc/' . preg_replace('/[^a-z0-9-]/', '', strtolower($kind)),
         };
     }

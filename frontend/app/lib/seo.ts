@@ -33,9 +33,11 @@ export const SITE_NOINDEX: boolean = (() => {
 })();
 
 export const SITE_NAME = "Recta";
-// default OG 画像: 1200×630 の専用画像 (Figma デザインのヒーロー + サイトと同じ
-// ダークグラデを焼き込み)。SNS シェア時のサムネに使う。
-export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-default.jpg`;
+// default OG 画像: 1200×630。バックエンドが管理画面のヒーロー設定 (背景画像 +
+// タグライン/サブタイトル + 「AIで質問できる」訴求) を焼き込んで動的生成し、
+// 同一オリジンの固定 URL (/api/og-image, nginx 経由で Laravel) で配信する。
+// 個別 OG を持たないページ (トップ/一覧/汎用ページ) の og:image はすべてこれ。
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/api/og-image`;
 
 /**
  * 相対パス (`/stores/1` 等) を絶対 URL に変換する。
@@ -102,7 +104,8 @@ export function buildMetaTags(input: MetaTagsInput): MetaTag[] {
   } = input;
 
   const canonical = absoluteUrl(path);
-  const ogImage = image && image.trim() ? toAbsoluteImage(image) : DEFAULT_OG_IMAGE;
+  const usingDefaultOg = !(image && image.trim());
+  const ogImage = usingDefaultOg ? DEFAULT_OG_IMAGE : toAbsoluteImage(image!);
 
   const tags: MetaTag[] = [
     { title },
@@ -120,6 +123,13 @@ export function buildMetaTags(input: MetaTagsInput): MetaTag[] {
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: ogImage },
   ];
+
+  // 既定 OG (動的生成の 1200×630) のときだけ寸法ヒントを出す。
+  // 個別 OG (記事サムネ / 店舗写真) は任意サイズなので付けない。
+  if (usingDefaultOg) {
+    tags.push({ property: "og:image:width", content: "1200" });
+    tags.push({ property: "og:image:height", content: "630" });
+  }
 
   if (noindex || SITE_NOINDEX) {
     tags.push({ name: "robots", content: "noindex,nofollow" });
