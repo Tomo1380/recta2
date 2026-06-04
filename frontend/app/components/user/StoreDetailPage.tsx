@@ -1497,6 +1497,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           {/* 11a. Transfer / 足代 — distance-based zone fee map + table */}
           {/* ============================================================ */}
           <TransferMapSection
+            isPreview={!!previewData}
             lat={store.lat}
             lng={store.lng}
             zones={store.transfer_zones}
@@ -3150,12 +3151,16 @@ function TransferMapSection({
   zones,
   fallbackDescription,
   fallbackKm,
+  isPreview = false,
 }: {
   lat: number | null;
   lng: number | null;
   zones?: TransferZone[] | null;
   fallbackDescription?: string | null;
   fallbackKm?: string | null;
+  /** 管理画面プレビュー (transform:scale の縮小枠) では Google Maps が
+   *  正しく描画できないため、実地図の代わりに案内プレースホルダを出す。 */
+  isPreview?: boolean;
 }) {
   // 色未設定のゾーンには自動でパレット色を割り当てる (運営の色選択を不要に)。
   const zoneList = (zones ?? []).map((z, i) => ({
@@ -3173,7 +3178,7 @@ function TransferMapSection({
       icon={<MapIcon size={20} style={{ color: GOLD_HEX }} />}
       title="送り・足代"
     >
-      {canShowMap && (
+      {canShowMap && !isPreview && (
         <div className="mb-3">
           <StoreMap
             lat={lat}
@@ -3181,6 +3186,19 @@ function TransferMapSection({
             zones={zoneList.map((z) => ({ radius_km: z.radius_km, color: z.color }))}
             height={220}
           />
+        </div>
+      )}
+      {canShowMap && isPreview && (
+        <div
+          className="mb-3 flex items-center justify-center rounded-[12px] text-center text-[12px] px-4"
+          style={{
+            height: 220,
+            background: "linear-gradient(135deg, #1b2528, #0f1618)",
+            color: "rgba(255,255,255,0.6)",
+            border: "1px solid rgba(212,175,55,0.18)",
+          }}
+        >
+          距離別足代マップは公開ページで表示されます<br />（プレビューの縮小表示では省略）
         </div>
       )}
       {hasZones && (
