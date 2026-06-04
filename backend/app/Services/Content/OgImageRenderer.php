@@ -189,6 +189,7 @@ class OgImageRenderer
 
     private function fetchHeroBytes(?string $heroUrl): ?string
     {
+        // 1) 管理画面でアップロードされたヒーロー画像 / env の既定 URL を HTTP 取得。
         $candidates = array_values(array_filter([
             $heroUrl,
             config('og.default_hero_url'),
@@ -207,6 +208,18 @@ class OgImageRenderer
                 report($e);
             }
         }
+
+        // 2) どれも取得できなければ backend 同梱の既定ヒーロー (frontend の
+        //    /hero-top.jpg のコピー) を使う。これでヒーロー未設定でも OG は
+        //    トップと同じヒーロー画像入りになる (ネットワーク非依存)。
+        $bundled = resource_path('og/hero-default.jpg');
+        if (is_file($bundled)) {
+            $bytes = @file_get_contents($bundled);
+            if ($bytes !== false && $bytes !== '') {
+                return $bytes;
+            }
+        }
+
         return null;
     }
 
