@@ -264,14 +264,23 @@ export interface StoreDetailStore {
       過去データは number のこともある。表示側で両対応する。 */
   daily_estimate: number | string | null;
   back_items: BackItem[];
+  /** バックのフリーテキスト (新)。あれば back_items より優先表示。 */
+  back_text?: string | null;
   fee_items: FeeItem[];
   salary_notes: string;
+  /** 給料システム (複数選択 + 詳細備考) */
+  pay_system_types?: string[] | null;
+  pay_system_note?: string | null;
   guarantee_period: string;
   guarantee_details: string;
   norma_info: string;
   unit_wage_type: string | null;
   payroll_system_type: string | null;
   payroll_system_description: string | null;
+  /** 給与サイクル / 給料日 / 日払い上限金額 (新) */
+  payroll_cycle?: string | null;
+  payroll_pay_day?: string | null;
+  daily_pay_limit?: string | null;
   /** 体入時給（最低額） */
   trial_hourly_min: number | string | null;
   /** 体入時給（最高額） */
@@ -1111,35 +1120,90 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               支払い方法・保証・ノルマ・給与備考。すべて空なら丸ごと非表示
               (空のカードを残すと見出し詐欺になる)。 */}
           {/* ============================================================ */}
-          {((store.back_items ?? []).length > 0
-            || (store.fee_items ?? []).length > 0
-            || store.payroll_system_type
-            || store.guarantee_period
-            || store.norma_info
-            || store.salary_notes) && (
+          {(() => {
+            // 表示する給与系の値を先に組み立てる。給与サイクルは
+            // サイクル＋給料日＋日払い上限＋補足を1つの文字列に束ねる。
+            // サイクル系は1行に束ね、補足(description)は改行して別行に出す
+            // (運営要望: 補足は2行目に改行できるように)。
+            const payHead = [
+              store.payroll_cycle || store.payroll_system_type,
+              store.payroll_pay_day,
+              store.daily_pay_limit ? `日払い上限: ${store.daily_pay_limit}` : null,
+            ]
+              .filter((v): v is string => !!v && String(v).trim() !== "")
+              .join("／");
+            const payValue = [payHead, store.payroll_system_description]
+              .filter((v): v is string => !!v && String(v).trim() !== "")
+              .join("\n");
+            const paySystem = (store.pay_system_types ?? []).filter(Boolean);
+            const hasBack =
+              (store.back_text && store.back_text.trim() !== "") ||
+              (store.back_items ?? []).length > 0;
+            const show =
+              paySystem.length > 0 ||
+              !!store.pay_system_note ||
+              hasBack ||
+              (store.fee_items ?? []).length > 0 ||
+              !!payValue ||
+              !!store.guarantee_period ||
+              !!store.norma_info ||
+              !!store.salary_notes;
+            if (!show) return null;
+            return (
           <SectionCard
             icon={<Award size={20} style={{ color: "#D4AF37" }} />}
             title="報酬・待遇"
             previewAnchor="salary"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              {(store.back_items ?? []).length > 0 && (
+              {(paySystem.length > 0 || store.pay_system_note) && (
+                <InfoRow
+                  label="給料システム"
+                  value={
+                    <div className="space-y-1">
+                      {paySystem.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {paySystem.map((t) => (
+                            <span
+                              key={t}
+                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                              style={{ background: "rgba(212,175,55,0.12)", color: "#9a7a17" }}
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {store.pay_system_note && (
+                        <p className="text-sm whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
+                          {store.pay_system_note}
+                        </p>
+                      )}
+                    </div>
+                  }
+                />
+              )}
+              {hasBack && (
                 <InfoRow
                   label="バック"
                   value={
-                    <ul className="space-y-0.5">
-                      {(store.back_items ?? []).map((item) => (
-                        <li key={item.label} className="text-sm">
-                          {item.label}: {formatAmountItem(item)}
-                        </li>
-                      ))}
-                    </ul>
+                    store.back_text && store.back_text.trim() !== "" ? (
+                      <p className="text-sm whitespace-pre-line">{store.back_text}</p>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {(store.back_items ?? []).map((item) => (
+                          <li key={item.label} className="text-sm">
+                            {item.label}: {formatAmountItem(item)}
+                          </li>
+                        ))}
+                      </ul>
+                    )
                   }
                 />
               )}
               {(store.fee_items ?? []).length > 0 && (
                 <InfoRow
-                  label="控除"
+                  label="引かれ物"
                   value={
                     <ul className="space-y-0.5">
                       {(store.fee_items ?? []).map((item) => (
@@ -1151,22 +1215,26 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   }
                 />
               )}
-              {store.payroll_system_type && (
+              {payValue && (
                 <InfoRow
                   label="支払い方法"
-                  value={store.payroll_system_description
-                    ? `${store.payroll_system_type}／${store.payroll_system_description}`
-                    : store.payroll_system_type}
+                  value={<span className="whitespace-pre-line">{payValue}</span>}
                 />
               )}
               {store.guarantee_period && (
-                <InfoRow label="保証" value={`${store.guarantee_period}${store.guarantee_details ? ` / ${store.guarantee_details}` : ""}`} />
+                <InfoRow label="保証" value={store.guarantee_period} />
               )}
               {store.norma_info && <InfoRow label="ノルマ" value={store.norma_info} />}
-              {store.salary_notes && <InfoRow label="給与備考" value={store.salary_notes} />}
+              {store.salary_notes && (
+                <InfoRow
+                  label="給与備考"
+                  value={<span className="whitespace-pre-line">{store.salary_notes}</span>}
+                />
+              )}
             </div>
           </SectionCard>
-          )}
+            );
+          })()}
 
           {/* Relocate-support CTA — re-prompt the simulator for users coming from outside Tokyo */}
           <RelocateSupportCta variant="salary" />

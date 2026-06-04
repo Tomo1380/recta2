@@ -77,9 +77,22 @@ export interface ShopForm {
   minWage: string;
   maxWage: string;
   dailyPay: string;
+  /** 給料システム (複数選択: 完全時給制 / 時給+バック など) */
+  paySystemTypes: string[];
+  /** 給料システムの詳細備考 (売上制/ポイント制の具体ロジック等) */
+  paySystemNote: string;
+  /** バックをフリーテキストで記載 (同伴/本指名/場内など月本数で変わる複雑なものに対応) */
+  backText: string;
   backItems: LabelValue[];
+  /** 引かれ物 (旧「控除/手数料」) */
   feeItems: LabelValue[];
   salaryNote: string;
+  /** 給与サイクル (旧 payrollSystemType を置き換え。月末締め翌月払い 等) */
+  payrollCycle: string;
+  /** 給料日 (サイクルにより条件表示。締め日・支払日) */
+  payrollPayDay: string;
+  /** 日払い上限金額 (「日払い可」の代わり) */
+  dailyPayLimit: string;
   guaranteePeriod: string;
   guaranteeDetail: string;
   normaInfo: string;
@@ -162,7 +175,9 @@ export const INITIAL_FORM: ShopForm = {
   category: "", openingTime: "", closingTime: "", holiday: "", phone: "", website: "",
   videos: [], staffPhotos: [],
   minWage: "", maxWage: "", dailyPay: "",
-  backItems: [], feeItems: [], salaryNote: "",
+  paySystemTypes: [], paySystemNote: "",
+  backText: "", backItems: [], feeItems: [], salaryNote: "",
+  payrollCycle: "", payrollPayDay: "", dailyPayLimit: "",
   guaranteePeriod: "", guaranteeDetail: "", normaInfo: "",
   trialMinWage: "", trialMaxWage: "",
   interviewStart: "", interviewEnd: "", sameDayTrial: "normal",
@@ -404,6 +419,21 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     minWage: store.hourly_min?.toString() ?? "",
     maxWage: store.hourly_max?.toString() ?? "",
     dailyPay: store.daily_estimate ?? "",
+    paySystemTypes: Array.isArray(store.pay_system_types) ? store.pay_system_types : [],
+    paySystemNote: store.pay_system_note ?? "",
+    // バックはフリーテキストに移行。新フィールド (back_text) が無い既存店舗は
+    // 旧 back_items を「名前: 金額」改行テキストへ自動変換して初期表示する
+    // (初回保存でフリーテキストに引き継がれ、データを失わない)。
+    backText:
+      store.back_text ??
+      (Array.isArray(store.back_items) && store.back_items.length > 0
+        ? store.back_items
+            .map((i: AnyStore) =>
+              i.amount ? `${i.label}: ${i.amount}` : String(i.label ?? ""),
+            )
+            .filter(Boolean)
+            .join("\n")
+        : ""),
     backItems: (store.back_items ?? []).map((i: AnyStore) => ({
       label: i.label,
       value: i.amount,
@@ -413,6 +443,9 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
       value: i.amount,
     })),
     salaryNote: store.salary_notes ?? "",
+    payrollCycle: store.payroll_cycle ?? store.payroll_system_type ?? "",
+    payrollPayDay: store.payroll_pay_day ?? "",
+    dailyPayLimit: store.daily_pay_limit ?? "",
     guaranteePeriod: store.guarantee_period ?? "",
     guaranteeDetail: store.guarantee_details ?? "",
     normaInfo: store.norma_info ?? "",
@@ -551,6 +584,9 @@ export function formToPayload(
     // 日給目安は手入力を廃止し「体入時給 × 1日4時間」で自動算出する
     // (体入日給)。通常時給の項目を撤去したため、計算元は体入時給に一本化。
     daily_estimate: trialDailyEstimate(form.trialMinWage, form.trialMaxWage),
+    back_text: form.backText.trim() || null,
+    pay_system_types: form.paySystemTypes,
+    pay_system_note: form.paySystemNote.trim() || null,
     back_items: form.backItems
       .filter((i) => i.label)
       .map((i) => ({ label: i.label, amount: i.value })),
@@ -638,6 +674,9 @@ export function formToPayload(
       form.relatedStoreIds.length > 0 ? form.relatedStoreIds : null,
     payroll_system_type: form.payrollSystemType || null,
     payroll_system_description: form.payrollSystemDescription,
+    payroll_cycle: form.payrollCycle || null,
+    payroll_pay_day: form.payrollPayDay.trim() || null,
+    daily_pay_limit: form.dailyPayLimit.trim() || null,
     champagne_description: form.champagneDescription,
     champagne_prices: (() => {
       const out: Record<string, { amount: number; note?: string }> = {};

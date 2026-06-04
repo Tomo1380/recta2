@@ -65,11 +65,20 @@ class StoreResource extends JsonResource
             'trial_hourly_max' => self::toInt($trial['hourly_max'] ?? $trial['hourly']     ?? null),
             'payroll_system_type'        => $payroll['type']        ?? null,
             'payroll_system_description' => $payroll['description'] ?? null,
+            // 給与サイクル/給料日/日払い上限 (旧 payroll_system_type は後方互換で残置)
+            'payroll_cycle'     => $payroll['cycle']        ?? null,
+            'payroll_pay_day'   => $payroll['pay_day']      ?? null,
+            'daily_pay_limit'   => $payroll['daily_limit']  ?? null,
 
-            // compensation — back_items / fee_items は {label, value, unit} の new shape
+            // compensation — back_items / fee_items は {label, value, unit} の new shape。
+            // back_text はバックをフリーテキストで持つ新フィールド (項目別 back と併存)。
             'back_items'    => self::projectAmountItems($compensation['back']  ?? null),
+            'back_text'     => $compensation['back_text'] ?? null,
             'fee_items'     => self::projectAmountItems($compensation['fees']  ?? null),
             'salary_notes'  => $compensation['notes'] ?? null,
+            // 給料システム (複数選択 + 詳細備考)
+            'pay_system_types' => $compensation['pay_system']['types'] ?? [],
+            'pay_system_note'  => $compensation['pay_system']['note']  ?? null,
 
             // guarantee
             'guarantee_period'  => $guarantee['period']  ?? null,

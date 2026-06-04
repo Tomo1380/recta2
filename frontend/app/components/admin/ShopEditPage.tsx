@@ -197,6 +197,28 @@ function isHeicFile(f: File): boolean {
   return /\.(heic|heif)$/i.test(f.name) || /hei[cf]/i.test(f.type);
 }
 
+/** 給料システム (複数選択)。詳細ロジックは別の備考欄に書く。 */
+const PAY_SYSTEM_OPTIONS = [
+  "完全時給制",
+  "時給+バック",
+  "時給+バックor売上の高い方",
+  "売上スライド(歩合)制",
+  "ポイントスライド制",
+  "完全歩合制",
+];
+
+/** 給与サイクル。「日払い可」は廃止し、日払いは「日払い上限金額」欄で表現する。 */
+const PAYROLL_CYCLE_OPTIONS = [
+  "月末締め翌月払い",
+  "月1回",
+  "月2回",
+  "週払い",
+  "全額日払い",
+];
+
+/** 締め日・支払日の入力欄を出すサイクル (月締め系のみ)。 */
+const PAYROLL_CYCLES_WITH_PAYDAY = ["月末締め翌月払い", "月1回", "月2回"];
+
 function TextInput({
   placeholder = "",
   value = "",
@@ -713,6 +735,9 @@ export function ShopEditPage() {
   const [minWage, setMinWage] = useState("");
   const [maxWage, setMaxWage] = useState("");
   const [dailyPay, setDailyPay] = useState("");
+  const [paySystemTypes, setPaySystemTypes] = useState<string[]>([]);
+  const [paySystemNote, setPaySystemNote] = useState("");
+  const [backText, setBackText] = useState("");
   const [backItems, setBackItems] = useState<
     { label: string; value: string }[]
   >([]);
@@ -720,6 +745,9 @@ export function ShopEditPage() {
     { label: string; value: string }[]
   >([]);
   const [salaryNote, setSalaryNote] = useState("");
+  const [payrollCycle, setPayrollCycle] = useState("");
+  const [payrollPayDay, setPayrollPayDay] = useState("");
+  const [dailyPayLimit, setDailyPayLimit] = useState("");
   const [guaranteePeriod, setGuaranteePeriod] = useState("");
   const [guaranteeDetail, setGuaranteeDetail] = useState("");
   const [normaInfo, setNormaInfo] = useState("");
@@ -915,9 +943,15 @@ export function ShopEditPage() {
     if (f.minWage !== undefined) setMinWage(f.minWage);
     if (f.maxWage !== undefined) setMaxWage(f.maxWage);
     if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
+    if (f.paySystemTypes !== undefined) setPaySystemTypes(f.paySystemTypes);
+    if (f.paySystemNote !== undefined) setPaySystemNote(f.paySystemNote);
+    if (f.backText !== undefined) setBackText(f.backText);
     if (f.backItems !== undefined) setBackItems(f.backItems);
     if (f.feeItems !== undefined) setFeeItems(f.feeItems);
     if (f.salaryNote !== undefined) setSalaryNote(f.salaryNote);
+    if (f.payrollCycle !== undefined) setPayrollCycle(f.payrollCycle);
+    if (f.payrollPayDay !== undefined) setPayrollPayDay(f.payrollPayDay);
+    if (f.dailyPayLimit !== undefined) setDailyPayLimit(f.dailyPayLimit);
     if (f.guaranteePeriod !== undefined) setGuaranteePeriod(f.guaranteePeriod);
     if (f.guaranteeDetail !== undefined) setGuaranteeDetail(f.guaranteeDetail);
     if (f.normaInfo !== undefined) setNormaInfo(f.normaInfo);
@@ -1047,7 +1081,10 @@ export function ShopEditPage() {
       shopName, area, address, lat, lng, station, category,
       openingTime, closingTime, holiday, phone, website,
       videos, staffPhotos,
-      minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+      minWage, maxWage, dailyPay,
+      paySystemTypes, paySystemNote, backText,
+      payrollCycle, payrollPayDay, dailyPayLimit,
+      backItems, feeItems, salaryNote,
       guaranteePeriod, guaranteeDetail, normaInfo,
       trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
       payrollSystemType, payrollSystemDescription,
@@ -1068,7 +1105,10 @@ export function ShopEditPage() {
     shopName, area, address, lat, lng, station, category,
     openingTime, closingTime, holiday, phone, website,
     videos, staffPhotos,
-    minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+    minWage, maxWage, dailyPay,
+    paySystemTypes, paySystemNote, backText,
+    payrollCycle, payrollPayDay, dailyPayLimit,
+    backItems, feeItems, salaryNote,
     guaranteePeriod, guaranteeDetail, normaInfo,
     trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
     payrollSystemType, payrollSystemDescription,
@@ -1582,27 +1622,61 @@ export function ShopEditPage() {
     <div className="space-y-6">
       <SectionCard title="報酬・待遇" icon={DollarSign} previewAnchor="salary" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここはバック・
-              控除・備考・支払い方法・保証・ノルマ等の詳細を扱う。 */}
-          <Field
-            label="バック項目"
-            hint="指名バック・同伴バックなど、項目名と金額を入力してください"
-          >
-            <DynamicPairList
-              items={backItems}
-              setItems={setBackItems}
-              labelPlaceholder="バック名"
-              valuePlaceholder="例: 1,000円 / 10%"
+          {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここは給料システム・
+              バック・引かれ物・備考・サイクル・保証・ノルマ等の詳細を扱う。 */}
+          {/* 給料システム (複数選択 + 詳細備考)。売上制/ポイント制なら具体ロジックを備考へ。 */}
+          <Field label="給料システム" hint="当てはまるものを選択（複数可）。詳細は下の備考に記載">
+            <div className="flex flex-wrap gap-2">
+              {PAY_SYSTEM_OPTIONS.map((opt) => {
+                const active = paySystemTypes.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setPaySystemTypes(
+                        active
+                          ? paySystemTypes.filter((t) => t !== opt)
+                          : [...paySystemTypes, opt],
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-full text-[13px] border transition ${
+                      active
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-foreground/70 border-border hover:bg-muted"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          <Field label="給料システムの詳細備考" hint="売上スライド/ポイント制などの具体的な計算ルール">
+            <TextArea
+              value={paySystemNote}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaySystemNote(e.target.value)}
+              placeholder="例: 売上の◯%還元。ポイントは1pt=◯円で時給に加算。改行で見やすく書けます。"
+              rows={3}
+            />
+          </Field>
+          {/* バックは月本数で変わる複雑な体系もそのまま書けるようフリーテキスト。 */}
+          <Field label="バック" hint="同伴/本指名/場内など。改行して自由に記載できます（公開ページにも改行が反映されます）">
+            <TextArea
+              value={backText}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBackText(e.target.value)}
+              placeholder={"例:\n同伴バック：21:30までに入店\n1回目→5,000円 / 2回目→10,000円 …\n本指名バック：1セット目→3,000円\n場内バック：1,000円/本数"}
+              rows={6}
             />
           </Field>
           <Field
-            label="手数料項目"
-            hint="雑費・送り代など、控除される項目を入力してください"
+            label="引かれ物"
+            hint="雑費・送り代など、給与から引かれる項目を入力してください"
           >
             <DynamicPairList
               items={feeItems}
               setItems={setFeeItems}
-              labelPlaceholder="手数料名"
+              labelPlaceholder="引かれ物の名前"
               valuePlaceholder="金額"
             />
           </Field>
@@ -1613,44 +1687,54 @@ export function ShopEditPage() {
               placeholder="その他、給与に関する補足情報があれば入力してください"
             />
           </Field>
-          <Field label="給与支払い方法">
+          {/* 給与サイクル → 月締め系を選んだら締め日・支払日を条件表示。
+              「日払い可」は廃止し、日払いは「日払い上限金額」欄で表す。 */}
+          <Field label="給与サイクル">
             <SelectInput
-              value={payrollSystemType}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemType(e.target.value)}
-              options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
+              value={payrollCycle}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollCycle(e.target.value)}
+              options={PAYROLL_CYCLE_OPTIONS}
               placeholder="選択してください"
+            />
+          </Field>
+          {PAYROLL_CYCLES_WITH_PAYDAY.includes(payrollCycle) && (
+            <Field label="締め日・支払日" hint="例: 月末締め翌月15日払い / 15日・末日締め">
+              <TextInput
+                value={payrollPayDay}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollPayDay(e.target.value)}
+                placeholder="例: 月末締め翌月15日払い"
+              />
+            </Field>
+          )}
+          <Field label="日払い上限金額" hint="日払いの有無・上限。なければ空欄でOK">
+            <TextInput
+              value={dailyPayLimit}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPayLimit(e.target.value)}
+              placeholder="例: 30,000円まで / 上限なし / 要相談"
             />
           </Field>
           <Field label="給与支払い補足">
             <TextArea
               value={payrollSystemDescription}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemDescription(e.target.value)}
-              placeholder="給与支払いに関する補足（例: 日払い上限5万円まで等）"
+              placeholder="給与支払いに関する補足（改行で2行目以降も書けます）"
               rows={2}
             />
           </Field>
           {/* 保証・ノルマはユーザー画面では報酬・待遇カード内に同居するため、
-              管理画面も同じセクション内にまとめる。 */}
+              管理画面も同じセクション内にまとめる。保証詳細は廃止し、永久保証等も
+              保証期間にまとめて書く。 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-            <Field label="保証期間">
+            <Field label="保証期間" hint="例: 3ヶ月 / 永久保証 など（詳細もここにまとめて記載）">
               <TextInput
                 value={guaranteePeriod}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   setGuaranteePeriod(e.target.value)
                 }
-                placeholder="例: 3ヶ月"
+                placeholder="例: 3ヶ月 / 永久保証"
               />
             </Field>
           </div>
-          <Field label="保証詳細">
-            <TextArea
-              value={guaranteeDetail}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setGuaranteeDetail(e.target.value)
-              }
-              placeholder="保証の具体的な内容を入力してください"
-            />
-          </Field>
           <Field label="ノルマ情報">
             <TextArea
               value={normaInfo}

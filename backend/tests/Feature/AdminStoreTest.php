@@ -282,6 +282,35 @@ class AdminStoreTest extends TestCase
     }
 
     /**
+     * 第2弾グループ1: 給料システム / バックのフリーテキスト / 給与サイクル・
+     * 給料日・日払い上限 が JSONB に格納され、Resource で flat に返ること。
+     */
+    public function test_create_store_with_pay_system_and_payroll_fields(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Pay System Store',
+                'area' => '六本木',
+                'category' => 'ラウンジ',
+                'pay_system_types' => ['完全時給制', '時給+バックor売上の高い方'],
+                'pay_system_note' => "売上の20%還元。\nポイントは1pt=100円。",
+                'back_text' => "同伴バック：21:30まで\n1回目→5,000円",
+                'payroll_cycle' => '月末締め翌月払い',
+                'payroll_pay_day' => '月末締め翌月15日払い',
+                'daily_pay_limit' => '30,000円まで',
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertSame('完全時給制', $response->json('pay_system_types.0'));
+        $this->assertCount(2, $response->json('pay_system_types'));
+        $this->assertStringContainsString('ポイント', $response->json('pay_system_note'));
+        $this->assertStringContainsString('同伴バック', $response->json('back_text'));
+        $this->assertSame('月末締め翌月払い', $response->json('payroll_cycle'));
+        $this->assertSame('月末締め翌月15日払い', $response->json('payroll_pay_day'));
+        $this->assertSame('30,000円まで', $response->json('daily_pay_limit'));
+    }
+
+    /**
      * 金額＋％の複合バック項目は {value,unit} 1組では表現できないため、
      * 入力文字列をそのまま amount に保持して忠実に表示する (金額が消えない)。
      */

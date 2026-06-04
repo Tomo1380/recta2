@@ -335,11 +335,13 @@ class StoreController extends Controller
         return [
             'business_hours', 'opening_time', 'closing_time', 'holidays', 'shift_info',
             'hourly_min', 'hourly_max', 'daily_estimate',
-            'back_items', 'fee_items', 'salary_notes',
+            'back_items', 'fee_items', 'salary_notes', 'back_text',
+            'pay_system_types', 'pay_system_note',
             'guarantee_period', 'guarantee_details', 'norma_info', 'same_day_trial',
             'trial_avg_hourly', 'trial_hourly', // 旧キー (deprecated)
             'trial_hourly_min', 'trial_hourly_max',
             'payroll_system_type', 'payroll_system_description',
+            'payroll_cycle', 'payroll_pay_day', 'daily_pay_limit',
             'interview_hours', 'interview_start', 'interview_end',
             'interview_info',
         ];
@@ -364,6 +366,11 @@ class StoreController extends Controller
             'fee_items.*.label' => 'required|string',
             'fee_items.*.amount' => 'nullable|string',
             'salary_notes' => 'nullable|string',
+            // バックのフリーテキスト & 給料システム (複数選択 + 備考)
+            'back_text' => 'nullable|string',
+            'pay_system_types' => 'nullable|array',
+            'pay_system_types.*' => 'string|max:60',
+            'pay_system_note' => 'nullable|string',
             'guarantee_period' => 'nullable|string|max:255',
             'guarantee_details' => 'nullable|string',
             'norma_info' => 'nullable|string',
@@ -377,6 +384,10 @@ class StoreController extends Controller
             'trial_hourly_max' => 'nullable|string|max:255',
             'payroll_system_type' => 'nullable|string|max:100',
             'payroll_system_description' => 'nullable|string',
+            // 給与サイクル / 給料日 / 日払い上限金額
+            'payroll_cycle' => 'nullable|string|max:60',
+            'payroll_pay_day' => 'nullable|string|max:255',
+            'daily_pay_limit' => 'nullable|string|max:120',
             'interview_hours' => 'nullable|string|max:255',
             'interview_start' => 'nullable|string|max:10',
             'interview_end' => 'nullable|string|max:10',
@@ -434,6 +445,9 @@ class StoreController extends Controller
         $payroll = $wage['payroll'] ?? [];
         if (array_key_exists('payroll_system_type', $legacy)) $payroll['type'] = $legacy['payroll_system_type'];
         if (array_key_exists('payroll_system_description', $legacy)) $payroll['description'] = $legacy['payroll_system_description'];
+        if (array_key_exists('payroll_cycle', $legacy)) $payroll['cycle'] = $legacy['payroll_cycle'];
+        if (array_key_exists('payroll_pay_day', $legacy)) $payroll['pay_day'] = $legacy['payroll_pay_day'];
+        if (array_key_exists('daily_pay_limit', $legacy)) $payroll['daily_limit'] = $legacy['daily_pay_limit'];
         if (!empty($payroll)) $wage['payroll'] = $payroll;
 
         if (array_key_exists('daily_estimate', $legacy)) $wage['daily_estimate'] = $legacy['daily_estimate'];
@@ -444,8 +458,15 @@ class StoreController extends Controller
         // compensation
         $compensation = $data['compensation'] ?? [];
         if (array_key_exists('back_items', $legacy)) $compensation['back'] = $legacy['back_items'];
+        if (array_key_exists('back_text', $legacy))  $compensation['back_text'] = $legacy['back_text'];
         if (array_key_exists('fee_items', $legacy))  $compensation['fees'] = $legacy['fee_items'];
         if (array_key_exists('salary_notes', $legacy)) $compensation['notes'] = $legacy['salary_notes'];
+        if (array_key_exists('pay_system_types', $legacy) || array_key_exists('pay_system_note', $legacy)) {
+            $compensation['pay_system'] = [
+                'types' => $legacy['pay_system_types'] ?? [],
+                'note' => $legacy['pay_system_note'] ?? '',
+            ];
+        }
         if (!empty($compensation)) {
             $data['compensation'] = $compensation;
         }
