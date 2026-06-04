@@ -31,7 +31,10 @@ class MediaStorage
      */
     public static function upload(UploadedFile $file, string $category): string
     {
-        $ext = $file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin';
+        // iPhone 標準の HEIC/HEIF はブラウザ表示も多くの環境で不可なので、
+        // アップロード時点で JPEG に変換して保存する。それ以外はそのまま。
+        [$contents, $ext, $contentType] = self::readForStorage($file);
+
         $filename = Str::uuid()->toString() . '.' . $ext;
         $key = self::prefix() . trim($category, '/') . '/' . $filename;
 
@@ -39,12 +42,109 @@ class MediaStorage
         // bucket が ObjectOwnership=BucketOwnerEnforced だと ACL が使えず put が
         // 黙って false を返す。bucket policy で全 object public read を許可済み
         // なので ACL 指定は不要。
-        self::disk()->put($key, file_get_contents($file->getRealPath()), [
-            'ContentType' => $file->getMimeType() ?: 'application/octet-stream',
+        self::disk()->put($key, $contents, [
+            'ContentType' => $contentType,
             'CacheControl' => 'public, max-age=31536000, immutable',
         ]);
 
         return self::disk()->url($key);
+    }
+
+    /**
+     * 保存用のバイナリ・拡張子・Content-Type を決める。
+     * HEIC/HEIF は JPEG へ変換し、それ以外は原本のまま返す。
+     *
+     * @return array{0: string, 1: string, 2: string}  [contents, ext, contentType]
+     */
+    private static function readForStorage(UploadedFile $file): array
+    {
+        $ext = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
+        $mime = strtolower($file->getMimeType() ?: '');
+
+        $isHeic = in_array($ext, ['heic', 'heif'], true)
+            || in_array($mime, [
+                'image/heic', 'image/heif',
+                'image/heic-sequence', 'image/heif-sequence',
+            ], true);
+
+        if ($isHeic) {
+            return self::convertHeicToJpeg($file);
+        }
+
+        return [
+            file_get_contents($file->getRealPath()),
+            $ext !== '' ? $ext : 'bin',
+            $mime !== '' ? $mime : 'application/octet-stream',
+        ];
+    }
+
+    /**
+     * HEIC/HEIF を JPEG に変換して [binary, 'jpg', 'image/jpeg'] を返す。
+     * Imagick (libheif delegate) が無い環境では 422 で分かるように落とす。
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private static function convertHeicToJpeg(UploadedFile $file): array
+    {
+        if (!class_exists(\Imagick::class) || !\Imagick::queryFormats('HEIC')) {
+            abort(422, 'HEIC形式の画像をサーバで変換できません。JPEGまたはPNGに変換してからアップロードしてください。');
+        }
+
+        try {
+            $img = new \Imagick();
+            $img->readImage($file->getRealPath());
+            // iPhone は EXIF の回転情報を持つので、変換前に向きを焼き込む。
+            if (method_exists($img, 'autoOrientImage')) {
+                $img->autoOrientImage();
+            }
+            $img->setImageFormat('jpeg');
+            $img->setImageCompressionQuality(88);
+            $img->stripImage();
+            $blob = $img->getImageBlob();
+            $img->clear();
+            $img->destroy();
+
+            return [$blob, 'jpg', 'image/jpeg'];
+        } catch (\Throwable $e) {
+            abort(422, 'HEIC画像の変換に失敗しました。別の画像でお試しください。');
+        }
+    }
+
+    /**
+     * 生バイナリを「固定の相対キー」で put して public URL を返す。
+     *
+     * upload() が uuid 採番で都度 key を変えるのに対し、こちらは呼び出し側が
+     * 指定した相対キー (例: "og/home.jpg") にそのまま上書き保存する。OG 画像の
+     * ように「常に同じ URL で最新版を配りたい」用途に使う。
+     *
+     * @param  string  $relativeKey  prefix を含まない相対キー (例 "og/home.jpg")
+     */
+    public static function putBytes(string $contents, string $relativeKey, string $contentType): string
+    {
+        $key = self::prefix() . ltrim($relativeKey, '/');
+
+        self::disk()->put($key, $contents, [
+            'ContentType' => $contentType,
+            // 固定 URL で上書きするので長期 immutable にはせず、SNS 再クロールで
+            // 更新が拾える程度の短めキャッシュにする。
+            'CacheControl' => 'public, max-age=300',
+        ]);
+
+        return self::disk()->url($key);
+    }
+
+    /**
+     * putBytes() で保存した固定キーの内容を取り出す。無ければ null。
+     *
+     * @param  string  $relativeKey  prefix を含まない相対キー
+     */
+    public static function getBytes(string $relativeKey): ?string
+    {
+        $key = self::prefix() . ltrim($relativeKey, '/');
+        if (!self::disk()->exists($key)) {
+            return null;
+        }
+        return self::disk()->get($key);
     }
 
     /**

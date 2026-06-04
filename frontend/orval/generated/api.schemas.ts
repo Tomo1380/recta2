@@ -160,6 +160,8 @@ export interface BannerSettingsResource {
   hero_badge: string | null;
   /** @nullable */
   hero_ai_label: string | null;
+  /** @nullable */
+  hero_image_url: string | null;
 }
 
 export interface Category {
@@ -190,6 +192,53 @@ export interface CategoryResource {
      * @nullable
      */
   shop_count: number | null;
+}
+
+export type ChatRequestPageType = typeof ChatRequestPageType[keyof typeof ChatRequestPageType];
+
+
+export const ChatRequestPageType = {
+  top: 'top',
+  list: 'list',
+  detail: 'detail',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ChatRequestMode = typeof ChatRequestMode[keyof typeof ChatRequestMode] | null;
+
+
+export const ChatRequestMode = {
+  agent: 'agent',
+  finetuned: 'finetuned',
+} as const;
+
+/**
+ * AIチャット (POST /chat, POST /chat/stream) の入力検証。
+ *
+ * chat() / chatStream() で同一ルールをインライン validate していたのを
+ * FormRequest に集約 (アーキ原則: inline validate 禁止)。公開エンドポイントだが
+ * 任意認証 (auth('sanctum')) なので authorize は常に true。
+ */
+export interface ChatRequest {
+  /** @maxLength 1000 */
+  message: string;
+  page_type: ChatRequestPageType;
+  /** @nullable */
+  store_id?: number | null;
+  /**
+     * @maxItems 20
+     * @nullable
+     */
+  history?: string[] | null;
+  /** @nullable */
+  mode?: ChatRequestMode;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  user_area?: string | null;
 }
 
 export interface Consultation {
@@ -311,6 +360,14 @@ export interface RelocateVoice {
 export interface ReorderRequest {
   /** @minItems 1 */
   ids: number[];
+}
+
+export interface ReorderStoreImagesRequest {
+  /**
+     * @minItems 1
+     * @items.minimum 0
+     */
+  order: number[];
 }
 
 export interface ResetAdminPasswordRequest {
@@ -711,6 +768,13 @@ export interface UpdateBannerSettingsRequest {
   hero_badge?: string | null;
   /** @nullable */
   hero_ai_label?: string | null;
+  /**
+     * ヒーロー背景画像。フロントが先に汎用 upload endpoint へ送って得た
+   * S3 URL をここで保存する (この endpoint 自体はファイルを受けない)。
+     * @maxLength 2048
+     * @nullable
+     */
+  hero_image_url?: string | null;
 }
 
 export interface UpdateCategoryRequest {
@@ -847,25 +911,33 @@ export interface UpdateUserStatusRequest {
 }
 
 export interface UploadArticleThumbnailRequest {
-  /** @maxLength 5120 */
+  /**
+     * max は 15MB。画像アップロードの上限を全 endpoint で統一 (nginx/PHP 20M 内)。
+     * @maxLength 15360
+     */
   image: Blob;
 }
 
 export interface UploadCategoryImageRequest {
-  /** @maxLength 5120 */
+  /**
+     * max は 15MB。画像アップロードの上限を全 endpoint で統一 (nginx/PHP 20M 内)。
+     * @maxLength 15360
+     */
   image: Blob;
 }
 
 export interface UploadMediaRequest {
   /**
-     * 5MB 上限はフロントの圧縮ロジック次第で見直す。とりあえず 10MB に。
-     * @maxLength 10240
+     * max は 15MB。画像アップロードの上限を全 endpoint で統一 (nginx/PHP 20M 内)。
+   * HEIC/HEIF (iPhone 標準) も許可。`image` ルールは getimagesize() が
+   * HEIC 非対応で弾くため使わず、mimes で受けて MediaStorage で JPEG 変換。
+     * @maxLength 15360
      */
   image: Blob;
 }
 
 export interface UploadStoreImageRequest {
-  /** @maxLength 5120 */
+  /** @maxLength 15360 */
   image: Blob;
 }
 
@@ -1042,46 +1114,6 @@ export type AiChatConfig200 = {
   suggest_display_mode: 'off';
 };
 
-export type AiChatChatBodyPageType = typeof AiChatChatBodyPageType[keyof typeof AiChatChatBodyPageType];
-
-
-export const AiChatChatBodyPageType = {
-  top: 'top',
-  list: 'list',
-  detail: 'detail',
-} as const;
-
-/**
- * @nullable
- */
-export type AiChatChatBodyMode = typeof AiChatChatBodyMode[keyof typeof AiChatChatBodyMode] | null;
-
-
-export const AiChatChatBodyMode = {
-  agent: 'agent',
-  finetuned: 'finetuned',
-} as const;
-
-export type AiChatChatBody = {
-  /** @maxLength 1000 */
-  message: string;
-  page_type: AiChatChatBodyPageType;
-  /** @nullable */
-  store_id?: number | null;
-  /**
-     * @maxItems 20
-     * @nullable
-     */
-  history?: string[] | null;
-  /** @nullable */
-  mode?: AiChatChatBodyMode;
-  /**
-     * @maxLength 100
-     * @nullable
-     */
-  user_area?: string | null;
-};
-
 export type AiChatChat200 = {
   message: 'ただいま混み合っております。少し時間を置いてから再度お試しください。';
   /**
@@ -1104,7 +1136,7 @@ export type AiChatChat200 = {
   tool_calls: number;
 };
 } | {
-  message: null | unknown[] | string | { [key: string]: unknown };
+  message: 'ご希望に近いお店をいくつかご紹介します。気になるお店があれば、LINEから気軽にご相談くださいね。' | 'うまくお探しできませんでした。条件を変えて試すか、LINEから直接ご相談ください。スタッフが一緒にお店探しをお手伝いします。';
   stores: (string | {
   id: string;
   name: string;
@@ -1112,8 +1144,37 @@ export type AiChatChat200 = {
   /** @nullable */
   category: string | null;
   nearest_station: string;
-  hourly_min: string;
-  hourly_max: string;
+  trial_hourly_min: string;
+  trial_hourly_max: string;
+  feature_tags: string;
+  description: string;
+  images: string;
+})[];
+  /**
+     * @minItems 0
+     * @maxItems 0
+     */
+  follow_ups: string[];
+  meta: {
+  mode: 'agent';
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: string;
+  response_ms: number;
+  tool_calls: number;
+  max_iterations_reached: boolean;
+};
+} | {
+  message: string;
+  stores: (string | {
+  id: string;
+  name: string;
+  area: string;
+  /** @nullable */
+  category: string | null;
+  nearest_station: string;
+  trial_hourly_min: string;
+  trial_hourly_max: string;
   feature_tags: string;
   description: string;
   images: string;
@@ -1132,7 +1193,7 @@ export type AiChatChat200 = {
   tool_calls: number;
 };
 } | {
-  message: null | unknown[] | string | { [key: string]: unknown };
+  message: string;
   stores: unknown[] | ({
   id: number;
   name: string;
@@ -1140,10 +1201,13 @@ export type AiChatChat200 = {
   category: string;
   /** @nullable */
   nearest_station: string | null;
+  /**
+     * 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+     * @nullable
+     */
+  trial_hourly_min: string | null;
   /** @nullable */
-  hourly_min: string | null;
-  /** @nullable */
-  hourly_max: string | null;
+  trial_hourly_max: string | null;
   /** @nullable */
   description: string | null;
   /** @nullable */
@@ -1203,44 +1267,24 @@ export type AiChatChat429 = null | {
   limit_type: 'global_daily';
 };
 
-export type AiChatChatStreamBodyPageType = typeof AiChatChatStreamBodyPageType[keyof typeof AiChatChatStreamBodyPageType];
+export type AiChatChat503Meta = {
+  mode: unknown;
+  model: 'unavailable';
+};
 
-
-export const AiChatChatStreamBodyPageType = {
-  top: 'top',
-  list: 'list',
-  detail: 'detail',
-} as const;
-
-/**
- * @nullable
- */
-export type AiChatChatStreamBodyMode = typeof AiChatChatStreamBodyMode[keyof typeof AiChatChatStreamBodyMode] | null;
-
-
-export const AiChatChatStreamBodyMode = {
-  agent: 'agent',
-  finetuned: 'finetuned',
-} as const;
-
-export type AiChatChatStreamBody = {
-  /** @maxLength 1000 */
-  message: string;
-  page_type: AiChatChatStreamBodyPageType;
-  /** @nullable */
-  store_id?: number | null;
+export type AiChatChat503 = {
+  message: 'ただいまAIチャットをご利用いただけません。お手数ですがLINEから直接ご相談ください。';
   /**
-     * @maxItems 20
-     * @nullable
+     * @minItems 0
+     * @maxItems 0
      */
-  history?: string[] | null;
-  /** @nullable */
-  mode?: AiChatChatStreamBodyMode;
+  stores: string[];
   /**
-     * @maxLength 100
-     * @nullable
+     * @minItems 0
+     * @maxItems 0
      */
-  user_area?: string | null;
+  follow_ups: string[];
+  meta: AiChatChat503Meta;
 };
 
 export type AiChatSettingStatsParams = {
@@ -1679,6 +1723,20 @@ code: string;
 state: string;
 };
 
+export type LineAuthExchangeBody = {
+  code?: string;
+};
+
+export type LineAuthExchange200 = {
+  token: string;
+};
+
+export type LineAuthExchange422 = {
+  message: 'コードが無効または期限切れです。';
+} | {
+  message: 'コードが指定されていません。';
+};
+
 export type LineFriendBroadcast200 = {
   message: string;
 };
@@ -1698,6 +1756,8 @@ export type LineWebhookHandle403 = {
 export type MediaUploadStore201 = {
   url: string;
 };
+
+export type OgImageShow200 = { [key: string]: unknown };
 
 export type PublicArticleIndexParams = {
 per_page?: string;
@@ -1742,14 +1802,13 @@ export type PublicStoreHome200PickupShopsItem = {
   name: string;
   area: string;
   category: string;
-  hourly_min: unknown;
-  hourly_max: unknown;
+  trial_hourly_min: unknown;
+  trial_hourly_max: unknown;
   /** @nullable */
   feature_tags: unknown[] | null;
   /** @nullable */
   images: unknown[] | null;
   is_pr: boolean;
-  /** @minimum 0 */
   reviews_count: number;
   average_rating: number;
 };
@@ -1805,9 +1864,9 @@ export type PublicStoreHome200 = {
 
 export type PublicStoreIndexParams = {
 /**
- * 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+ * 体入確約フラグでの絞り込み。フロントの「体入確約」タブ (BUG-E09)
  *  が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
- *  絞り込み。「体験確約」リボンを出している店舗を抽出。
+ *  絞り込み。「体入確約」リボンを出している店舗を抽出。
  *  デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
  */
 sort?: string;
@@ -1869,34 +1928,9 @@ export const StoresStoreBodyPublishStatus = {
   draft: 'draft',
 } as const;
 
-/**
- * @nullable
- */
-export type StoresStoreBodyWageRegularUnit = typeof StoresStoreBodyWageRegularUnit[keyof typeof StoresStoreBodyWageRegularUnit] | null;
-
-
-export const StoresStoreBodyWageRegularUnit = {
-  hour: 'hour',
-  day: 'day',
-} as const;
-
-export type StoresStoreBodyWageRegular = {
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  min?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  max?: number | null;
-  /** @nullable */
-  unit?: StoresStoreBodyWageRegularUnit;
-};
-
 export type StoresStoreBodyWageTrial = {
   /**
+     * 通常時給 (wage.regular) は廃止。給与は体入時給 (wage.trial) に一本化。
      * @minimum 0
      * @nullable
      */
@@ -1928,7 +1962,6 @@ export type StoresStoreBodyWage = {
      * @nullable
      */
   daily_estimate_max?: number | null;
-  regular?: StoresStoreBodyWageRegular;
   trial?: StoresStoreBodyWageTrial;
 };
 
@@ -1990,6 +2023,19 @@ export type StoresStoreBodyCompensation = {
   back?: StoresStoreBodyCompensationBackItem[] | null;
   /** @nullable */
   fees?: StoresStoreBodyCompensationFeesItem[] | null;
+};
+
+export type StoresStoreBodyFacilityPhotosItem = {
+  /**
+     * @maxLength 500
+     * @pattern #^(https?://|/storage/)#
+     */
+  image_url?: string;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  caption?: string | null;
 };
 
 export type StoresStoreBodyQaItem = {
@@ -2097,14 +2143,19 @@ export type StoresStoreBody = {
      */
   phone?: string | null;
   /**
+     * href に直接出力されるため http(s) scheme を強制 (javascript:/data: による
+   * 格納型 XSS を防ぐ。videos 等と同じ方針で regex は array 形式で書く)。
      * @maxLength 2048
      * @nullable
+     * @pattern #^https?://#i
      */
   website_url?: string | null;
   /** @nullable */
   description?: string | null;
   /** @nullable */
   features_text?: string | null;
+  /** @nullable */
+  summary_text?: string | null;
   /**
      * @maxLength 255
      * @nullable
@@ -2175,8 +2226,18 @@ export type StoresStoreBody = {
   compensation?: StoresStoreBodyCompensation;
   /** @nullable */
   feature_tags?: string[] | null;
+  /**
+     * @nullable
+     * @items.maxLength 255
+     */
+  recent_hire_examples?: string[] | null;
   /** @nullable */
   related_store_ids?: number[] | null;
+  /**
+     * 施設写真 (トイレ/更衣室/セット場所 等)。[{image_url, caption}]
+     * @nullable
+     */
+  facility_photos?: StoresStoreBodyFacilityPhotosItem[] | null;
   /** @nullable */
   qa?: StoresStoreBodyQaItem[] | null;
   /** @nullable */
@@ -2222,32 +2283,6 @@ export const StoresUpdateBodySameDayTrial = {
   none: 'none',
 } as const;
 
-/**
- * @nullable
- */
-export type StoresUpdateBodyWageRegularUnit = typeof StoresUpdateBodyWageRegularUnit[keyof typeof StoresUpdateBodyWageRegularUnit] | null;
-
-
-export const StoresUpdateBodyWageRegularUnit = {
-  hour: 'hour',
-  day: 'day',
-} as const;
-
-export type StoresUpdateBodyWageRegular = {
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  min?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  max?: number | null;
-  /** @nullable */
-  unit?: StoresUpdateBodyWageRegularUnit;
-};
-
 export type StoresUpdateBodyWageTrial = {
   /**
      * @minimum 0
@@ -2277,7 +2312,6 @@ export type StoresUpdateBodyWage = {
      * @nullable
      */
   daily_estimate_max?: number | null;
-  regular?: StoresUpdateBodyWageRegular;
   trial?: StoresUpdateBodyWageTrial;
 };
 
@@ -2336,6 +2370,19 @@ export type StoresUpdateBodyCompensation = {
   back?: StoresUpdateBodyCompensationBackItem[] | null;
   /** @nullable */
   fees?: StoresUpdateBodyCompensationFeesItem[] | null;
+};
+
+export type StoresUpdateBodyFacilityPhotosItem = {
+  /**
+     * @maxLength 500
+     * @pattern #^(https?://|/storage/)#
+     */
+  image_url?: string;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  caption?: string | null;
 };
 
 export type StoresUpdateBodyQaItem = {
@@ -2407,12 +2454,14 @@ export type StoresUpdateBodyStaffPhotosItem = {
 
 export type StoresUpdateBodyBackItemsItem = {
   label: string;
-  amount: string;
+  /** @nullable */
+  amount?: string | null;
 };
 
 export type StoresUpdateBodyFeeItemsItem = {
   label: string;
-  amount: string;
+  /** @nullable */
+  amount?: string | null;
 };
 
 export type StoresUpdateBody = {
@@ -2452,12 +2501,15 @@ export type StoresUpdateBody = {
   /**
      * @maxLength 2048
      * @nullable
+     * @pattern #^https?://#i
      */
   website_url?: string | null;
   /** @nullable */
   description?: string | null;
   /** @nullable */
   features_text?: string | null;
+  /** @nullable */
+  summary_text?: string | null;
   /**
      * @maxLength 255
      * @nullable
@@ -2543,22 +2595,16 @@ export type StoresUpdateBody = {
      */
   shift_info?: string | null;
   /**
-     * @minimum 0
-     * @nullable
-     */
-  hourly_min?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  hourly_max?: number | null;
-  /**
      * @maxLength 255
      * @nullable
      */
   daily_estimate?: string | null;
   /** @nullable */
   salary_notes?: string | null;
+  /** @nullable */
+  back_text?: string | null;
+  /** @nullable */
+  pay_system_note?: string | null;
   /**
      * @maxLength 255
      * @nullable
@@ -2598,6 +2644,21 @@ export type StoresUpdateBody = {
   /** @nullable */
   payroll_system_description?: string | null;
   /**
+     * @maxLength 60
+     * @nullable
+     */
+  payroll_cycle?: string | null;
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  payroll_pay_day?: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  daily_pay_limit?: string | null;
+  /**
      * @maxLength 255
      * @nullable
      */
@@ -2618,8 +2679,20 @@ export type StoresUpdateBody = {
   compensation?: StoresUpdateBodyCompensation;
   /** @nullable */
   feature_tags?: string[] | null;
+  /**
+     * @nullable
+     * @items.maxLength 255
+     */
+  recent_hire_examples?: string[] | null;
   /** @nullable */
   related_store_ids?: number[] | null;
+  /**
+     * @nullable
+     * @items.maxLength 60
+     */
+  pay_system_types?: string[] | null;
+  /** @nullable */
+  facility_photos?: StoresUpdateBodyFacilityPhotosItem[] | null;
   /** @nullable */
   qa?: StoresUpdateBodyQaItem[] | null;
   /** @nullable */
@@ -2638,6 +2711,13 @@ export type StoreUploadImage201 = {
   url: string;
   images: unknown[];
 };
+
+/**
+ * @nullable
+ */
+export type StoreReorderImages200 = {
+  images: string[];
+} | null;
 
 /**
  * @nullable

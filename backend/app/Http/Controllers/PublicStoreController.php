@@ -58,9 +58,11 @@ class PublicStoreController extends Controller
         }
 
         if ($minWage = $request->input('min_hourly')) {
-            // wage->regular->min stored as int in JSONB.
-            // Use Laravel's portable JSON path syntax (works on PG and SQLite).
-            $query->where('wage->regular->min', '>=', (int) $minWage);
+            // 通常時給は廃止。時給フィルタは体入時給 (wage.trial) 基準。新キー
+            // hourly_min を優先し旧キー avg_hourly にフォールバック。単位付き文字列も
+            // 数値化して比較 (Postgres)。
+            $trialMinExpr = "NULLIF(regexp_replace(COALESCE(wage->'trial'->>'hourly_min', wage->'trial'->>'avg_hourly', ''), '[^0-9]', '', 'g'), '')::numeric";
+            $query->whereRaw("{$trialMinExpr} >= ?", [(int) $minWage]);
         }
 
         // reviews_count は popular/newest 問わず一覧の評価表示で要るので、
@@ -71,9 +73,9 @@ class PublicStoreController extends Controller
         $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
             ->withAvg(['reviews as reviews_avg_rating' => fn ($q) => $q->where('status', 'published')], 'rating');
 
-        // 体験確約フラグでの絞り込み。フロントの「体験確約」タブ (BUG-E09)
+        // 体入確約フラグでの絞り込み。フロントの「体入確約」タブ (BUG-E09)
         // が `sort=experience_guaranteed` を投げるが、これは並び替えではなく
-        // 絞り込み。「体験確約」リボンを出している店舗を抽出。
+        // 絞り込み。「体入確約」リボンを出している店舗を抽出。
         // デフォルトは表示優先度順 (運営が priority を上げた店舗を上位に)。
         $sort = $request->input('sort', 'priority');
         if ($sort === 'experience_guaranteed') {
@@ -81,17 +83,19 @@ class PublicStoreController extends Controller
         }
 
         switch ($sort) {
+            // 通常時給は廃止。並び替えは体入時給 (wage.trial) 基準。新キー
+            // hourly_min/max を優先し旧キー avg_hourly/hourly にフォールバック。
             case 'hourly_desc':
                 $driver = $query->getConnection()->getDriverName();
                 $query->orderByRaw($driver === 'pgsql'
-                    ? "nullif(wage->'regular'->>'max','')::int desc nulls last"
-                    : "CAST(json_extract(wage, '$.regular.max') AS INTEGER) desc");
+                    ? "nullif(regexp_replace(coalesce(wage->'trial'->>'hourly_max', wage->'trial'->>'hourly', wage->'trial'->>'hourly_min', wage->'trial'->>'avg_hourly',''),'[^0-9]','','g'),'')::int desc nulls last"
+                    : "CAST(COALESCE(json_extract(wage, '$.trial.hourly_max'), json_extract(wage, '$.trial.hourly'), json_extract(wage, '$.trial.hourly_min'), json_extract(wage, '$.trial.avg_hourly')) AS INTEGER) desc");
                 break;
             case 'hourly_asc':
                 $driver = $query->getConnection()->getDriverName();
                 $query->orderByRaw($driver === 'pgsql'
-                    ? "nullif(wage->'regular'->>'min','')::int asc nulls last"
-                    : "CAST(json_extract(wage, '$.regular.min') AS INTEGER) asc");
+                    ? "nullif(regexp_replace(coalesce(wage->'trial'->>'hourly_min', wage->'trial'->>'avg_hourly',''),'[^0-9]','','g'),'')::int asc nulls last"
+                    : "CAST(COALESCE(json_extract(wage, '$.trial.hourly_min'), json_extract(wage, '$.trial.avg_hourly')) AS INTEGER) asc");
                 break;
             case 'popular':
                 // フロントのタブラベルは「評価順」。平均評価の高い順に並べ、
@@ -205,7 +209,7 @@ class PublicStoreController extends Controller
     public function home(): JsonResponse
     {
         // Banner settings
-        $bannerKeys = ['hero_tagline', 'hero_subtitle', 'hero_badge', 'hero_ai_label'];
+        $bannerKeys = ['hero_tagline', 'hero_subtitle', 'hero_badge', 'hero_ai_label', 'hero_image_url'];
         $banner = [];
         foreach ($bannerKeys as $key) {
             $setting = SiteSetting::where('key', $key)->first();
@@ -229,8 +233,9 @@ class PublicStoreController extends Controller
                     'name' => $store->name,
                     'area' => $store->area,
                     'category' => $store->category,
-                    'hourly_min' => $full['hourly_min'] ?? null,
-                    'hourly_max' => $full['hourly_max'] ?? null,
+                    // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+                    'trial_hourly_min' => $full['trial_hourly_min'] ?? null,
+                    'trial_hourly_max' => $full['trial_hourly_max'] ?? null,
                     'feature_tags' => $store->feature_tags,
                     'images' => $store->images,
                     'is_pr' => $pickup->is_pr,

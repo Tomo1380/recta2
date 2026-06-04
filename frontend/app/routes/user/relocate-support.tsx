@@ -18,7 +18,7 @@ const STEPS = [
   },
   {
     no: "02",
-    title: "体験入店（体験確約）",
+    title: "体験入店（体入確約）",
     body: "希望店舗での体験入店を確約。交通費サポートあり。",
   },
   {
@@ -111,7 +111,7 @@ export default function RelocateSupportPage() {
             地方から東京で働きたい方を<br />全力サポート
           </h1>
           <p style={{ fontFamily: J, fontWeight: 400, fontSize: "13.5px", color: "rgba(255,255,255,.78)", margin: 0, lineHeight: 1.7 }}>
-            体験確約・オンライン面接・住居・引越し費用まで、Rectaが上京を一気通貫でサポートします。
+            体入確約・オンライン面接・住居・引越し費用まで、Rectaが上京を一気通貫でサポートします。
           </p>
         </div>
       </div>

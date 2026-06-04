@@ -6,7 +6,7 @@ import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores"
 import RelocateSupportCta from "~/components/user/shared/RelocateSupportCta";
 import SectionHeader from "~/components/user/shared/SectionHeader";
 import { LineIcon } from "~/components/user/shared/LineIcon";
-import { useUserAuth } from "~/lib/user-auth";
+import { useUserAuthSafe } from "~/lib/user-auth";
 import { LUXE } from "~/lib/luxe-tokens";
 import { getPreferredArea, setPreferredArea } from "~/lib/preferred-area";
 import type { ArticleSummary, PublicArticleIndexResponse } from "~/lib/types";
@@ -27,8 +27,8 @@ interface PickupShop {
   name: string;
   area?: string;
   category?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number;
+  trial_hourly_max?: number;
   feature_tags?: string[];
   images?: (string | { url: string })[];
   is_pr?: boolean;
@@ -70,8 +70,16 @@ interface RecentReview {
   user: RecentReviewUser | null;
 }
 
+interface HomeBanner {
+  hero_tagline?: string | null;
+  hero_subtitle?: string | null;
+  hero_badge?: string | null;
+  hero_ai_label?: string | null;
+  hero_image_url?: string | null;
+}
+
 interface HomeData {
-  banner?: { hero_tagline?: string; hero_subtitle?: string };
+  banner?: HomeBanner;
   pickup_shops?: PickupShop[];
   consultations?: { id: number; question: string; tag?: string; answer?: string; count?: number }[];
   areas?: Area[];
@@ -305,10 +313,17 @@ function getImageUrl(image: string | { url: string } | undefined): string | unde
 const AREA_INITIAL = 6;
 const AREA_STEP = 8;
 
-export default function TopPage() {
+export default function TopPage({
+  previewBanner = null,
+}: {
+  // 管理画面のフロートプレビューから、未保存のヒーロー編集内容を渡して
+  // 即時反映表示するための prop (StoreDetailPage の previewData と同じ発想)。
+  previewBanner?: HomeBanner | null;
+} = {}) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<HomeData | null>(null);
-  const { isAuthenticated } = useUserAuth();
+  // Provider 外 (admin プレビューで TopPage を直接 render) でも動くよう safe 版。
+  const isAuthenticated = useUserAuthSafe()?.isAuthenticated ?? false;
   const [areasVisible, setAreasVisible] = useState(AREA_INITIAL);
   // 最新コラム。0 件ならセクションごと非表示にするので別 state で軽く取る。
   const [columns, setColumns] = useState<ArticleSummary[]>([]);
@@ -357,6 +372,16 @@ export default function TopPage() {
   const categories = data.categories ?? [];
   const recentReviews = data.recent_reviews ?? [];
 
+  // ヒーロー表示値: API の banner にプレビュー draft を重ね、空なら既定文言。
+  const heroBanner: HomeBanner = { ...(data.banner ?? {}), ...(previewBanner ?? {}) };
+  const pick = (v: string | null | undefined, fallback: string) =>
+    v && v.trim() ? v : fallback;
+  const heroImage = pick(heroBanner.hero_image_url, "/hero-top.jpg");
+  const heroTagline = pick(heroBanner.hero_tagline, "AIと探す、理想のナイトワーク");
+  const heroSubtitle = pick(heroBanner.hero_subtitle, "キャバクラ・ラウンジ・クラブ｜全国厳選");
+  const heroBadge = pick(heroBanner.hero_badge, "ナイトワーク求人");
+  const heroAiLabel = pick(heroBanner.hero_ai_label, "AI MATCHING");
+
   // preferred area が選ばれていればピックアップを絞り込む。
   // 該当 0 件なら全件にフォールバック (空棚を出さない)。
   const preferredAreaName = preferredArea
@@ -372,7 +397,7 @@ export default function TopPage() {
       {/* ══ HERO ══ */}
         <div className="relative w-full" style={{ height: "82vw", maxHeight: "360px", minHeight: "260px" }}>
           <img
-            src="/hero-top.jpg"
+            src={heroImage}
             alt=""
             width={1200}
             height={630}
@@ -388,12 +413,12 @@ export default function TopPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: "rgba(212,175,55,.9)" }} />
                 <span className="relative inline-flex rounded-full h-[6px] w-[6px]" style={{ background: GOLD }} />
               </span>
-              <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: "9.5px", letterSpacing: "0.18em", color: "rgba(255,220,100,.95)" }}>AI MATCHING</span>
+              <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: "9.5px", letterSpacing: "0.18em", color: "rgba(255,220,100,.95)" }}>{heroAiLabel}</span>
             </div>
           </div>
           <div className="absolute bottom-6 left-5 right-5">
             <div className="mb-2 inline-flex">
-              <span className="px-2.5 py-0.5 rounded-sm" style={{ background: "rgba(200,96,128,.85)", fontFamily: J, fontWeight: 700, fontSize: "10px", letterSpacing: "0.14em", color: "white" }}>ナイトワーク求人</span>
+              <span className="px-2.5 py-0.5 rounded-sm" style={{ background: "rgba(200,96,128,.85)", fontFamily: J, fontWeight: 700, fontSize: "10px", letterSpacing: "0.14em", color: "white" }}>{heroBadge}</span>
             </div>
             <div className="flex items-end gap-2 mb-2">
               <h1 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "clamp(36px,11vw,46px)", letterSpacing: "0.04em", lineHeight: 1, color: "#fff", textShadow: "0 2px 24px rgba(0,0,0,.5)", margin: 0 }}>Recta</h1>
@@ -403,8 +428,8 @@ export default function TopPage() {
             {/* BUG-Live-08: ヒーロー文言は site_settings (DB) で管理する想定だが、
                 ここでハードコードされていたため、管理画面で変えても反映されなかった。
                 API レスポンス (data.banner) を優先し、無い場合だけ既定文言にフォールバック。 */}
-            <p style={{ fontFamily: J, fontWeight: 500, fontSize: "15px", letterSpacing: "0.04em", color: "rgba(255,255,255,.96)", lineHeight: 1.5, textShadow: "0 1px 12px rgba(0,0,0,.5)", margin: "0 0 4px" }}>{data.banner?.hero_tagline || "AIと探す、理想のナイトワーク"}</p>
-            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>{data.banner?.hero_subtitle || "キャバクラ・ラウンジ・クラブ｜全国厳選"}</p>
+            <p style={{ fontFamily: J, fontWeight: 500, fontSize: "15px", letterSpacing: "0.04em", color: "rgba(255,255,255,.96)", lineHeight: 1.5, textShadow: "0 1px 12px rgba(0,0,0,.5)", margin: "0 0 4px" }}>{heroTagline}</p>
+            <p style={{ fontFamily: J, fontWeight: 300, fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,240,180,.88)", margin: 0 }}>{heroSubtitle}</p>
           </div>
         </div>
 
@@ -482,10 +507,10 @@ export default function TopPage() {
                         <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "10px", color: "white" }}>1</span>
                       </div>
                     )}
-                    {(store.hourly_min || store.hourly_max) && (
+                    {(store.trial_hourly_min || store.trial_hourly_max) && (
                       <div className="absolute bottom-2.5 left-2.5 right-2.5">
                         <p style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "13px", color: "white", margin: 0, textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>
-                          時給 {store.hourly_min?.toLocaleString()}〜{store.hourly_max?.toLocaleString()}円
+                          体入時給 {store.trial_hourly_min?.toLocaleString()}〜{store.trial_hourly_max?.toLocaleString()}円
                         </p>
                       </div>
                     )}

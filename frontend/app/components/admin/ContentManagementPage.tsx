@@ -18,8 +18,12 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Upload,
 } from "lucide-react";
 import { api } from "~/lib/api"; // admin store 検索のみ (Wave 7 まで残る)
+import { useFileUpload } from "~/hooks/useFileUpload";
+import { FloatingPreview } from "./shared/FloatingPreview";
+import TopPage from "~/components/user/TopPage";
 import type { Store } from "~/lib/types";
 import {
   contentPickupShops,
@@ -55,8 +59,10 @@ export function ContentManagementPage() {
   const [activeTab, setActiveTab] = useState<Tab>("pickup");
   const [pickupShops, setPickupShops] = useState<PickupShop[]>([]);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
-  const [banner, setBanner] = useState<BannerSettings>({ hero_tagline: "", hero_subtitle: "", hero_badge: "", hero_ai_label: "" });
+  const [banner, setBanner] = useState<BannerSettings>({ hero_tagline: "", hero_subtitle: "", hero_badge: "", hero_ai_label: "", hero_image_url: "" });
   const [editingBanner, setEditingBanner] = useState(false);
+  const [showHeroPreview, setShowHeroPreview] = useState(false);
+  const heroUpload = useFileUpload("hero");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -302,6 +308,20 @@ export function ContentManagementPage() {
     }
   };
 
+  const handleHeroImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 同じファイルを選び直せるようにクリア
+    if (!file) return;
+    const url = await heroUpload.uploadFile(file);
+    if (url) {
+      setBanner((prev) => ({ ...prev, hero_image_url: url }));
+      showToast("背景画像をアップロードしました");
+    } else {
+      showToast(heroUpload.error ?? "画像のアップロードに失敗しました", "error");
+    }
+  };
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -537,13 +557,29 @@ export function ContentManagementPage() {
         {/* バナー・ヒーロー */}
         {activeTab === "banner" && (
           <div className="space-y-4">
-            <p className="text-[13px] text-muted-foreground">
-              トップページのヒーローセクションに表示されるテキストとバッジを管理します。
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[13px] text-muted-foreground">
+                トップページのヒーローセクションに表示されるテキスト・バッジ・背景画像を管理します。
+              </p>
+              <button
+                onClick={() => setShowHeroPreview(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-gray-700 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition"
+                title="未保存の編集内容を反映した実機トップページをスマホ枠でプレビューします"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                プレビュー
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              ※ 下は簡易表示です。実際のスマホでの見え方は「プレビュー」で確認してください。
             </p>
 
             {/* Preview */}
-            <div className="bg-gradient-to-br from-[#1b2528] to-[#0d1416] rounded-xl p-8 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50" />
+            <div
+              className="bg-gradient-to-br from-[#1b2528] to-[#0d1416] rounded-xl p-8 relative overflow-hidden bg-cover bg-center"
+              style={banner.hero_image_url ? { backgroundImage: `url(${banner.hero_image_url})` } : undefined}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
               <div className="relative space-y-4">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] px-3 py-1 rounded-full border border-amber-500/40 text-amber-300/90 tracking-widest" style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -639,10 +675,64 @@ export function ContentManagementPage() {
                 </div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-[12px] text-gray-500">
-                  ※ ヒーロー背景画像はコードで管理しています。変更が必要な場合は開発チームにご連絡ください。
-                </p>
+              {/* ヒーロー背景画像 */}
+              <div className="border-t border-border pt-4">
+                <label className="block text-[12px] text-muted-foreground mb-2">ヒーロー背景画像</label>
+                <div className="flex items-start gap-4">
+                  <div className="relative w-40 h-[84px] shrink-0 rounded-lg overflow-hidden border border-border bg-muted/30">
+                    {banner.hero_image_url ? (
+                      // eslint-disable-next-line jsx-a11y/alt-text
+                      <img src={banner.hero_image_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[11px] text-muted-foreground">
+                        既定画像
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] rounded-lg border transition ${
+                          editingBanner && !heroUpload.uploading
+                            ? "text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50 cursor-pointer"
+                            : "text-muted-foreground border-border opacity-50 cursor-not-allowed"
+                        }`}
+                      >
+                        {heroUpload.uploading ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        背景画像を選択
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                          className="hidden"
+                          disabled={!editingBanner || heroUpload.uploading}
+                          onChange={handleHeroImageSelect}
+                        />
+                      </label>
+                      {editingBanner && banner.hero_image_url && (
+                        <button
+                          onClick={() => setBanner((prev) => ({ ...prev, hero_image_url: "" }))}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[12px] text-gray-500 hover:text-red-500 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          既定に戻す
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      推奨: 横長 1200×630px 以上（比率 1.91:1）/ JPEG・PNG・WebP・HEIC（最大 15MB）。未設定の場合は既定画像を表示します。
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      スマホでは画面幅に合わせて中央がトリミングされるため、被写体は中央寄せがおすすめです。
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      この画像とテキストは、保存時に SNS シェア用の OG 画像（1200×630）にも反映されます。
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -828,6 +918,24 @@ export function ContentManagementPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ヒーロー フロートプレビュー — 実際の TopPage をスマホ枠で即時表示 */}
+      {showHeroPreview && (
+        <FloatingPreview onClose={() => setShowHeroPreview(false)}>
+          <div style={{ transform: "scale(0.8)", transformOrigin: "top center" }}>
+            {/* Phone shell — 390×844 (iPhone 14) at 80% scale */}
+            <div className="w-[390px] bg-black rounded-[48px] p-[10px] shadow-2xl ring-1 ring-white/10">
+              <div className="relative bg-[#f7f6f3] rounded-[38px] h-[844px] overflow-hidden flex flex-col">
+                {/* Dynamic island */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 w-[120px] h-[32px] bg-black rounded-b-[20px]" />
+                <div className="flex-1 overflow-y-auto overscroll-contain pt-8">
+                  <TopPage previewBanner={banner} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </FloatingPreview>
       )}
     </div>
   );

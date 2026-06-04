@@ -54,7 +54,7 @@ export function meta({
   const { area, category, stats } = data;
   return buildMetaTags({
     title: `${area.name}の${category.name}求人[${stats.count}件]・体入・体験入店 | Recta`,
-    description: `${area.name}の${category.name}求人を ${stats.count} 件掲載。平均時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜、体験確約 OK の店舗も。LINE で 24h 相談 OK。`,
+    description: `${area.name}の${category.name}求人を ${stats.count} 件掲載。平均体入時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜、体入確約 OK の店舗も。LINE で 24h 相談 OK。`,
     path: `/jobs/areas/${area.slug}/categories/${category.slug}`,
     // 掲載 0 件の空ページはインデックスさせない (虚偽の件数・薄いコンテンツ回避)。
     noindex: stats.count === 0,
@@ -110,13 +110,13 @@ function buildLandingSchema(data: LandingPayload): string {
       buildFAQSchema([
         {
           question: `${area.name}で${category.name}の体入はできますか？`,
-          answer: `Recta では ${area.name} エリアの ${category.name} 求人を ${data.stats.count} 件掲載中。体験確約 OK の店舗も多数あり、LINE で直接相談できます。`,
+          answer: `Recta では ${area.name} エリアの ${category.name} 求人を ${data.stats.count} 件掲載中。体入確約 OK の店舗も多数あり、LINE で直接相談できます。`,
         },
         {
-          question: `${area.name}の${category.name}の時給はどれくらいですか？`,
+          question: `${area.name}の${category.name}の体入時給はどれくらいですか？`,
           answer: data.stats.hourly_min && data.stats.hourly_max
-            ? `掲載店舗の時給は ¥${data.stats.hourly_min.toLocaleString()}〜¥${data.stats.hourly_max.toLocaleString()} のレンジです。最低時給の平均は ¥${(data.stats.avg_hourly_min ?? 0).toLocaleString()}。`
-            : "店舗ごとに異なりますので、各詳細ページの「時給」項目をご確認ください。",
+            ? `掲載店舗の体入時給は ¥${data.stats.hourly_min.toLocaleString()}〜¥${data.stats.hourly_max.toLocaleString()} のレンジです。最低体入時給の平均は ¥${(data.stats.avg_hourly_min ?? 0).toLocaleString()}。`
+            : "店舗ごとに異なりますので、各詳細ページの「体入時給」項目をご確認ください。",
         },
         {
           question: "未経験でも応募できますか？",

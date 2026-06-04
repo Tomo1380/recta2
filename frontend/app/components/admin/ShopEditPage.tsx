@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
 import { useShopImages } from "~/hooks/useShopImages";
@@ -7,6 +7,7 @@ import { useFileUpload } from "~/hooks/useFileUpload";
 import { ImageCropDialog } from "~/components/admin/ImageCropDialog";
 import { formToPayload, storeToForm, type ShopForm } from "~/hooks/useShopForm";
 import type { Store } from "~/lib/types";
+import { trialDailyEstimate } from "~/lib/wage";
 import {
   ArrowLeft,
   ArrowRight,
@@ -42,6 +43,7 @@ import {
   Crown,
   Globe,
   Loader2,
+  GripVertical,
 } from "lucide-react";
 import { FloatingPreview } from "./shared/FloatingPreview";
 import { ShopPhonePreview } from "./ShopPhonePreview";
@@ -187,23 +189,99 @@ function Field({
   );
 }
 
+/**
+ * HEIC/HEIF (iPhone 標準形式) かどうか。ブラウザは HEIC を canvas で描画できず
+ * クライアント側トリミングが失敗するため、これらは生のままアップロードして
+ * サーバ側で JPEG 変換させる (= トリミングを迂回する) 判定に使う。
+ */
+function isHeicFile(f: File): boolean {
+  return /\.(heic|heif)$/i.test(f.name) || /hei[cf]/i.test(f.type);
+}
+
+/** 給料システム (複数選択)。詳細ロジックは別の備考欄に書く。 */
+const PAY_SYSTEM_OPTIONS = [
+  "完全時給制",
+  "時給+バック",
+  "時給+バックor売上の高い方",
+  "売上スライド(歩合)制",
+  "ポイントスライド制",
+  "完全歩合制",
+];
+
+/** 給与サイクル。「日払い可」は廃止し、日払いは「日払い上限金額」欄で表現する。 */
+const PAYROLL_CYCLE_OPTIONS = [
+  "月末締め翌月払い",
+  "月1回",
+  "月2回",
+  "週払い",
+  "全額日払い",
+];
+
+/** 締め日・支払日の入力欄を出すサイクル (月締め系のみ)。 */
+const PAYROLL_CYCLES_WITH_PAYDAY = ["月末締め翌月払い", "月1回", "月2回"];
+
+/** 客層年齢の固定ラベル。運営は割合(%)だけ入力すればよい。 */
+const CLIENT_AGE_LABELS = ["20代", "30代", "40代", "50代以降"];
+
+/**
+ * セット料金のコピペ取込パーサ。
+ * 「項目名／単位」行のあとに「金額」行が続く書式を想定し、項目化する。
+ *   セット／60分        → label
+ *   15,000円           → amount
+ *   延長／30分          → label
+ *   7,500円／メイン      → amount (複数行は " / " で連結)
+ *   25,000円／VIP        → amount
+ * 金額行 = ¥や「数字+円/%」を含む行。それ以外を新しい項目名(ラベル)とみなす。
+ */
+function parseSetFeeText(text: string): { label: string; amount: string; note: string }[] {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const isAmountLine = (l: string) =>
+    /[¥￥]/.test(l) || /[\d０-９][\d０-９,，]*\s*(円|%|％)/.test(l) || /^[¥￥]?\s*[\d０-９]/.test(l);
+  const items: { label: string; amount: string; note: string }[] = [];
+  let cur: { label: string; amount: string; note: string } | null = null;
+  for (const line of lines) {
+    if (isAmountLine(line) && cur) {
+      cur.amount = cur.amount ? `${cur.amount} / ${line}` : line;
+    } else {
+      if (cur) items.push(cur);
+      cur = { label: line, amount: "", note: "" };
+    }
+  }
+  if (cur) items.push(cur);
+  return items.filter((it) => it.label);
+}
+
+/** 直近採用の相対月スロット。絶対月(◯年◯月)だと更新コストが高いため固定。
+ *  運営は各月の採用人数だけ入れればよい (基本5ヶ月前まで、新店は3ヶ月前まで等)。 */
+const RELATIVE_HIRE_LABELS = ["1ヶ月前", "2ヶ月前", "3ヶ月前", "4ヶ月前", "5ヶ月前"];
+
 function TextInput({
   placeholder = "",
   value = "",
   onChange,
   type = "text",
   inputMode,
+  step,
+  min,
+  max,
 }: {
   placeholder?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   type?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  // 数値入力のスピナー刻み幅 / 範囲。項目に応じた step を指定する。
+  step?: number | string;
+  min?: number | string;
+  max?: number | string;
 }) {
   return (
     <input
       type={type}
       inputMode={inputMode}
+      step={step}
+      min={min}
+      max={max}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
@@ -217,20 +295,30 @@ function TextArea({
   value = "",
   onChange,
   rows = 3,
+  /** 改行/リンク記法のヒントを下に出す (公開ページに出る自由記述は既定で表示)。 */
+  richHint = true,
 }: {
   placeholder?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   rows?: number;
+  richHint?: boolean;
 }) {
   return (
-    <textarea
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      rows={rows}
-      className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 resize-y transition-all placeholder:text-muted-foreground/50"
-    />
+    <div>
+      <textarea
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 resize-y transition-all placeholder:text-muted-foreground/50"
+      />
+      {richHint && (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          改行OK・<code className="px-1 py-0.5 rounded bg-muted text-[10px]">[表示文字](URL)</code> でリンク可（内部リンク <span className="font-mono">/columns/…</span> も外部URLもOK）
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -258,6 +346,93 @@ function SelectInput({
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * 入力もできるドロップダウン (combobox)。候補にない値も自由入力できる。
+ * 営業時間・面接時間など「だいたい決まった選択肢だが例外も許したい」項目に使う。
+ *
+ * native <datalist> は入力済みの値で候補を絞り込むため、値が入っていると
+ * 開いても候補が出なくなる。これを解消するため自前のドロップダウンにし、
+ * フォーカス/クリック時は現在値に関係なく全候補を表示する。入力中だけ
+ * 部分一致でフィルタし、一致ゼロなら全件にフォールバックする。
+ */
+function ComboInput({
+  value = "",
+  onChange,
+  options,
+  placeholder = "",
+}: {
+  value?: string;
+  onChange?: (value: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setTyping(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const q = value.trim().toLowerCase();
+  const matches = q ? options.filter((o) => o.toLowerCase().includes(q)) : options;
+  // typing 中だけ絞り込み。フォーカス直後は全候補を見せる。一致ゼロなら全件。
+  const filtered = typing && q ? (matches.length > 0 ? matches : options) : options;
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <input
+        value={value}
+        onChange={(e) => {
+          setTyping(true);
+          setOpen(true);
+          onChange?.(e.target.value);
+        }}
+        onFocus={() => {
+          setTyping(false);
+          setOpen(true);
+        }}
+        onClick={() => {
+          setTyping(false);
+          setOpen(true);
+        }}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/50"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-white py-1 shadow-lg">
+          {filtered.map((o) => (
+            <li key={o}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange?.(o);
+                  setOpen(false);
+                  setTyping(false);
+                }}
+                className={`flex w-full items-center px-3 py-2 text-left text-[13px] transition-colors hover:bg-muted ${
+                  o === value ? "bg-muted/60 font-medium" : ""
+                }`}
+              >
+                {o}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -440,10 +615,64 @@ function SliderField({
  * 返ってきた public URL を value に流す。
  * StaffPhotosEditor / DressCode OK・NG など複数箇所で再利用。
  */
-// ImageUrlInput (URL 入力 + 「画像を選択」ボタン) は元々ドレスコード
-// OK/NG / 在籍女性ギャラリー /etc の単一画像 URL フィールドで使っていた。
-// ドレスコード OK/NG の画像を廃止した結果 consumer が無くなったので削除。
-// 必要になったら git history から取り戻せる。
+// ImageUrlInput (URL 入力 + 「画像を選択」ボタン)。URL 直貼りだけでなく、
+// その場でファイルを選んでアップロードもできる単一画像 URL フィールド。
+// レクタ経由エピソードの写真など「URL 欄しかなくて貼りにくい」箇所で使う。
+// HEIC/HEIF (iPhone) も選択でき、サーバ側で JPEG に変換される。
+function ImageUrlInput({
+  value,
+  onChange,
+  kind,
+  placeholder = "https://...",
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  kind: string;
+  placeholder?: string;
+}) {
+  const { uploadFile, uploading, error } = useFileUpload(kind);
+  return (
+    <div>
+      <div className="flex gap-2 items-start">
+        <div className="flex-1">
+          <TextInput
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+          />
+        </div>
+        <label
+          className="shrink-0 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-border bg-white text-[12px] cursor-pointer hover:bg-accent transition"
+          aria-disabled={uploading}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          {uploading ? "アップ中..." : "画像を選択"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif"
+            className="hidden"
+            disabled={uploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              const url = await uploadFile(file);
+              if (url) onChange(url);
+            }}
+          />
+        </label>
+      </div>
+      {value && (
+        <img
+          src={value}
+          alt=""
+          className="mt-2 h-20 w-20 rounded-lg object-cover border border-border"
+        />
+      )}
+      {error && <p className="mt-1 text-[11px] text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 function ImageUploadZone({
   onUpload,
@@ -471,7 +700,7 @@ function ImageUploadZone({
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif"
         multiple
         className="hidden"
         onChange={(e) => {
@@ -492,7 +721,7 @@ function ImageUploadZone({
         {uploading ? "アップロード中..." : disabled ? "先に店舗を保存してください" : "ドラッグ&ドロップまたはクリックしてアップロード"}
       </p>
       <p className="text-xs text-muted-foreground/60 mt-1.5">
-        PNG, JPG, WEBP（最大5MB）
+        PNG, JPG, WEBP, HEIC（最大5MB / iPhoneの写真もOK）
       </p>
     </div>
   );
@@ -509,7 +738,7 @@ function ImageUpload() {
         ドラッグ&ドロップまたはクリックしてアップロード
       </p>
       <p className="text-xs text-muted-foreground/60 mt-1.5">
-        PNG, JPG, WEBP（最大5MB）
+        PNG, JPG, WEBP, HEIC（最大5MB / iPhoneの写真もOK）
       </p>
     </div>
   );
@@ -609,9 +838,14 @@ export function ShopEditPage() {
     staff_type: string;
   };
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotoDraft[]>([]);
-  const [minWage, setMinWage] = useState("");
-  const [maxWage, setMaxWage] = useState("");
+  // 施設写真（トイレ/更衣室/セット場所 等）の編集 state。
+  type FacilityPhotoDraft = { image_url: string; caption: string };
+  const [facilityPhotos, setFacilityPhotos] = useState<FacilityPhotoDraft[]>([]);
+  // 通常時給 (minWage/maxWage) は廃止。給与は体入時給 (trialMinWage/Max) に一本化。
   const [dailyPay, setDailyPay] = useState("");
+  const [paySystemTypes, setPaySystemTypes] = useState<string[]>([]);
+  const [paySystemNote, setPaySystemNote] = useState("");
+  const [backText, setBackText] = useState("");
   const [backItems, setBackItems] = useState<
     { label: string; value: string }[]
   >([]);
@@ -619,6 +853,9 @@ export function ShopEditPage() {
     { label: string; value: string }[]
   >([]);
   const [salaryNote, setSalaryNote] = useState("");
+  const [payrollCycle, setPayrollCycle] = useState("");
+  const [payrollPayDay, setPayrollPayDay] = useState("");
+  const [dailyPayLimit, setDailyPayLimit] = useState("");
   const [guaranteePeriod, setGuaranteePeriod] = useState("");
   const [guaranteeDetail, setGuaranteeDetail] = useState("");
   const [normaInfo, setNormaInfo] = useState("");
@@ -626,12 +863,13 @@ export function ShopEditPage() {
   const [trialMaxWage, setTrialMaxWage] = useState("");
   const [interviewStart, setInterviewStart] = useState("");
   const [interviewEnd, setInterviewEnd] = useState("");
-  // 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし)。
+  // 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし)。
   const [sameDayTrial, setSameDayTrial] = useState<"same_day" | "normal" | "none">("normal");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [description, setDescription] = useState("");
   const [featureText, setFeatureText] = useState("");
+  const [summaryText, setSummaryText] = useState("");
   const [expLevel, setExpLevel] = useState(50);
   const [atmosphere, setAtmosphere] = useState(50);
   // BUG-Live-03 (続き): 新規作成時に prefill 値があると、未編集のまま保存して
@@ -652,6 +890,9 @@ export function ShopEditPage() {
   const [interviewDialog, setInterviewDialog] = useState<
     { label: string; value: string }[]
   >([]);
+  const [interviewQuestions, setInterviewQuestions] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [documents, setDocuments] = useState<string[]>([]);
   const [docNote, setDocNote] = useState("");
   const [shiftInfo, setShiftInfo] = useState("");
@@ -660,9 +901,11 @@ export function ShopEditPage() {
   // 入ってしまう。新規作成では空にし、既存店舗を開いたときだけ
   // populateFromStore() で実データを流す。
   const [hiringEntries, setHiringEntries] = useState<
-    { month: string; count: string; examples: string[] }[]
+    { month: string; count: string }[]
   >([]);
   const [hiringTotal, setHiringTotal] = useState("");
+  // 採用例はセクション単位 (各月には紐付けない)。
+  const [hiringExamples, setHiringExamples] = useState<string[]>([]);
   // New schema fields
   const [transferDescription, setTransferDescription] = useState("");
   const [transferKm, setTransferKm] = useState("");
@@ -696,10 +939,13 @@ export function ShopEditPage() {
   // 画像 (image_url) は廃止し note のみ。型は将来の互換のため optional 拡張可。
   const [dressCodeOk, setDressCodeOk] = useState<{ note: string }[]>([]);
   const [dressCodeNg, setDressCodeNg] = useState<{ note: string }[]>([]);
+  // ドレス例画像（OK/NGを廃止し説明＋画像に簡素化）。
+  const [dressPhotos, setDressPhotos] = useState<{ image_url: string; caption: string }[]>([]);
   const [setFeeList, setSetFeeList] = useState<
     { label: string; amount: string; note: string }[]
   >([]);
   const [setFeeNotes, setSetFeeNotes] = useState("");
+  const [setFeePaste, setSetFeePaste] = useState("");
   const [rectaEpisodes, setRectaEpisodes] = useState<
     { name: string; comment: string; instagram_url: string; photo_url: string }[]
   >([]);
@@ -722,17 +968,86 @@ export function ShopEditPage() {
     setImages: setStoreImages,
     upload: uploadShopImages,
     remove: removeShopImage,
+    reorder: reorderShopImages,
     uploading: uploadingImage,
     error: shopImageError,
   } = useShopImages(isNew ? null : (id ?? null));
 
-  // 店舗ギャラリー画像: アップロード前にトリミングする。選択/ドロップされた
-  // 複数ファイルをキューに積み、1 枚ずつ ImageCropDialog で切り抜いて upload。
+  // ドラッグ&ドロップ並び替え中の掴んでいる画像 index。
+  const [dragImageIdx, setDragImageIdx] = useState<number | null>(null);
+
+  // 店舗ギャラリー画像。通常はアップロード前にブラウザでトリミングするが、
+  // HEIC/HEIF (iPhone 標準) はブラウザが canvas で描画できずトリミングできない
+  // ため、生のままサーバへ送って JPEG 変換してもらう (= サーバ側変換)。
   const [galleryCropQueue, setGalleryCropQueue] = useState<File[]>([]);
-  const enqueueGalleryFiles = useCallback((files: FileList | File[]) => {
-    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imgs.length > 0) setGalleryCropQueue(imgs);
-  }, []);
+
+  // 新規店舗 (まだ id がない) では店舗紐付けの画像エンドポイントが使えないため、
+  // 親非依存の汎用アップロード (useFileUpload) で URL を取得し storeImages に積む。
+  // 保存時に payload の images として店舗本体と一緒に作成する。
+  const { uploadFile: uploadGalleryFile, uploading: uploadingGalleryNew } =
+    useFileUpload("store-extra");
+
+  // 既存店舗はフックの remove (サーバ側 images を更新)、新規店舗はまだ保存前なので
+  // ローカル state から取り除くだけ。
+  const handleRemoveShopImage = useCallback(
+    (idx: number) => {
+      if (isNew) {
+        setStoreImages(storeImages.filter((_, i) => i !== idx));
+      } else {
+        removeShopImage(idx);
+      }
+    },
+    [isNew, storeImages, setStoreImages, removeShopImage],
+  );
+
+  // ドラッグ&ドロップで from→to に並べ替える。1枚目がサムネイルなので、
+  // ここでサムネイルの差し替えができる。新規店舗はローカル state のみ
+  // (作成時に order 付きで保存)、既存店舗はサーバへ永続化する。
+  const handleReorderShopImage = useCallback(
+    (from: number, to: number) => {
+      if (from === to || from < 0 || to < 0) return;
+      const order = storeImages.map((_, i) => i);
+      const [moved] = order.splice(from, 1);
+      order.splice(to, 0, moved);
+      if (isNew) {
+        setStoreImages(order.map((i) => storeImages[i]));
+      } else {
+        reorderShopImages(order);
+      }
+    },
+    [isNew, storeImages, setStoreImages, reorderShopImages],
+  );
+
+  // 1 枚アップロードする共通ハンドラ。新規/既存でアップロード先が違うだけで、
+  // 結果は storeImages に反映される。トリミング済み JPEG でも生 HEIC でも使える。
+  const uploadGalleryImage = useCallback(
+    async (file: File) => {
+      if (isNew) {
+        const url = await uploadGalleryFile(file);
+        if (url) setStoreImages((prev) => [...prev, url]);
+      } else {
+        await uploadShopImages([file]);
+      }
+    },
+    [isNew, uploadGalleryFile, setStoreImages, uploadShopImages],
+  );
+
+  const enqueueGalleryFiles = useCallback(
+    (files: FileList | File[]) => {
+      const arr = Array.from(files);
+      // HEIC はトリミングできないので即サーバへ (サーバで JPEG 変換)。
+      const heic = arr.filter(isHeicFile);
+      // それ以外でブラウザが画像と認識できるものだけトリミングキューへ。
+      const cropable = arr.filter(
+        (f) => !isHeicFile(f) && f.type.startsWith("image/"),
+      );
+      if (cropable.length > 0) setGalleryCropQueue(cropable);
+      heic.forEach((f) => {
+        void uploadGalleryImage(f);
+      });
+    },
+    [uploadGalleryImage],
+  );
 
   const [existingShops, setExistingShops] = useState<{id: number; name: string}[]>([]);
   // エリア/業種カテゴリのマスタ。マスタテーブルと options が乖離するとSelectの復元が壊れる
@@ -764,12 +1079,17 @@ export function ShopEditPage() {
     if (f.website !== undefined) setWebsite(f.website);
     if (f.videos !== undefined) setVideos(f.videos);
     if (f.staffPhotos !== undefined) setStaffPhotos(f.staffPhotos);
-    if (f.minWage !== undefined) setMinWage(f.minWage);
-    if (f.maxWage !== undefined) setMaxWage(f.maxWage);
+    if (f.facilityPhotos !== undefined) setFacilityPhotos(f.facilityPhotos);
     if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
+    if (f.paySystemTypes !== undefined) setPaySystemTypes(f.paySystemTypes);
+    if (f.paySystemNote !== undefined) setPaySystemNote(f.paySystemNote);
+    if (f.backText !== undefined) setBackText(f.backText);
     if (f.backItems !== undefined) setBackItems(f.backItems);
     if (f.feeItems !== undefined) setFeeItems(f.feeItems);
     if (f.salaryNote !== undefined) setSalaryNote(f.salaryNote);
+    if (f.payrollCycle !== undefined) setPayrollCycle(f.payrollCycle);
+    if (f.payrollPayDay !== undefined) setPayrollPayDay(f.payrollPayDay);
+    if (f.dailyPayLimit !== undefined) setDailyPayLimit(f.dailyPayLimit);
     if (f.guaranteePeriod !== undefined) setGuaranteePeriod(f.guaranteePeriod);
     if (f.guaranteeDetail !== undefined) setGuaranteeDetail(f.guaranteeDetail);
     if (f.normaInfo !== undefined) setNormaInfo(f.normaInfo);
@@ -783,6 +1103,7 @@ export function ShopEditPage() {
     if (f.tags !== undefined) setTags(f.tags);
     if (f.description !== undefined) setDescription(f.description);
     if (f.featureText !== undefined) setFeatureText(f.featureText);
+    if (f.summaryText !== undefined) setSummaryText(f.summaryText);
     if (f.expLevel !== undefined) setExpLevel(f.expLevel);
     if (f.atmosphere !== undefined) setAtmosphere(f.atmosphere);
     if (f.castBijin !== undefined) setCastBijin(f.castBijin);
@@ -796,11 +1117,13 @@ export function ShopEditPage() {
     if (f.dressCode !== undefined) setDressCode(f.dressCode);
     if (f.hiringCriteria !== undefined) setHiringCriteria(f.hiringCriteria);
     if (f.interviewDialog !== undefined) setInterviewDialog(f.interviewDialog);
+    if (f.interviewQuestions !== undefined) setInterviewQuestions(f.interviewQuestions);
     if (f.documents !== undefined) setDocuments(f.documents);
     if (f.docNote !== undefined) setDocNote(f.docNote);
     if (f.shiftInfo !== undefined) setShiftInfo(f.shiftInfo);
     if (f.hiringEntries !== undefined) setHiringEntries(f.hiringEntries);
     if (f.hiringTotal !== undefined) setHiringTotal(f.hiringTotal);
+    if (f.hiringExamples !== undefined) setHiringExamples(f.hiringExamples);
     if (f.transferDescription !== undefined) setTransferDescription(f.transferDescription);
     if (f.transferKm !== undefined) setTransferKm(f.transferKm);
     if (f.transferZones !== undefined) setTransferZones(f.transferZones);
@@ -810,6 +1133,7 @@ export function ShopEditPage() {
     if (f.dressCodeDescription !== undefined) setDressCodeDescription(f.dressCodeDescription);
     if (f.dressCodeOk !== undefined) setDressCodeOk(f.dressCodeOk);
     if (f.dressCodeNg !== undefined) setDressCodeNg(f.dressCodeNg);
+    if (f.dressPhotos !== undefined) setDressPhotos(f.dressPhotos);
     if (f.setFeeList !== undefined) setSetFeeList(f.setFeeList);
     if (f.setFeeNotes !== undefined) setSetFeeNotes(f.setFeeNotes);
     if (f.rectaEpisodes !== undefined) setRectaEpisodes(f.rectaEpisodes);
@@ -835,7 +1159,11 @@ export function ShopEditPage() {
     setLoading(true);
     setNotFound(false);
     api.get<Store>(`/admin/stores/${id}`)
-      .then(populateFromStore)
+      .then((store) => {
+        populateFromStore(store);
+        // populate 後の値を baseline (保存済み) として確定。
+        setBaselineKey((k) => k + 1);
+      })
       .catch((err) => {
         const status = (err as { status?: number })?.status;
         if (status === 404) {
@@ -898,18 +1226,22 @@ export function ShopEditPage() {
     const form: ShopForm = {
       shopName, area, address, lat, lng, station, category,
       openingTime, closingTime, holiday, phone, website,
-      videos, staffPhotos,
-      minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+      videos, staffPhotos, facilityPhotos,
+      dailyPay,
+      paySystemTypes, paySystemNote, backText,
+      payrollCycle, payrollPayDay, dailyPayLimit,
+      backItems, feeItems, salaryNote,
       guaranteePeriod, guaranteeDetail, normaInfo,
       trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
       payrollSystemType, payrollSystemDescription,
-      tags, description, featureText, expLevel, atmosphere,
+      tags, description, featureText, summaryText, expLevel, atmosphere,
       castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
-      documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+      interviewQuestions,
+      documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
       transferDescription, transferKm, transferZones, relatedStoreIds,
       champagneDescription, champagnePrices,
-      dressCodeDescription, dressCodeOk, dressCodeNg,
+      dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
       setFeeList, setFeeNotes, rectaEpisodes, qaItems,
       staffName, staffRole, staffComment, supportItems,
       seoMetaDescription,
@@ -920,23 +1252,81 @@ export function ShopEditPage() {
     shopName, area, address, lat, lng, station, category,
     openingTime, closingTime, holiday, phone, website,
     videos, staffPhotos,
-    minWage, maxWage, dailyPay, backItems, feeItems, salaryNote,
+    dailyPay,
+    paySystemTypes, paySystemNote, backText,
+    payrollCycle, payrollPayDay, dailyPayLimit,
+    backItems, feeItems, salaryNote,
     guaranteePeriod, guaranteeDetail, normaInfo,
     trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
     payrollSystemType, payrollSystemDescription,
-    tags, description, featureText, expLevel, atmosphere,
+    tags, description, featureText, summaryText, expLevel, atmosphere,
     castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
     dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
-    documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+    interviewQuestions,
+    documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
     transferDescription, transferKm, transferZones, relatedStoreIds,
     champagneDescription, champagnePrices,
-    dressCodeDescription, dressCodeOk, dressCodeNg,
+    dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
     setFeeList, setFeeNotes, rectaEpisodes, qaItems,
     staffName, staffRole, staffComment, supportItems,
     seoMetaDescription,
     priority,
     publishStatus,
   ]);
+
+  // ── 未保存検知 ────────────────────────────────────────────────────────
+  // このフォームは全 STEP のデータを React state に保持し、保存は一括 (handleSave)。
+  // STEP を移動してもデータは消えないが、未保存のまま離脱すると失われるため、
+  // 保存済みスナップショットと現在値を比較して「未保存」を可視化・警告する。
+  const currentSnapshot = useMemo(
+    () => JSON.stringify({ p: buildPayload(), imgs: storeImages }),
+    [buildPayload, storeImages],
+  );
+  // 最新スナップショットを ref に映しておき、baseline 確定 effect が stale を読まないようにする。
+  const currentSnapshotRef = useRef(currentSnapshot);
+  currentSnapshotRef.current = currentSnapshot;
+  const savedSnapshotRef = useRef<string | null>(null);
+  const [baselineKey, setBaselineKey] = useState(0);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // 新規店舗は初期空フォームを baseline に。既存店舗は populate 完了時に確定。
+  useEffect(() => {
+    if (isNew) setBaselineKey((k) => k + 1);
+  }, [isNew]);
+
+  // baseline 確定 (populate / 保存成功 / 新規初期化のたびに現在値を保存済みとみなす)。
+  useEffect(() => {
+    savedSnapshotRef.current = currentSnapshotRef.current;
+    setIsDirty(false);
+  }, [baselineKey]);
+
+  // 現在値が baseline と異なれば未保存。
+  useEffect(() => {
+    if (savedSnapshotRef.current === null) return;
+    setIsDirty(currentSnapshot !== savedSnapshotRef.current);
+  }, [currentSnapshot]);
+
+  // タブを閉じる / リロード時、未保存ならブラウザ標準の確認を出す。
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // 店舗一覧へ戻る等の離脱時、未保存なら確認する。
+  const handleLeave = useCallback(() => {
+    if (
+      isDirty &&
+      !window.confirm("未保存の変更があります。保存せずにページを離れますか？")
+    ) {
+      return;
+    }
+    navigate("/admin/shops");
+  }, [isDirty, navigate]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -965,12 +1355,20 @@ export function ShopEditPage() {
     try {
       const payload = buildPayload();
       if (isNew) {
-        const created = await api.post<Store>("/admin/stores", payload);
+        // 新規作成では保存前にアップロード済みの画像 URL を images として
+        // 店舗本体と一緒に永続化する (既存店舗は別エンドポイントで管理済み)。
+        const createPayload = {
+          ...payload,
+          images: storeImages.map((url, order) => ({ url, order })),
+        };
+        const created = await api.post<Store>("/admin/stores", createPayload);
         setSaveSuccess(true);
         setTimeout(() => navigate(`/admin/shops/${created.id}/edit`, { replace: true }), 1000);
       } else {
         await api.put(`/admin/stores/${id}`, payload);
         setSaveSuccess(true);
+        // 保存できたので現在値を新しい baseline に。未保存表示が消える。
+        setBaselineKey((k) => k + 1);
         setTimeout(() => setSaveSuccess(false), 2500);
       }
     } catch (err) {
@@ -979,7 +1377,7 @@ export function ShopEditPage() {
       setSaving(false);
     }
   }, [
-    isNew, id, buildPayload, navigate,
+    isNew, id, buildPayload, navigate, storeImages,
     shopName, area, category, station, address, openingTime, closingTime,
     stepFlow,
   ]);
@@ -1042,8 +1440,8 @@ export function ShopEditPage() {
     !!(shopName && area && category && station && address && openingTime && closingTime),
     // Step2: 画像・動画
     storeImages.length > 0 || videos.length > 0 || staffPhotos.length > 0,
-    // Step3: 報酬・体入
-    !!(minWage && maxWage),
+    // Step3: 報酬・体入 (通常時給は廃止。体入時給の入力で完了とみなす)
+    !!(trialMinWage && trialMaxWage),
     // Step4: 分析・面接
     !!(hiringCriteria || interviewDialog.length > 0 || expLevel > 0 || atmosphere > 0),
     // Step5: 価格・サービス
@@ -1159,17 +1557,19 @@ export function ShopEditPage() {
               }
             />
           </Field>
-          <Field label="営業時間（開始）" required>
-            <TextInput
+          <Field label="営業時間（開始）" required hint="候補から選択、または直接入力できます">
+            <ComboInput
               value={openingTime}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setOpeningTime(e.target.value)}
+              onChange={setOpeningTime}
+              options={["19:00", "20:00", "21:00"]}
               placeholder="例: 20:00"
             />
           </Field>
-          <Field label="営業時間（終了）" required>
-            <TextInput
+          <Field label="営業時間（終了）" required hint="候補から選択、または直接入力できます">
+            <ComboInput
               value={closingTime}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setClosingTime(e.target.value)}
+              onChange={setClosingTime}
+              options={["1:00", "LAST"]}
               placeholder="例: 1:00 / LAST"
             />
           </Field>
@@ -1196,32 +1596,10 @@ export function ShopEditPage() {
               />
             </Field>
           </div>
-          {/* 時給/日給目安/シフト は管理画面上「店舗情報」の一部として扱う。
-              ユーザー画面の店舗情報カードにも同じ並びで出る。詳細な給与
-              (バック / 控除 / 保証 / ノルマ等) は STEP2「報酬・待遇」へ。 */}
-          <Field label="時給の最低額（円）">
-            <TextInput
-              type="number"
-              value={minWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMinWage(e.target.value)}
-              placeholder="4000"
-            />
-          </Field>
-          <Field label="時給の最高額（円）">
-            <TextInput
-              type="number"
-              value={maxWage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMaxWage(e.target.value)}
-              placeholder="8000"
-            />
-          </Field>
-          <Field label="日給目安">
-            <TextInput
-              value={dailyPay}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPay(e.target.value)}
-              placeholder="例: 30000〜60000"
-            />
-          </Field>
+          {/* 給与は「体入時給(最低/最高)」と、そこから自動算出する「体入日給」に
+              一本化した (本入店後の通常時給は撤去)。入力欄は下の「体入(体験入店)
+              情報」セクションに集約している。シフト/詳細給与 (バック/控除/保証/
+              ノルマ等) は STEP2「報酬・待遇」へ。 */}
           <div className="md:col-span-2">
             <Field label="シフト">
               <TextArea
@@ -1253,20 +1631,39 @@ export function ShopEditPage() {
       <div className="space-y-5">
         <Field
           label="店舗画像"
-          hint={isNew ? "店舗を保存した後に画像をアップロードできます。" : "最大10枚まで。1枚目がサムネイルになります。"}
+          hint="最大10枚まで。1枚目がサムネイルになります。ドラッグ&ドロップで並び替え（サムネイル変更）できます。スマホの写真もそのままアップロードできます。"
         >
           {storeImages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {storeImages.map((url, idx) => (
-                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-video">
-                  <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
+                <div
+                  key={idx}
+                  draggable
+                  onDragStart={() => setDragImageIdx(idx)}
+                  onDragEnd={() => setDragImageIdx(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragImageIdx !== null) handleReorderShopImage(dragImageIdx, idx);
+                    setDragImageIdx(null);
+                  }}
+                  className={`relative group rounded-lg overflow-hidden border bg-muted aspect-video cursor-move transition ${
+                    dragImageIdx === idx ? "border-primary opacity-50" : "border-border"
+                  }`}
+                >
+                  <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover pointer-events-none" />
                   {idx === 0 && (
                     <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
                       サムネイル
                     </span>
                   )}
+                  <span className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-black/55 text-white opacity-0 group-hover:opacity-100 transition">
+                    <GripVertical className="w-3 h-3" />
+                    ドラッグで並び替え
+                  </span>
                   <button
-                    onClick={() => removeShopImage(idx)}
+                    type="button"
+                    onClick={() => handleRemoveShopImage(idx)}
                     className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -1277,8 +1674,7 @@ export function ShopEditPage() {
           )}
           <ImageUploadZone
             onUpload={enqueueGalleryFiles}
-            uploading={uploadingImage}
-            disabled={isNew}
+            uploading={uploadingImage || uploadingGalleryNew}
           />
           {galleryCropQueue.length > 0 && (
             <ImageCropDialog
@@ -1287,7 +1683,7 @@ export function ShopEditPage() {
               title={`店舗写真をトリミング（残り ${galleryCropQueue.length} 枚）`}
               onCancel={() => setGalleryCropQueue([])}
               onCropped={async (cropped) => {
-                await uploadShopImages([cropped]);
+                await uploadGalleryImage(cropped);
                 setGalleryCropQueue((q) => q.slice(1));
               }}
             />
@@ -1305,7 +1701,7 @@ export function ShopEditPage() {
 
   // 体入（体験入店）情報。元 STEP3 にあったが、求職者目線ではユーザー画面
   // 上部に出る情報なので STEP1「店舗情報」末尾に同居させる。中身: 体入時給
-  // (最低/最高)、面接可能時間 (開始/終了)、体験確約可否。
+  // (最低/最高)、面接可能時間 (開始/終了)、体入確約可否。
   const sectionTrial = () => (
     <SectionCard title="体入（体験入店）情報" icon={Sparkles} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1316,6 +1712,8 @@ export function ShopEditPage() {
           <TextInput
             type="number"
             inputMode="numeric"
+            step={1000}
+            min={0}
             value={trialMinWage}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMinWage(e.target.value.replace(/[^\d]/g, ""))}
             placeholder="例: 4500"
@@ -1325,26 +1723,44 @@ export function ShopEditPage() {
           <TextInput
             type="number"
             inputMode="numeric"
+            step={1000}
+            min={0}
             value={trialMaxWage}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMaxWage(e.target.value.replace(/[^\d]/g, ""))}
             placeholder="例: 6000"
           />
         </Field>
-        <Field label="面接可能時間(開始)">
-          <TextInput
+        {/* 体入日給は手入力せず「体入時給 × 1日4時間」で自動算出する (表示のみ)。
+            体入時給を入れると即座に反映される。計算元は lib/wage.ts に一本化。 */}
+        <Field
+          label="体入日給（自動計算）"
+          hint="体入時給 × 1日4時間で自動算出されます（入力不要）"
+        >
+          <div className="w-full px-3 py-2 rounded-lg border border-dashed border-border bg-muted/40 text-[13px] text-foreground/80 min-h-[38px] flex items-center">
+            {trialDailyEstimate(trialMinWage, trialMaxWage) ?? (
+              <span className="text-muted-foreground/60">
+                体入時給を入力すると表示されます
+              </span>
+            )}
+          </div>
+        </Field>
+        <Field label="面接可能時間(開始)" hint="候補から選択、または直接入力できます">
+          <ComboInput
             value={interviewStart}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewStart(e.target.value)}
-            placeholder="例: 14:00"
+            onChange={setInterviewStart}
+            options={["17:00", "17:30", "18:00"]}
+            placeholder="例: 17:00"
           />
         </Field>
-        <Field label="面接可能時間(終了)">
-          <TextInput
+        <Field label="面接可能時間(終了)" hint="候補から選択、または直接入力できます">
+          <ComboInput
             value={interviewEnd}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInterviewEnd(e.target.value)}
-            placeholder="例: 19:00"
+            onChange={setInterviewEnd}
+            options={["20:00", "21:00", "22:00", "23:00"]}
+            placeholder="例: 21:00"
           />
         </Field>
-        <Field label="体入の種類" hint="店舗詳細やフィルターで「体験確約OK」リボンの出し分けに使用">
+        <Field label="体入の種類" hint="店舗詳細やフィルターで「体入確約OK」リボンの出し分けに使用">
           <select
             value={sameDayTrial}
             onChange={(e) =>
@@ -1352,7 +1768,7 @@ export function ShopEditPage() {
             }
             className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
           >
-            <option value="same_day">体験確約</option>
+            <option value="same_day">体入確約</option>
             <option value="normal">体入可能</option>
             <option value="none">体入なし</option>
           </select>
@@ -1372,7 +1788,7 @@ export function ShopEditPage() {
       <div className="space-y-5">
         <Field
           label="特徴タグ"
-          hint="Enterキーでタグを追加できます"
+          hint="日本語変換を確定したあと、もう一度Enterで追加されます"
         >
           <div className="flex flex-wrap gap-2 mb-3">
             {tags.map((tag, i) => (
@@ -1396,7 +1812,14 @@ export function ShopEditPage() {
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && tagInput.trim()) {
+              // IME 変換確定の Enter ではタグ登録しない (isComposing で判定)。
+              // 日本語入力中は1回目の Enter = 変換確定、2回目の Enter = 登録、
+              // となり「Enter1回で勝手に登録される」誤爆を防ぐ。
+              if (
+                e.key === "Enter" &&
+                !e.nativeEvent.isComposing &&
+                tagInput.trim()
+              ) {
                 e.preventDefault();
                 setTags([...tags, tagInput.trim()]);
                 setTagInput("");
@@ -1422,27 +1845,61 @@ export function ShopEditPage() {
     <div className="space-y-6">
       <SectionCard title="報酬・待遇" icon={DollarSign} previewAnchor="salary" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここはバック・
-              控除・備考・支払い方法・保証・ノルマ等の詳細を扱う。 */}
-          <Field
-            label="バック項目"
-            hint="指名バック・同伴バックなど、項目名と金額を入力してください"
-          >
-            <DynamicPairList
-              items={backItems}
-              setItems={setBackItems}
-              labelPlaceholder="バック名"
-              valuePlaceholder="例: 1,000円 / 10%"
+          {/* 時給 / 日給目安は STEP1「店舗基本情報」に移動済み。ここは給料システム・
+              バック・引かれ物・備考・サイクル・保証・ノルマ等の詳細を扱う。 */}
+          {/* 給料システム (複数選択 + 詳細備考)。売上制/ポイント制なら具体ロジックを備考へ。 */}
+          <Field label="給料システム" hint="当てはまるものを選択（複数可）。詳細は下の備考に記載">
+            <div className="flex flex-wrap gap-2">
+              {PAY_SYSTEM_OPTIONS.map((opt) => {
+                const active = paySystemTypes.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setPaySystemTypes(
+                        active
+                          ? paySystemTypes.filter((t) => t !== opt)
+                          : [...paySystemTypes, opt],
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-full text-[13px] border transition ${
+                      active
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-foreground/70 border-border hover:bg-muted"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          <Field label="給料システムの詳細備考" hint="売上スライド/ポイント制などの具体的な計算ルール">
+            <TextArea
+              value={paySystemNote}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaySystemNote(e.target.value)}
+              placeholder="例: 売上の◯%還元。ポイントは1pt=◯円で時給に加算。改行で見やすく書けます。"
+              rows={3}
+            />
+          </Field>
+          {/* バックは月本数で変わる複雑な体系もそのまま書けるようフリーテキスト。 */}
+          <Field label="バック" hint="同伴/本指名/場内など、自由に記載できます">
+            <TextArea
+              value={backText}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBackText(e.target.value)}
+              placeholder={"例:\n同伴バック：21:30までに入店\n1回目→5,000円 / 2回目→10,000円 …\n本指名バック：1セット目→3,000円\n場内バック：1,000円/本数"}
+              rows={6}
             />
           </Field>
           <Field
-            label="手数料項目"
-            hint="雑費・送り代など、控除される項目を入力してください"
+            label="引かれ物"
+            hint="雑費・送り代など、給与から引かれる項目を入力してください"
           >
             <DynamicPairList
               items={feeItems}
               setItems={setFeeItems}
-              labelPlaceholder="手数料名"
+              labelPlaceholder="引かれ物の名前"
               valuePlaceholder="金額"
             />
           </Field>
@@ -1453,44 +1910,54 @@ export function ShopEditPage() {
               placeholder="その他、給与に関する補足情報があれば入力してください"
             />
           </Field>
-          <Field label="給与支払い方法">
+          {/* 給与サイクル → 月締め系を選んだら締め日・支払日を条件表示。
+              「日払い可」は廃止し、日払いは「日払い上限金額」欄で表す。 */}
+          <Field label="給与サイクル">
             <SelectInput
-              value={payrollSystemType}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemType(e.target.value)}
-              options={["全額日払い", "日払い可", "月2回", "月末締め翌月払い"]}
+              value={payrollCycle}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollCycle(e.target.value)}
+              options={PAYROLL_CYCLE_OPTIONS}
               placeholder="選択してください"
+            />
+          </Field>
+          {PAYROLL_CYCLES_WITH_PAYDAY.includes(payrollCycle) && (
+            <Field label="締め日・支払日" hint="例: 月末締め翌月15日払い / 15日・末日締め">
+              <TextInput
+                value={payrollPayDay}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollPayDay(e.target.value)}
+                placeholder="例: 月末締め翌月15日払い"
+              />
+            </Field>
+          )}
+          <Field label="日払い上限金額" hint="日払いの有無・上限。なければ空欄でOK">
+            <TextInput
+              value={dailyPayLimit}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPayLimit(e.target.value)}
+              placeholder="例: 30,000円まで / 上限なし / 要相談"
             />
           </Field>
           <Field label="給与支払い補足">
             <TextArea
               value={payrollSystemDescription}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemDescription(e.target.value)}
-              placeholder="給与支払いに関する補足（例: 日払い上限5万円まで等）"
+              placeholder="給与支払いに関する補足（改行で2行目以降も書けます）"
               rows={2}
             />
           </Field>
           {/* 保証・ノルマはユーザー画面では報酬・待遇カード内に同居するため、
-              管理画面も同じセクション内にまとめる。 */}
+              管理画面も同じセクション内にまとめる。保証詳細は廃止し、永久保証等も
+              保証期間にまとめて書く。 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-            <Field label="保証期間">
+            <Field label="保証期間" hint="例: 3ヶ月 / 永久保証 など（詳細もここにまとめて記載）">
               <TextInput
                 value={guaranteePeriod}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   setGuaranteePeriod(e.target.value)
                 }
-                placeholder="例: 3ヶ月"
+                placeholder="例: 3ヶ月 / 永久保証"
               />
             </Field>
           </div>
-          <Field label="保証詳細">
-            <TextArea
-              value={guaranteeDetail}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setGuaranteeDetail(e.target.value)
-              }
-              placeholder="保証の具体的な内容を入力してください"
-            />
-          </Field>
           <Field label="ノルマ情報">
             <TextArea
               value={normaInfo}
@@ -1504,81 +1971,56 @@ export function ShopEditPage() {
       {/* 体入（体験入店）情報は STEP1「店舗情報」に移動済み (sectionTrial)。 */}
       {/* 直近の採用実績は体入と一緒に検討できるほうが運営フローに合うので、
           STEP4 から STEP3 (報酬・体入) 直後に維持。 */}
-      <SectionCard title="直近の採用実績" icon={TrendingUp} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
+      <SectionCard title="直近◯ヶ月での採用" icon={TrendingUp} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          {hiringEntries.map((entry, i) => (
-            <div
-              key={i}
-              className="border border-border rounded-xl p-5 space-y-4 bg-muted/20"
-            >
-              <div className="flex items-center justify-between gap-2">
-                {/* BUG-Live-07: 月名を編集可能に。これまで <span> で固定表示
-                    だったため、「月を追加」で出る `"2026年3月"` を任意の月に
-                    変えられず、過去月の実績を入力できなかった。 */}
-                <TextInput
-                  value={entry.month}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = { ...updated[i], month: e.target.value };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="例: 2026年4月"
-                />
-                <button
-                  onClick={() =>
-                    setHiringEntries(
-                      hiringEntries.filter((_, idx) => idx !== i)
-                    )
-                  }
-                  className="text-muted-foreground hover:text-destructive transition shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+          <div className="space-y-2">
+            <Field label="月別の採用人数">
+              <p className="text-xs text-muted-foreground mb-2">
+                「1ヶ月前」が直近。人数を入れた月までが公開ページに表示されます
+                （基本は5ヶ月前まで、新しい店舗は3ヶ月前まで等で調整OK）。
+              </p>
+              {/* 相対月の固定スロット。index で hiringEntries に対応づける。
+                  採用例は月に紐付けずセクション単位で持つので、ここは人数だけ。 */}
+              <div className="space-y-2">
+                {RELATIVE_HIRE_LABELS.map((relLabel, i) => {
+                  const entry = hiringEntries[i] ?? { month: relLabel, count: "" };
+                  const writeCount = (count: string) => {
+                    const next = RELATIVE_HIRE_LABELS.map((lbl, idx) => {
+                      const base = hiringEntries[idx] ?? { month: lbl, count: "" };
+                      return idx === i
+                        ? { month: lbl, count }
+                        : { month: lbl, count: base.count };
+                    });
+                    setHiringEntries(next);
+                  };
+                  return (
+                    <div key={relLabel} className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 text-sm font-medium text-foreground/80">{relLabel}</span>
+                      <div className="flex-1">
+                        <TextInput
+                          type="number"
+                          inputMode="numeric"
+                          step={1}
+                          min={0}
+                          value={entry.count}
+                          onChange={(e) => writeCount(e.target.value.replace(/[^\d]/g, ""))}
+                          placeholder="採用人数（空欄=非表示）"
+                        />
+                      </div>
+                      <span className="text-sm text-foreground/50">名</span>
+                    </div>
+                  );
+                })}
               </div>
-              <Field label="採用人数">
-                <TextInput
-                  type="number"
-                  value={entry.count}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = {
-                      ...updated[i],
-                      count: e.target.value,
-                    };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="人数を入力"
-                />
-              </Field>
-              <Field label="採用例">
-                <DynamicTextList
-                  items={entry.examples}
-                  setItems={(newExamples) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = {
-                      ...updated[i],
-                      examples: newExamples,
-                    };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="例: 20歳 未経験 → 時給5,000円スタート"
-                />
-              </Field>
-            </div>
-          ))}
-          <button
-            onClick={() => {
-              const now = new Date();
-              const defaultMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-              setHiringEntries([
-                ...hiringEntries,
-                { month: defaultMonth, count: "", examples: [] },
-              ]);
-            }}
-            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition"
-          >
-            <Plus className="w-3.5 h-3.5" /> 月を追加
-          </button>
+            </Field>
+          </div>
+          <Field label="採用例（任意）" hint="このお店全体の採用例。月とは紐付きません。">
+            <DynamicTextList
+              items={hiringExamples}
+              setItems={setHiringExamples}
+              placeholder="例: 20歳 未経験 → 時給5,000円スタート"
+            />
+          </Field>
           <Field label="直近の合計テキスト">
             <TextInput
               value={hiringTotal}
@@ -1598,21 +2040,24 @@ export function ShopEditPage() {
       {/* 「店舗の特徴」は STEP1 末尾に移動 (sectionFeatures)。 */}
       <SectionCard title="店舗分析" icon={BarChart3} previewAnchor="analysis" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-6">
+          {/* 在籍キャスト割合: スライダー値 = 経験者入店の割合。
+              未経験入店 = 100 - 値。公開側で2色バーで何割か分かるよう表示。 */}
           <SliderField
-            label="経験レベル"
+            label="在籍キャスト割合"
             value={expLevel}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExpLevel(Number(e.target.value))}
-            leftLabel="初心者向け"
-            rightLabel="経験者向け"
+            leftLabel="未経験入店"
+            rightLabel="経験者入店"
           />
+          {/* 店内の雰囲気: スライダー値 = ワイワイ度。落ち着いてる = 100 - 値。 */}
           <SliderField
-            label="雰囲気"
+            label="店内の雰囲気"
             value={atmosphere}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setAtmosphere(Number(e.target.value))
             }
-            leftLabel="落ち着き"
-            rightLabel="賑やか"
+            leftLabel="落ち着いてる"
+            rightLabel="ワイワイ"
           />
           <div>
             <label className="block text-sm mb-3 text-foreground">
@@ -1624,6 +2069,10 @@ export function ShopEditPage() {
               <Field label="綺麗系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castBijin}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCastBijin(e.target.value)}
                 />
@@ -1631,6 +2080,10 @@ export function ShopEditPage() {
               <Field label="可愛い系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castKawaii}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastKawaii(e.target.value)
@@ -1640,6 +2093,10 @@ export function ShopEditPage() {
               <Field label="派手系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castGlamour}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastGlamour(e.target.value)
@@ -1649,6 +2106,10 @@ export function ShopEditPage() {
               <Field label="素人系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castNatural}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastNatural(e.target.value)
@@ -1657,26 +2118,63 @@ export function ShopEditPage() {
               </Field>
             </div>
           </div>
-          <Field label="客層年齢分布">
-            <DynamicPairList
-              items={clientAge}
-              setItems={setClientAge}
-              labelPlaceholder="年齢層"
-              valuePlaceholder="割合"
-            />
+          {/* 客層年齢は 20代/30代/40代/50代以降 を固定ラベルにし、運営は%のみ入力。 */}
+          <Field label="客層年齢分布" hint="各年齢層の割合(%)を入力。空欄は0%扱い">
+            <div className="space-y-2">
+              {CLIENT_AGE_LABELS.map((ageLabel) => {
+                const cur = clientAge.find((c) => c.label === ageLabel)?.value ?? "";
+                return (
+                  <div key={ageLabel} className="flex items-center gap-3">
+                    <span className="w-20 shrink-0 text-sm text-foreground/70">{ageLabel}</span>
+                    <div className="flex-1">
+                      <TextInput
+                        type="number"
+                        inputMode="numeric"
+                        step={5}
+                        min={0}
+                        max={100}
+                        value={cur}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^\d]/g, "");
+                          setClientAge(
+                            CLIENT_AGE_LABELS.map((l) => ({
+                              label: l,
+                              value:
+                                l === ageLabel
+                                  ? v
+                                  : clientAge.find((c) => c.label === l)?.value ?? "",
+                            })),
+                          );
+                        }}
+                        placeholder="例: 40"
+                      />
+                    </div>
+                    <span className="text-sm text-foreground/50">%</span>
+                  </div>
+                );
+              })}
+            </div>
           </Field>
+          {/* 公開ページ (AnalysisSection 飲み度) のラベルと揃える。 */}
           <SliderField
             label="客層の飲み方"
             value={drinkStyle}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setDrinkStyle(Number(e.target.value))
             }
-            leftLabel="落ち着き"
-            rightLabel="盛り上がり"
+            leftLabel="飲まなくてOK"
+            rightLabel="飲める方が◎"
           />
         </div>
       </SectionCard>
 
+      {/* 施設写真は「お店の分析」の直後（公開ページでも分析の下）に配置。 */}
+      <SectionCard title="施設写真" icon={ImageIcon} previewAnchor="facility" onFocusEnter={handlePreviewFocus}>
+        <p className="text-xs text-muted-foreground mb-4">
+          トイレ・更衣室・店内のセット場所など、働く環境が分かる写真を掲載できます。
+        </p>
+        <FacilityPhotosEditor photos={facilityPhotos} onChange={setFacilityPhotos} />
+      </SectionCard>
     </div>
   );
 
@@ -1684,47 +2182,48 @@ export function ShopEditPage() {
     <div className="space-y-6">
       <SectionCard title="面接・採用" icon={UserCheck} previewAnchor="interview" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          <Field label="面接時の服装アドバイス">
+          <Field label="採用基準" hint="採用時に重視するポイントを記載">
+            <TextArea
+              value={hiringCriteria}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                setHiringCriteria(e.target.value)
+              }
+              rows={3}
+              placeholder="採用時に重視するポイントを入力してください（改行可）"
+            />
+          </Field>
+          <Field label="面接についてのアドバイス">
             <TextArea
               value={dressAdvice}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressAdvice(e.target.value)}
-              placeholder="面接時のおすすめの服装について入力してください"
+              placeholder="面接に向けたアドバイスを入力してください"
             />
           </Field>
-          <Field label="服装Tips">
+          <Field label="服装について">
+            <TextInput
+              value={dressCode}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCode(e.target.value)}
+              placeholder="例: 私服でOK / ワンピース推奨 / ドレス貸し出しあり"
+            />
+          </Field>
+          <Field label="服装についてのポイント（箇条書き）">
             <DynamicTextList
               items={dressTips}
               setItems={setDressTips}
               placeholder="例: ワンピースがおすすめ"
             />
           </Field>
-          <Field label="ドレスコード">
-            <TextInput
-              value={dressCode}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCode(e.target.value)}
-              placeholder="例: フリー / ドレス貸し出しあり"
-            />
-          </Field>
-          <Field label="採用基準">
-            <TextArea
-              value={hiringCriteria}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setHiringCriteria(e.target.value)
-              }
-              placeholder="採用時に重視するポイントを入力してください"
-            />
-          </Field>
+          {/* 「面接の流れ(会話)」→「面接で聞かれることリスト」。質問をタップで
+              回答が開く Q&A 形式 (公開ページ)。label=質問, value=回答。 */}
           <Field
-            label="面接サポート対話"
-            hint="面接の流れを会話形式で。話者は「面接官 / 応募者」を選択。"
+            label="面接で聞かれることリスト"
+            hint="面接でよく聞かれる質問と回答例。公開ページではタップで開くQ&Aになります。"
           >
             <DynamicPairList
-              items={interviewDialog}
-              setItems={setInterviewDialog}
-              labelPlaceholder="話者"
-              valuePlaceholder="セリフ"
-              labelOptions={["面接官", "応募者"]}
-              defaultLabel="面接官"
+              items={interviewQuestions}
+              setItems={setInterviewQuestions}
+              labelPlaceholder="質問（例: 出勤頻度は？）"
+              valuePlaceholder="回答例（例: 週1からOKです）"
             />
           </Field>
         </div>
@@ -1784,7 +2283,7 @@ export function ShopEditPage() {
           </Field>
           <Field
             label="足代テーブル（高級店向け）"
-            hint="距離別の足代を設定。空のままなら詳細ページに表示されません。"
+            hint="距離別の足代を設定。色は自動で割り当てられます。空のままなら詳細ページに表示されません。"
           >
             <div className="space-y-2">
               {transferZones.map((z, i) => (
@@ -1792,8 +2291,9 @@ export function ShopEditPage() {
                   key={i}
                   className="grid grid-cols-12 gap-2 items-center rounded-lg border border-border bg-muted/20 p-2"
                 >
+                  {/* 色は公開ページで距離区分の index 順に自動割り当て (運営の色選択を撤去)。 */}
                   <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    className="col-span-4 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="ラベル (例: 都内)"
                     value={z.label}
                     onChange={(e) => {
@@ -1802,7 +2302,12 @@ export function ShopEditPage() {
                       setTransferZones(next);
                     }}
                   />
+                  {/* 半径は km 単位。0.5km 刻みで微調整できるよう step=0.5。 */}
                   <input
+                    type="number"
+                    inputMode="decimal"
+                    step={0.5}
+                    min={0}
                     className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="半径 km"
                     value={z.radius_km}
@@ -1812,23 +2317,18 @@ export function ShopEditPage() {
                       setTransferZones(next);
                     }}
                   />
+                  {/* 足代は円。1,000 円刻み。 */}
                   <input
-                    className="col-span-3 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                    type="number"
+                    inputMode="numeric"
+                    step={1000}
+                    min={0}
+                    className="col-span-4 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
                     placeholder="足代 ¥"
                     value={z.fee}
                     onChange={(e) => {
                       const next = [...transferZones];
                       next[i] = { ...next[i], fee: e.target.value };
-                      setTransferZones(next);
-                    }}
-                  />
-                  <input
-                    type="color"
-                    className="col-span-2 h-8 w-full cursor-pointer rounded border border-input bg-background"
-                    value={z.color || "#D4AF37"}
-                    onChange={(e) => {
-                      const next = [...transferZones];
-                      next[i] = { ...next[i], color: e.target.value };
                       setTransferZones(next);
                     }}
                   />
@@ -1847,7 +2347,7 @@ export function ShopEditPage() {
                 onClick={() =>
                   setTransferZones([
                     ...transferZones,
-                    { label: "", radius_km: "", fee: "", color: "#D4AF37" },
+                    { label: "", radius_km: "", fee: "", color: "" },
                   ])
                 }
                 className="text-xs text-primary hover:underline"
@@ -1898,6 +2398,9 @@ export function ShopEditPage() {
               <div className="md:col-span-1">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={1000}
+                  min={0}
                   value={champagnePrices[key].amount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setChampagnePrices({
@@ -1927,6 +2430,42 @@ export function ShopEditPage() {
 
       <SectionCard title="セット料金" icon={DollarSign} previewAnchor="set-fee" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
+          {/* コピペ取込: 記事等から「項目名／単位」「金額」が並んだテキストを貼って
+              「取り込む」を押すと自動で項目化される。1項目ずつ入力する手間を省く。 */}
+          <Field
+            label="まとめて貼り付け（コピペ取込）"
+            hint="「セット／60分」「15,000円」のように項目名と金額が並んだテキストを貼って「取り込む」"
+          >
+            <TextArea
+              value={setFeePaste}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSetFeePaste(e.target.value)}
+              rows={5}
+              placeholder={"例:\nセット／60分\n15,000円\n延長／30分\n7,500円／メイン\n25,000円／VIP\n指名料／60分\n3,000円"}
+            />
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const parsed = parseSetFeeText(setFeePaste);
+                  if (parsed.length > 0) {
+                    // 既存が空なら置換、入っていれば末尾に追記。
+                    setSetFeeList((prev) => {
+                      const hasContent = prev.some((p) => p.label.trim() || p.amount.trim());
+                      return hasContent ? [...prev, ...parsed] : parsed;
+                    });
+                    setSetFeePaste("");
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition disabled:opacity-50"
+                disabled={!setFeePaste.trim()}
+              >
+                <Plus className="w-3.5 h-3.5" /> 取り込む
+              </button>
+              <span className="text-[11px] text-muted-foreground">
+                取り込んだ後、下のリストで微調整できます
+              </span>
+            </div>
+          </Field>
           <Field
             label="セット料金項目"
             hint="ボトル代・席料・チャージなど、項目ごとに金額を登録してください"
@@ -1996,29 +2535,32 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="ドレスコード（OK / NG）" icon={Star} previewAnchor="dress-code" onFocusEnter={handlePreviewFocus}>
+      {/* 店舗まとめ — セット料金の直後。SEO/回遊目的の長文フリーテキスト。 */}
+      <SectionCard title="店舗まとめ" icon={FileText} previewAnchor="summary" onFocusEnter={handlePreviewFocus}>
+        <Field label="まとめ本文">
+          <TextArea
+            value={summaryText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSummaryText(e.target.value)}
+            rows={8}
+            placeholder={"例: 未経験から銀座エリアのラウンジで働きたい方におすすめ。\n\n21時までの同伴で小計30%バック…\n\n系列の[ベネ系列の店](/columns/bene)もチェック。"}
+          />
+        </Field>
+      </SectionCard>
+
+      <SectionCard title="ドレスコード" icon={Star} previewAnchor="dress-code" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          <Field label="ドレスコード説明" hint="お店で働く際の服装ルール全体を記載してください">
+          {/* OK例/NG例は廃止し「説明＋ドレス例画像」に簡素化。黒やロングがNGか等は
+              説明に書き、スナイデル/シーン等の参考写真は画像で掲載する。 */}
+          <Field label="ドレスコード説明" hint="例: 黒・ロングはNG / 明るめのミニドレス推奨 / 貸し出しあり">
             <TextArea
               value={dressCodeDescription}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCodeDescription(e.target.value)}
               rows={3}
-              placeholder="例: ミニドレス着用必須 / 貸し出しドレスあり / 黒ドレス NG"
+              placeholder="例: 明るめのミニドレス推奨。黒・ロング丈はNG。ドレス貸し出しあり。"
             />
           </Field>
-          <Field label="OKな例" hint="OKな服装の説明をテキストで列挙してください">
-            <DynamicTextList
-              items={dressCodeOk.map((d) => d.note)}
-              setItems={(notes) => setDressCodeOk(notes.map((n) => ({ note: n })))}
-              placeholder="例: 明るめのカラードレス"
-            />
-          </Field>
-          <Field label="NGな例" hint="NGな服装の説明をテキストで列挙してください">
-            <DynamicTextList
-              items={dressCodeNg.map((d) => d.note)}
-              setItems={(notes) => setDressCodeNg(notes.map((n) => ({ note: n })))}
-              placeholder="例: 黒ドレス・ビジュー付き"
-            />
+          <Field label="ドレスの例画像" hint="ブランド例（スナイデル/シーン等）の写真を掲載できます">
+            <FacilityPhotosEditor photos={dressPhotos} onChange={setDressPhotos} />
           </Field>
         </div>
       </SectionCard>
@@ -2068,15 +2610,16 @@ export function ShopEditPage() {
                   />
                 </Field>
               </div>
-              <Field label="写真URL（任意）">
-                <TextInput
+              <Field label="写真（URL貼り付け or アップロード・任意）">
+                <ImageUrlInput
+                  kind="store-extra"
                   value={ep.photo_url}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+                  placeholder="https://... または「画像を選択」"
+                  onChange={(url) => {
                     const next = [...rectaEpisodes];
-                    next[i] = { ...next[i], photo_url: e.target.value };
+                    next[i] = { ...next[i], photo_url: url };
                     setRectaEpisodes(next);
                   }}
-                  placeholder="https://..."
                 />
               </Field>
               <Field label="エピソード">
@@ -2248,15 +2791,16 @@ export function ShopEditPage() {
           </Field>
           <Field
             label="表示優先度"
-            hint="一覧の「おすすめ順」で並べる際の優先度。値が大きいほど上位に表示されます。範囲: -1000〜1000。デフォルト 0。"
+            hint="一覧の「おすすめ順」で並べる際の優先度。1〜10で設定（大きいほど上位）。"
           >
             <input
               type="number"
-              min={-1000}
-              max={1000}
-              step={10}
+              min={1}
+              max={10}
+              step={1}
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
+              placeholder="1〜10"
               className="w-32 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all tabular-nums"
             />
           </Field>
@@ -2329,6 +2873,21 @@ export function ShopEditPage() {
           </div>
         </div>
       )}
+      {/* 未保存インジケータ — スクロール位置や STEP に関わらず常時表示し、
+          別 STEP で編集したことを忘れて離脱するのを防ぐ。クリックで保存。 */}
+      {isDirty && !saveSuccess && (
+        <div className="fixed bottom-6 left-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800 shadow-lg transition hover:bg-amber-100 disabled:opacity-50"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            未保存の変更があります
+            <span className="font-semibold underline underline-offset-2">保存</span>
+          </button>
+        </div>
+      )}
       {saveError && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-[13px] text-red-700">
           {saveError}
@@ -2338,14 +2897,20 @@ export function ShopEditPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/admin/shops")}
+            onClick={handleLeave}
             className="p-2 rounded-xl hover:bg-accent transition"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-base">
+            <h2 className="text-base flex items-center gap-2">
               {isNew ? "店舗作成" : "店舗編集"}
+              {isDirty && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-normal text-amber-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  未保存
+                </span>
+              )}
             </h2>
             {!isNew && (
               <p className="text-xs text-muted-foreground">
@@ -2372,10 +2937,12 @@ export function ShopEditPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 text-white text-[13px] hover:bg-indigo-700 transition disabled:opacity-50"
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-white text-[13px] transition disabled:opacity-50 ${
+              isDirty ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"
+            }`}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? "保存中..." : "保存"}
+            {saving ? "保存中..." : isDirty ? "保存（未保存あり）" : "保存"}
           </button>
         </div>
       </div>
@@ -2460,8 +3027,7 @@ export function ShopEditPage() {
                   shift_info: shiftInfo || null,
                   phone: phone,
                   website_url: website,
-                  hourly_min: minWage ? Number(minWage) : null,
-                  hourly_max: maxWage ? Number(maxWage) : null,
+                  // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
                   daily_estimate: dailyPay || null,
                   back_items: backItems
                     .filter((b) => b.label)
@@ -2485,6 +3051,7 @@ export function ShopEditPage() {
                   feature_tags: tags,
                   description: description,
                   features_text: featureText,
+                  summary_text: summaryText || null,
                   images: storeImages.length > 0 ? storeImages.map((url, i) => ({ url, order: i })) : null,
                   // Preview consumes the same `videos` shape as the public API.
                   videos: videos
@@ -2506,6 +3073,9 @@ export function ShopEditPage() {
                       staff_type: p.staff_type.trim() || null,
                       display_order: i,
                     })),
+                  facility_photos: facilityPhotos
+                    .filter((p) => p.image_url.trim() !== "")
+                    .map((p) => ({ image_url: p.image_url.trim(), caption: p.caption.trim() || null })),
                   analysis: {
                     experience_level: expLevel,
                     atmosphere: atmosphere,
@@ -2521,7 +3091,7 @@ export function ShopEditPage() {
                     })),
                     drinking_style: drinkStyle,
                   },
-                  interview_info: dressAdvice || dressTips.length > 0 || interviewDialog.length > 0
+                  interview_info: dressAdvice || dressTips.length > 0 || interviewDialog.length > 0 || interviewQuestions.length > 0 || hiringCriteria
                     ? {
                         dress_advice: dressAdvice,
                         tips: dressTips,
@@ -2539,6 +3109,9 @@ export function ShopEditPage() {
                                 ? "user"
                                 : d.label,
                         })),
+                        questions: interviewQuestions
+                          .filter((q) => q.label.trim())
+                          .map((q) => ({ question: q.label.trim(), answer: q.value.trim() })),
                       }
                     : null,
                   required_documents: documents.length > 0 || docNote
@@ -2549,10 +3122,10 @@ export function ShopEditPage() {
                     ? hiringEntries.map((h) => ({
                         month: h.month,
                         count: Number(h.count) || 0,
-                        examples: h.examples,
                       }))
                     : null,
                   recent_hires_summary: hiringTotal,
+                  recent_hire_examples: hiringExamples.map((e) => e.trim()).filter(Boolean),
                   qa: qaItems.length > 0
                     ? qaItems.map((q) => ({ question: q.label, answer: q.value }))
                     : null,
@@ -2583,18 +3156,22 @@ export function ShopEditPage() {
                       color: z.color.trim() || null,
                     })),
                   unit_wage_type: null,
-                  dress_code: dressCodeDescription || dressCodeOk.length > 0 || dressCodeNg.length > 0
+                  dress_code: dressCodeDescription || dressPhotos.some((p) => p.image_url.trim())
                     ? {
                         description: dressCodeDescription || undefined,
-                        // 画像 (image_url) は廃止。note のみ。
-                        ok_examples: dressCodeOk
-                          .filter((e) => e.note)
-                          .map((e) => ({ note: e.note })),
-                        ng_examples: dressCodeNg
-                          .filter((e) => e.note)
-                          .map((e) => ({ note: e.note })),
+                        ok_examples: [],
+                        ng_examples: [],
+                        photos: dressPhotos
+                          .filter((p) => p.image_url.trim())
+                          .map((p) => ({ image_url: p.image_url.trim(), caption: p.caption.trim() || null })),
                       }
                     : null,
+                  back_text: backText || null,
+                  pay_system_types: paySystemTypes,
+                  pay_system_note: paySystemNote || null,
+                  payroll_cycle: payrollCycle || null,
+                  payroll_pay_day: payrollPayDay || null,
+                  daily_pay_limit: dailyPayLimit || null,
                   payroll_system_type: payrollSystemType || null,
                   payroll_system_description: payrollSystemDescription || null,
                   champagne_description: champagneDescription || null,
@@ -2883,7 +3460,9 @@ export function ShopEditPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-[13px] hover:bg-indigo-700 transition disabled:opacity-50"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-[13px] transition disabled:opacity-50 ${
+                  isDirty ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "保存中..." : "保存して完了"}
@@ -3004,16 +3583,8 @@ function VideoListEditor({
                 placeholder="例: https://youtube.com/watch?v=... または https://example.com/video.mp4"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-                ラベル（任意・例: 店内ツアー / 店長インタビュー）
-              </label>
-              <TextInput
-                value={video.label}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => update(i, { label: e.target.value })}
-                placeholder="動画の見出しになります（空でも可）"
-              />
-            </div>
+            {/* 動画ラベル欄は運用上不要 (レクタ経由などは別枠管理) のため撤去。
+                既存データの label は保持され、保存時もそのまま送られる。 */}
             <div>
               <label className="block text-[11px] font-medium text-muted-foreground mb-1">
                 説明テキスト（任意・動画の下に表示）
@@ -3036,6 +3607,80 @@ function VideoListEditor({
       >
         <Plus className="size-3.5" />
         動画を追加
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FacilityPhotosEditor — 施設写真（トイレ/更衣室/セット場所 等）の編集 UI
+// ---------------------------------------------------------------------------
+//
+// 画像（URL貼付 or アップロード, HEIC可）＋キャプションのシンプルなギャラリー。
+// 女性が気にする「働く環境」を見せるための写真。
+function FacilityPhotosEditor({
+  photos,
+  onChange,
+}: {
+  photos: { image_url: string; caption: string }[];
+  onChange: (next: { image_url: string; caption: string }[]) => void;
+}) {
+  const update = (i: number, patch: Partial<{ image_url: string; caption: string }>) => {
+    onChange(photos.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  };
+  const remove = (i: number) => onChange(photos.filter((_, idx) => idx !== i));
+  const add = () => onChange([...photos, { image_url: "", caption: "" }]);
+
+  return (
+    <div className="space-y-3">
+      {photos.length === 0 && (
+        <p className="text-[12px] text-muted-foreground">
+          施設写真はまだ登録されていません。下のボタンから追加できます（例: トイレ / 更衣室 / セット場所）。
+        </p>
+      )}
+      {photos.map((photo, i) => (
+        <div key={i} className="rounded-lg border border-border bg-white p-3 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center justify-center rounded-md bg-foreground/5 text-[11px] font-semibold text-foreground/70 px-1.5 py-0.5">
+              #{i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              aria-label="この写真を削除"
+              className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">写真</label>
+            <ImageUrlInput
+              kind="store-extra"
+              value={photo.image_url}
+              placeholder="https://... または「画像を選択」"
+              onChange={(url) => update(i, { image_url: url })}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+              キャプション（任意・例: 更衣室 / パウダールーム）
+            </label>
+            <TextInput
+              value={photo.caption}
+              onChange={(e) => update(i, { caption: e.target.value })}
+              placeholder="例: 広々とした更衣室"
+            />
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/70 hover:text-foreground px-3 py-2 rounded-md border border-dashed border-border hover:bg-foreground/5 transition-colors"
+      >
+        <Plus className="size-3.5" />
+        施設写真を追加
       </button>
     </div>
   );
@@ -3179,13 +3824,20 @@ function StaffPhotosEditor({
                   {uploading ? "アップ中..." : "画像を選択"}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
                     className="hidden"
                     disabled={uploading}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) setPendingCrop({ index: i, file });
                       e.target.value = ""; // 同じファイル再選択を許可
+                      if (!file) return;
+                      // HEIC はブラウザでトリミングできないので生のままアップロード
+                      // (サーバで JPEG 変換)。それ以外はトリミングダイアログへ。
+                      if (isHeicFile(file)) {
+                        void handlePick(i, file);
+                      } else {
+                        setPendingCrop({ index: i, file });
+                      }
                     }}
                   />
                 </label>

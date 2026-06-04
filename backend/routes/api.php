@@ -61,6 +61,10 @@ Route::get('/columns/{slug}', [PublicArticleController::class, 'show']);
 Route::get('/sitemap', [SeoController::class, 'sitemap']);
 Route::get('/robots', [SeoController::class, 'robots']);
 
+// OG 画像 (トップ/一覧/汎用ページ共通の og:image)。管理画面のヒーロー設定を
+// 焼き込んだ 1200x630 を配信する。frontend の seo.ts が DEFAULT_OG_IMAGE として参照。
+Route::get('/og-image', [\App\Http\Controllers\OgImageController::class, 'show']);
+
 // ========== LINE認証 ==========
 // state cookie / 交換コードを扱うため、ブルートフォース・濫用を防ぐ throttle を付与。
 Route::middleware('throttle:20,1')->group(function () {
@@ -114,6 +118,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/stores/geocode', [StoreController::class, 'geocode']);
         Route::apiResource('/stores', StoreController::class);
         Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
+        Route::put('/stores/{store}/images/reorder', [StoreController::class, 'reorderImages']);
         Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);
 
         // 汎用画像アップロード (StaffPhotosEditor / DressCode OK・NG / TipTap 本文 等)。

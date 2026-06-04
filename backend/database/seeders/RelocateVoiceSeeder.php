@@ -18,7 +18,7 @@ class RelocateVoiceSeeder extends Seeder
             [
                 'area_from' => '九州',
                 'area_to' => '銀座',
-                'body' => '体験確約だったので安心して来れました。最初の家賃も補助があったので貯金ゼロでも始められた。',
+                'body' => '体入確約だったので安心して来れました。最初の家賃も補助があったので貯金ゼロでも始められた。',
             ],
             [
                 'area_from' => '東北',

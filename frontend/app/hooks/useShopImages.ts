@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import { api, ApiError } from "~/lib/api";
 
 /**
@@ -31,10 +31,12 @@ function toUrlList(images: unknown): string[] {
  */
 export interface UseShopImagesResult {
   images: string[];
-  setImages: (images: string[]) => void;
+  setImages: Dispatch<SetStateAction<string[]>>;
   /** FileList (input) でも File[] (トリミング後) でも受け取れる。 */
   upload: (files: FileList | File[]) => Promise<void>;
   remove: (index: number) => Promise<void>;
+  /** order = 現在の index を新しい並び順で列挙した配列。サーバへ永続化する。 */
+  reorder: (order: number[]) => Promise<void>;
   uploading: boolean;
   error: string | null;
   clearError: () => void;
@@ -87,9 +89,27 @@ export function useShopImages(storeId: number | string | null): UseShopImagesRes
     [storeId],
   );
 
+  const reorder = useCallback(
+    async (order: number[]) => {
+      if (!storeId) return;
+      // 楽観的更新: 先にローカルを並べ替えてから永続化し、サーバの正規化結果で確定。
+      setImages((prev) => order.map((i) => prev[i]).filter((u): u is string => !!u));
+      try {
+        const res = await api.put<{ images: unknown[] }>(
+          `/admin/stores/${storeId}/images/reorder`,
+          { order },
+        );
+        setImages(toUrlList(res.images));
+      } catch (err) {
+        setError(extractMessage(err, "画像の並び替えに失敗しました"));
+      }
+    },
+    [storeId],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
-  return { images, setImages, upload, remove, uploading, error, clearError };
+  return { images, setImages, upload, remove, reorder, uploading, error, clearError };
 }
 
 function extractMessage(err: unknown, fallback: string): string {

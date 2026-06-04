@@ -6,10 +6,9 @@
  */
 import type {
   AiChatChat200,
-  AiChatChatBody,
-  AiChatChatStreamBody,
   AiChatConfig200,
-  AiChatConfigParams
+  AiChatConfigParams,
+  ChatRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -34,22 +33,22 @@ export const aiChatConfig = (
 fine-tuned mode, selectable via `mode` parameter
  */
 export const aiChatChat = (
-    aiChatChatBody: AiChatChatBody,
+    chatRequest: ChatRequest,
  ) => {
       return rectaMutator<AiChatChat200>(
       {url: `/chat`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: aiChatChatBody
+      data: chatRequest
     },
       );
     }
   export const aiChatChatStream = (
-    aiChatChatStreamBody: AiChatChatStreamBody,
+    chatRequest: ChatRequest,
  ) => {
       return rectaMutator<string>(
       {url: `/chat/stream`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: aiChatChatStreamBody
+      data: chatRequest
     },
       );
     }

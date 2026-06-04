@@ -15,8 +15,8 @@ export interface ViewedStore {
   area?: string;
   category?: string;
   image_url?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number | string | null;
+  trial_hourly_max?: number | string | null;
   /** ms epoch — used for ordering and pruning */
   viewed_at: number;
 }

@@ -152,12 +152,21 @@ class PublicLandingController extends Controller
         $mins = [];
         $maxs = [];
         $count = 0;
+        // 通常時給は廃止。集計は体入時給 (wage.trial) ベース。新キー hourly_min/max を
+        // 優先し旧キー avg_hourly/hourly にフォールバック。単位付き文字列も数値化する。
+        $parse = static function ($v): ?int {
+            if ($v === null || $v === '') return null;
+            $n = (int) preg_replace('/[^\d]/', '', (string) $v);
+            return $n > 0 ? $n : null;
+        };
         foreach ($stores as $store) {
             $count++;
-            $wage = $store->wage['regular'] ?? null;
-            if (is_array($wage)) {
-                if (!empty($wage['min'])) $mins[] = (int) $wage['min'];
-                if (!empty($wage['max'])) $maxs[] = (int) $wage['max'];
+            $trial = $store->wage['trial'] ?? null;
+            if (is_array($trial)) {
+                $min = $parse($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null);
+                $max = $parse($trial['hourly_max'] ?? $trial['hourly'] ?? null);
+                if ($min !== null) $mins[] = $min;
+                if ($max !== null) $maxs[] = $max;
             }
         }
 

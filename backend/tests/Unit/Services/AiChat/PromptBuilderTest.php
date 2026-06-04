@@ -92,7 +92,8 @@ class PromptBuilderTest extends TestCase
             'category' => 'ラウンジ',
             'description' => 'お洒落なラウンジ',
             'schedule' => ['hours_text' => '20:00-LAST'],
-            'wage' => ['regular' => ['min' => 4000, 'max' => 8000]],
+            // 通常時給は廃止。給与は体入時給 (wage.trial) に一本化。
+            'wage' => ['trial' => ['hourly_min' => 4000, 'hourly_max' => 8000]],
             'feature_tags' => ['未経験歓迎', 'ノルマなし'],
             'publish_status' => 'published',
         ]);

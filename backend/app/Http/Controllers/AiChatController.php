@@ -337,8 +337,8 @@ class AiChatController extends Controller
                         'area' => $s['area'],
                         'category' => $s['category'] ?? null,
                         'nearest_station' => $s['nearest_station'] ?? null,
-                        'hourly_min' => $s['hourly_min'],
-                        'hourly_max' => $s['hourly_max'],
+                        'trial_hourly_min' => $s['trial_hourly_min'] ?? null,
+                        'trial_hourly_max' => $s['trial_hourly_max'] ?? null,
                         'feature_tags' => $s['feature_tags'] ?? [],
                         'description' => mb_substr($s['description'] ?? '', 0, 100),
                         'images' => $s['images'] ?? [],
@@ -582,7 +582,7 @@ class AiChatController extends Controller
     private function storeToCard(Store $s): array
     {
         $wage    = is_array($s->wage) ? $s->wage : [];
-        $regular = $wage['regular'] ?? [];
+        $trial   = $wage['trial'] ?? [];
 
         return [
             'id' => $s->id,
@@ -590,8 +590,9 @@ class AiChatController extends Controller
             'area' => $s->area,
             'category' => $s->category,
             'nearest_station' => $s->nearest_station,
-            'hourly_min' => $regular['min'] ?? null,
-            'hourly_max' => $regular['max'] ?? null,
+            // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+            'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+            'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
             'description' => $s->description,
             'feature_tags' => $s->feature_tags,
             'images' => $s->images,
@@ -620,7 +621,8 @@ class AiChatController extends Controller
             $query->whereJsonContains('feature_tags', '日払いOK');
         }
         if (str_contains($message, '時給') || str_contains($message, '高時給') || str_contains($message, 'バック') || str_contains($message, '給料')) {
-            $query->orderBy('wage->regular->max', 'desc');
+            // 通常時給は廃止。体入時給 (wage.trial) の高い順。
+            $query->orderByRaw("nullif(regexp_replace(coalesce(wage->'trial'->>'hourly_max', wage->'trial'->>'hourly', wage->'trial'->>'hourly_min', wage->'trial'->>'avg_hourly',''),'[^0-9]','','g'),'')::int desc nulls last");
         }
 
         // Area keywords
@@ -651,15 +653,16 @@ class AiChatController extends Controller
 
         $storeCards = $stores->map(function ($s) {
             $wage    = is_array($s->wage) ? $s->wage : [];
-            $regular = $wage['regular'] ?? [];
+            $trial   = $wage['trial'] ?? [];
             return [
                 'id' => $s->id,
                 'name' => $s->name,
                 'area' => $s->area,
                 'category' => $s->category,
                 'nearest_station' => $s->nearest_station,
-                'hourly_min' => $regular['min'] ?? null,
-                'hourly_max' => $regular['max'] ?? null,
+                // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+                'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
+                'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
                 'feature_tags' => $s->feature_tags,
                 'description' => mb_substr($s->description ?? '', 0, 100),
                 'images' => $s->images,
@@ -672,14 +675,19 @@ class AiChatController extends Controller
         // Build response with actual store names and details
         $storeList = $stores->map(function ($s) {
             $wage      = is_array($s->wage) ? $s->wage : [];
-            $regular   = $wage['regular'] ?? [];
+            $trial     = $wage['trial'] ?? [];
             $guarantee = is_array($s->guarantee) ? $s->guarantee : [];
-            $hourlyMin = (int) ($regular['min'] ?? 0);
-            $hourlyMax = (int) ($regular['max'] ?? 0);
+            // 通常時給は廃止。表示は体入時給。
+            $hourlyMin = (int) preg_replace('/[^\d]/', '', (string) ($trial['hourly_min'] ?? $trial['avg_hourly'] ?? 0));
+            $hourlyMax = (int) preg_replace('/[^\d]/', '', (string) ($trial['hourly_max'] ?? $trial['hourly'] ?? 0));
 
-            $line = "・{$s->name}（{$s->area}/{$s->nearest_station}）時給" . number_format($hourlyMin) . "〜" . number_format($hourlyMax) . "円";
+            $line = "・{$s->name}（{$s->area}/{$s->nearest_station}）体入時給" . number_format($hourlyMin) . "〜" . number_format($hourlyMax) . "円";
             $features = [];
-            if (!empty($guarantee['same_day_trial'])) $features[] = '体験確約OK';
+            // same_day_trial は enum string ('same_day'|'normal'|'none')。'none' も
+            // 非空なので !empty 判定は誤り (体入なしを体入確約扱いしてしまう)。
+            $trialType = $guarantee['same_day_trial'] ?? 'none';
+            if ($trialType === 'same_day') $features[] = '体入確約OK';
+            elseif ($trialType === 'normal') $features[] = '体入あり';
             if (!empty($guarantee['period'])) $features[] = '保証あり';
             $tags = $s->feature_tags ?? [];
             if (in_array('未経験歓迎', $tags)) $features[] = '未経験歓迎';
@@ -696,7 +704,7 @@ class AiChatController extends Controller
         } elseif (str_contains($message, 'ノルマ')) {
             $response = "ノルマなしで働けるお店をご紹介します！\n\n{$storeList}\n\nプレッシャーなく、自分のペースで働ける環境が整っています。{$lineCta}";
         } elseif (str_contains($message, '体入') || str_contains($message, '体験入店')) {
-            $response = "体験入店できるお店をご紹介します！\n\n{$storeList}\n\n体験確約OKのお店なら、思い立ったらすぐ体験できます。{$lineCta}";
+            $response = "体験入店できるお店をご紹介します！\n\n{$storeList}\n\n体入確約OKのお店なら、思い立ったらすぐ体験できます。{$lineCta}";
         } elseif (str_contains($message, '保証')) {
             $response = "保証制度があるお店をご紹介します！\n\n{$storeList}\n\n保証期間中は安定した収入が確保できるので、安心してスタートできます。{$lineCta}";
         } else {

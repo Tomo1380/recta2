@@ -71,6 +71,45 @@ class StoreImageService
     }
 
     /**
+     * images を新しい並び順に並べ替える。$order は現在の index を新しい順序で
+     * 列挙した配列で、0..n-1 の順列でなければならない (重複・欠番・範囲外は拒否)。
+     * order フィールドも新しい位置で振り直す。サムネイル (先頭) を差し替えたい
+     * ケースのために用意。
+     *
+     * @param  array<int, int>  $order
+     * @return array{images: array<int, mixed>}|null
+     */
+    public function reorderImages(Store $store, array $order): ?array
+    {
+        $images = array_values($store->images ?? []);
+        $count = count($images);
+
+        // 0..n-1 の順列であることを検証 (欠番・重複・範囲外を弾く)。
+        $expected = range(0, $count - 1);
+        $given = array_map('intval', array_values($order));
+        sort($expected);
+        $sortedGiven = $given;
+        sort($sortedGiven);
+        if ($count === 0 || $sortedGiven !== $expected) {
+            return null;
+        }
+
+        $reordered = [];
+        foreach ($given as $newPos => $oldIndex) {
+            $img = $images[$oldIndex];
+            // {url, order} 形なら order を新位置で振り直す。生 URL 文字列はそのまま。
+            if (is_array($img)) {
+                $img['order'] = $newPos;
+            }
+            $reordered[] = $img;
+        }
+
+        $store->update(['images' => $reordered]);
+
+        return ['images' => $reordered];
+    }
+
+    /**
      * 受け取った videos 配列で store_videos を全置換する。
      * 差分計算より UI が分かりやすいので全置換方式。
      *

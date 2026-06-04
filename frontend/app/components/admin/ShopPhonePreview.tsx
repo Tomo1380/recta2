@@ -257,7 +257,7 @@ export function ShopPhonePreview({ shop }: ShopPreviewProps) {
                   <div className="flex gap-2">
                     <div className="flex-1 bg-violet-50 border border-violet-100 rounded-xl p-2 text-center">
                       <Sparkles className="w-3 h-3 text-violet-500 mx-auto mb-0.5" />
-                      <p className="text-[9px] text-violet-600">体験確約</p>
+                      <p className="text-[9px] text-violet-600">体入確約</p>
                       <p className="text-[11px] text-violet-800 mt-0.5" style={{ fontWeight: 600 }}>{shop.sameDayTrial}</p>
                     </div>
                     {shop.trialWage && (
