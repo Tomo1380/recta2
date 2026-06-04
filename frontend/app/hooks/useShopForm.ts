@@ -30,6 +30,11 @@ export type StaffPhotoDraft = {
   instagram_url: string;
   staff_type: string;
 };
+/** 施設写真 (トイレ/更衣室/セット場所 等) のドラフト。 */
+export type FacilityPhotoDraft = {
+  image_url: string;
+  caption: string;
+};
 export type TransferZoneDraft = {
   label: string;
   radius_km: string;
@@ -72,6 +77,8 @@ export interface ShopForm {
   // 動画・スタッフ写真
   videos: VideoDraft[];
   staffPhotos: StaffPhotoDraft[];
+  /** 施設写真 (トイレ/更衣室/セット場所 等) */
+  facilityPhotos: FacilityPhotoDraft[];
 
   // 給与・待遇
   minWage: string;
@@ -173,7 +180,7 @@ const EMPTY_CHAMPAGNE = (): Record<ChampagneKey, ChampagnePriceDraft> => ({
 export const INITIAL_FORM: ShopForm = {
   shopName: "", area: "", address: "", lat: null, lng: null, station: "",
   category: "", openingTime: "", closingTime: "", holiday: "", phone: "", website: "",
-  videos: [], staffPhotos: [],
+  videos: [], staffPhotos: [], facilityPhotos: [],
   minWage: "", maxWage: "", dailyPay: "",
   paySystemTypes: [], paySystemNote: "",
   backText: "", backItems: [], feeItems: [], salaryNote: "",
@@ -321,6 +328,13 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     }),
   );
 
+  const facilityPhotos: FacilityPhotoDraft[] = (store.facility_photos ?? []).map(
+    (p: AnyStore) => ({
+      image_url: p.image_url ?? "",
+      caption: p.caption ?? "",
+    }),
+  );
+
   const reqDocs = store.required_documents;
   const documents: string[] =
     reqDocs && !Array.isArray(reqDocs) ? reqDocs.documents ?? [] : (reqDocs as string[]) ?? [];
@@ -416,6 +430,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     website: store.website_url ?? "",
     videos,
     staffPhotos,
+    facilityPhotos,
     minWage: store.hourly_min?.toString() ?? "",
     maxWage: store.hourly_max?.toString() ?? "",
     dailyPay: store.daily_estimate ?? "",
@@ -579,6 +594,12 @@ export function formToPayload(
         instagram_url: p.instagram_url.trim() || null,
         staff_type: p.staff_type.trim() || null,
       })),
+    facility_photos: form.facilityPhotos
+      .filter((p) => p.image_url.trim() !== "")
+      .map((p) => ({
+        image_url: p.image_url.trim(),
+        caption: p.caption.trim() || null,
+      })),
     hourly_min: form.minWage ? Number(form.minWage) : null,
     hourly_max: form.maxWage ? Number(form.maxWage) : null,
     // 日給目安は手入力を廃止し「体入時給 × 1日4時間」で自動算出する
@@ -627,8 +648,10 @@ export function formToPayload(
         glamour: Number(form.castGlamour) || 0,
         natural: Number(form.castNatural) || 0,
       },
+      // 固定ラベル(20代/30代/40代/50代以降)のうち割合>0 のものだけ送る
+      // (公開ページで0%の空行を出さないため)。
       customer_age: form.clientAge
-        .filter((c) => c.label)
+        .filter((c) => c.label && (Number(c.value) || 0) > 0)
         .map((c) => ({ label: c.label, ratio: Number(c.value) || 0 })),
       drinking_style: form.drinkStyle,
     },

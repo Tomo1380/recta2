@@ -305,6 +305,8 @@ export interface StoreDetailStore {
   videos?: StoreVideo[] | null;
   /** Ordered staff photos (在籍女性ギャラリー) */
   staff_photos?: StoreStaffPhoto[] | null;
+  /** 施設写真 (トイレ/更衣室/セット場所 等) */
+  facility_photos?: { image_url: string; caption?: string | null }[] | null;
   analysis: Analysis | null;
   interview_info: InterviewInfo | null;
   required_documents: RequiredDocuments | null;
@@ -1243,6 +1245,11 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           {/* 7. Analysis */}
           {/* ============================================================ */}
           {store.analysis && <AnalysisSection analysis={store.analysis} />}
+
+          {/* 施設写真 — 分析の直後に配置 (トイレ/更衣室/セット場所 等)。 */}
+          {(store.facility_photos ?? []).filter((p) => p.image_url).length > 0 && (
+            <FacilityPhotosSection photos={store.facility_photos ?? []} storeName={store.name} />
+          )}
 
           {/* 店内写真セクションは廃止。ページ最上部のヘッダー画像で十分
               なので、同じ写真をもう一度カードで出さない。 */}
@@ -2704,6 +2711,107 @@ function EmptyValue() {
 }
 
 
+/** 施設写真セクション (トイレ/更衣室/セット場所 等)。お店の分析の直後に出す。 */
+function FacilityPhotosSection({
+  photos,
+  storeName,
+}: {
+  photos: { image_url: string; caption?: string | null }[];
+  storeName: string;
+}) {
+  const items = photos.filter((p) => p.image_url);
+  if (items.length === 0) return null;
+  return (
+    <SectionCard
+      icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+      title="施設写真"
+    >
+      <div className="grid grid-cols-2 gap-3">
+        {items.map((p, i) => (
+          <figure
+            key={i}
+            className="overflow-hidden rounded-lg"
+            style={{ border: "1px solid rgba(27,37,40,0.06)" }}
+          >
+            <img
+              src={p.image_url}
+              alt={p.caption ?? `${storeName} 施設写真 ${i + 1}`}
+              className="w-full aspect-[4/3] object-cover"
+              loading="lazy"
+            />
+            {p.caption && (
+              <figcaption
+                className="px-2 py-1.5 text-xs"
+                style={{ color: "rgba(27,37,40,0.6)" }}
+              >
+                {p.caption}
+              </figcaption>
+            )}
+          </figure>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+/**
+ * 2区分の割合バー (在籍キャスト割合・店内の雰囲気)。両側を色付き＋%で示し、
+ * 「右側が色無しで何割か分かりにくい」問題を解消する。
+ */
+function SplitBar({
+  title,
+  segments,
+}: {
+  title: string;
+  segments: { label: string; pct: number; color: string }[];
+}) {
+  const visible = segments.filter((s) => s.pct > 0);
+  if (visible.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium" style={{ color: "#1b2528" }}>{title}</p>
+      <div
+        className="flex h-9 w-full overflow-hidden rounded-md"
+        style={{ boxShadow: "inset 0 0 0 1px rgba(27,37,40,0.06)" }}
+      >
+        {visible.map((s) => (
+          <div
+            key={s.label}
+            className="h-full flex items-center justify-center transition-all"
+            style={{ width: `${s.pct}%`, backgroundColor: s.color }}
+            title={`${s.label} ${s.pct}%`}
+          >
+            {s.pct >= 12 && (
+              <span
+                className="text-[10px] font-semibold leading-none text-white"
+                style={{ textShadow: "0 1px 1px rgba(0,0,0,0.25)" }}
+              >
+                {s.pct}%
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+        {segments.map((s) => (
+          <span
+            key={s.label}
+            className="inline-flex items-center gap-1.5 text-xs"
+            style={{ color: "rgba(27,37,40,0.7)" }}
+          >
+            <span
+              className="inline-block h-3 w-3 rounded-sm shrink-0"
+              style={{ backgroundColor: s.color, boxShadow: "0 0 0 1px rgba(27,37,40,0.08)" }}
+            />
+            <span className="font-medium">{s.label}</span>
+            <span className="tabular-nums" style={{ color: "rgba(27,37,40,0.5)" }}>{s.pct}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AnalysisSection({ analysis }: { analysis: Analysis }) {
   // 各項目が 0 (未入力) のときは個別に非表示。全部 0 / 空ならセクション自体を
   // 出さない (StoreDetailPage 側で `hasAnalysis` を計算して条件 render する)。
@@ -2721,6 +2829,11 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
   ];
   const castTotal = castSegments.reduce((sum, s) => sum + (Number(s.value) || 0), 0);
   const hasCast = castTotal > 0;
+  const clampPct = (v: number | string | undefined) =>
+    Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+  // experience_level = 経験者入店の割合、atmosphere = ワイワイ度 (残りが反対側)。
+  const expPct = clampPct(analysis.experience_level);
+  const atmPct = clampPct(analysis.atmosphere);
   const hasExperience = (Number(analysis.experience_level) || 0) > 0;
   const hasAtmosphere = (Number(analysis.atmosphere) || 0) > 0;
   const hasDrink = (Number(analysis.drinking_style) || 0) > 0;
@@ -2741,24 +2854,13 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
     >
       <div className="space-y-5">
         {hasExperience && (
-          <>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium" style={{ color: "#1b2528" }}>経験レベル</span>
-            <span style={{ color: "rgba(27,37,40,0.45)" }}>{analysis.experience_level}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "rgba(27,37,40,0.06)" }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${analysis.experience_level}%`, backgroundColor: "#D4AF37" }}
-            />
-          </div>
-          <div className="flex justify-between text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
-            <span>未経験向け</span>
-            <span>経験者向け</span>
-          </div>
-        </div>
-          </>
+          <SplitBar
+            title="在籍キャスト割合"
+            segments={[
+              { label: "未経験入店", pct: 100 - expPct, color: "#5BA89A" },
+              { label: "経験者入店", pct: expPct, color: "#D4AF37" },
+            ]}
+          />
         )}
 
         {hasExperience && hasAtmosphere && (
@@ -2766,22 +2868,13 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
         )}
 
         {hasAtmosphere && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium" style={{ color: "#1b2528" }}>雰囲気</span>
-            <span style={{ color: "rgba(27,37,40,0.45)" }}>{analysis.atmosphere}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "rgba(27,37,40,0.06)" }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${analysis.atmosphere}%`, backgroundColor: "rgba(200,96,128,0.8)" }}
-            />
-          </div>
-          <div className="flex justify-between text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
-            <span>カジュアル</span>
-            <span>フォーマル</span>
-          </div>
-        </div>
+          <SplitBar
+            title="店内の雰囲気"
+            segments={[
+              { label: "落ち着いてる", pct: 100 - atmPct, color: "#7C9CBF" },
+              { label: "ワイワイ", pct: atmPct, color: "#E8956B" },
+            ]}
+          />
         )}
 
         {(hasExperience || hasAtmosphere) && hasCast && (

@@ -298,10 +298,16 @@ class AdminStoreTest extends TestCase
                 'payroll_cycle' => '月末締め翌月払い',
                 'payroll_pay_day' => '月末締め翌月15日払い',
                 'daily_pay_limit' => '30,000円まで',
+                'facility_photos' => [
+                    ['image_url' => 'https://example.com/locker.jpg', 'caption' => '更衣室'],
+                    ['image_url' => '/storage/stores/extra/toilet.jpg', 'caption' => 'パウダールーム'],
+                ],
             ]);
 
         $response->assertStatus(201);
         $this->assertSame('完全時給制', $response->json('pay_system_types.0'));
+        $this->assertCount(2, $response->json('facility_photos'));
+        $this->assertSame('更衣室', $response->json('facility_photos.0.caption'));
         $this->assertCount(2, $response->json('pay_system_types'));
         $this->assertStringContainsString('ポイント', $response->json('pay_system_note'));
         $this->assertStringContainsString('同伴バック', $response->json('back_text'));

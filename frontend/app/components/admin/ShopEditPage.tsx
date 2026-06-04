@@ -219,6 +219,9 @@ const PAYROLL_CYCLE_OPTIONS = [
 /** 締め日・支払日の入力欄を出すサイクル (月締め系のみ)。 */
 const PAYROLL_CYCLES_WITH_PAYDAY = ["月末締め翌月払い", "月1回", "月2回"];
 
+/** 客層年齢の固定ラベル。運営は割合(%)だけ入力すればよい。 */
+const CLIENT_AGE_LABELS = ["20代", "30代", "40代", "50代以降"];
+
 function TextInput({
   placeholder = "",
   value = "",
@@ -732,6 +735,9 @@ export function ShopEditPage() {
     staff_type: string;
   };
   const [staffPhotos, setStaffPhotos] = useState<StaffPhotoDraft[]>([]);
+  // 施設写真（トイレ/更衣室/セット場所 等）の編集 state。
+  type FacilityPhotoDraft = { image_url: string; caption: string };
+  const [facilityPhotos, setFacilityPhotos] = useState<FacilityPhotoDraft[]>([]);
   const [minWage, setMinWage] = useState("");
   const [maxWage, setMaxWage] = useState("");
   const [dailyPay, setDailyPay] = useState("");
@@ -940,6 +946,7 @@ export function ShopEditPage() {
     if (f.website !== undefined) setWebsite(f.website);
     if (f.videos !== undefined) setVideos(f.videos);
     if (f.staffPhotos !== undefined) setStaffPhotos(f.staffPhotos);
+    if (f.facilityPhotos !== undefined) setFacilityPhotos(f.facilityPhotos);
     if (f.minWage !== undefined) setMinWage(f.minWage);
     if (f.maxWage !== undefined) setMaxWage(f.maxWage);
     if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
@@ -1080,7 +1087,7 @@ export function ShopEditPage() {
     const form: ShopForm = {
       shopName, area, address, lat, lng, station, category,
       openingTime, closingTime, holiday, phone, website,
-      videos, staffPhotos,
+      videos, staffPhotos, facilityPhotos,
       minWage, maxWage, dailyPay,
       paySystemTypes, paySystemNote, backText,
       payrollCycle, payrollPayDay, dailyPayLimit,
@@ -1842,21 +1849,24 @@ export function ShopEditPage() {
       {/* 「店舗の特徴」は STEP1 末尾に移動 (sectionFeatures)。 */}
       <SectionCard title="店舗分析" icon={BarChart3} previewAnchor="analysis" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-6">
+          {/* 在籍キャスト割合: スライダー値 = 経験者入店の割合。
+              未経験入店 = 100 - 値。公開側で2色バーで何割か分かるよう表示。 */}
           <SliderField
-            label="経験レベル"
+            label="在籍キャスト割合"
             value={expLevel}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExpLevel(Number(e.target.value))}
-            leftLabel="初心者向け"
-            rightLabel="経験者向け"
+            leftLabel="未経験入店"
+            rightLabel="経験者入店"
           />
+          {/* 店内の雰囲気: スライダー値 = ワイワイ度。落ち着いてる = 100 - 値。 */}
           <SliderField
-            label="雰囲気"
+            label="店内の雰囲気"
             value={atmosphere}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
               setAtmosphere(Number(e.target.value))
             }
-            leftLabel="落ち着き"
-            rightLabel="賑やか"
+            leftLabel="落ち着いてる"
+            rightLabel="ワイワイ"
           />
           <div>
             <label className="block text-sm mb-3 text-foreground">
@@ -1901,13 +1911,39 @@ export function ShopEditPage() {
               </Field>
             </div>
           </div>
-          <Field label="客層年齢分布">
-            <DynamicPairList
-              items={clientAge}
-              setItems={setClientAge}
-              labelPlaceholder="年齢層"
-              valuePlaceholder="割合"
-            />
+          {/* 客層年齢は 20代/30代/40代/50代以降 を固定ラベルにし、運営は%のみ入力。 */}
+          <Field label="客層年齢分布" hint="各年齢層の割合(%)を入力。空欄は0%扱い">
+            <div className="space-y-2">
+              {CLIENT_AGE_LABELS.map((ageLabel) => {
+                const cur = clientAge.find((c) => c.label === ageLabel)?.value ?? "";
+                return (
+                  <div key={ageLabel} className="flex items-center gap-3">
+                    <span className="w-20 shrink-0 text-sm text-foreground/70">{ageLabel}</span>
+                    <div className="flex-1">
+                      <TextInput
+                        type="number"
+                        inputMode="numeric"
+                        value={cur}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^\d]/g, "");
+                          setClientAge(
+                            CLIENT_AGE_LABELS.map((l) => ({
+                              label: l,
+                              value:
+                                l === ageLabel
+                                  ? v
+                                  : clientAge.find((c) => c.label === l)?.value ?? "",
+                            })),
+                          );
+                        }}
+                        placeholder="例: 40"
+                      />
+                    </div>
+                    <span className="text-sm text-foreground/50">%</span>
+                  </div>
+                );
+              })}
+            </div>
           </Field>
           <SliderField
             label="客層の飲み方"
@@ -1921,6 +1957,13 @@ export function ShopEditPage() {
         </div>
       </SectionCard>
 
+      {/* 施設写真は「お店の分析」の直後（公開ページでも分析の下）に配置。 */}
+      <SectionCard title="施設写真" icon={ImageIcon} previewAnchor="facility" onFocusEnter={handlePreviewFocus}>
+        <p className="text-xs text-muted-foreground mb-4">
+          トイレ・更衣室・店内のセット場所など、働く環境が分かる写真を掲載できます。
+        </p>
+        <FacilityPhotosEditor photos={facilityPhotos} onChange={setFacilityPhotos} />
+      </SectionCard>
     </div>
   );
 
@@ -3273,6 +3316,80 @@ function VideoListEditor({
       >
         <Plus className="size-3.5" />
         動画を追加
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FacilityPhotosEditor — 施設写真（トイレ/更衣室/セット場所 等）の編集 UI
+// ---------------------------------------------------------------------------
+//
+// 画像（URL貼付 or アップロード, HEIC可）＋キャプションのシンプルなギャラリー。
+// 女性が気にする「働く環境」を見せるための写真。
+function FacilityPhotosEditor({
+  photos,
+  onChange,
+}: {
+  photos: { image_url: string; caption: string }[];
+  onChange: (next: { image_url: string; caption: string }[]) => void;
+}) {
+  const update = (i: number, patch: Partial<{ image_url: string; caption: string }>) => {
+    onChange(photos.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  };
+  const remove = (i: number) => onChange(photos.filter((_, idx) => idx !== i));
+  const add = () => onChange([...photos, { image_url: "", caption: "" }]);
+
+  return (
+    <div className="space-y-3">
+      {photos.length === 0 && (
+        <p className="text-[12px] text-muted-foreground">
+          施設写真はまだ登録されていません。下のボタンから追加できます（例: トイレ / 更衣室 / セット場所）。
+        </p>
+      )}
+      {photos.map((photo, i) => (
+        <div key={i} className="rounded-lg border border-border bg-white p-3 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center justify-center rounded-md bg-foreground/5 text-[11px] font-semibold text-foreground/70 px-1.5 py-0.5">
+              #{i + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              aria-label="この写真を削除"
+              className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">写真</label>
+            <ImageUrlInput
+              kind="store-extra"
+              value={photo.image_url}
+              placeholder="https://... または「画像を選択」"
+              onChange={(url) => update(i, { image_url: url })}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+              キャプション（任意・例: 更衣室 / パウダールーム）
+            </label>
+            <TextInput
+              value={photo.caption}
+              onChange={(e) => update(i, { caption: e.target.value })}
+              placeholder="例: 広々とした更衣室"
+            />
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/70 hover:text-foreground px-3 py-2 rounded-md border border-dashed border-border hover:bg-foreground/5 transition-colors"
+      >
+        <Plus className="size-3.5" />
+        施設写真を追加
       </button>
     </div>
   );
