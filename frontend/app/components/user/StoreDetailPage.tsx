@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
+import { RichText } from "~/components/user/shared/RichText";
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
@@ -367,50 +368,12 @@ interface StoreDetailPageProps {
  */
 /**
  * 店舗の特徴テキストを表示する。SEO 目的で長文＆改行ありを想定。
- * - 改行をそのまま反映 (whitespace-pre-line)
- * - `[表示文字](URL)` 記法をリンク化（回遊用にコラム等へ内部リンクを貼れる）
- *   - "/" 始まりは同一サイト内リンク → React Router <Link>
- *   - http(s):// などは外部リンク → 新規タブ
+ * 改行保持 + `[表示文字](URL)` リンク化は共通 RichText に集約済み。
  */
-const FEATURE_LINK_RE = /\[([^\]]+)\]\(([^)\s]+)\)/g;
-
 function FeatureText({ text }: { text: string }) {
-  const nodes: React.ReactNode[] = [];
-  let last = 0;
-  let key = 0;
-  for (const m of text.matchAll(FEATURE_LINK_RE)) {
-    const idx = m.index ?? 0;
-    if (idx > last) nodes.push(text.slice(last, idx));
-    const [whole, label, url] = m;
-    const linkClass = "text-primary underline underline-offset-2 hover:opacity-80";
-    if (url.startsWith("/")) {
-      nodes.push(
-        <Link key={key++} to={url} className={linkClass}>
-          {label}
-        </Link>,
-      );
-    } else {
-      nodes.push(
-        <a
-          key={key++}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={linkClass}
-        >
-          {label}
-        </a>,
-      );
-    }
-    last = idx + whole.length;
-  }
-  if (last < text.length) nodes.push(text.slice(last));
   return (
-    <p
-      className="text-sm leading-relaxed whitespace-pre-line"
-      style={{ color: "rgba(27,37,40,0.65)" }}
-    >
-      {nodes}
+    <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.65)" }}>
+      <RichText text={text} />
     </p>
   );
 }
@@ -1197,8 +1160,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                         </div>
                       )}
                       {store.pay_system_note && (
-                        <p className="text-sm whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
-                          {store.pay_system_note}
+                        <p className="text-sm" style={{ color: "rgba(27,37,40,0.7)" }}>
+                          <RichText text={store.pay_system_note} />
                         </p>
                       )}
                     </div>
@@ -1210,7 +1173,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   label="バック"
                   value={
                     store.back_text && store.back_text.trim() !== "" ? (
-                      <p className="text-sm whitespace-pre-line">{store.back_text}</p>
+                      <p className="text-sm"><RichText text={store.back_text} /></p>
                     ) : (
                       <ul className="space-y-0.5">
                         {(store.back_items ?? []).map((item) => (
@@ -1238,20 +1201,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 />
               )}
               {payValue && (
-                <InfoRow
-                  label="支払い方法"
-                  value={<span className="whitespace-pre-line">{payValue}</span>}
-                />
+                <InfoRow label="支払い方法" value={payValue} />
               )}
               {store.guarantee_period && (
                 <InfoRow label="保証" value={store.guarantee_period} />
               )}
               {store.norma_info && <InfoRow label="ノルマ" value={store.norma_info} />}
               {store.salary_notes && (
-                <InfoRow
-                  label="給与備考"
-                  value={<span className="whitespace-pre-line">{store.salary_notes}</span>}
-                />
+                <InfoRow label="給与備考" value={store.salary_notes} />
               )}
             </div>
           </SectionCard>
@@ -1308,7 +1265,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   {store.interview_info.criteria && (
                     <InfoRow
                       label="採用基準"
-                      value={<span className="whitespace-pre-line">{store.interview_info.criteria}</span>}
+                      value={store.interview_info.criteria}
                     />
                   )}
                   {store.interview_info.dress_code && (
@@ -1371,10 +1328,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                             </summary>
                             {qa.answer && (
                               <div
-                                className="px-3.5 pb-3 pt-0 text-sm whitespace-pre-line"
+                                className="px-3.5 pb-3 pt-0 text-sm"
                                 style={{ color: "rgba(27,37,40,0.7)" }}
                               >
-                                {qa.answer}
+                                <RichText text={qa.answer} />
                               </div>
                             )}
                           </details>
@@ -1447,10 +1404,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     )}
                     {store.required_documents.notes && (
                       <p
-                        className="rounded-[12px] px-3 py-2 text-sm whitespace-pre-line"
+                        className="rounded-[12px] px-3 py-2 text-sm"
                         style={{ backgroundColor: "rgba(27,37,40,0.04)", color: "rgba(27,37,40,0.7)" }}
                       >
-                        {store.required_documents.notes}
+                        <RichText text={store.required_documents.notes} />
                       </p>
                     )}
                   </div>
@@ -1466,8 +1423,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                       ドレスコード
                     </h3>
                     {(dressDetail?.description || dressFallbackString) && (
-                      <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
-                        {dressDetail?.description || dressFallbackString}
+                      <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+                        <RichText text={dressDetail?.description || dressFallbackString} />
                       </p>
                     )}
                     {/* OK/NG例は廃止。ドレスの例画像を掲載 (スナイデル/シーン等)。 */}
@@ -2221,10 +2178,10 @@ function StoreVideosBlock({
               )}
               {v.description && (
                 <p
-                  className="text-[12px] leading-relaxed whitespace-pre-line"
+                  className="text-[12px] leading-relaxed"
                   style={{ color: "rgba(27,37,40,0.62)", fontFamily: "'Noto Sans JP',sans-serif", margin: 0 }}
                 >
-                  {v.description}
+                  <RichText text={v.description} />
                 </p>
               )}
             </div>
@@ -2788,7 +2745,10 @@ function InfoRow({
       <span className="w-24 shrink-0 font-medium" style={{ color: "rgba(27,37,40,0.45)" }}>
         {label}
       </span>
-      <span className="flex-1" style={{ color: "#1b2528" }}>{value}</span>
+      <span className="flex-1" style={{ color: "#1b2528" }}>
+        {/* 文字列値は改行保持 + [表示文字](URL) リンクで描画する。 */}
+        {typeof value === "string" ? <RichText text={value} /> : value}
+      </span>
     </div>
   );
 }
@@ -3370,8 +3330,8 @@ function TransferMapSection({
             </p>
           )}
           {fallbackDescription && (
-            <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "rgba(27,37,40,0.7)" }}>
-              {fallbackDescription}
+            <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+              <RichText text={fallbackDescription} />
             </p>
           )}
         </div>
@@ -3456,13 +3416,13 @@ function ChampagnePricesSection({
                 上に明示的なテキストブロックを置く。 */}
             {fallback && (
               <p
-                className="relative mb-3 whitespace-pre-line text-center text-[13px] leading-relaxed"
+                className="relative mb-3 text-center text-[13px] leading-relaxed"
                 style={{
                   color: "rgba(255,255,255,0.82)",
                   fontFamily: "'Noto Sans JP', sans-serif",
                 }}
               >
-                {fallback}
+                <RichText text={fallback} />
               </p>
             )}
 
@@ -3559,10 +3519,10 @@ function ChampagnePricesSection({
               </h3>
             </div>
             <p
-              className="relative whitespace-pre-line text-sm leading-relaxed text-center"
+              className="relative text-sm leading-relaxed text-center"
               style={{ color: "rgba(255,255,255,0.8)", fontFamily: "'Noto Sans JP', sans-serif" }}
             >
-              {fallback}
+              <RichText text={fallback} />
             </p>
           </>
         )}

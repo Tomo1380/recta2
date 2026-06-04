@@ -295,20 +295,30 @@ function TextArea({
   value = "",
   onChange,
   rows = 3,
+  /** 改行/リンク記法のヒントを下に出す (公開ページに出る自由記述は既定で表示)。 */
+  richHint = true,
 }: {
   placeholder?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   rows?: number;
+  richHint?: boolean;
 }) {
   return (
-    <textarea
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      rows={rows}
-      className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 resize-y transition-all placeholder:text-muted-foreground/50"
-    />
+    <div>
+      <textarea
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 resize-y transition-all placeholder:text-muted-foreground/50"
+      />
+      {richHint && (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          改行OK・<code className="px-1 py-0.5 rounded bg-muted text-[10px]">[表示文字](URL)</code> でリンク可（内部リンク <span className="font-mono">/columns/…</span> も外部URLもOK）
+        </p>
+      )}
+    </div>
   );
 }
 
