@@ -56,7 +56,6 @@ export type RectaEpisodeDraft = {
 export type HiringEntryDraft = {
   month: string;
   count: string;
-  examples: string[];
 };
 
 export interface ShopForm {
@@ -144,6 +143,8 @@ export interface ShopForm {
   shiftInfo: string;
   hiringEntries: HiringEntryDraft[];
   hiringTotal: string;
+  /** 採用例 (セクション単位)。旧来は各月に紐付いていたが月単位の必然性がないため統合。 */
+  hiringExamples: string[];
 
   // その他 (送り、系列、シャンパン、ドレスコード詳細、セット料金、エピソード、Q&A、コメント)
   transferDescription: string;
@@ -209,7 +210,7 @@ export const INITIAL_FORM: ShopForm = {
   dressAdvice: "", dressTips: [], dressCode: "", hiringCriteria: "",
   interviewDialog: [], interviewQuestions: [],
   documents: [...DEFAULT_DOCUMENTS], docNote: "", shiftInfo: "",
-  hiringEntries: [], hiringTotal: "",
+  hiringEntries: [], hiringTotal: "", hiringExamples: [],
   transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
   dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [], dressPhotos: [],
@@ -535,9 +536,14 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     hiringEntries: ((store.recent_hires as AnyStore[] | undefined) ?? []).map((h) => ({
       month: h.month ?? "",
       count: h.count?.toString() ?? "",
-      examples: h.examples ?? [],
     })),
     hiringTotal: store.recent_hires_summary ?? "",
+    // 採用例はセクション単位。旧データ (各月 recent_hires[].examples) は flatten して移行。
+    hiringExamples:
+      (store.recent_hire_examples as string[] | undefined) ??
+      ((store.recent_hires as AnyStore[] | undefined) ?? []).flatMap(
+        (h) => (h.examples as string[] | undefined) ?? [],
+      ),
     transferDescription: store.transfer_description ?? "",
     transferKm: store.transfer_km ?? "",
     transferZones,
@@ -703,9 +709,10 @@ export function formToPayload(
       .map((h) => ({
         month: h.month,
         count: Number(h.count) || 0,
-        examples: h.examples,
       })),
     recent_hires_summary: form.hiringTotal,
+    // 採用例はセクション単位。空文字は除外。
+    recent_hire_examples: form.hiringExamples.map((e) => e.trim()).filter(Boolean),
     staff_comment: {
       name: form.staffName,
       role: form.staffRole,

@@ -148,7 +148,8 @@ interface Schedule {
 interface RecentHire {
   month: string;
   count: number;
-  examples: string[];
+  /** @deprecated 採用例はセクション単位 (recent_hire_examples) に移行。旧データ互換のため残置。 */
+  examples?: string[];
 }
 
 interface QAItem {
@@ -319,6 +320,8 @@ export interface StoreDetailStore {
   schedule: Schedule | null;
   recent_hires: RecentHire[] | null;
   recent_hires_summary: string;
+  /** 採用例 (セクション単位)。旧データは recent_hires[].examples に入っている。 */
+  recent_hire_examples: string[] | null;
   qa: QAItem[] | null;
   staff_comment: StaffComment | null;
   recruitment_standards: string | null;
@@ -1042,20 +1045,28 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   })}
                 </div>
 
-                {/* Hiring examples */}
-                {store.recent_hires.some((h) => h.examples?.length > 0) && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
-                      採用例
-                    </p>
-                    {store.recent_hires.flatMap((h) => h.examples ?? []).slice(0, 3).map((ex, i) => (
-                      <p key={i} className="flex items-start gap-1.5 text-xs" style={{ color: "rgba(27,37,40,0.6)" }}>
-                        <span style={{ color: "#D4AF37" }}>●</span>
-                        {ex}
+                {/* Hiring examples — セクション単位 (recent_hire_examples)。
+                    旧データは recent_hires[].examples に入っているので flatten でフォールバック。 */}
+                {(() => {
+                  const examples =
+                    store.recent_hire_examples && store.recent_hire_examples.length > 0
+                      ? store.recent_hire_examples
+                      : store.recent_hires.flatMap((h) => h.examples ?? []);
+                  if (examples.length === 0) return null;
+                  return (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
+                        採用例
                       </p>
-                    ))}
-                  </div>
-                )}
+                      {examples.slice(0, 3).map((ex, i) => (
+                        <p key={i} className="flex items-start gap-1.5 text-xs" style={{ color: "rgba(27,37,40,0.6)" }}>
+                          <span style={{ color: "#D4AF37" }}>●</span>
+                          {ex}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </SectionCard>
@@ -3145,6 +3156,96 @@ function blendZoneFillColor(
   return `rgb(${r},${g},${b})`;
 }
 
+/**
+ * 管理画面プレビュー用の足代ゾーン図。プレビューパネルは transform:scale で
+ * 縮小されるため Google Maps が正しく描画できない。代わりに距離区分を同心円の
+ * SVG で描き、縮小枠でも崩れない「足代マップの代替ビジュアル」を出す。
+ * 公開ページでは引き続き実 Google Maps (StoreMap) を使う。
+ */
+function ZoneRingDiagram({
+  zones,
+  height = 220,
+}: {
+  zones: { radius_km?: number | string | null; color?: string | null }[];
+  height?: number;
+}) {
+  const parseKm = (raw: unknown): number => {
+    if (raw == null) return NaN;
+    if (typeof raw === "number") return raw;
+    const m = String(raw).match(/-?\d+(?:\.\d+)?/);
+    return m ? Number(m[0]) : NaN;
+  };
+
+  // 半径が有効なゾーンだけ、大きい順に (大きい円を奥に描く)。
+  const rings = zones
+    .map((z) => ({ km: parseKm(z.radius_km), color: z.color || GOLD_HEX }))
+    .filter((z) => Number.isFinite(z.km) && z.km > 0)
+    .sort((a, b) => b.km - a.km);
+
+  if (rings.length === 0) return null;
+
+  const SIZE = 200;
+  const cx = SIZE / 2;
+  const cy = SIZE / 2;
+  const maxR = SIZE / 2 - 14;
+  const maxKm = rings[0].km;
+
+  return (
+    <div
+      className="mb-3 overflow-hidden rounded-[12px]"
+      style={{
+        height,
+        background: "linear-gradient(135deg, #1b2528, #0f1618)",
+        border: "1px solid rgba(212,175,55,0.18)",
+      }}
+    >
+      <svg
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="距離別足代ゾーン図"
+      >
+        {rings.map((z, i) => {
+          const r = Math.max(8, (z.km / maxKm) * maxR);
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill={z.color}
+              fillOpacity={0.22}
+              stroke={z.color}
+              strokeOpacity={0.9}
+              strokeWidth={1.5}
+            />
+          );
+        })}
+        {/* km ラベルは各円の上端に。重なりを避けつつ距離感が分かる程度に。 */}
+        {rings.map((z, i) => {
+          const r = Math.max(8, (z.km / maxKm) * maxR);
+          return (
+            <text
+              key={`l-${i}`}
+              x={cx}
+              y={cy - r + 11}
+              textAnchor="middle"
+              fontSize="8.5"
+              fill="rgba(255,255,255,0.82)"
+            >
+              〜{z.km}km
+            </text>
+          );
+        })}
+        {/* 店舗位置マーカー */}
+        <circle cx={cx} cy={cy} r={4} fill={GOLD_HEX} stroke="#1b2528" strokeWidth={1} />
+      </svg>
+    </div>
+  );
+}
+
 function TransferMapSection({
   lat,
   lng,
@@ -3188,19 +3289,9 @@ function TransferMapSection({
           />
         </div>
       )}
-      {canShowMap && isPreview && (
-        <div
-          className="mb-3 flex items-center justify-center rounded-[12px] text-center text-[12px] px-4"
-          style={{
-            height: 220,
-            background: "linear-gradient(135deg, #1b2528, #0f1618)",
-            color: "rgba(255,255,255,0.6)",
-            border: "1px solid rgba(212,175,55,0.18)",
-          }}
-        >
-          距離別足代マップは公開ページで表示されます<br />（プレビューの縮小表示では省略）
-        </div>
-      )}
+      {/* プレビューは Google Maps が縮小枠で崩れるため、同心円の SVG で
+          足代ゾーンを可視化する (lat/lng 未取得でもゾーンがあれば表示)。 */}
+      {hasZones && isPreview && <ZoneRingDiagram zones={zoneList} height={220} />}
       {hasZones && (
         <div className="space-y-2">
           <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>

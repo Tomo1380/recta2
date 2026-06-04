@@ -520,10 +520,10 @@ class StoreSeeder extends Seeder
                 [
                     'month' => '2026年2月',
                     'count' => rand(3, 15),
-                    'examples' => [rand(18, 28) . '歳 未経験 → 時給' . number_format($hourlyMin) . '円スタート'],
                 ],
             ];
             $store['recent_hires_summary'] = '直近1ヶ月で' . $store['recent_hires'][0]['count'] . '名採用';
+            $store['recent_hire_examples'] = [rand(18, 28) . '歳 未経験 → 時給' . number_format($hourlyMin) . '円スタート'];
         }
 
         // experience_guaranteed flag
@@ -782,10 +782,16 @@ class StoreSeeder extends Seeder
                     'notes' => '身分証は面接時に確認します。住民票は採用決定後でOKです。',
                 ],
                 'recent_hires' => [
-                    ['month' => '2026年1月', 'count' => 8, 'examples' => ['22歳 未経験 → 時給5,000円スタート', '25歳 経験1年 → 時給6,500円スタート']],
-                    ['month' => '2026年2月', 'count' => 12, 'examples' => ['20歳 大学生 → 時給4,500円スタート', '28歳 経験3年 → 時給7,000円スタート']],
+                    ['month' => '2026年1月', 'count' => 8],
+                    ['month' => '2026年2月', 'count' => 12],
                 ],
                 'recent_hires_summary' => '直近2ヶ月で20名採用',
+                'recent_hire_examples' => [
+                    '22歳 未経験 → 時給5,000円スタート',
+                    '25歳 経験1年 → 時給6,500円スタート',
+                    '20歳 大学生 → 時給4,500円スタート',
+                    '28歳 経験3年 → 時給7,000円スタート',
+                ],
                 'dress_code' => [
                     'description' => 'ドレス貸出あり（無料）。自前ドレスも可。華やかめの服装推奨。',
                 ],
@@ -1074,9 +1080,13 @@ class StoreSeeder extends Seeder
                     'notes' => '寮入居希望者は契約時に保証人不要。',
                 ],
                 'recent_hires' => [
-                    ['month' => '2026年4月', 'count' => 15, 'examples' => ['20歳 地方上京 → 時給6,000円 + 寮入居', '24歳 未経験 → 時給6,500円スタート']],
+                    ['month' => '2026年4月', 'count' => 15],
                 ],
                 'recent_hires_summary' => '直近1ヶ月で15名採用、うち5名が地方上京',
+                'recent_hire_examples' => [
+                    '20歳 地方上京 → 時給6,000円 + 寮入居',
+                    '24歳 未経験 → 時給6,500円スタート',
+                ],
                 'qa' => [
                     ['question' => '寮はどんな感じ？', 'answer' => '家具家電付きのワンルーム個室。家賃は給料から月3万円のみ。'],
                     ['question' => '寮に住みながら何ヶ月から働ける？', 'answer' => '最短1日から OK。上京の翌日から勤務開始も可能。'],

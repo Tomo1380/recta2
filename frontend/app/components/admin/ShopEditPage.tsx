@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 import { api } from "~/lib/api";
 import { useShopImages } from "~/hooks/useShopImages";
@@ -43,6 +43,7 @@ import {
   Crown,
   Globe,
   Loader2,
+  GripVertical,
 } from "lucide-react";
 import { FloatingPreview } from "./shared/FloatingPreview";
 import { ShopPhonePreview } from "./ShopPhonePreview";
@@ -260,17 +261,27 @@ function TextInput({
   onChange,
   type = "text",
   inputMode,
+  step,
+  min,
+  max,
 }: {
   placeholder?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   type?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  // 数値入力のスピナー刻み幅 / 範囲。項目に応じた step を指定する。
+  step?: number | string;
+  min?: number | string;
+  max?: number | string;
 }) {
   return (
     <input
       type={type}
       inputMode={inputMode}
+      step={step}
+      min={min}
+      max={max}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
@@ -329,39 +340,89 @@ function SelectInput({
 }
 
 /**
- * 入力もできるドロップダウン (combobox)。候補は datalist で出しつつ、
- * 候補にない値も自由入力できる。営業時間・面接時間など「だいたい決まった
- * 選択肢だが例外も許したい」項目に使う。listId は datalist の id として
- * ページ内で一意である必要がある。
+ * 入力もできるドロップダウン (combobox)。候補にない値も自由入力できる。
+ * 営業時間・面接時間など「だいたい決まった選択肢だが例外も許したい」項目に使う。
+ *
+ * native <datalist> は入力済みの値で候補を絞り込むため、値が入っていると
+ * 開いても候補が出なくなる。これを解消するため自前のドロップダウンにし、
+ * フォーカス/クリック時は現在値に関係なく全候補を表示する。入力中だけ
+ * 部分一致でフィルタし、一致ゼロなら全件にフォールバックする。
  */
 function ComboInput({
   value = "",
   onChange,
   options,
   placeholder = "",
-  listId,
 }: {
   value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange?: (value: string) => void;
   options: string[];
   placeholder?: string;
-  listId: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setTyping(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const q = value.trim().toLowerCase();
+  const matches = q ? options.filter((o) => o.toLowerCase().includes(q)) : options;
+  // typing 中だけ絞り込み。フォーカス直後は全候補を見せる。一致ゼロなら全件。
+  const filtered = typing && q ? (matches.length > 0 ? matches : options) : options;
+
   return (
-    <>
+    <div ref={wrapRef} className="relative">
       <input
-        list={listId}
         value={value}
-        onChange={onChange}
+        onChange={(e) => {
+          setTyping(true);
+          setOpen(true);
+          onChange?.(e.target.value);
+        }}
+        onFocus={() => {
+          setTyping(false);
+          setOpen(true);
+        }}
+        onClick={() => {
+          setTyping(false);
+          setOpen(true);
+        }}
         placeholder={placeholder}
         className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 transition-all placeholder:text-muted-foreground/50"
       />
-      <datalist id={listId}>
-        {options.map((o: string) => (
-          <option key={o} value={o} />
-        ))}
-      </datalist>
-    </>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-white py-1 shadow-lg">
+          {filtered.map((o) => (
+            <li key={o}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange?.(o);
+                  setOpen(false);
+                  setTyping(false);
+                }}
+                className={`flex w-full items-center px-3 py-2 text-left text-[13px] transition-colors hover:bg-muted ${
+                  o === value ? "bg-muted/60 font-medium" : ""
+                }`}
+              >
+                {o}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -831,9 +892,11 @@ export function ShopEditPage() {
   // 入ってしまう。新規作成では空にし、既存店舗を開いたときだけ
   // populateFromStore() で実データを流す。
   const [hiringEntries, setHiringEntries] = useState<
-    { month: string; count: string; examples: string[] }[]
+    { month: string; count: string }[]
   >([]);
   const [hiringTotal, setHiringTotal] = useState("");
+  // 採用例はセクション単位 (各月には紐付けない)。
+  const [hiringExamples, setHiringExamples] = useState<string[]>([]);
   // New schema fields
   const [transferDescription, setTransferDescription] = useState("");
   const [transferKm, setTransferKm] = useState("");
@@ -896,9 +959,13 @@ export function ShopEditPage() {
     setImages: setStoreImages,
     upload: uploadShopImages,
     remove: removeShopImage,
+    reorder: reorderShopImages,
     uploading: uploadingImage,
     error: shopImageError,
   } = useShopImages(isNew ? null : (id ?? null));
+
+  // ドラッグ&ドロップ並び替え中の掴んでいる画像 index。
+  const [dragImageIdx, setDragImageIdx] = useState<number | null>(null);
 
   // 店舗ギャラリー画像。通常はアップロード前にブラウザでトリミングするが、
   // HEIC/HEIF (iPhone 標準) はブラウザが canvas で描画できずトリミングできない
@@ -922,6 +989,24 @@ export function ShopEditPage() {
       }
     },
     [isNew, storeImages, setStoreImages, removeShopImage],
+  );
+
+  // ドラッグ&ドロップで from→to に並べ替える。1枚目がサムネイルなので、
+  // ここでサムネイルの差し替えができる。新規店舗はローカル state のみ
+  // (作成時に order 付きで保存)、既存店舗はサーバへ永続化する。
+  const handleReorderShopImage = useCallback(
+    (from: number, to: number) => {
+      if (from === to || from < 0 || to < 0) return;
+      const order = storeImages.map((_, i) => i);
+      const [moved] = order.splice(from, 1);
+      order.splice(to, 0, moved);
+      if (isNew) {
+        setStoreImages(order.map((i) => storeImages[i]));
+      } else {
+        reorderShopImages(order);
+      }
+    },
+    [isNew, storeImages, setStoreImages, reorderShopImages],
   );
 
   // 1 枚アップロードする共通ハンドラ。新規/既存でアップロード先が違うだけで、
@@ -1031,6 +1116,7 @@ export function ShopEditPage() {
     if (f.shiftInfo !== undefined) setShiftInfo(f.shiftInfo);
     if (f.hiringEntries !== undefined) setHiringEntries(f.hiringEntries);
     if (f.hiringTotal !== undefined) setHiringTotal(f.hiringTotal);
+    if (f.hiringExamples !== undefined) setHiringExamples(f.hiringExamples);
     if (f.transferDescription !== undefined) setTransferDescription(f.transferDescription);
     if (f.transferKm !== undefined) setTransferKm(f.transferKm);
     if (f.transferZones !== undefined) setTransferZones(f.transferZones);
@@ -1066,7 +1152,11 @@ export function ShopEditPage() {
     setLoading(true);
     setNotFound(false);
     api.get<Store>(`/admin/stores/${id}`)
-      .then(populateFromStore)
+      .then((store) => {
+        populateFromStore(store);
+        // populate 後の値を baseline (保存済み) として確定。
+        setBaselineKey((k) => k + 1);
+      })
       .catch((err) => {
         const status = (err as { status?: number })?.status;
         if (status === 404) {
@@ -1141,7 +1231,7 @@ export function ShopEditPage() {
       castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
       interviewQuestions,
-      documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+      documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
       transferDescription, transferKm, transferZones, relatedStoreIds,
       champagneDescription, champagnePrices,
       dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
@@ -1166,7 +1256,7 @@ export function ShopEditPage() {
     castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
     dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
     interviewQuestions,
-    documents, docNote, shiftInfo, hiringEntries, hiringTotal,
+    documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
     transferDescription, transferKm, transferZones, relatedStoreIds,
     champagneDescription, champagnePrices,
     dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
@@ -1176,6 +1266,60 @@ export function ShopEditPage() {
     priority,
     publishStatus,
   ]);
+
+  // ── 未保存検知 ────────────────────────────────────────────────────────
+  // このフォームは全 STEP のデータを React state に保持し、保存は一括 (handleSave)。
+  // STEP を移動してもデータは消えないが、未保存のまま離脱すると失われるため、
+  // 保存済みスナップショットと現在値を比較して「未保存」を可視化・警告する。
+  const currentSnapshot = useMemo(
+    () => JSON.stringify({ p: buildPayload(), imgs: storeImages }),
+    [buildPayload, storeImages],
+  );
+  // 最新スナップショットを ref に映しておき、baseline 確定 effect が stale を読まないようにする。
+  const currentSnapshotRef = useRef(currentSnapshot);
+  currentSnapshotRef.current = currentSnapshot;
+  const savedSnapshotRef = useRef<string | null>(null);
+  const [baselineKey, setBaselineKey] = useState(0);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // 新規店舗は初期空フォームを baseline に。既存店舗は populate 完了時に確定。
+  useEffect(() => {
+    if (isNew) setBaselineKey((k) => k + 1);
+  }, [isNew]);
+
+  // baseline 確定 (populate / 保存成功 / 新規初期化のたびに現在値を保存済みとみなす)。
+  useEffect(() => {
+    savedSnapshotRef.current = currentSnapshotRef.current;
+    setIsDirty(false);
+  }, [baselineKey]);
+
+  // 現在値が baseline と異なれば未保存。
+  useEffect(() => {
+    if (savedSnapshotRef.current === null) return;
+    setIsDirty(currentSnapshot !== savedSnapshotRef.current);
+  }, [currentSnapshot]);
+
+  // タブを閉じる / リロード時、未保存ならブラウザ標準の確認を出す。
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // 店舗一覧へ戻る等の離脱時、未保存なら確認する。
+  const handleLeave = useCallback(() => {
+    if (
+      isDirty &&
+      !window.confirm("未保存の変更があります。保存せずにページを離れますか？")
+    ) {
+      return;
+    }
+    navigate("/admin/shops");
+  }, [isDirty, navigate]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -1216,6 +1360,8 @@ export function ShopEditPage() {
       } else {
         await api.put(`/admin/stores/${id}`, payload);
         setSaveSuccess(true);
+        // 保存できたので現在値を新しい baseline に。未保存表示が消える。
+        setBaselineKey((k) => k + 1);
         setTimeout(() => setSaveSuccess(false), 2500);
       }
     } catch (err) {
@@ -1406,18 +1552,16 @@ export function ShopEditPage() {
           </Field>
           <Field label="営業時間（開始）" required hint="候補から選択、または直接入力できます">
             <ComboInput
-              listId="opening-time-options"
               value={openingTime}
-              onChange={(e) => setOpeningTime(e.target.value)}
+              onChange={setOpeningTime}
               options={["19:00", "20:00", "21:00"]}
               placeholder="例: 20:00"
             />
           </Field>
           <Field label="営業時間（終了）" required hint="候補から選択、または直接入力できます">
             <ComboInput
-              listId="closing-time-options"
               value={closingTime}
-              onChange={(e) => setClosingTime(e.target.value)}
+              onChange={setClosingTime}
               options={["1:00", "LAST"]}
               placeholder="例: 1:00 / LAST"
             />
@@ -1480,19 +1624,38 @@ export function ShopEditPage() {
       <div className="space-y-5">
         <Field
           label="店舗画像"
-          hint="最大10枚まで。1枚目がサムネイルになります。スマホの写真もそのままアップロードできます。"
+          hint="最大10枚まで。1枚目がサムネイルになります。ドラッグ&ドロップで並び替え（サムネイル変更）できます。スマホの写真もそのままアップロードできます。"
         >
           {storeImages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {storeImages.map((url, idx) => (
-                <div key={idx} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-video">
-                  <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover" />
+                <div
+                  key={idx}
+                  draggable
+                  onDragStart={() => setDragImageIdx(idx)}
+                  onDragEnd={() => setDragImageIdx(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragImageIdx !== null) handleReorderShopImage(dragImageIdx, idx);
+                    setDragImageIdx(null);
+                  }}
+                  className={`relative group rounded-lg overflow-hidden border bg-muted aspect-video cursor-move transition ${
+                    dragImageIdx === idx ? "border-primary opacity-50" : "border-border"
+                  }`}
+                >
+                  <img src={url} alt={`店舗画像 ${idx + 1}`} className="w-full h-full object-cover pointer-events-none" />
                   {idx === 0 && (
                     <span className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-white">
                       サムネイル
                     </span>
                   )}
+                  <span className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-black/55 text-white opacity-0 group-hover:opacity-100 transition">
+                    <GripVertical className="w-3 h-3" />
+                    ドラッグで並び替え
+                  </span>
                   <button
+                    type="button"
                     onClick={() => handleRemoveShopImage(idx)}
                     className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                   >
@@ -1542,6 +1705,8 @@ export function ShopEditPage() {
           <TextInput
             type="number"
             inputMode="numeric"
+            step={1000}
+            min={0}
             value={trialMinWage}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMinWage(e.target.value.replace(/[^\d]/g, ""))}
             placeholder="例: 4500"
@@ -1551,6 +1716,8 @@ export function ShopEditPage() {
           <TextInput
             type="number"
             inputMode="numeric"
+            step={1000}
+            min={0}
             value={trialMaxWage}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTrialMaxWage(e.target.value.replace(/[^\d]/g, ""))}
             placeholder="例: 6000"
@@ -1572,18 +1739,16 @@ export function ShopEditPage() {
         </Field>
         <Field label="面接可能時間(開始)" hint="候補から選択、または直接入力できます">
           <ComboInput
-            listId="interview-start-options"
             value={interviewStart}
-            onChange={(e) => setInterviewStart(e.target.value)}
+            onChange={setInterviewStart}
             options={["17:00", "17:30", "18:00"]}
             placeholder="例: 17:00"
           />
         </Field>
         <Field label="面接可能時間(終了)" hint="候補から選択、または直接入力できます">
           <ComboInput
-            listId="interview-end-options"
             value={interviewEnd}
-            onChange={(e) => setInterviewEnd(e.target.value)}
+            onChange={setInterviewEnd}
             options={["20:00", "21:00", "22:00", "23:00"]}
             placeholder="例: 21:00"
           />
@@ -1801,47 +1966,54 @@ export function ShopEditPage() {
           STEP4 から STEP3 (報酬・体入) 直後に維持。 */}
       <SectionCard title="直近◯ヶ月での採用" icon={TrendingUp} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          <p className="text-xs text-muted-foreground">
-            各月の採用人数だけ入力してください（「1ヶ月前」が直近）。人数を入れた月までが
-            公開ページに表示されます。基本は5ヶ月前まで、新しい店舗は3ヶ月前まで等で調整OK。
-          </p>
-          {/* 相対月の固定スロット。index で hiringEntries に対応づける。 */}
-          {RELATIVE_HIRE_LABELS.map((relLabel, i) => {
-            const entry = hiringEntries[i] ?? { month: relLabel, count: "", examples: [] };
-            const writeSlot = (patch: Partial<{ count: string; examples: string[] }>) => {
-              const next = RELATIVE_HIRE_LABELS.map((lbl, idx) => {
-                const base = hiringEntries[idx] ?? { month: lbl, count: "", examples: [] };
-                return idx === i
-                  ? { month: lbl, count: base.count, examples: base.examples, ...patch }
-                  : { month: lbl, count: base.count, examples: base.examples };
-              });
-              setHiringEntries(next);
-            };
-            return (
-              <div key={relLabel} className="border border-border rounded-xl p-4 space-y-3 bg-muted/20">
-                <div className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 text-sm font-medium text-foreground/80">{relLabel}</span>
-                  <div className="flex-1">
-                    <TextInput
-                      type="number"
-                      inputMode="numeric"
-                      value={entry.count}
-                      onChange={(e) => writeSlot({ count: e.target.value.replace(/[^\d]/g, "") })}
-                      placeholder="採用人数（空欄=非表示）"
-                    />
-                  </div>
-                  <span className="text-sm text-foreground/50">名</span>
-                </div>
-                <Field label="採用例（任意）">
-                  <DynamicTextList
-                    items={entry.examples}
-                    setItems={(newExamples) => writeSlot({ examples: newExamples })}
-                    placeholder="例: 20歳 未経験 → 時給5,000円スタート"
-                  />
-                </Field>
+          <div className="space-y-2">
+            <Field label="月別の採用人数">
+              <p className="text-xs text-muted-foreground mb-2">
+                「1ヶ月前」が直近。人数を入れた月までが公開ページに表示されます
+                （基本は5ヶ月前まで、新しい店舗は3ヶ月前まで等で調整OK）。
+              </p>
+              {/* 相対月の固定スロット。index で hiringEntries に対応づける。
+                  採用例は月に紐付けずセクション単位で持つので、ここは人数だけ。 */}
+              <div className="space-y-2">
+                {RELATIVE_HIRE_LABELS.map((relLabel, i) => {
+                  const entry = hiringEntries[i] ?? { month: relLabel, count: "" };
+                  const writeCount = (count: string) => {
+                    const next = RELATIVE_HIRE_LABELS.map((lbl, idx) => {
+                      const base = hiringEntries[idx] ?? { month: lbl, count: "" };
+                      return idx === i
+                        ? { month: lbl, count }
+                        : { month: lbl, count: base.count };
+                    });
+                    setHiringEntries(next);
+                  };
+                  return (
+                    <div key={relLabel} className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 text-sm font-medium text-foreground/80">{relLabel}</span>
+                      <div className="flex-1">
+                        <TextInput
+                          type="number"
+                          inputMode="numeric"
+                          step={1}
+                          min={0}
+                          value={entry.count}
+                          onChange={(e) => writeCount(e.target.value.replace(/[^\d]/g, ""))}
+                          placeholder="採用人数（空欄=非表示）"
+                        />
+                      </div>
+                      <span className="text-sm text-foreground/50">名</span>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </Field>
+          </div>
+          <Field label="採用例（任意）" hint="このお店全体の採用例。月とは紐付きません。">
+            <DynamicTextList
+              items={hiringExamples}
+              setItems={setHiringExamples}
+              placeholder="例: 20歳 未経験 → 時給5,000円スタート"
+            />
+          </Field>
           <Field label="直近の合計テキスト">
             <TextInput
               value={hiringTotal}
@@ -1890,6 +2062,10 @@ export function ShopEditPage() {
               <Field label="綺麗系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castBijin}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCastBijin(e.target.value)}
                 />
@@ -1897,6 +2073,10 @@ export function ShopEditPage() {
               <Field label="可愛い系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castKawaii}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastKawaii(e.target.value)
@@ -1906,6 +2086,10 @@ export function ShopEditPage() {
               <Field label="派手系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castGlamour}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastGlamour(e.target.value)
@@ -1915,6 +2099,10 @@ export function ShopEditPage() {
               <Field label="素人系">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={5}
+                  min={0}
+                  max={100}
                   value={castNatural}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setCastNatural(e.target.value)
@@ -1935,6 +2123,9 @@ export function ShopEditPage() {
                       <TextInput
                         type="number"
                         inputMode="numeric"
+                        step={5}
+                        min={0}
+                        max={100}
                         value={cur}
                         onChange={(e) => {
                           const v = e.target.value.replace(/[^\d]/g, "");
@@ -2190,6 +2381,9 @@ export function ShopEditPage() {
               <div className="md:col-span-1">
                 <TextInput
                   type="number"
+                  inputMode="numeric"
+                  step={1000}
+                  min={0}
                   value={champagnePrices[key].amount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setChampagnePrices({
@@ -2665,6 +2859,21 @@ export function ShopEditPage() {
           </div>
         </div>
       )}
+      {/* 未保存インジケータ — スクロール位置や STEP に関わらず常時表示し、
+          別 STEP で編集したことを忘れて離脱するのを防ぐ。クリックで保存。 */}
+      {isDirty && !saveSuccess && (
+        <div className="fixed bottom-6 left-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800 shadow-lg transition hover:bg-amber-100 disabled:opacity-50"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            未保存の変更があります
+            <span className="font-semibold underline underline-offset-2">保存</span>
+          </button>
+        </div>
+      )}
       {saveError && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-[13px] text-red-700">
           {saveError}
@@ -2674,14 +2883,20 @@ export function ShopEditPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/admin/shops")}
+            onClick={handleLeave}
             className="p-2 rounded-xl hover:bg-accent transition"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-base">
+            <h2 className="text-base flex items-center gap-2">
               {isNew ? "店舗作成" : "店舗編集"}
+              {isDirty && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-normal text-amber-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  未保存
+                </span>
+              )}
             </h2>
             {!isNew && (
               <p className="text-xs text-muted-foreground">
@@ -2708,10 +2923,12 @@ export function ShopEditPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 text-white text-[13px] hover:bg-indigo-700 transition disabled:opacity-50"
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-white text-[13px] transition disabled:opacity-50 ${
+              isDirty ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"
+            }`}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? "保存中..." : "保存"}
+            {saving ? "保存中..." : isDirty ? "保存（未保存あり）" : "保存"}
           </button>
         </div>
       </div>
@@ -2892,10 +3109,10 @@ export function ShopEditPage() {
                     ? hiringEntries.map((h) => ({
                         month: h.month,
                         count: Number(h.count) || 0,
-                        examples: h.examples,
                       }))
                     : null,
                   recent_hires_summary: hiringTotal,
+                  recent_hire_examples: hiringExamples.map((e) => e.trim()).filter(Boolean),
                   qa: qaItems.length > 0
                     ? qaItems.map((q) => ({ question: q.label, answer: q.value }))
                     : null,
@@ -3230,7 +3447,9 @@ export function ShopEditPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-[13px] hover:bg-indigo-700 transition disabled:opacity-50"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-[13px] transition disabled:opacity-50 ${
+                  isDirty ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "保存中..." : "保存して完了"}

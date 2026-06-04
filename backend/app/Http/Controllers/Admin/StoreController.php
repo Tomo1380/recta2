@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ReorderStoreImagesRequest;
 use App\Http\Requests\Admin\UploadStoreImageRequest;
 use App\Http\Resources\StoreResource;
 use App\Models\Store;
@@ -130,6 +131,8 @@ class StoreController extends Controller
             'analysis' => 'nullable|array',
             'required_documents' => 'nullable|array',
             'recent_hires' => 'nullable|array',
+            'recent_hire_examples' => 'nullable|array',
+            'recent_hire_examples.*' => 'string|max:255',
             'qa' => 'nullable|array',
             'qa.*.question' => 'required|string',
             'qa.*.answer' => 'required|string',
@@ -179,7 +182,7 @@ class StoreController extends Controller
             'feature_tags', 'description', 'features_text', 'summary_text',
             'images', 'facility_photos',
             'analysis', 'required_documents',
-            'recent_hires', 'recent_hires_summary',
+            'recent_hires', 'recent_hires_summary', 'recent_hire_examples',
             'qa', 'staff_comment',
             'champagne_prices', 'champagne_description',
             'transfer_description', 'transfer_km', 'transfer_zones',
@@ -322,6 +325,17 @@ class StoreController extends Controller
 
         if ($result === null) {
             return response()->json(['message' => 'Image not found'], 404);
+        }
+
+        return response()->json($result);
+    }
+
+    public function reorderImages(ReorderStoreImagesRequest $request, Store $store): JsonResponse
+    {
+        $result = $this->images->reorderImages($store, $request->validated()['order']);
+
+        if ($result === null) {
+            return response()->json(['message' => 'Invalid image order'], 422);
         }
 
         return response()->json($result);

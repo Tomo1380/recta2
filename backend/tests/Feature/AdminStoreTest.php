@@ -274,6 +274,78 @@ class AdminStoreTest extends TestCase
         $this->assertEquals('Store with JSON', $response->json('name'));
     }
 
+    /**
+     * 6/4 追加FB: 採用例はセクション単位 (recent_hire_examples) で保存・返却される。
+     * recent_hires は月別の人数だけを持ち、examples は紐付かない。
+     */
+    public function test_create_store_with_recent_hire_examples(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Recent Hire Store',
+                'area' => '銀座',
+                'category' => 'クラブ',
+                'recent_hires' => [
+                    ['month' => '1ヶ月前', 'count' => 12],
+                    ['month' => '2ヶ月前', 'count' => 8],
+                ],
+                'recent_hires_summary' => '直近2ヶ月で20名採用',
+                'recent_hire_examples' => [
+                    '20歳 未経験 → 時給5,000円スタート',
+                    '25歳 経験1年 → 時給6,500円スタート',
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertSame(['20歳 未経験 → 時給5,000円スタート', '25歳 経験1年 → 時給6,500円スタート'], $response->json('recent_hire_examples'));
+        $this->assertSame(12, $response->json('recent_hires.0.count'));
+        // 月別エントリに examples は含めない。
+        $this->assertArrayNotHasKey('examples', $response->json('recent_hires.0'));
+    }
+
+    /**
+     * 6/4 追加FB: 店舗画像をドラッグ&ドロップで並べ替えできる (= サムネイル変更)。
+     * order は現在 index の新しい並び順。order フィールドも振り直される。
+     */
+    public function test_admin_can_reorder_store_images(): void
+    {
+        $store = $this->createStore([
+            'images' => [
+                ['url' => 'https://example.com/a.jpg', 'order' => 0],
+                ['url' => 'https://example.com/b.jpg', 'order' => 1],
+                ['url' => 'https://example.com/c.jpg', 'order' => 2],
+            ],
+        ]);
+
+        // 3枚目を先頭 (サムネイル) に持ってくる: [2, 0, 1]
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/stores/{$store->id}/images/reorder", ['order' => [2, 0, 1]]);
+
+        $response->assertStatus(200);
+        $images = $response->json('images');
+        $this->assertSame('https://example.com/c.jpg', $images[0]['url']);
+        $this->assertSame('https://example.com/a.jpg', $images[1]['url']);
+        $this->assertSame('https://example.com/b.jpg', $images[2]['url']);
+        // order は新しい位置で振り直される。
+        $this->assertSame([0, 1, 2], array_column($images, 'order'));
+    }
+
+    public function test_reorder_store_images_rejects_invalid_permutation(): void
+    {
+        $store = $this->createStore([
+            'images' => [
+                ['url' => 'https://example.com/a.jpg', 'order' => 0],
+                ['url' => 'https://example.com/b.jpg', 'order' => 1],
+            ],
+        ]);
+
+        // 重複・欠番は順列でないので 422。
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/stores/{$store->id}/images/reorder", ['order' => [0, 0]]);
+
+        $response->assertStatus(422);
+    }
+
     public function test_store_list_requires_authentication(): void
     {
         $response = $this->getJson('/api/admin/stores');

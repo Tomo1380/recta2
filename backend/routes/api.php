@@ -114,6 +114,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/stores/geocode', [StoreController::class, 'geocode']);
         Route::apiResource('/stores', StoreController::class);
         Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
+        Route::put('/stores/{store}/images/reorder', [StoreController::class, 'reorderImages']);
         Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);
 
         // 汎用画像アップロード (StaffPhotosEditor / DressCode OK・NG / TipTap 本文 等)。
