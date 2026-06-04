@@ -23,7 +23,7 @@ class AiChatLogSeeder extends Seeder
             // [page_type, mode, user_message, ai_response, input_tokens, output_tokens]
             ['top', 'agent', '六本木で時給高めのラウンジを教えて', 'Lounge Phoenix / LOUNGE Noble など 3 件をご紹介します。', 320, 220],
             ['top', 'agent', '未経験でも入れるお店ある？', '未経験歓迎のお店を 5 件ピックアップしました。', 280, 180],
-            ['top', 'agent', '体験入店できるお店だけ知りたい', '体験確約のお店一覧です。', 240, 160],
+            ['top', 'agent', '体験入店できるお店だけ知りたい', '体入確約のお店一覧です。', 240, 160],
             ['list', 'agent', '銀座エリアでノルマなしのお店', '銀座でノルマなしのラウンジを 4 件抽出しました。', 300, 200],
             ['list', 'agent', '日払い対応のお店だけ絞れる？', '日払い対応の店舗をフィルタしました。', 220, 140],
             ['detail', 'agent', 'このお店の交通費は？', 'こちらの店舗は六本木駅周辺まで全額支給です。', 280, 90],

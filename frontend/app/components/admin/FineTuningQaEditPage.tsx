@@ -150,10 +150,10 @@ export function FineTuningQaEditPage({
         ? `${store.area}/${store.nearest_station}`
         : store.area;
       const wage =
-        store.hourly_min && store.hourly_max
-          ? `時給${store.hourly_min.toLocaleString()}〜${store.hourly_max.toLocaleString()}円`
-          : store.hourly_min
-            ? `時給${store.hourly_min.toLocaleString()}円〜`
+        store.trial_hourly_min && store.trial_hourly_max
+          ? `体入時給${store.trial_hourly_min.toLocaleString()}〜${store.trial_hourly_max.toLocaleString()}円`
+          : store.trial_hourly_min
+            ? `体入時給${store.trial_hourly_min.toLocaleString()}円〜`
             : "";
       const line = `\n・[STORE:${store.id}] ${store.name}（${stationPart}）${wage}`;
       return { ...f, answer: f.answer.trimEnd() + line };
@@ -497,8 +497,8 @@ export function FineTuningQaEditPage({
                       <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
                         {store.area}
                         {store.nearest_station ? ` / ${store.nearest_station}` : ""}
-                        {store.hourly_min || store.hourly_max
-                          ? ` / 時給${(store.hourly_min ?? 0).toLocaleString()}〜${(store.hourly_max ?? 0).toLocaleString()}円`
+                        {store.trial_hourly_min || store.trial_hourly_max
+                          ? ` / 体入時給${(store.trial_hourly_min ?? 0).toLocaleString()}〜${(store.trial_hourly_max ?? 0).toLocaleString()}円`
                           : ""}
                       </div>
                     )}
@@ -591,8 +591,8 @@ export function FineTuningQaEditPage({
                           <div className="text-[11px] text-muted-foreground truncate">
                             {s.area}
                             {s.nearest_station ? ` / ${s.nearest_station}` : ""}
-                            {s.hourly_min || s.hourly_max
-                              ? ` / 時給${(s.hourly_min ?? 0).toLocaleString()}〜${(s.hourly_max ?? 0).toLocaleString()}円`
+                            {s.trial_hourly_min || s.trial_hourly_max
+                              ? ` / 体入時給${(s.trial_hourly_min ?? 0).toLocaleString()}〜${(s.trial_hourly_max ?? 0).toLocaleString()}円`
                               : ""}
                           </div>
                         </div>

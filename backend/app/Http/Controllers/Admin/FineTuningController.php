@@ -525,24 +525,30 @@ class FineTuningController extends Controller
 
     private function getStoreJson(): string
     {
-        return Cache::remember('ft_stores_pipe_v2', 600, function () {
+        return Cache::remember('ft_stores_pipe_v3', 600, function () {
             $stores = Store::where('publish_status', 'published')->get();
 
-            $header = "ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|日払い体系|体入|保証|ノルマ|ランク|特徴タグ|説明|詳細";
+            $header = "ID|店名|エリア|最寄り駅|カテゴリ|体入時給MIN|体入時給MAX|日払い体系|体入|保証|ノルマ|ランク|特徴タグ|説明|詳細";
             $lines = [$header];
 
             foreach ($stores as $s) {
                 $wage         = is_array($s->wage)      ? $s->wage      : [];
                 $guaranteeArr = is_array($s->guarantee) ? $s->guarantee : [];
-                $regular      = $wage['regular'] ?? [];
                 $trialArr     = $wage['trial']   ?? [];
                 $payrollArr   = $wage['payroll'] ?? [];
 
+                // 通常時給は廃止。体入時給 (最低/最高) を出す。
+                $trialMin = $trialArr['hourly_min'] ?? $trialArr['avg_hourly'] ?? '';
+                $trialMax = $trialArr['hourly_max'] ?? $trialArr['hourly'] ?? '';
+
                 $tags = implode(',', $s->feature_tags ?? []);
                 $payroll = $payrollArr['type'] ?? '';
-                $trialHourly = $trialArr['hourly'] ?? '';
-                $sameDay = (bool) ($guaranteeArr['same_day_trial'] ?? false);
-                $trial = $sameDay ? "当日OK({$trialHourly})" : ($trialHourly ? "体入{$trialHourly}" : '');
+                $trialHourly = $trialArr['hourly_min'] ?? $trialArr['avg_hourly'] ?? $trialArr['hourly'] ?? '';
+                // same_day_trial は enum string ('same_day'|'normal'|'none')。boolean ではない。
+                $trialType = $guaranteeArr['same_day_trial'] ?? 'none';
+                $trial = $trialType === 'same_day'
+                    ? "当日OK({$trialHourly})"
+                    : ($trialType === 'normal' ? ($trialHourly ? "体入{$trialHourly}" : '体入あり') : '');
                 $guarantee = $guaranteeArr['period'] ?? '';
                 $norma = $guaranteeArr['norma'] ?? '';
                 $rank = $s->rank ?? '';
@@ -555,8 +561,8 @@ class FineTuningController extends Controller
                     $s->area,
                     $s->nearest_station ?? '',
                     $s->category ?? '',
-                    $regular['min'] ?? '',
-                    $regular['max'] ?? '',
+                    $trialMin,
+                    $trialMax,
                     $payroll,
                     $trial,
                     $guarantee,

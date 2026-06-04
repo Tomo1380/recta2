@@ -8,8 +8,8 @@ export interface LandingStore {
   name: string;
   area?: string | null;
   category?: string | null;
-  hourly_min?: number | null;
-  hourly_max?: number | null;
+  trial_hourly_min?: number | null;
+  trial_hourly_max?: number | null;
   trial_type?: "same_day" | "normal" | "none" | null;
   reviews_count?: number | null;
   average_rating?: number | null;
@@ -118,7 +118,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
         <div className="grid grid-cols-3 gap-3 text-center">
           <Stat label="掲載店舗" value={`${stats.count}`} suffix="店" />
           <Stat
-            label="時給レンジ"
+            label="体入時給レンジ"
             value={
               stats.hourly_min && stats.hourly_max
                 ? `¥${formatYen(stats.hourly_min)}〜¥${formatYen(stats.hourly_max)}`
@@ -126,7 +126,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
             }
           />
           <Stat
-            label="平均最低時給"
+            label="平均最低体入時給"
             value={stats.avg_hourly_min ? `¥${formatYen(stats.avg_hourly_min)}` : "-"}
           />
         </div>
@@ -168,10 +168,10 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
                       {store.area}
                       {store.category ? ` · ${store.category}` : ""}
                     </p>
-                    {store.hourly_min && (
+                    {store.trial_hourly_min && (
                       <p className="mt-1 text-[12px] tabular-nums" style={{ color: GOLD, fontWeight: 600 }}>
-                        時給 ¥{formatYen(store.hourly_min)}
-                        {store.hourly_max ? `〜¥${formatYen(store.hourly_max)}` : "〜"}
+                        体入時給 ¥{formatYen(store.trial_hourly_min)}
+                        {store.trial_hourly_max ? `〜¥${formatYen(store.trial_hourly_max)}` : "〜"}
                       </p>
                     )}
                   </div>
@@ -189,7 +189,7 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
                         className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white"
                         style={{ background: GOLD }}
                       >
-                        体験確約
+                        体入確約
                       </span>
                     )}
                   </div>
@@ -309,7 +309,7 @@ function buildHeadings(
   if (area && category) {
     return {
       headingTitle: `${area.name}の${category.name}求人・体入・バイト`,
-      headingDescription: `${area.name}エリアの${category.name}の求人を ${stats.count} 件掲載。平均最低時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜。体験確約・LINE 相談・24h サポート。`,
+      headingDescription: `${area.name}エリアの${category.name}の求人を ${stats.count} 件掲載。平均最低時給 ¥${(stats.avg_hourly_min ?? 0).toLocaleString()}〜。体入確約・LINE 相談・24h サポート。`,
       breadcrumbItems: [
         { label: "ホーム", to: "/" },
         { label: "求人を探す", to: "/stores" },
@@ -332,7 +332,7 @@ function buildHeadings(
   if (category) {
     return {
       headingTitle: `${category.name}の求人一覧`,
-      headingDescription: `${category.name}の求人を ${stats.count} 件掲載。体験確約・高時給・未経験 OK の店舗を比較検討できます。`,
+      headingDescription: `${category.name}の求人を ${stats.count} 件掲載。体入確約・高時給・未経験 OK の店舗を比較検討できます。`,
       breadcrumbItems: [
         { label: "ホーム", to: "/" },
         { label: "求人を探す", to: "/stores" },
@@ -356,7 +356,7 @@ function buildAboutText(
   return (
     `${areaName}の${categoryName}は、未経験から始める方も多く、お店ごとに体入時給・バック・ノルマ・送り条件が大きく違います。` +
     `Recta では各店舗の時給レンジ、面接情報、体入の流れ、口コミ評価を一覧で比較でき、` +
-    `気になる店舗は LINE から直接担当者へ相談できます。体験確約・住居サポート・上京サポートも、` +
+    `気になる店舗は LINE から直接担当者へ相談できます。体入確約・住居サポート・上京サポートも、` +
     `各店舗ページに条件が明示されているので、自分に合う一店を効率よく見つけられます。`
   );
 }

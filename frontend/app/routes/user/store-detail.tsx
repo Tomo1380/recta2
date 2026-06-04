@@ -165,8 +165,9 @@ export default function StoreDetail() {
           url: canonical,
           datePosted: createdAt,
           description,
-          hourlyMin: (store as { hourly_min?: number | null }).hourly_min ?? null,
-          hourlyMax: (store as { hourly_max?: number | null }).hourly_max ?? null,
+          // 通常時給は廃止。JobPosting の baseSalary も体入時給を使う。
+          hourlyMin: (store as { trial_hourly_min?: number | null }).trial_hourly_min ?? null,
+          hourlyMax: (store as { trial_hourly_max?: number | null }).trial_hourly_max ?? null,
           address: store.address ?? null,
           image,
         }),

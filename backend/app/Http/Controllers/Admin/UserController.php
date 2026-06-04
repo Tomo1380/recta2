@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\Concerns\SortsListByDate;
 use App\Http\Requests\Admin\SendUserLineMessageRequest;
 use App\Http\Requests\Admin\UpdateUserNotesRequest;
 use App\Http\Requests\Admin\UpdateUserStatusRequest;
@@ -17,6 +18,8 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
+    use SortsListByDate;
+
     /**
      * @response array{
      *   users: array{
@@ -52,8 +55,8 @@ class UserController extends Controller
             });
         }
 
-        $users = $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')])
-            ->orderBy('created_at', 'desc')
+        $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
+        $users = $this->applyListSort($query, $request)
             ->paginate($request->input('per_page', 20));
 
         $totalUsers = User::count();

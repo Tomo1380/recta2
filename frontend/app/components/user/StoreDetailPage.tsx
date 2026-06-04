@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import { Link } from "react-router";
+import { trialDailyEstimate } from "~/lib/wage";
 
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -22,7 +23,6 @@ import {
   Navigation,
   Sparkles,
   Map as MapIcon,
-  Wine,
   Heart,
   Calculator,
   Wallet,
@@ -31,6 +31,7 @@ import {
   Pause,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X as XIcon,
   Minus,
   Maximize2,
@@ -39,6 +40,7 @@ import {
 } from "lucide-react";
 
 import RecentlyViewedStores from "~/components/user/shared/RecentlyViewedStores";
+import { RichText } from "~/components/user/shared/RichText";
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import UserAvatar from "~/components/user/shared/UserAvatar";
 import AiChatPanel from "~/components/user/AiChatPanel";
@@ -129,6 +131,8 @@ interface InterviewInfo {
   dress_code: string;
   criteria: string;
   dialog: DialogEntry[];
+  /** 面接で聞かれることリスト (Q&Aアコーディオン) */
+  questions?: { question: string; answer: string }[] | null;
 }
 
 interface RequiredDocuments {
@@ -145,7 +149,8 @@ interface Schedule {
 interface RecentHire {
   month: string;
   count: number;
-  examples: string[];
+  /** @deprecated 採用例はセクション単位 (recent_hire_examples) に移行。旧データ互換のため残置。 */
+  examples?: string[];
 }
 
 interface QAItem {
@@ -189,6 +194,8 @@ export interface DressCodeObject {
   description?: string;
   ok_examples?: DressExample[];
   ng_examples?: DressExample[];
+  /** ドレス例画像 (OK/NGを廃止し説明＋画像に簡素化) */
+  photos?: { image_url: string; caption?: string | null }[] | null;
 }
 
 export interface ChampagnePriceItem {
@@ -236,8 +243,8 @@ export interface RelatedStoreLite {
   area?: string;
   category?: string;
   image_url?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number | string | null;
+  trial_hourly_max?: number | string | null;
 }
 
 export interface StoreDetailStore {
@@ -257,20 +264,27 @@ export interface StoreDetailStore {
   shift_info: string | null;
   phone: string;
   website_url: string;
-  hourly_min: number | null;
-  hourly_max: number | null;
   /** 日給目安。Resource は文字列 (例: "30,000円〜60,000円") を返す想定だが、
       過去データは number のこともある。表示側で両対応する。 */
   daily_estimate: number | string | null;
   back_items: BackItem[];
+  /** バックのフリーテキスト (新)。あれば back_items より優先表示。 */
+  back_text?: string | null;
   fee_items: FeeItem[];
   salary_notes: string;
+  /** 給料システム (複数選択 + 詳細備考) */
+  pay_system_types?: string[] | null;
+  pay_system_note?: string | null;
   guarantee_period: string;
   guarantee_details: string;
   norma_info: string;
   unit_wage_type: string | null;
   payroll_system_type: string | null;
   payroll_system_description: string | null;
+  /** 給与サイクル / 給料日 / 日払い上限金額 (新) */
+  payroll_cycle?: string | null;
+  payroll_pay_day?: string | null;
+  daily_pay_limit?: string | null;
   /** 体入時給（最低額） */
   trial_hourly_min: number | string | null;
   /** 体入時給（最高額） */
@@ -282,11 +296,13 @@ export interface StoreDetailStore {
   interview_hours: string;
   interview_start: string | null;
   interview_end: string | null;
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type: "same_day" | "normal" | "none";
   feature_tags: string[];
   description: string;
   features_text: string;
+  /** 店舗まとめ (改行＋内部リンク対応のフリーテキスト) */
+  summary_text?: string | null;
   dress_code: string | DressCodeObject | null;
   images: StoreImage[] | null;
   /** Legacy single-video URL — still emitted by the API as the first videos[] entry. Prefer `videos`. */
@@ -295,12 +311,16 @@ export interface StoreDetailStore {
   videos?: StoreVideo[] | null;
   /** Ordered staff photos (在籍女性ギャラリー) */
   staff_photos?: StoreStaffPhoto[] | null;
+  /** 施設写真 (トイレ/更衣室/セット場所 等) */
+  facility_photos?: { image_url: string; caption?: string | null }[] | null;
   analysis: Analysis | null;
   interview_info: InterviewInfo | null;
   required_documents: RequiredDocuments | null;
   schedule: Schedule | null;
   recent_hires: RecentHire[] | null;
   recent_hires_summary: string;
+  /** 採用例 (セクション単位)。旧データは recent_hires[].examples に入っている。 */
+  recent_hire_examples: string[] | null;
   qa: QAItem[] | null;
   staff_comment: StaffComment | null;
   recruitment_standards: string | null;
@@ -346,6 +366,18 @@ interface StoreDetailPageProps {
  * 明示するため、もう片方を空白にする (¥0 とは表示しない)。
  * 両方空なら null を返す (呼び出し側で EmptyValue にフォールバック)。
  */
+/**
+ * 店舗の特徴テキストを表示する。SEO 目的で長文＆改行ありを想定。
+ * 改行保持 + `[表示文字](URL)` リンク化は共通 RichText に集約済み。
+ */
+function FeatureText({ text }: { text: string }) {
+  return (
+    <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.65)" }}>
+      <RichText text={text} />
+    </p>
+  );
+}
+
 function formatWageRange(
   min: number | string | null | undefined,
   max: number | string | null | undefined,
@@ -641,8 +673,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
       area: s.area,
       category: s.category,
       image_url: firstImage,
-      hourly_min: s.hourly_min ?? undefined,
-      hourly_max: s.hourly_max ?? undefined,
+      trial_hourly_min: s.trial_hourly_min ?? s.trial_avg_hourly ?? null,
+      trial_hourly_max: s.trial_hourly_max ?? s.trial_hourly ?? null,
     });
   }, [data?.store, previewData]);
 
@@ -733,13 +765,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               border: "1px solid rgba(27,37,40,0.06)",
             }}
           >
-            {/* 体験時給・時給は「最低〜最高」のレンジで表示。片方欠けてたら
+            {/* 体入時給・体入日給は「最低〜最高」のレンジで表示。片方欠けてたら
                 「¥8,000〜」「〜¥10,000」のように見せる (空欄であることを明示)。
                 4 セル横並びで桁が多いと 1 行に収まらないので、レンジは 2 行
-                ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。 */}
+                ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。
+                通常時給 (本入店後) は表示せず、体入日給 (体入時給×4時間) を出す。 */}
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                体験時給
+                体入時給
               </div>
               <QuickRangeValue
                 min={store.trial_hourly_min ?? store.trial_avg_hourly}
@@ -749,19 +782,28 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                時給
+                体入日給
               </div>
-              <QuickRangeValue
-                min={store.hourly_min}
-                max={store.hourly_max}
-                color="#1b2528"
-              />
+              {(() => {
+                // 体入日給 = 体入時給 × 1日4時間 (lib/wage.ts と同じ計算元)。
+                const x4 = (v: number | string | null | undefined): number | null => {
+                  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
+                  return Number.isFinite(n) && n > 0 ? n * 4 : null;
+                };
+                return (
+                  <QuickRangeValue
+                    min={x4(store.trial_hourly_min ?? store.trial_avg_hourly)}
+                    max={x4(store.trial_hourly_max ?? store.trial_hourly)}
+                    color="#1b2528"
+                  />
+                );
+              })()}
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 営業
               </div>
-              <div className="mt-0.5 text-[10.5px] font-semibold leading-tight" style={{ color: "#1b2528" }}>
+              <div className="mt-0.5 text-[12px] font-bold tabular-nums leading-[1.15]" style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}>
                 {store.opening_time && store.closing_time
                   ? `${store.opening_time}〜${store.closing_time}`
                   : store.business_hours || "—"}
@@ -821,8 +863,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     area: store.area,
                     category: store.category,
                     nearest_station: store.nearest_station,
-                    hourly_min: store.hourly_min ?? undefined,
-                    hourly_max: store.hourly_max ?? undefined,
+                    trial_hourly_min: toAmountNumberSafe(store.trial_hourly_min ?? store.trial_avg_hourly) ?? undefined,
+                    trial_hourly_max: toAmountNumberSafe(store.trial_hourly_max ?? store.trial_hourly) ?? undefined,
                     feature_tags: store.feature_tags,
                     description: store.description,
                     business_hours: store.business_hours,
@@ -869,7 +911,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 const display = formatWageRange(min, max);
                 return (
                   <InfoRow
-                    label="体験時給"
+                    label="体入時給"
                     value={display ?? <EmptyValue />}
                   />
                 );
@@ -893,7 +935,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                         className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
                         style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
                       >
-                        体験確約OK
+                        体入確約OK
                       </span>
                     );
                   }
@@ -918,7 +960,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 })()}
               />
               {store.recent_hires_summary && (
-                <InfoRow label="直近の採用" value={store.recent_hires_summary} />
+                <InfoRow
+                  label={
+                    store.recent_hires && store.recent_hires.length > 0
+                      ? `直近${store.recent_hires.length}ヶ月での採用`
+                      : "直近の採用"
+                  }
+                  value={store.recent_hires_summary}
+                />
               )}
             </div>
 
@@ -948,27 +997,35 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                           className="text-[10px] text-center"
                           style={{ color: "rgba(27,37,40,0.45)" }}
                         >
-                          {hire.month.replace("2026年", "")}
+                          {hire.month}
                         </span>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Hiring examples */}
-                {store.recent_hires.some((h) => h.examples?.length > 0) && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
-                      採用例
-                    </p>
-                    {store.recent_hires.flatMap((h) => h.examples ?? []).slice(0, 3).map((ex, i) => (
-                      <p key={i} className="flex items-start gap-1.5 text-xs" style={{ color: "rgba(27,37,40,0.6)" }}>
-                        <span style={{ color: "#D4AF37" }}>●</span>
-                        {ex}
+                {/* Hiring examples — セクション単位 (recent_hire_examples)。
+                    旧データは recent_hires[].examples に入っているので flatten でフォールバック。 */}
+                {(() => {
+                  const examples =
+                    store.recent_hire_examples && store.recent_hire_examples.length > 0
+                      ? store.recent_hire_examples
+                      : store.recent_hires.flatMap((h) => h.examples ?? []);
+                  if (examples.length === 0) return null;
+                  return (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
+                        採用例
                       </p>
-                    ))}
-                  </div>
-                )}
+                      {examples.slice(0, 3).map((ex, i) => (
+                        <p key={i} className="flex items-start gap-1.5 text-xs" style={{ color: "rgba(27,37,40,0.6)" }}>
+                          <span style={{ color: "#D4AF37" }}>●</span>
+                          {ex}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </SectionCard>
@@ -988,9 +1045,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             previewAnchor="shop-info"
           >
             {store.features_text && (
-              <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.65)" }}>
-                {store.features_text}
-              </p>
+              <FeatureText text={store.features_text} />
             )}
 
             {/* Feature tags — 管理画面 STEP3 で入力された特徴タグ (BUG-008) */}
@@ -1020,20 +1075,15 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               <InfoRow label="業種" value={store.category} />
               <InfoRow label="エリア" value={store.area} />
               <InfoRow label="最寄り駅" value={store.nearest_station} />
-              {/* いくら */}
+              {/* いくら: 本入店後の通常時給は表示しない。給与は体入時給を起点に
+                  「体入日給 = 体入時給 × 1日4時間」で算出した値だけ出す
+                  (計算元は lib/wage.ts に一本化)。 */}
               {(() => {
-                const range = formatWageRange(store.hourly_min, store.hourly_max);
-                return range ? <InfoRow label="時給" value={range} /> : null;
-              })()}
-              {(() => {
-                const raw = store.daily_estimate;
-                const isEmpty =
-                  raw == null ||
-                  (typeof raw === "string" && raw.trim() === "") ||
-                  (typeof raw === "number" && raw <= 0);
-                return isEmpty ? null : (
-                  <InfoRow label="日給目安" value={formatCurrency(raw)} />
+                const daily = trialDailyEstimate(
+                  store.trial_hourly_min ?? store.trial_avg_hourly,
+                  store.trial_hourly_max ?? store.trial_hourly,
                 );
+                return daily ? <InfoRow label="体入日給" value={daily} /> : null;
               })()}
               {/* いつ */}
               <InfoRow
@@ -1055,35 +1105,90 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               支払い方法・保証・ノルマ・給与備考。すべて空なら丸ごと非表示
               (空のカードを残すと見出し詐欺になる)。 */}
           {/* ============================================================ */}
-          {((store.back_items ?? []).length > 0
-            || (store.fee_items ?? []).length > 0
-            || store.payroll_system_type
-            || store.guarantee_period
-            || store.norma_info
-            || store.salary_notes) && (
+          {(() => {
+            // 表示する給与系の値を先に組み立てる。給与サイクルは
+            // サイクル＋給料日＋日払い上限＋補足を1つの文字列に束ねる。
+            // サイクル系は1行に束ね、補足(description)は改行して別行に出す
+            // (運営要望: 補足は2行目に改行できるように)。
+            const payHead = [
+              store.payroll_cycle || store.payroll_system_type,
+              store.payroll_pay_day,
+              store.daily_pay_limit ? `日払い上限: ${store.daily_pay_limit}` : null,
+            ]
+              .filter((v): v is string => !!v && String(v).trim() !== "")
+              .join("／");
+            const payValue = [payHead, store.payroll_system_description]
+              .filter((v): v is string => !!v && String(v).trim() !== "")
+              .join("\n");
+            const paySystem = (store.pay_system_types ?? []).filter(Boolean);
+            const hasBack =
+              (store.back_text && store.back_text.trim() !== "") ||
+              (store.back_items ?? []).length > 0;
+            const show =
+              paySystem.length > 0 ||
+              !!store.pay_system_note ||
+              hasBack ||
+              (store.fee_items ?? []).length > 0 ||
+              !!payValue ||
+              !!store.guarantee_period ||
+              !!store.norma_info ||
+              !!store.salary_notes;
+            if (!show) return null;
+            return (
           <SectionCard
             icon={<Award size={20} style={{ color: "#D4AF37" }} />}
             title="報酬・待遇"
             previewAnchor="salary"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              {(store.back_items ?? []).length > 0 && (
+              {(paySystem.length > 0 || store.pay_system_note) && (
+                <InfoRow
+                  label="給料システム"
+                  value={
+                    <div className="space-y-1">
+                      {paySystem.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {paySystem.map((t) => (
+                            <span
+                              key={t}
+                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                              style={{ background: "rgba(212,175,55,0.12)", color: "#9a7a17" }}
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {store.pay_system_note && (
+                        <p className="text-sm" style={{ color: "rgba(27,37,40,0.7)" }}>
+                          <RichText text={store.pay_system_note} />
+                        </p>
+                      )}
+                    </div>
+                  }
+                />
+              )}
+              {hasBack && (
                 <InfoRow
                   label="バック"
                   value={
-                    <ul className="space-y-0.5">
-                      {(store.back_items ?? []).map((item) => (
-                        <li key={item.label} className="text-sm">
-                          {item.label}: {formatAmountItem(item)}
-                        </li>
-                      ))}
-                    </ul>
+                    store.back_text && store.back_text.trim() !== "" ? (
+                      <p className="text-sm"><RichText text={store.back_text} /></p>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {(store.back_items ?? []).map((item) => (
+                          <li key={item.label} className="text-sm">
+                            {item.label}: {formatAmountItem(item)}
+                          </li>
+                        ))}
+                      </ul>
+                    )
                   }
                 />
               )}
               {(store.fee_items ?? []).length > 0 && (
                 <InfoRow
-                  label="控除"
+                  label="引かれ物"
                   value={
                     <ul className="space-y-0.5">
                       {(store.fee_items ?? []).map((item) => (
@@ -1095,22 +1200,20 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   }
                 />
               )}
-              {store.payroll_system_type && (
-                <InfoRow
-                  label="支払い方法"
-                  value={store.payroll_system_description
-                    ? `${store.payroll_system_type}／${store.payroll_system_description}`
-                    : store.payroll_system_type}
-                />
+              {payValue && (
+                <InfoRow label="支払い方法" value={payValue} />
               )}
               {store.guarantee_period && (
-                <InfoRow label="保証" value={`${store.guarantee_period}${store.guarantee_details ? ` / ${store.guarantee_details}` : ""}`} />
+                <InfoRow label="保証" value={store.guarantee_period} />
               )}
               {store.norma_info && <InfoRow label="ノルマ" value={store.norma_info} />}
-              {store.salary_notes && <InfoRow label="給与備考" value={store.salary_notes} />}
+              {store.salary_notes && (
+                <InfoRow label="給与備考" value={store.salary_notes} />
+              )}
             </div>
           </SectionCard>
-          )}
+            );
+          })()}
 
           {/* Relocate-support CTA — re-prompt the simulator for users coming from outside Tokyo */}
           <RelocateSupportCta variant="salary" />
@@ -1119,6 +1222,11 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           {/* 7. Analysis */}
           {/* ============================================================ */}
           {store.analysis && <AnalysisSection analysis={store.analysis} />}
+
+          {/* 施設写真 — 分析の直後に配置 (トイレ/更衣室/セット場所 等)。 */}
+          {(store.facility_photos ?? []).filter((p) => p.image_url).length > 0 && (
+            <FacilityPhotosSection photos={store.facility_photos ?? []} storeName={store.name} />
+          )}
 
           {/* 店内写真セクションは廃止。ページ最上部のヘッダー画像で十分
               なので、同じ写真をもう一度カードで出さない。 */}
@@ -1137,10 +1245,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             const dressDetail = store.dress_code_detail
               ?? (typeof store.dress_code === "object" ? (store.dress_code as DressCodeObject | null) : null);
             const dressFallbackString = typeof store.dress_code === "string" ? store.dress_code : null;
+            const dressPhotos = (dressDetail?.photos ?? []).filter((p) => p.image_url);
             const hasDress = !!(
               dressDetail?.description
-              || (dressDetail?.ok_examples ?? []).length > 0
-              || (dressDetail?.ng_examples ?? []).length > 0
+              || dressPhotos.length > 0
               || dressFallbackString
             );
             const showSection = !!(store.interview_info || store.required_documents || hasDress);
@@ -1155,7 +1263,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 {store.interview_info && (
                 <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
                   {store.interview_info.criteria && (
-                    <InfoRow label="採用基準" value={store.interview_info.criteria} />
+                    <InfoRow
+                      label="採用基準"
+                      value={store.interview_info.criteria}
+                    />
                   )}
                   {store.interview_info.dress_code && (
                     <InfoRow label="服装" value={store.interview_info.dress_code} />
@@ -1185,7 +1296,49 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   </div>
                 )}
 
-                {(store.interview_info?.dialog ?? []).length > 0 && (
+                {/* 面接で聞かれることリスト: 質問をタップで回答が開くQ&Aアコーディオン。
+                    新データ(questions)を優先し、無ければ旧 dialog をフォールバック表示。 */}
+                {(store.interview_info?.questions ?? []).filter((q) => q.question).length > 0 ? (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
+                      面接で聞かれることリスト
+                    </h3>
+                    <div className="space-y-1.5">
+                      {(store.interview_info?.questions ?? [])
+                        .filter((q) => q.question)
+                        .map((qa, i) => (
+                          <details
+                            key={i}
+                            className="group rounded-[12px] overflow-hidden"
+                            style={{ border: "1px solid rgba(27,37,40,0.08)" }}
+                          >
+                            <summary
+                              className="flex items-center justify-between gap-2 cursor-pointer list-none px-3.5 py-2.5 text-sm font-medium"
+                              style={{ color: "#1b2528" }}
+                            >
+                              <span className="flex items-start gap-2">
+                                <span style={{ color: "#D4AF37" }}>Q.</span>
+                                <span>{qa.question}</span>
+                              </span>
+                              <ChevronDown
+                                size={16}
+                                className="shrink-0 transition-transform group-open:rotate-180"
+                                style={{ color: "rgba(27,37,40,0.4)" }}
+                              />
+                            </summary>
+                            {qa.answer && (
+                              <div
+                                className="px-3.5 pb-3 pt-0 text-sm"
+                                style={{ color: "rgba(27,37,40,0.7)" }}
+                              >
+                                <RichText text={qa.answer} />
+                              </div>
+                            )}
+                          </details>
+                        ))}
+                    </div>
+                  </div>
+                ) : (store.interview_info?.dialog ?? []).length > 0 ? (
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
                       面接の流れ
@@ -1221,7 +1374,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                       ))}
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* 必要書類はかつて独立 SectionCard だったが、面接情報と
                     文脈が近い (「面接の持ち物」) のでサブブロックとして
@@ -1252,9 +1405,9 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     {store.required_documents.notes && (
                       <p
                         className="rounded-[12px] px-3 py-2 text-sm"
-                        style={{ backgroundColor: "rgba(212,175,55,0.08)", color: "rgba(27,37,40,0.7)" }}
+                        style={{ backgroundColor: "rgba(27,37,40,0.04)", color: "rgba(27,37,40,0.7)" }}
                       >
-                        {store.required_documents.notes}
+                        <RichText text={store.required_documents.notes} />
                       </p>
                     )}
                   </div>
@@ -1271,14 +1424,28 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     </h3>
                     {(dressDetail?.description || dressFallbackString) && (
                       <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
-                        {dressDetail?.description || dressFallbackString}
+                        <RichText text={dressDetail?.description || dressFallbackString} />
                       </p>
                     )}
-                    {(dressDetail?.ok_examples ?? []).length > 0 && (
-                      <DressExampleList items={dressDetail?.ok_examples ?? []} variant="ok" />
-                    )}
-                    {(dressDetail?.ng_examples ?? []).length > 0 && (
-                      <DressExampleList items={dressDetail?.ng_examples ?? []} variant="ng" />
+                    {/* OK/NG例は廃止。ドレスの例画像を掲載 (スナイデル/シーン等)。 */}
+                    {dressPhotos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {dressPhotos.map((p, i) => (
+                          <figure key={i} className="overflow-hidden rounded-lg" style={{ border: "1px solid rgba(27,37,40,0.06)" }}>
+                            <img
+                              src={p.image_url}
+                              alt={p.caption ?? `ドレス例 ${i + 1}`}
+                              className="w-full aspect-[3/4] object-cover"
+                              loading="lazy"
+                            />
+                            {p.caption && (
+                              <figcaption className="px-1.5 py-1 text-[11px]" style={{ color: "rgba(27,37,40,0.6)" }}>
+                                {p.caption}
+                              </figcaption>
+                            )}
+                          </figure>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1287,10 +1454,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             );
           })()}
 
+          {/* レクタ経由入店女性エピソードは「面接情報」の直後に配置 (運営要望)。 */}
+          <RectaEpisodesSection episodes={store.recta_episodes} />
+
           {/* ============================================================ */}
           {/* 11a. Transfer / 足代 — distance-based zone fee map + table */}
           {/* ============================================================ */}
           <TransferMapSection
+            isPreview={!!previewData}
             lat={store.lat}
             lng={store.lng}
             zones={store.transfer_zones}
@@ -1307,21 +1478,18 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             fallback={store.champagne_description}
           />
 
-          {/* ============================================================ */}
-          {/* 11c. Recta-keiyū episodes (レクタ経由入店女性エピソード) */}
-          {/* ============================================================ */}
-          <RectaEpisodesSection episodes={store.recta_episodes} />
+          {/* レクタ経由入店女性エピソードは「面接情報」直後へ移動済み。 */}
 
           {/* ドレスコードは「面接情報」セクション内に統合 (画像も廃止し
               テキストだけに簡素化)。独立 SectionCard は廃止。 */}
 
           {/* ============================================================ */}
-          {/* 11e. Salary simulator (interactive, derived from hourly_min/max) */}
+          {/* 11e. Salary simulator (interactive, derived from 体入時給 + back_items) */}
           {/* ============================================================ */}
           <SalarySimulatorSection
             backItems={store.back_items}
-            hourlyMin={store.hourly_min ?? undefined}
-            hourlyMax={store.hourly_max ?? undefined}
+            hourlyMin={toAmountNumberSafe(store.trial_hourly_min ?? store.trial_avg_hourly) ?? undefined}
+            hourlyMax={toAmountNumberSafe(store.trial_hourly_max ?? store.trial_hourly) ?? undefined}
           />
 
           {/* ============================================================ */}
@@ -1393,7 +1561,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   </div>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
-                      {name || "—"} / Recta キャリアアドバイザー
+                      {name || "—"}
                     </p>
                     {role && (
                       <p className="text-xs" style={{ color: "rgba(27,37,40,0.45)" }}>
@@ -1513,6 +1681,16 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
           {/* 15b. Set fee (セット料金) — アクセスの直下 (運営要望) */}
           {/* ============================================================ */}
           <SetFeeSection setFee={store.set_fee} />
+
+          {/* 店舗まとめ — セット料金の直後 (運営要望)。改行＋内部リンク対応。 */}
+          {store.summary_text && store.summary_text.trim() !== "" && (
+            <SectionCard
+              icon={<FileText size={20} style={{ color: "#D4AF37" }} />}
+              title={`${store.name}まとめ`}
+            >
+              <FeatureText text={store.summary_text} />
+            </SectionCard>
+          )}
 
           {/* ============================================================ */}
           {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}
@@ -1802,7 +1980,7 @@ function LuxeHero({
               className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
               style={{ background: "linear-gradient(135deg, #D4AF37, #c8960c)" }}
             >
-              体験確約OK
+              体入確約OK
             </span>
           )}
           {trialType === "normal" && (
@@ -2000,10 +2178,10 @@ function StoreVideosBlock({
               )}
               {v.description && (
                 <p
-                  className="text-[12px] leading-relaxed whitespace-pre-line"
+                  className="text-[12px] leading-relaxed"
                   style={{ color: "rgba(27,37,40,0.62)", fontFamily: "'Noto Sans JP',sans-serif", margin: 0 }}
                 >
-                  {v.description}
+                  <RichText text={v.description} />
                 </p>
               )}
             </div>
@@ -2567,7 +2745,10 @@ function InfoRow({
       <span className="w-24 shrink-0 font-medium" style={{ color: "rgba(27,37,40,0.45)" }}>
         {label}
       </span>
-      <span className="flex-1" style={{ color: "#1b2528" }}>{value}</span>
+      <span className="flex-1" style={{ color: "#1b2528" }}>
+        {/* 文字列値は改行保持 + [表示文字](URL) リンクで描画する。 */}
+        {typeof value === "string" ? <RichText text={value} /> : value}
+      </span>
     </div>
   );
 }
@@ -2579,6 +2760,107 @@ function EmptyValue() {
   );
 }
 
+
+/** 施設写真セクション (トイレ/更衣室/セット場所 等)。お店の分析の直後に出す。 */
+function FacilityPhotosSection({
+  photos,
+  storeName,
+}: {
+  photos: { image_url: string; caption?: string | null }[];
+  storeName: string;
+}) {
+  const items = photos.filter((p) => p.image_url);
+  if (items.length === 0) return null;
+  return (
+    <SectionCard
+      icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+      title="施設写真"
+    >
+      <div className="grid grid-cols-2 gap-3">
+        {items.map((p, i) => (
+          <figure
+            key={i}
+            className="overflow-hidden rounded-lg"
+            style={{ border: "1px solid rgba(27,37,40,0.06)" }}
+          >
+            <img
+              src={p.image_url}
+              alt={p.caption ?? `${storeName} 施設写真 ${i + 1}`}
+              className="w-full aspect-[4/3] object-cover"
+              loading="lazy"
+            />
+            {p.caption && (
+              <figcaption
+                className="px-2 py-1.5 text-xs"
+                style={{ color: "rgba(27,37,40,0.6)" }}
+              >
+                {p.caption}
+              </figcaption>
+            )}
+          </figure>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+/**
+ * 2区分の割合バー (在籍キャスト割合・店内の雰囲気)。両側を色付き＋%で示し、
+ * 「右側が色無しで何割か分かりにくい」問題を解消する。
+ */
+function SplitBar({
+  title,
+  segments,
+}: {
+  title: string;
+  segments: { label: string; pct: number; color: string }[];
+}) {
+  const visible = segments.filter((s) => s.pct > 0);
+  if (visible.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium" style={{ color: "#1b2528" }}>{title}</p>
+      <div
+        className="flex h-9 w-full overflow-hidden rounded-md"
+        style={{ boxShadow: "inset 0 0 0 1px rgba(27,37,40,0.06)" }}
+      >
+        {visible.map((s) => (
+          <div
+            key={s.label}
+            className="h-full flex items-center justify-center transition-all"
+            style={{ width: `${s.pct}%`, backgroundColor: s.color }}
+            title={`${s.label} ${s.pct}%`}
+          >
+            {s.pct >= 12 && (
+              <span
+                className="text-[10px] font-semibold leading-none text-white"
+                style={{ textShadow: "0 1px 1px rgba(0,0,0,0.25)" }}
+              >
+                {s.pct}%
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+        {segments.map((s) => (
+          <span
+            key={s.label}
+            className="inline-flex items-center gap-1.5 text-xs"
+            style={{ color: "rgba(27,37,40,0.7)" }}
+          >
+            <span
+              className="inline-block h-3 w-3 rounded-sm shrink-0"
+              style={{ backgroundColor: s.color, boxShadow: "0 0 0 1px rgba(27,37,40,0.08)" }}
+            />
+            <span className="font-medium">{s.label}</span>
+            <span className="tabular-nums" style={{ color: "rgba(27,37,40,0.5)" }}>{s.pct}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function AnalysisSection({ analysis }: { analysis: Analysis }) {
   // 各項目が 0 (未入力) のときは個別に非表示。全部 0 / 空ならセクション自体を
@@ -2597,6 +2879,11 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
   ];
   const castTotal = castSegments.reduce((sum, s) => sum + (Number(s.value) || 0), 0);
   const hasCast = castTotal > 0;
+  const clampPct = (v: number | string | undefined) =>
+    Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+  // experience_level = 経験者入店の割合、atmosphere = ワイワイ度 (残りが反対側)。
+  const expPct = clampPct(analysis.experience_level);
+  const atmPct = clampPct(analysis.atmosphere);
   const hasExperience = (Number(analysis.experience_level) || 0) > 0;
   const hasAtmosphere = (Number(analysis.atmosphere) || 0) > 0;
   const hasDrink = (Number(analysis.drinking_style) || 0) > 0;
@@ -2617,24 +2904,13 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
     >
       <div className="space-y-5">
         {hasExperience && (
-          <>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium" style={{ color: "#1b2528" }}>経験レベル</span>
-            <span style={{ color: "rgba(27,37,40,0.45)" }}>{analysis.experience_level}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "rgba(27,37,40,0.06)" }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${analysis.experience_level}%`, backgroundColor: "#D4AF37" }}
-            />
-          </div>
-          <div className="flex justify-between text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
-            <span>未経験向け</span>
-            <span>経験者向け</span>
-          </div>
-        </div>
-          </>
+          <SplitBar
+            title="在籍キャスト割合"
+            segments={[
+              { label: "未経験入店", pct: 100 - expPct, color: "#5BA89A" },
+              { label: "経験者入店", pct: expPct, color: "#D4AF37" },
+            ]}
+          />
         )}
 
         {hasExperience && hasAtmosphere && (
@@ -2642,22 +2918,13 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
         )}
 
         {hasAtmosphere && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium" style={{ color: "#1b2528" }}>雰囲気</span>
-            <span style={{ color: "rgba(27,37,40,0.45)" }}>{analysis.atmosphere}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: "rgba(27,37,40,0.06)" }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${analysis.atmosphere}%`, backgroundColor: "rgba(200,96,128,0.8)" }}
-            />
-          </div>
-          <div className="flex justify-between text-xs" style={{ color: "rgba(27,37,40,0.4)" }}>
-            <span>カジュアル</span>
-            <span>フォーマル</span>
-          </div>
-        </div>
+          <SplitBar
+            title="店内の雰囲気"
+            segments={[
+              { label: "落ち着いてる", pct: 100 - atmPct, color: "#7C9CBF" },
+              { label: "ワイワイ", pct: atmPct, color: "#E8956B" },
+            ]}
+          />
         )}
 
         {(hasExperience || hasAtmosphere) && hasCast && (
@@ -2782,6 +3049,10 @@ function AnalysisSection({ analysis }: { analysis: Analysis }) {
 
 const GOLD_HEX = "#D4AF37";
 
+/** 足代ゾーンの自動カラーパレット。運営が色を選ばなくても距離区分ごとに
+ *  見分けがつくよう、index 順にこの色を割り当てる。 */
+const ZONE_PALETTE = ["#D4AF37", "#5BA89A", "#7C9CBF", "#E8956B", "#9D4B5C", "#6FB37D"];
+
 function toAmountNumber(value: number | string | undefined): number | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -2841,20 +3112,118 @@ function blendZoneFillColor(
   return `rgb(${r},${g},${b})`;
 }
 
+/**
+ * 管理画面プレビュー用の足代ゾーン図。プレビューパネルは transform:scale で
+ * 縮小されるため Google Maps が正しく描画できない。代わりに距離区分を同心円の
+ * SVG で描き、縮小枠でも崩れない「足代マップの代替ビジュアル」を出す。
+ * 公開ページでは引き続き実 Google Maps (StoreMap) を使う。
+ */
+function ZoneRingDiagram({
+  zones,
+  height = 220,
+}: {
+  zones: { radius_km?: number | string | null; color?: string | null }[];
+  height?: number;
+}) {
+  const parseKm = (raw: unknown): number => {
+    if (raw == null) return NaN;
+    if (typeof raw === "number") return raw;
+    const m = String(raw).match(/-?\d+(?:\.\d+)?/);
+    return m ? Number(m[0]) : NaN;
+  };
+
+  // 半径が有効なゾーンだけ、大きい順に (大きい円を奥に描く)。
+  const rings = zones
+    .map((z) => ({ km: parseKm(z.radius_km), color: z.color || GOLD_HEX }))
+    .filter((z) => Number.isFinite(z.km) && z.km > 0)
+    .sort((a, b) => b.km - a.km);
+
+  if (rings.length === 0) return null;
+
+  const SIZE = 200;
+  const cx = SIZE / 2;
+  const cy = SIZE / 2;
+  const maxR = SIZE / 2 - 14;
+  const maxKm = rings[0].km;
+
+  return (
+    <div
+      className="mb-3 overflow-hidden rounded-[12px]"
+      style={{
+        height,
+        background: "linear-gradient(135deg, #1b2528, #0f1618)",
+        border: "1px solid rgba(212,175,55,0.18)",
+      }}
+    >
+      <svg
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="距離別足代ゾーン図"
+      >
+        {rings.map((z, i) => {
+          const r = Math.max(8, (z.km / maxKm) * maxR);
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill={z.color}
+              fillOpacity={0.22}
+              stroke={z.color}
+              strokeOpacity={0.9}
+              strokeWidth={1.5}
+            />
+          );
+        })}
+        {/* km ラベルは各円の上端に。重なりを避けつつ距離感が分かる程度に。 */}
+        {rings.map((z, i) => {
+          const r = Math.max(8, (z.km / maxKm) * maxR);
+          return (
+            <text
+              key={`l-${i}`}
+              x={cx}
+              y={cy - r + 11}
+              textAnchor="middle"
+              fontSize="8.5"
+              fill="rgba(255,255,255,0.82)"
+            >
+              〜{z.km}km
+            </text>
+          );
+        })}
+        {/* 店舗位置マーカー */}
+        <circle cx={cx} cy={cy} r={4} fill={GOLD_HEX} stroke="#1b2528" strokeWidth={1} />
+      </svg>
+    </div>
+  );
+}
+
 function TransferMapSection({
   lat,
   lng,
   zones,
   fallbackDescription,
   fallbackKm,
+  isPreview = false,
 }: {
   lat: number | null;
   lng: number | null;
   zones?: TransferZone[] | null;
   fallbackDescription?: string | null;
   fallbackKm?: string | null;
+  /** 管理画面プレビュー (transform:scale の縮小枠) では Google Maps が
+   *  正しく描画できないため、実地図の代わりに案内プレースホルダを出す。 */
+  isPreview?: boolean;
 }) {
-  const zoneList = zones ?? [];
+  // 色未設定のゾーンには自動でパレット色を割り当てる (運営の色選択を不要に)。
+  const zoneList = (zones ?? []).map((z, i) => ({
+    ...z,
+    color: z.color || ZONE_PALETTE[i % ZONE_PALETTE.length],
+  }));
   const hasZones = zoneList.length > 0;
   const hasFallback = !!(fallbackDescription || fallbackKm);
   const canShowMap = hasZones && typeof lat === "number" && typeof lng === "number";
@@ -2866,7 +3235,7 @@ function TransferMapSection({
       icon={<MapIcon size={20} style={{ color: GOLD_HEX }} />}
       title="送り・足代"
     >
-      {canShowMap && (
+      {canShowMap && !isPreview && (
         <div className="mb-3">
           <StoreMap
             lat={lat}
@@ -2876,6 +3245,9 @@ function TransferMapSection({
           />
         </div>
       )}
+      {/* プレビューは Google Maps が縮小枠で崩れるため、同心円の SVG で
+          足代ゾーンを可視化する (lat/lng 未取得でもゾーンがあれば表示)。 */}
+      {hasZones && isPreview && <ZoneRingDiagram zones={zoneList} height={220} />}
       {hasZones && (
         <div className="space-y-2">
           <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
@@ -2946,12 +3318,23 @@ function TransferMapSection({
         </div>
       )}
 
-      {!hasZones && hasFallback && (
-        <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
-          {fallbackKm
-            ? `${fallbackDescription ?? "送りあり"}（${fallbackKm}以内）`
-            : fallbackDescription}
-        </p>
+      {/* 送り距離・送りの説明は足代テーブルの有無に関わらず、入力があれば表示する
+          (どちらか一方しか出ない制限を撤廃。BUG: ゾーン設定時に送り距離/説明が
+          消えていた不具合の修正)。 */}
+      {(fallbackKm || fallbackDescription) && (
+        <div className={`space-y-1 ${hasZones ? "mt-3" : ""}`}>
+          {fallbackKm && (
+            <p className="text-sm" style={{ color: "rgba(27,37,40,0.7)" }}>
+              <span style={{ color: "rgba(27,37,40,0.45)" }}>送り距離: </span>
+              {fallbackKm}
+            </p>
+          )}
+          {fallbackDescription && (
+            <p className="text-sm leading-relaxed" style={{ color: "rgba(27,37,40,0.7)" }}>
+              <RichText text={fallbackDescription} />
+            </p>
+          )}
+        </div>
       )}
     </SectionCard>
   );
@@ -2995,7 +3378,7 @@ function ChampagnePricesSection({
       {/* Custom dark slab — we bypass SectionCard's white surface because the
           editorial menu vibe depends on the whole panel being dark. */}
       <div
-        className="relative px-5 py-7"
+        className="relative px-4 py-4"
         style={{
           // ベースは深い緑黒。元は ambient gold orb を右上に重ねていたが、
           // orb の bounding-box 右端と下端で透明境界が直線になって「黒と
@@ -3014,9 +3397,9 @@ function ChampagnePricesSection({
             {/* Title — Japanese-primary because this is for job seekers
                 gauging per-bottle revenue (= potential bottle-back commission),
                 not a customer-facing wine list. */}
-            <div className="relative mb-5 text-center">
+            <div className="relative mb-3 text-center">
               <h3
-                className="m-0 text-[19px] font-bold leading-tight"
+                className="m-0 text-[17px] font-bold leading-tight"
                 style={{
                   color: "#f7d976",
                   fontFamily: "'Noto Sans JP','Outfit',sans-serif",
@@ -3026,16 +3409,6 @@ function ChampagnePricesSection({
               >
                 ボトル目安価格
               </h3>
-              <p
-                className="mt-1 text-[9.5px] font-medium uppercase"
-                style={{
-                  color: "rgba(212,175,55,0.65)",
-                  fontFamily: "'Outfit', sans-serif",
-                  letterSpacing: "0.32em",
-                }}
-              >
-                Champagne Price
-              </p>
             </div>
 
             {/* 説明文 (運営入力) — 改行を反映。価格表とは別ブロックで上に。
@@ -3043,121 +3416,88 @@ function ChampagnePricesSection({
                 上に明示的なテキストブロックを置く。 */}
             {fallback && (
               <p
-                className="relative mb-5 whitespace-pre-line text-center text-sm leading-relaxed"
+                className="relative mb-3 text-center text-[13px] leading-relaxed"
                 style={{
                   color: "rgba(255,255,255,0.82)",
                   fontFamily: "'Noto Sans JP', sans-serif",
                 }}
               >
-                {fallback}
+                <RichText text={fallback} />
               </p>
             )}
 
-            {/* 2x2 グリッド — 縦に長い zigzag を廃止して、カード型でコンパクトに */}
-            <ul className="relative grid grid-cols-2 gap-2.5">
+            {/* 2x2 グリッド — 画像主体。ローマ字(筆記体)は廃止し、ボトル画像を
+                大きく見せてシャンパン名＋価格だけ添える。 */}
+            <ul className="relative grid grid-cols-2 gap-2">
               {visible.map(({ tpl, item }) => {
                 const src = item!.image_url || tpl.defaultImage;
                 return (
                   <li
                     key={tpl.key}
-                    className="relative flex items-center gap-2 rounded-xl px-2.5 py-2"
+                    className="relative flex flex-col items-center gap-0.5 rounded-xl px-2 py-2"
                     style={{
                       background: "rgba(255,255,255,0.04)",
                       border: "1px solid rgba(212,175,55,0.18)",
                     }}
                   >
+                    {/* 画像サイズは維持 (h-96/maxWidth72)。周囲の余白だけ詰めて
+                        セクション全体の高さを抑える。 */}
                     <img
                       src={src}
                       alt={tpl.kanaName}
                       loading="lazy"
                       decoding="async"
-                      className="h-[44px] w-auto shrink-0 object-contain"
+                      className="h-[96px] w-auto object-contain"
                       style={{
-                        filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
-                        maxWidth: 28,
+                        filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.55))",
+                        maxWidth: 72,
                       }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.visibility = "hidden";
                       }}
                     />
-                    <div className="min-w-0 flex-1">
+                    <p
+                      className="text-center text-[12px] font-semibold leading-tight"
+                      style={{
+                        color: "#f7d976",
+                        fontFamily: "'Noto Sans JP', sans-serif",
+                      }}
+                    >
+                      {tpl.kanaName}
+                    </p>
+                    <p
+                      className="tabular-nums text-[12px] font-semibold leading-tight"
+                      style={{ fontFamily: "'Outfit', sans-serif", color: "#ffe066" }}
+                    >
+                      ¥{formatYen(item!.amount)}
+                    </p>
+                    {item!.note && (
                       <p
-                        className="m-0 truncate"
+                        className="text-center text-[9.5px] leading-tight"
                         style={{
-                          fontFamily: "'Great Vibes', cursive",
-                          fontSize: 20,
-                          lineHeight: 1.1,
-                          color: "#f7d976",
-                          textShadow: "0 1px 4px rgba(0,0,0,0.4)",
-                        }}
-                      >
-                        {tpl.scriptName}
-                      </p>
-                      <p
-                        className="mt-0.5 truncate text-[10px]"
-                        style={{
-                          color: "rgba(255,255,255,0.55)",
+                          color: "rgba(255,255,255,0.45)",
                           fontFamily: "'Noto Sans JP', sans-serif",
                         }}
                       >
-                        {tpl.kanaName}
+                        {item!.note}
                       </p>
-                      <p
-                        className="mt-0.5 tabular-nums text-[12px] font-semibold"
-                        style={{
-                          fontFamily: "'Outfit', sans-serif",
-                          color: "#ffe066",
-                        }}
-                      >
-                        ¥{formatYen(item!.amount)}
-                      </p>
-                      {item!.note && (
-                        <p
-                          className="mt-0.5 truncate text-[9.5px]"
-                          style={{
-                            color: "rgba(255,255,255,0.4)",
-                            fontFamily: "'Noto Sans JP', sans-serif",
-                          }}
-                        >
-                          {item!.note}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </li>
                 );
               })}
             </ul>
 
-            {/* Footer ornament */}
-            <div className="relative mt-5 flex items-center justify-center gap-2">
-              <span
-                aria-hidden
-                style={{
-                  width: 32,
-                  height: 1,
-                  background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.7))",
-                }}
-              />
-              <Wine size={11} style={{ color: "rgba(212,175,55,0.85)" }} aria-hidden />
-              <span
-                aria-hidden
-                style={{
-                  width: 32,
-                  height: 1,
-                  background: "linear-gradient(90deg, rgba(212,175,55,0.7), transparent)",
-                }}
-              />
-            </div>
+            {/* Footer ornament は高さ削減のため撤去 (運営要望: セクションを短く)。 */}
             {/* Disclaimer — make it obvious these numbers are reference values
                 so users don't take them as the venue's actual current menu. */}
             <p
-              className="relative mt-2 text-center text-[10px] leading-relaxed"
+              className="relative mt-2.5 text-center text-[10px] leading-relaxed"
               style={{
                 color: "rgba(255,255,255,0.45)",
                 fontFamily: "'Noto Sans JP', sans-serif",
               }}
             >
-              ※ 価格は参考目安です。詳細は店舗にお問い合わせください。
+              ※時期によって変動するケースございます
             </p>
           </>
         ) : (
@@ -3177,22 +3517,12 @@ function ChampagnePricesSection({
               >
                 ボトル目安価格
               </h3>
-              <p
-                className="mt-1 text-[9.5px] font-medium uppercase"
-                style={{
-                  color: "rgba(212,175,55,0.65)",
-                  fontFamily: "'Outfit', sans-serif",
-                  letterSpacing: "0.32em",
-                }}
-              >
-                Champagne Price
-              </p>
             </div>
             <p
-              className="relative whitespace-pre-line text-sm leading-relaxed text-center"
+              className="relative text-sm leading-relaxed text-center"
               style={{ color: "rgba(255,255,255,0.8)", fontFamily: "'Noto Sans JP', sans-serif" }}
             >
-              {fallback}
+              <RichText text={fallback} />
             </p>
           </>
         )}
@@ -3430,7 +3760,7 @@ function SalarySimulatorSection({
         {/* Sliders — ClaudeDesign style with custom gold thumb */}
         <div className="space-y-4 pt-1">
           <LuxeSimSlider
-            label="時給"
+            label="体入時給"
             value={hourly}
             min={1500}
             max={Math.max(hourlyMaxBound, 10000)}
@@ -3467,7 +3797,7 @@ function SalarySimulatorSection({
           }}
         >
           <SimBreakdownRow
-            label={`時給×時間（${hoursPerDay}h × ${daysPerMonth}日）`}
+            label={`体入時給×時間（${hoursPerDay}h × ${daysPerMonth}日）`}
             value={`¥${wage.toLocaleString()}`}
           />
           <SimBreakdownRow
@@ -3723,8 +4053,8 @@ function RelatedStoresSection({
           area: s.area,
           category: s.category,
           image_url: firstImage,
-          hourly_min: s.hourly_min,
-          hourly_max: s.hourly_max,
+          trial_hourly_min: s.trial_hourly_min ?? null,
+          trial_hourly_max: s.trial_hourly_max ?? null,
         });
       }
       setResolved(items);
@@ -3784,12 +4114,12 @@ function RelatedStoresSection({
                   {s.category ? ` / ${s.category}` : ""}
                 </p>
               )}
-              {(s.hourly_min || s.hourly_max) && (
+              {(s.trial_hourly_min || s.trial_hourly_max) && (
                 <p
                   className="mt-0.5 text-[10px]"
                   style={{ color: GOLD_HEX, fontWeight: 600 }}
                 >
-                  時給 {formatWageRange(s.hourly_min, s.hourly_max) ?? "—"}
+                  体入時給 {formatWageRange(s.trial_hourly_min, s.trial_hourly_max) ?? "—"}
                 </p>
               )}
             </div>
@@ -3938,7 +4268,7 @@ function ReviewsSection({
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-semibold" style={{ color: "#1b2528" }}>
-                ログインで残り{Math.max(reviewsCount - visible.length, 1)}件の口コミを表示
+                ログインで残りの口コミを表示
               </div>
               <div className="mt-0.5 text-[10.5px]" style={{ color: "rgba(27,37,40,0.5)" }}>
                 LINEで30秒・無料

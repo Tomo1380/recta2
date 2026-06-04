@@ -50,8 +50,6 @@ describe("storeToForm", () => {
       holidays: "日曜",
       phone: "03-...",
       website_url: "https://x.example.com",
-      hourly_min: 4000,
-      hourly_max: 8000,
       daily_estimate: "50000",
       trial_type: "same_day",
       feature_tags: ["未経験歓迎"],
@@ -63,8 +61,6 @@ describe("storeToForm", () => {
     const form = storeToForm(store);
     expect(form.shopName).toBe("Lounge X");
     expect(form.area).toBe("六本木");
-    expect(form.minWage).toBe("4000");
-    expect(form.maxWage).toBe("8000");
     expect(form.sameDayTrial).toBe("same_day");
     expect(form.tags).toEqual(["未経験歓迎"]);
   });

@@ -5,9 +5,11 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
+  ReorderStoreImagesRequest,
   StoreDeleteImage200,
   StoreGeocode200,
   StoreGeocodeBody,
+  StoreReorderImages200,
   StoreUploadImage201,
   StoresIndex200,
   StoresIndexParams,
@@ -96,6 +98,17 @@ formData.append(`image`, uploadStoreImageRequest.image);
     },
       );
     }
+  export const storeReorderImages = (
+    store: number,
+    reorderStoreImagesRequest: ReorderStoreImagesRequest,
+ ) => {
+      return rectaMutator<StoreReorderImages200>(
+      {url: `/admin/stores/${store}/images/reorder`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: reorderStoreImagesRequest
+    },
+      );
+    }
   export const storeDeleteImage = (
     store: number,
     index: number,
@@ -112,4 +125,5 @@ export type StoresShowResult = NonNullable<Awaited<ReturnType<typeof storesShow>
 export type StoresUpdateResult = NonNullable<Awaited<ReturnType<typeof storesUpdate>>>
 export type StoresDestroyResult = NonNullable<Awaited<ReturnType<typeof storesDestroy>>>
 export type StoreUploadImageResult = NonNullable<Awaited<ReturnType<typeof storeUploadImage>>>
+export type StoreReorderImagesResult = NonNullable<Awaited<ReturnType<typeof storeReorderImages>>>
 export type StoreDeleteImageResult = NonNullable<Awaited<ReturnType<typeof storeDeleteImage>>>

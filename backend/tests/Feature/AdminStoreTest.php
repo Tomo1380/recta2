@@ -62,8 +62,10 @@ class AdminStoreTest extends TestCase
             'area' => '六本木',
             'category' => 'ラウンジ',
             'publish_status' => 'draft',
-            'hourly_min' => 3000,
-            'hourly_max' => 8000,
+            // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+            // フロントは体入時給を文字列で送る (BUG-013)。
+            'trial_hourly_min' => '3000',
+            'trial_hourly_max' => '8000',
             'description' => 'A nice lounge',
             'feature_tags' => ['未経験歓迎', 'ノルマなし'],
         ];
@@ -77,8 +79,9 @@ class AdminStoreTest extends TestCase
                 'area' => '六本木',
                 'category' => 'ラウンジ',
                 'publish_status' => 'draft',
-                'hourly_min' => 3000,
-                'hourly_max' => 8000,
+                // 通常時給は廃止。給与は体入時給に一本化。
+                'trial_hourly_min' => 3000,
+                'trial_hourly_max' => 8000,
             ]);
 
         $this->assertDatabaseHas('stores', [
@@ -159,13 +162,15 @@ class AdminStoreTest extends TestCase
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/admin/stores/{$store->id}", [
                 'name' => 'Updated Store',
-                'hourly_min' => 5000,
+                // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
+                'trial_hourly_min' => '5000',
             ]);
 
         $response->assertStatus(200)
             ->assertJson([
                 'name' => 'Updated Store',
-                'hourly_min' => 5000,
+                // 通常時給は廃止。給与は体入時給に一本化。
+                'trial_hourly_min' => 5000,
             ]);
 
         $this->assertDatabaseHas('stores', [
@@ -274,11 +279,168 @@ class AdminStoreTest extends TestCase
         $this->assertEquals('Store with JSON', $response->json('name'));
     }
 
+    /**
+     * 6/4 追加FB: 採用例はセクション単位 (recent_hire_examples) で保存・返却される。
+     * recent_hires は月別の人数だけを持ち、examples は紐付かない。
+     */
+    public function test_create_store_with_recent_hire_examples(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Recent Hire Store',
+                'area' => '銀座',
+                'category' => 'クラブ',
+                'recent_hires' => [
+                    ['month' => '1ヶ月前', 'count' => 12],
+                    ['month' => '2ヶ月前', 'count' => 8],
+                ],
+                'recent_hires_summary' => '直近2ヶ月で20名採用',
+                'recent_hire_examples' => [
+                    '20歳 未経験 → 時給5,000円スタート',
+                    '25歳 経験1年 → 時給6,500円スタート',
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertSame(['20歳 未経験 → 時給5,000円スタート', '25歳 経験1年 → 時給6,500円スタート'], $response->json('recent_hire_examples'));
+        $this->assertSame(12, $response->json('recent_hires.0.count'));
+        // 月別エントリに examples は含めない。
+        $this->assertArrayNotHasKey('examples', $response->json('recent_hires.0'));
+    }
+
+    /**
+     * 6/4 追加FB: 店舗画像をドラッグ&ドロップで並べ替えできる (= サムネイル変更)。
+     * order は現在 index の新しい並び順。order フィールドも振り直される。
+     */
+    public function test_admin_can_reorder_store_images(): void
+    {
+        $store = $this->createStore([
+            'images' => [
+                ['url' => 'https://example.com/a.jpg', 'order' => 0],
+                ['url' => 'https://example.com/b.jpg', 'order' => 1],
+                ['url' => 'https://example.com/c.jpg', 'order' => 2],
+            ],
+        ]);
+
+        // 3枚目を先頭 (サムネイル) に持ってくる: [2, 0, 1]
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/stores/{$store->id}/images/reorder", ['order' => [2, 0, 1]]);
+
+        $response->assertStatus(200);
+        $images = $response->json('images');
+        $this->assertSame('https://example.com/c.jpg', $images[0]['url']);
+        $this->assertSame('https://example.com/a.jpg', $images[1]['url']);
+        $this->assertSame('https://example.com/b.jpg', $images[2]['url']);
+        // order は新しい位置で振り直される。
+        $this->assertSame([0, 1, 2], array_column($images, 'order'));
+    }
+
+    public function test_reorder_store_images_rejects_invalid_permutation(): void
+    {
+        $store = $this->createStore([
+            'images' => [
+                ['url' => 'https://example.com/a.jpg', 'order' => 0],
+                ['url' => 'https://example.com/b.jpg', 'order' => 1],
+            ],
+        ]);
+
+        // 重複・欠番は順列でないので 422。
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/stores/{$store->id}/images/reorder", ['order' => [0, 0]]);
+
+        $response->assertStatus(422);
+    }
+
     public function test_store_list_requires_authentication(): void
     {
         $response = $this->getJson('/api/admin/stores');
 
         $response->assertStatus(401);
+    }
+
+    /**
+     * 第2弾グループ4: ドレスコードの説明＋ドレス例画像 (dress_code.photos) が
+     * dress_code_detail として返ること。
+     */
+    public function test_create_store_with_dress_photos(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Dress Photo Store',
+                'area' => '銀座',
+                'category' => 'ラウンジ',
+                'dress_code' => [
+                    'description' => "明るめのミニドレス推奨。\n黒・ロングはNG。",
+                    'photos' => [
+                        ['image_url' => 'https://example.com/dress1.jpg', 'caption' => 'スナイデル'],
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertCount(1, $response->json('dress_code_detail.photos'));
+        $this->assertSame('スナイデル', $response->json('dress_code_detail.photos.0.caption'));
+    }
+
+    /**
+     * 第2弾グループ3: 面接で聞かれることリスト (interview_info.questions) が
+     * 格納され Resource で返ること。
+     */
+    public function test_create_store_with_interview_questions(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Interview Q Store',
+                'area' => '銀座',
+                'category' => 'クラブ',
+                'interview_info' => [
+                    'criteria' => "明るい方歓迎\n未経験OK",
+                    'questions' => [
+                        ['question' => '出勤頻度は？', 'answer' => '週1からOKです'],
+                        ['question' => '体験はできますか？', 'answer' => 'はい、当日体験も可能です'],
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertCount(2, $response->json('interview_info.questions'));
+        $this->assertSame('出勤頻度は？', $response->json('interview_info.questions.0.question'));
+        $this->assertSame('週1からOKです', $response->json('interview_info.questions.0.answer'));
+    }
+
+    /**
+     * 第2弾グループ1: 給料システム / バックのフリーテキスト / 給与サイクル・
+     * 給料日・日払い上限 が JSONB に格納され、Resource で flat に返ること。
+     */
+    public function test_create_store_with_pay_system_and_payroll_fields(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Pay System Store',
+                'area' => '六本木',
+                'category' => 'ラウンジ',
+                'pay_system_types' => ['完全時給制', '時給+バックor売上の高い方'],
+                'pay_system_note' => "売上の20%還元。\nポイントは1pt=100円。",
+                'back_text' => "同伴バック：21:30まで\n1回目→5,000円",
+                'payroll_cycle' => '月末締め翌月払い',
+                'payroll_pay_day' => '月末締め翌月15日払い',
+                'daily_pay_limit' => '30,000円まで',
+                'facility_photos' => [
+                    ['image_url' => 'https://example.com/locker.jpg', 'caption' => '更衣室'],
+                    ['image_url' => '/storage/stores/extra/toilet.jpg', 'caption' => 'パウダールーム'],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertSame('完全時給制', $response->json('pay_system_types.0'));
+        $this->assertCount(2, $response->json('facility_photos'));
+        $this->assertSame('更衣室', $response->json('facility_photos.0.caption'));
+        $this->assertCount(2, $response->json('pay_system_types'));
+        $this->assertStringContainsString('ポイント', $response->json('pay_system_note'));
+        $this->assertStringContainsString('同伴バック', $response->json('back_text'));
+        $this->assertSame('月末締め翌月払い', $response->json('payroll_cycle'));
+        $this->assertSame('月末締め翌月15日払い', $response->json('payroll_pay_day'));
+        $this->assertSame('30,000円まで', $response->json('daily_pay_limit'));
     }
 
     /**

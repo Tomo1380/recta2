@@ -26,7 +26,7 @@ const PRESETS: Record<RelocateSupportVariant, {
     eyebrowTag: "Relocate Support",
     badge: "家紹介あり",
     title: "地方から東京で働きたい方へ",
-    subtitle: "体験確約・オンライン面接・住居サポートまで一気通貫",
+    subtitle: "体入確約・オンライン面接・住居サポートまで一気通貫",
     Icon: HomeIcon,
     iconRender: "outline",
   },

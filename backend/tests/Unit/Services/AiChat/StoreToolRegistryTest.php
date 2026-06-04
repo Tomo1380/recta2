@@ -72,7 +72,8 @@ class StoreToolRegistryTest extends TestCase
             'area' => '六本木',
             'category' => 'ラウンジ',
             'nearest_station' => '六本木駅',
-            'wage' => ['regular' => ['min' => 4000, 'max' => 8000, 'unit' => 'hour']],
+            // 通常時給は廃止。給与は体入時給 (wage.trial) に一本化。
+            'wage' => ['trial' => ['hourly_min' => 4000, 'hourly_max' => 8000]],
             'schedule' => ['hours_text' => '20-LAST', 'open' => '20:00', 'close' => 'LAST'],
             'feature_tags' => ['未経験歓迎'],
             'description' => 'テスト',
@@ -82,8 +83,9 @@ class StoreToolRegistryTest extends TestCase
         $result = $this->tools->getStoreDetail(['store_id' => $store->id]);
 
         $this->assertEquals('Lounge X', $result['name']);
-        $this->assertEquals(4000, $result['hourly_min']);
-        $this->assertEquals(8000, $result['hourly_max']);
+        // 通常時給は廃止。給与は体入時給に一本化。
+        $this->assertEquals(4000, $result['trial_hourly_min']);
+        $this->assertEquals(8000, $result['trial_hourly_max']);
         $this->assertEquals('20-LAST', $result['business_hours']);
         $this->assertContains('未経験歓迎', $result['feature_tags']);
     }

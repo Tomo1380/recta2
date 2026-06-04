@@ -23,8 +23,8 @@ class PublicApiTest extends TestCase
         static $counter = 0;
         $counter++;
 
-        // Allow tests to keep using the legacy flat fields (hourly_min, hourly_max)
-        // by folding them into the new JSONB structure here.
+        // テストの flat な hourly_min/hourly_max 指定を体入時給 (wage.trial) に畳む。
+        // 通常時給 (wage.regular) は廃止し、サイトの時給は体入時給に一本化したため。
         $hourlyMin = $overrides['hourly_min'] ?? 3000;
         $hourlyMax = $overrides['hourly_max'] ?? 8000;
         unset($overrides['hourly_min'], $overrides['hourly_max']);
@@ -35,7 +35,7 @@ class PublicApiTest extends TestCase
             'category' => 'キャバクラ',
             'publish_status' => 'published',
             'wage' => [
-                'regular' => ['min' => (int) $hourlyMin, 'max' => (int) $hourlyMax, 'unit' => 'hour'],
+                'trial' => ['hourly_min' => (int) $hourlyMin, 'hourly_max' => (int) $hourlyMax],
             ],
         ];
 
@@ -204,7 +204,7 @@ class PublicApiTest extends TestCase
 
         $response->assertStatus(200);
         $data = $response->json('data');
-        $this->assertGreaterThanOrEqual($data[1]['hourly_max'], $data[0]['hourly_max']);
+        $this->assertGreaterThanOrEqual($data[1]['trial_hourly_max'], $data[0]['trial_hourly_max']);
     }
 
     public function test_can_filter_stores_by_min_hourly(): void
@@ -217,7 +217,7 @@ class PublicApiTest extends TestCase
         $response->assertStatus(200);
         $data = $response->json('data');
         $this->assertCount(1, $data);
-        $this->assertGreaterThanOrEqual(4000, $data[0]['hourly_min']);
+        $this->assertGreaterThanOrEqual(4000, $data[0]['trial_hourly_min']);
     }
 
     // ========== Store Detail ==========

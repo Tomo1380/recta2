@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, Radio } from "lucide-react";
 import { api } from "~/lib/api";
 import type { User, Paginated, UserIndexResponse } from "~/lib/types";
+import { SortControl, type SortState } from "~/components/admin/shared/SortControl";
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -31,6 +32,7 @@ export function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("全て");
   const [lineFilter, setLineFilter] = useState("全て");
+  const [sortState, setSortState] = useState<SortState>({ sort: "created_at", order: "desc" });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Paginated<User> | null>(null);
@@ -48,7 +50,7 @@ export function UsersPage() {
   // Reset page when filter changes
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, lineFilter]);
+  }, [statusFilter, lineFilter, sortState]);
 
   // Fetch users
   useEffect(() => {
@@ -61,6 +63,8 @@ export function UsersPage() {
     if (status) params.set("status", status);
     const lineStatus = lineStatusParam(lineFilter);
     if (lineStatus) params.set("line_status", lineStatus);
+    params.set("sort", sortState.sort);
+    params.set("order", sortState.order);
     params.set("page", String(page));
 
     api
@@ -81,7 +85,7 @@ export function UsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, statusFilter, lineFilter, page]);
+  }, [debouncedSearch, statusFilter, lineFilter, sortState, page]);
 
   const users = data?.data ?? [];
   const currentPage = data?.current_page ?? 1;
@@ -197,6 +201,7 @@ export function UsersPage() {
             </button>
           ))}
         </div>
+        <SortControl value={sortState} onChange={setSortState} />
       </div>
 
       {/* Table */}
@@ -310,8 +315,10 @@ export function UsersPage() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-[12px] text-muted-foreground">
-          {total} 件中 {users.length} 件表示
+        <p className="text-[13px] text-muted-foreground">
+          {total === 0
+            ? "0 件"
+            : `全 ${total} 件中 ${(currentPage - 1) * 20 + 1}–${(currentPage - 1) * 20 + users.length} 件`}
         </p>
         <div className="flex items-center gap-0.5">
           <button

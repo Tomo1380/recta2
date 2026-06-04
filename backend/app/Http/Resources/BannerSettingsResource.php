@@ -15,6 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * @property string|null $hero_subtitle
  * @property string|null $hero_badge
  * @property string|null $hero_ai_label
+ * @property string|null $hero_image_url
  */
 class BannerSettingsResource extends JsonResource
 {
@@ -28,6 +29,7 @@ class BannerSettingsResource extends JsonResource
             'hero_subtitle' => $this->resource['hero_subtitle'] ?? null,
             'hero_badge' => $this->resource['hero_badge'] ?? null,
             'hero_ai_label' => $this->resource['hero_ai_label'] ?? null,
+            'hero_image_url' => $this->resource['hero_image_url'] ?? null,
         ];
     }
 }

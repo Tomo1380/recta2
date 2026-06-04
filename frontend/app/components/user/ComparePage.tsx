@@ -52,8 +52,7 @@ interface ComparableStore {
   name: string;
   area?: string;
   category?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
   daily_estimate?: number;
   trial_hourly_min?: number | string | null;
   trial_hourly_max?: number | string | null;
@@ -61,7 +60,7 @@ interface ComparableStore {
   trial_hourly?: number | string | null;
   /** @deprecated 旧キー (フォールバック用) */
   trial_avg_hourly?: number | string | null;
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし) */
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし) */
   trial_type?: "same_day" | "normal" | "none";
   back_items?: BackItem[];
   norma_info?: string;
@@ -94,6 +93,12 @@ interface ComparePageProps {
 function formatYen(value: number | undefined): string {
   if (value === undefined || value === null || !Number.isFinite(value)) return "—";
   return `¥${value.toLocaleString()}`;
+}
+
+/** 体入時給は number / "5,000円" / null が混在しうるので数値化する (空なら undefined)。 */
+function toWageNum(v: number | string | null | undefined): number | undefined {
+  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 function pickHeroImage(store: ComparableStore): string | undefined {
@@ -410,16 +415,16 @@ interface PickerCandidate {
   name: string;
   area?: string;
   image_url?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number | string | null;
+  trial_hourly_max?: number | string | null;
 }
 
 interface PickupApiShape {
   id: number;
   name: string;
   area?: string;
-  hourly_min?: number;
-  hourly_max?: number;
+  trial_hourly_min?: number | string | null;
+  trial_hourly_max?: number | string | null;
   images?: (string | { url?: string })[];
 }
 
@@ -467,8 +472,8 @@ function AddStorePicker({
           id: p.id,
           name: p.name,
           area: p.area,
-          hourly_min: p.hourly_min,
-          hourly_max: p.hourly_max,
+          trial_hourly_min: p.trial_hourly_min,
+          trial_hourly_max: p.trial_hourly_max,
           image_url: pickupImage(p),
         }));
         setPickup(list);
@@ -482,8 +487,8 @@ function AddStorePicker({
     name: v.name,
     area: v.area,
     image_url: v.image_url,
-    hourly_min: v.hourly_min,
-    hourly_max: v.hourly_max,
+    trial_hourly_min: v.trial_hourly_min,
+    trial_hourly_max: v.trial_hourly_max,
   }));
 
   // 重複と「既に比較中」の店舗を除外
@@ -645,12 +650,23 @@ function PickerSection({
                 <span className="mt-0.5 flex items-center gap-1.5">
                   <MapPin size={10} style={{ color: "rgba(27,37,40,0.4)" }} aria-hidden />
                   <span style={{ fontFamily: J, fontSize: 10.5, color: "rgba(27,37,40,0.55)" }}>{c.area ?? "—"}</span>
-                  {c.hourly_min && (
-                    <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 10, color: GOLD, marginLeft: 4 }}>
-                      時給 ¥{c.hourly_min.toLocaleString()}
-                      {c.hourly_max && c.hourly_max !== c.hourly_min ? `〜${c.hourly_max.toLocaleString()}` : ""}
-                    </span>
-                  )}
+                  {(() => {
+                    // 通常時給ではなく体入時給を出す。number|string|null を数値化。
+                    const toN = (v: number | string | null | undefined): number | null => {
+                      const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
+                      return Number.isFinite(n) && n > 0 ? n : null;
+                    };
+                    const lo = toN(c.trial_hourly_min);
+                    const hi = toN(c.trial_hourly_max);
+                    if (!lo && !hi) return null;
+                    const head = lo ?? hi!;
+                    return (
+                      <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 10, color: GOLD, marginLeft: 4 }}>
+                        体入時給 ¥{head.toLocaleString()}
+                        {lo && hi && hi !== lo ? `〜${hi.toLocaleString()}` : ""}
+                      </span>
+                    );
+                  })()}
                 </span>
               </span>
               <Plus size={16} aria-hidden style={{ color: GOLD }} />
@@ -771,15 +787,17 @@ export default function ComparePage({ ids }: ComparePageProps) {
         { label: "カテゴリ", values: valid.map((s) => s.category ?? "—"), bestAt: null },
       ],
       salary: [
+        // 本入店後の通常時給は載せず、体入時給(下限/上限)で比較する。
+        // 新キー優先・旧キー(avg_hourly/trial_hourly)フォールバックは詳細ページと同じ。
         {
-          label: "時給(上限)",
-          values: valid.map((s) => formatYen(s.hourly_max)),
-          bestAt: bestIndex(num((s) => s.hourly_max)),
+          label: "体入時給(下限)",
+          values: valid.map((s) => formatYen(toWageNum(s.trial_hourly_min ?? s.trial_avg_hourly))),
+          bestAt: bestIndex(num((s) => toWageNum(s.trial_hourly_min ?? s.trial_avg_hourly))),
         },
         {
-          label: "時給(下限)",
-          values: valid.map((s) => formatYen(s.hourly_min)),
-          bestAt: bestIndex(num((s) => s.hourly_min)),
+          label: "体入時給(上限)",
+          values: valid.map((s) => formatYen(toWageNum(s.trial_hourly_max ?? s.trial_hourly))),
+          bestAt: bestIndex(num((s) => toWageNum(s.trial_hourly_max ?? s.trial_hourly))),
         },
         {
           label: "バック類",
@@ -806,23 +824,6 @@ export default function ComparePage({ ids }: ComparePageProps) {
             valid.map((s) =>
               s.trial_type === "same_day" ? 2 : s.trial_type === "normal" ? 1 : 0,
             ),
-          ),
-        },
-        {
-          // 比較表は 1 値のみ表示できるので、最低額 (新キー or 旧 avg_hourly)
-          // を優先。空ならフォールバック (旧 trial_hourly → 最高額)。
-          label: "体験時給",
-          values: valid.map((s) => {
-            const v = s.trial_hourly_min ?? s.trial_avg_hourly ?? s.trial_hourly_max ?? s.trial_hourly;
-            const n = v != null && v !== "" ? Number(v) : undefined;
-            return formatYen(Number.isFinite(n) ? n : undefined);
-          }),
-          bestAt: bestIndex(
-            num((s) => {
-              const v = s.trial_hourly_min ?? s.trial_avg_hourly ?? s.trial_hourly_max ?? s.trial_hourly;
-              const n = v != null && v !== "" ? Number(v) : undefined;
-              return Number.isFinite(n) ? n : undefined;
-            }),
           ),
         },
       ],

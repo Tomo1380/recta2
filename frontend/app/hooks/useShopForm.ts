@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useReducer } from "react";
 import type { Store } from "~/lib/types";
+import { trialDailyEstimate } from "~/lib/wage";
 
 /**
  * ShopEditPage / ShopCreatePage の店舗フォーム state を集約する hook。
@@ -29,6 +30,11 @@ export type StaffPhotoDraft = {
   instagram_url: string;
   staff_type: string;
 };
+/** 施設写真 (トイレ/更衣室/セット場所 等) のドラフト。 */
+export type FacilityPhotoDraft = {
+  image_url: string;
+  caption: string;
+};
 export type TransferZoneDraft = {
   label: string;
   radius_km: string;
@@ -50,7 +56,6 @@ export type RectaEpisodeDraft = {
 export type HiringEntryDraft = {
   month: string;
   count: string;
-  examples: string[];
 };
 
 export interface ShopForm {
@@ -71,14 +76,27 @@ export interface ShopForm {
   // 動画・スタッフ写真
   videos: VideoDraft[];
   staffPhotos: StaffPhotoDraft[];
+  /** 施設写真 (トイレ/更衣室/セット場所 等) */
+  facilityPhotos: FacilityPhotoDraft[];
 
-  // 給与・待遇
-  minWage: string;
-  maxWage: string;
+  // 給与・待遇 (通常時給 minWage/maxWage は廃止。給与は体入時給 trialMinWage/Max に一本化)
   dailyPay: string;
+  /** 給料システム (複数選択: 完全時給制 / 時給+バック など) */
+  paySystemTypes: string[];
+  /** 給料システムの詳細備考 (売上制/ポイント制の具体ロジック等) */
+  paySystemNote: string;
+  /** バックをフリーテキストで記載 (同伴/本指名/場内など月本数で変わる複雑なものに対応) */
+  backText: string;
   backItems: LabelValue[];
+  /** 引かれ物 (旧「控除/手数料」) */
   feeItems: LabelValue[];
   salaryNote: string;
+  /** 給与サイクル (旧 payrollSystemType を置き換え。月末締め翌月払い 等) */
+  payrollCycle: string;
+  /** 給料日 (サイクルにより条件表示。締め日・支払日) */
+  payrollPayDay: string;
+  /** 日払い上限金額 (「日払い可」の代わり) */
+  dailyPayLimit: string;
   guaranteePeriod: string;
   guaranteeDetail: string;
   normaInfo: string;
@@ -88,7 +106,7 @@ export interface ShopForm {
   trialMaxWage: string;
   interviewStart: string;
   interviewEnd: string;
-  /** 体入タイプ: 'same_day' (体験確約) / 'normal' (体入可能) / 'none' (体入なし)。
+  /** 体入タイプ: 'same_day' (体入確約) / 'normal' (体入可能) / 'none' (体入なし)。
       フォーム内ではそのまま日本語ラベルを使わず enum string で持ち、表示時に
       ラベル変換する。 */
   sameDayTrial: "same_day" | "normal" | "none";
@@ -99,6 +117,8 @@ export interface ShopForm {
   tags: string[];
   description: string;
   featureText: string;
+  /** 店舗まとめ (例「六本木ポセイドンまとめ」)。改行＋内部リンク対応のフリーテキスト。 */
+  summaryText: string;
   expLevel: number;
   atmosphere: number;
   castBijin: string;
@@ -114,11 +134,15 @@ export interface ShopForm {
   dressCode: string;
   hiringCriteria: string;
   interviewDialog: LabelValue[];
+  /** 面接で聞かれることリスト (label=質問, value=回答)。Q&Aアコーディオンで表示。 */
+  interviewQuestions: LabelValue[];
   documents: string[];
   docNote: string;
   shiftInfo: string;
   hiringEntries: HiringEntryDraft[];
   hiringTotal: string;
+  /** 採用例 (セクション単位)。旧来は各月に紐付いていたが月単位の必然性がないため統合。 */
+  hiringExamples: string[];
 
   // その他 (送り、系列、シャンパン、ドレスコード詳細、セット料金、エピソード、Q&A、コメント)
   transferDescription: string;
@@ -130,6 +154,8 @@ export interface ShopForm {
   dressCodeDescription: string;
   dressCodeOk: DressExampleDraft[];
   dressCodeNg: DressExampleDraft[];
+  /** ドレス例画像 (OK/NGを廃止し、説明＋画像に簡素化) */
+  dressPhotos: FacilityPhotoDraft[];
   setFeeList: LabelValueNote[];
   setFeeNotes: string;
   rectaEpisodes: RectaEpisodeDraft[];
@@ -149,6 +175,13 @@ export interface ShopForm {
   priority: string;
 }
 
+/** 必要書類の基本3点。空の店舗ではこれを初期表示する (運営が変更可)。 */
+export const DEFAULT_DOCUMENTS = [
+  "身分証明書（顔写真付き）",
+  "住民票",
+  "マイナンバー",
+];
+
 const EMPTY_CHAMPAGNE = (): Record<ChampagneKey, ChampagnePriceDraft> => ({
   tequila: { amount: "", note: "" },
   belle_epoque: { amount: "", note: "" },
@@ -159,23 +192,26 @@ const EMPTY_CHAMPAGNE = (): Record<ChampagneKey, ChampagnePriceDraft> => ({
 export const INITIAL_FORM: ShopForm = {
   shopName: "", area: "", address: "", lat: null, lng: null, station: "",
   category: "", openingTime: "", closingTime: "", holiday: "", phone: "", website: "",
-  videos: [], staffPhotos: [],
-  minWage: "", maxWage: "", dailyPay: "",
-  backItems: [], feeItems: [], salaryNote: "",
+  videos: [], staffPhotos: [], facilityPhotos: [],
+  dailyPay: "",
+  paySystemTypes: [], paySystemNote: "",
+  backText: "", backItems: [], feeItems: [], salaryNote: "",
+  payrollCycle: "", payrollPayDay: "", dailyPayLimit: "",
   guaranteePeriod: "", guaranteeDetail: "", normaInfo: "",
   trialMinWage: "", trialMaxWage: "",
   interviewStart: "", interviewEnd: "", sameDayTrial: "normal",
   payrollSystemType: "", payrollSystemDescription: "",
-  tags: [], description: "", featureText: "",
+  tags: [], description: "", featureText: "", summaryText: "",
   expLevel: 50, atmosphere: 50,
   castBijin: "", castKawaii: "", castGlamour: "", castNatural: "",
   clientAge: [], drinkStyle: 50,
   dressAdvice: "", dressTips: [], dressCode: "", hiringCriteria: "",
-  interviewDialog: [], documents: [], docNote: "", shiftInfo: "",
-  hiringEntries: [], hiringTotal: "",
+  interviewDialog: [], interviewQuestions: [],
+  documents: [...DEFAULT_DOCUMENTS], docNote: "", shiftInfo: "",
+  hiringEntries: [], hiringTotal: "", hiringExamples: [],
   transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
-  dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [],
+  dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [], dressPhotos: [],
   setFeeList: [], setFeeNotes: "",
   rectaEpisodes: [], qaItems: [],
   staffName: "", staffRole: "", staffComment: "", supportItems: [],
@@ -305,6 +341,13 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     }),
   );
 
+  const facilityPhotos: FacilityPhotoDraft[] = (store.facility_photos ?? []).map(
+    (p: AnyStore) => ({
+      image_url: p.image_url ?? "",
+      caption: p.caption ?? "",
+    }),
+  );
+
   const reqDocs = store.required_documents;
   const documents: string[] =
     reqDocs && !Array.isArray(reqDocs) ? reqDocs.documents ?? [] : (reqDocs as string[]) ?? [];
@@ -366,6 +409,9 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
   const dressCodeNg: DressExampleDraft[] = (dressDetail?.ng_examples ?? []).map(
     (e: AnyStore) => ({ note: e?.note ?? "" }),
   );
+  const dressPhotos: FacilityPhotoDraft[] = (dressDetail?.photos ?? []).map(
+    (p: AnyStore) => ({ image_url: p?.image_url ?? "", caption: p?.caption ?? "" }),
+  );
 
   const sf = store.set_fee ?? {};
   const setFeeList: LabelValueNote[] = (sf.items ?? []).map((it: AnyStore) => ({
@@ -400,9 +446,23 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     website: store.website_url ?? "",
     videos,
     staffPhotos,
-    minWage: store.hourly_min?.toString() ?? "",
-    maxWage: store.hourly_max?.toString() ?? "",
+    facilityPhotos,
     dailyPay: store.daily_estimate ?? "",
+    paySystemTypes: Array.isArray(store.pay_system_types) ? store.pay_system_types : [],
+    paySystemNote: store.pay_system_note ?? "",
+    // バックはフリーテキストに移行。新フィールド (back_text) が無い既存店舗は
+    // 旧 back_items を「名前: 金額」改行テキストへ自動変換して初期表示する
+    // (初回保存でフリーテキストに引き継がれ、データを失わない)。
+    backText:
+      store.back_text ??
+      (Array.isArray(store.back_items) && store.back_items.length > 0
+        ? store.back_items
+            .map((i: AnyStore) =>
+              i.amount ? `${i.label}: ${i.amount}` : String(i.label ?? ""),
+            )
+            .filter(Boolean)
+            .join("\n")
+        : ""),
     backItems: (store.back_items ?? []).map((i: AnyStore) => ({
       label: i.label,
       value: i.amount,
@@ -412,6 +472,9 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
       value: i.amount,
     })),
     salaryNote: store.salary_notes ?? "",
+    payrollCycle: store.payroll_cycle ?? store.payroll_system_type ?? "",
+    payrollPayDay: store.payroll_pay_day ?? "",
+    dailyPayLimit: store.daily_pay_limit ?? "",
     guaranteePeriod: store.guarantee_period ?? "",
     guaranteeDetail: store.guarantee_details ?? "",
     normaInfo: store.norma_info ?? "",
@@ -430,6 +493,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     tags: store.feature_tags ?? [],
     description: store.description ?? "",
     featureText: store.features_text ?? "",
+    summaryText: store.summary_text ?? "",
     expLevel: analysis.experience_level ?? analysis.exp_level ?? 50,
     atmosphere: analysis.atmosphere ?? 50,
     castBijin: (castStyle.beauty ?? analysis.cast_bijin)?.toString() ?? "",
@@ -453,7 +517,13 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
       label: normalizeSpeaker(d.speaker ?? d.label ?? ""),
       value: d.text ?? d.value ?? "",
     })),
-    documents,
+    // 面接で聞かれることリスト (label=質問, value=回答)
+    interviewQuestions: (interview.questions ?? []).map((q: AnyStore) => ({
+      label: q.question ?? q.label ?? "",
+      value: q.answer ?? q.value ?? "",
+    })),
+    // 必要書類は空なら基本3点を初期表示 (運営が変更可)。
+    documents: documents.length > 0 ? documents : [...DEFAULT_DOCUMENTS],
     docNote,
     shiftInfo:
       (store.shift_info as string | undefined) ??
@@ -462,9 +532,14 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     hiringEntries: ((store.recent_hires as AnyStore[] | undefined) ?? []).map((h) => ({
       month: h.month ?? "",
       count: h.count?.toString() ?? "",
-      examples: h.examples ?? [],
     })),
     hiringTotal: store.recent_hires_summary ?? "",
+    // 採用例はセクション単位。旧データ (各月 recent_hires[].examples) は flatten して移行。
+    hiringExamples:
+      (store.recent_hire_examples as string[] | undefined) ??
+      ((store.recent_hires as AnyStore[] | undefined) ?? []).flatMap(
+        (h) => (h.examples as string[] | undefined) ?? [],
+      ),
     transferDescription: store.transfer_description ?? "",
     transferKm: store.transfer_km ?? "",
     transferZones,
@@ -476,6 +551,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     dressCodeDescription,
     dressCodeOk,
     dressCodeNg,
+    dressPhotos,
     setFeeList,
     setFeeNotes,
     rectaEpisodes: (store.recta_episodes ?? []).map((ep: AnyStore) => ({
@@ -545,9 +621,18 @@ export function formToPayload(
         instagram_url: p.instagram_url.trim() || null,
         staff_type: p.staff_type.trim() || null,
       })),
-    hourly_min: form.minWage ? Number(form.minWage) : null,
-    hourly_max: form.maxWage ? Number(form.maxWage) : null,
-    daily_estimate: form.dailyPay || null,
+    facility_photos: form.facilityPhotos
+      .filter((p) => p.image_url.trim() !== "")
+      .map((p) => ({
+        image_url: p.image_url.trim(),
+        caption: p.caption.trim() || null,
+      })),
+    // 通常時給 (hourly_min/max) は廃止したため payload に含めない。
+    // 日給目安は手入力を廃止し「体入時給 × 1日4時間」で自動算出する (体入日給)。
+    daily_estimate: trialDailyEstimate(form.trialMinWage, form.trialMaxWage),
+    back_text: form.backText.trim() || null,
+    pay_system_types: form.paySystemTypes,
+    pay_system_note: form.paySystemNote.trim() || null,
     back_items: form.backItems
       .filter((i) => i.label)
       .map((i) => ({ label: i.label, amount: i.value })),
@@ -572,6 +657,7 @@ export function formToPayload(
     feature_tags: form.tags,
     description: form.description,
     features_text: form.featureText,
+    summary_text: form.summaryText.trim() || null,
     required_documents: {
       documents: form.documents.filter(Boolean),
       notes: form.docNote,
@@ -588,8 +674,10 @@ export function formToPayload(
         glamour: Number(form.castGlamour) || 0,
         natural: Number(form.castNatural) || 0,
       },
+      // 固定ラベル(20代/30代/40代/50代以降)のうち割合>0 のものだけ送る
+      // (公開ページで0%の空行を出さないため)。
       customer_age: form.clientAge
-        .filter((c) => c.label)
+        .filter((c) => c.label && (Number(c.value) || 0) > 0)
         .map((c) => ({ label: c.label, ratio: Number(c.value) || 0 })),
       drinking_style: form.drinkStyle,
     },
@@ -603,14 +691,22 @@ export function formToPayload(
         // UI: label=話者 (面接官/応募者), value=セリフ
         // DB: { speaker: "staff" | "user", text: string }
         .map((i) => ({ text: i.value, speaker: speakerToDb(i.label) })),
+      // 面接で聞かれることリスト: { question, answer }。質問が空の行は捨てる。
+      questions: form.interviewQuestions
+        .filter((q) => q.label.trim())
+        .map((q) => ({ question: q.label.trim(), answer: q.value.trim() })),
     },
     schedule: form.shiftInfo ? { shift_info: form.shiftInfo } : null,
-    recent_hires: form.hiringEntries.map((h) => ({
-      month: h.month,
-      count: Number(h.count) || 0,
-      examples: h.examples,
-    })),
+    // 直近採用は相対月スロット(1〜5ヶ月前)。人数>0 の月だけ送る。
+    recent_hires: form.hiringEntries
+      .filter((h) => (Number(h.count) || 0) > 0)
+      .map((h) => ({
+        month: h.month,
+        count: Number(h.count) || 0,
+      })),
     recent_hires_summary: form.hiringTotal,
+    // 採用例はセクション単位。空文字は除外。
+    recent_hire_examples: form.hiringExamples.map((e) => e.trim()).filter(Boolean),
     staff_comment: {
       name: form.staffName,
       role: form.staffRole,
@@ -635,6 +731,9 @@ export function formToPayload(
       form.relatedStoreIds.length > 0 ? form.relatedStoreIds : null,
     payroll_system_type: form.payrollSystemType || null,
     payroll_system_description: form.payrollSystemDescription,
+    payroll_cycle: form.payrollCycle || null,
+    payroll_pay_day: form.payrollPayDay.trim() || null,
+    daily_pay_limit: form.dailyPayLimit.trim() || null,
     champagne_description: form.champagneDescription,
     champagne_prices: (() => {
       const out: Record<string, { amount: number; note?: string }> = {};
@@ -653,17 +752,25 @@ export function formToPayload(
     })(),
     dress_code:
       form.dressCodeDescription.trim() ||
+      form.dressPhotos.some((p) => p.image_url.trim()) ||
       form.dressCodeOk.length > 0 ||
       form.dressCodeNg.length > 0
         ? {
             description: form.dressCodeDescription.trim() || undefined,
-            // 画像 (image_url) は廃止。note のみを送る。
+            // OK/NG例は廃止し「説明＋ドレス例画像」に簡素化。旧データ保持のため
+            // ok/ng は送り続けるが、UI/公開からは出さない。
             ok_examples: form.dressCodeOk
               .filter((e) => e.note.trim())
               .map((e) => ({ note: e.note.trim() })),
             ng_examples: form.dressCodeNg
               .filter((e) => e.note.trim())
               .map((e) => ({ note: e.note.trim() })),
+            photos: form.dressPhotos
+              .filter((p) => p.image_url.trim())
+              .map((p) => ({
+                image_url: p.image_url.trim(),
+                caption: p.caption.trim() || null,
+              })),
           }
         : null,
     set_fee:
