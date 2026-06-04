@@ -32,6 +32,7 @@ import {
   Pause,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X as XIcon,
   Minus,
   Maximize2,
@@ -130,6 +131,8 @@ interface InterviewInfo {
   dress_code: string;
   criteria: string;
   dialog: DialogEntry[];
+  /** 面接で聞かれることリスト (Q&Aアコーディオン) */
+  questions?: { question: string; answer: string }[] | null;
 }
 
 interface RequiredDocuments {
@@ -992,7 +995,14 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 })()}
               />
               {store.recent_hires_summary && (
-                <InfoRow label="直近の採用" value={store.recent_hires_summary} />
+                <InfoRow
+                  label={
+                    store.recent_hires && store.recent_hires.length > 0
+                      ? `直近${store.recent_hires.length}ヶ月での採用`
+                      : "直近の採用"
+                  }
+                  value={store.recent_hires_summary}
+                />
               )}
             </div>
 
@@ -1022,7 +1032,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                           className="text-[10px] text-center"
                           style={{ color: "rgba(27,37,40,0.45)" }}
                         >
-                          {hire.month.replace("2026年", "")}
+                          {hire.month}
                         </span>
                       </div>
                     );
@@ -1286,7 +1296,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 {store.interview_info && (
                 <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
                   {store.interview_info.criteria && (
-                    <InfoRow label="採用基準" value={store.interview_info.criteria} />
+                    <InfoRow
+                      label="採用基準"
+                      value={<span className="whitespace-pre-line">{store.interview_info.criteria}</span>}
+                    />
                   )}
                   {store.interview_info.dress_code && (
                     <InfoRow label="服装" value={store.interview_info.dress_code} />
@@ -1316,7 +1329,49 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   </div>
                 )}
 
-                {(store.interview_info?.dialog ?? []).length > 0 && (
+                {/* 面接で聞かれることリスト: 質問をタップで回答が開くQ&Aアコーディオン。
+                    新データ(questions)を優先し、無ければ旧 dialog をフォールバック表示。 */}
+                {(store.interview_info?.questions ?? []).filter((q) => q.question).length > 0 ? (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
+                      面接で聞かれることリスト
+                    </h3>
+                    <div className="space-y-1.5">
+                      {(store.interview_info?.questions ?? [])
+                        .filter((q) => q.question)
+                        .map((qa, i) => (
+                          <details
+                            key={i}
+                            className="group rounded-[12px] overflow-hidden"
+                            style={{ border: "1px solid rgba(27,37,40,0.08)" }}
+                          >
+                            <summary
+                              className="flex items-center justify-between gap-2 cursor-pointer list-none px-3.5 py-2.5 text-sm font-medium"
+                              style={{ color: "#1b2528" }}
+                            >
+                              <span className="flex items-start gap-2">
+                                <span style={{ color: "#D4AF37" }}>Q.</span>
+                                <span>{qa.question}</span>
+                              </span>
+                              <ChevronDown
+                                size={16}
+                                className="shrink-0 transition-transform group-open:rotate-180"
+                                style={{ color: "rgba(27,37,40,0.4)" }}
+                              />
+                            </summary>
+                            {qa.answer && (
+                              <div
+                                className="px-3.5 pb-3 pt-0 text-sm whitespace-pre-line"
+                                style={{ color: "rgba(27,37,40,0.7)" }}
+                              >
+                                {qa.answer}
+                              </div>
+                            )}
+                          </details>
+                        ))}
+                    </div>
+                  </div>
+                ) : (store.interview_info?.dialog ?? []).length > 0 ? (
                   <div className="space-y-2">
                     <h3 className="text-sm font-semibold" style={{ color: "rgba(27,37,40,0.5)" }}>
                       面接の流れ
@@ -1352,7 +1407,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                       ))}
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* 必要書類はかつて独立 SectionCard だったが、面接情報と
                     文脈が近い (「面接の持ち物」) のでサブブロックとして
@@ -1382,8 +1437,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     )}
                     {store.required_documents.notes && (
                       <p
-                        className="rounded-[12px] px-3 py-2 text-sm"
-                        style={{ backgroundColor: "rgba(212,175,55,0.08)", color: "rgba(27,37,40,0.7)" }}
+                        className="rounded-[12px] px-3 py-2 text-sm whitespace-pre-line"
+                        style={{ backgroundColor: "rgba(27,37,40,0.04)", color: "rgba(27,37,40,0.7)" }}
                       >
                         {store.required_documents.notes}
                       </p>
@@ -1418,6 +1473,9 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             );
           })()}
 
+          {/* レクタ経由入店女性エピソードは「面接情報」の直後に配置 (運営要望)。 */}
+          <RectaEpisodesSection episodes={store.recta_episodes} />
+
           {/* ============================================================ */}
           {/* 11a. Transfer / 足代 — distance-based zone fee map + table */}
           {/* ============================================================ */}
@@ -1438,10 +1496,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             fallback={store.champagne_description}
           />
 
-          {/* ============================================================ */}
-          {/* 11c. Recta-keiyū episodes (レクタ経由入店女性エピソード) */}
-          {/* ============================================================ */}
-          <RectaEpisodesSection episodes={store.recta_episodes} />
+          {/* レクタ経由入店女性エピソードは「面接情報」直後へ移動済み。 */}
 
           {/* ドレスコードは「面接情報」セクション内に統合 (画像も廃止し
               テキストだけに簡素化)。独立 SectionCard は廃止。 */}

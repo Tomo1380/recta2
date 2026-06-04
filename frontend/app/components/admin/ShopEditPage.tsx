@@ -222,6 +222,10 @@ const PAYROLL_CYCLES_WITH_PAYDAY = ["月末締め翌月払い", "月1回", "月2
 /** 客層年齢の固定ラベル。運営は割合(%)だけ入力すればよい。 */
 const CLIENT_AGE_LABELS = ["20代", "30代", "40代", "50代以降"];
 
+/** 直近採用の相対月スロット。絶対月(◯年◯月)だと更新コストが高いため固定。
+ *  運営は各月の採用人数だけ入れればよい (基本5ヶ月前まで、新店は3ヶ月前まで等)。 */
+const RELATIVE_HIRE_LABELS = ["1ヶ月前", "2ヶ月前", "3ヶ月前", "4ヶ月前", "5ヶ月前"];
+
 function TextInput({
   placeholder = "",
   value = "",
@@ -787,6 +791,9 @@ export function ShopEditPage() {
   const [interviewDialog, setInterviewDialog] = useState<
     { label: string; value: string }[]
   >([]);
+  const [interviewQuestions, setInterviewQuestions] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [documents, setDocuments] = useState<string[]>([]);
   const [docNote, setDocNote] = useState("");
   const [shiftInfo, setShiftInfo] = useState("");
@@ -985,6 +992,7 @@ export function ShopEditPage() {
     if (f.dressCode !== undefined) setDressCode(f.dressCode);
     if (f.hiringCriteria !== undefined) setHiringCriteria(f.hiringCriteria);
     if (f.interviewDialog !== undefined) setInterviewDialog(f.interviewDialog);
+    if (f.interviewQuestions !== undefined) setInterviewQuestions(f.interviewQuestions);
     if (f.documents !== undefined) setDocuments(f.documents);
     if (f.docNote !== undefined) setDocNote(f.docNote);
     if (f.shiftInfo !== undefined) setShiftInfo(f.shiftInfo);
@@ -1098,6 +1106,7 @@ export function ShopEditPage() {
       tags, description, featureText, expLevel, atmosphere,
       castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
+      interviewQuestions,
       documents, docNote, shiftInfo, hiringEntries, hiringTotal,
       transferDescription, transferKm, transferZones, relatedStoreIds,
       champagneDescription, champagnePrices,
@@ -1122,6 +1131,7 @@ export function ShopEditPage() {
     tags, description, featureText, expLevel, atmosphere,
     castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
     dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
+    interviewQuestions,
     documents, docNote, shiftInfo, hiringEntries, hiringTotal,
     transferDescription, transferKm, transferZones, relatedStoreIds,
     champagneDescription, champagnePrices,
@@ -1755,81 +1765,49 @@ export function ShopEditPage() {
       {/* 体入（体験入店）情報は STEP1「店舗情報」に移動済み (sectionTrial)。 */}
       {/* 直近の採用実績は体入と一緒に検討できるほうが運営フローに合うので、
           STEP4 から STEP3 (報酬・体入) 直後に維持。 */}
-      <SectionCard title="直近の採用実績" icon={TrendingUp} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
+      <SectionCard title="直近◯ヶ月での採用" icon={TrendingUp} previewAnchor="trial" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          {hiringEntries.map((entry, i) => (
-            <div
-              key={i}
-              className="border border-border rounded-xl p-5 space-y-4 bg-muted/20"
-            >
-              <div className="flex items-center justify-between gap-2">
-                {/* BUG-Live-07: 月名を編集可能に。これまで <span> で固定表示
-                    だったため、「月を追加」で出る `"2026年3月"` を任意の月に
-                    変えられず、過去月の実績を入力できなかった。 */}
-                <TextInput
-                  value={entry.month}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = { ...updated[i], month: e.target.value };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="例: 2026年4月"
-                />
-                <button
-                  onClick={() =>
-                    setHiringEntries(
-                      hiringEntries.filter((_, idx) => idx !== i)
-                    )
-                  }
-                  className="text-muted-foreground hover:text-destructive transition shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+          <p className="text-xs text-muted-foreground">
+            各月の採用人数だけ入力してください（「1ヶ月前」が直近）。人数を入れた月までが
+            公開ページに表示されます。基本は5ヶ月前まで、新しい店舗は3ヶ月前まで等で調整OK。
+          </p>
+          {/* 相対月の固定スロット。index で hiringEntries に対応づける。 */}
+          {RELATIVE_HIRE_LABELS.map((relLabel, i) => {
+            const entry = hiringEntries[i] ?? { month: relLabel, count: "", examples: [] };
+            const writeSlot = (patch: Partial<{ count: string; examples: string[] }>) => {
+              const next = RELATIVE_HIRE_LABELS.map((lbl, idx) => {
+                const base = hiringEntries[idx] ?? { month: lbl, count: "", examples: [] };
+                return idx === i
+                  ? { month: lbl, count: base.count, examples: base.examples, ...patch }
+                  : { month: lbl, count: base.count, examples: base.examples };
+              });
+              setHiringEntries(next);
+            };
+            return (
+              <div key={relLabel} className="border border-border rounded-xl p-4 space-y-3 bg-muted/20">
+                <div className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-sm font-medium text-foreground/80">{relLabel}</span>
+                  <div className="flex-1">
+                    <TextInput
+                      type="number"
+                      inputMode="numeric"
+                      value={entry.count}
+                      onChange={(e) => writeSlot({ count: e.target.value.replace(/[^\d]/g, "") })}
+                      placeholder="採用人数（空欄=非表示）"
+                    />
+                  </div>
+                  <span className="text-sm text-foreground/50">名</span>
+                </div>
+                <Field label="採用例（任意）">
+                  <DynamicTextList
+                    items={entry.examples}
+                    setItems={(newExamples) => writeSlot({ examples: newExamples })}
+                    placeholder="例: 20歳 未経験 → 時給5,000円スタート"
+                  />
+                </Field>
               </div>
-              <Field label="採用人数">
-                <TextInput
-                  type="number"
-                  value={entry.count}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = {
-                      ...updated[i],
-                      count: e.target.value,
-                    };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="人数を入力"
-                />
-              </Field>
-              <Field label="採用例">
-                <DynamicTextList
-                  items={entry.examples}
-                  setItems={(newExamples) => {
-                    const updated = [...hiringEntries];
-                    updated[i] = {
-                      ...updated[i],
-                      examples: newExamples,
-                    };
-                    setHiringEntries(updated);
-                  }}
-                  placeholder="例: 20歳 未経験 → 時給5,000円スタート"
-                />
-              </Field>
-            </div>
-          ))}
-          <button
-            onClick={() => {
-              const now = new Date();
-              const defaultMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-              setHiringEntries([
-                ...hiringEntries,
-                { month: defaultMonth, count: "", examples: [] },
-              ]);
-            }}
-            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition"
-          >
-            <Plus className="w-3.5 h-3.5" /> 月を追加
-          </button>
+            );
+          })}
           <Field label="直近の合計テキスト">
             <TextInput
               value={hiringTotal}
@@ -1971,47 +1949,48 @@ export function ShopEditPage() {
     <div className="space-y-6">
       <SectionCard title="面接・採用" icon={UserCheck} previewAnchor="interview" onFocusEnter={handlePreviewFocus}>
         <div className="space-y-5">
-          <Field label="面接時の服装アドバイス">
+          <Field label="採用基準" hint="改行して2〜3行で書けます（公開ページにも改行が反映されます）">
+            <TextArea
+              value={hiringCriteria}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                setHiringCriteria(e.target.value)
+              }
+              rows={3}
+              placeholder="採用時に重視するポイントを入力してください（改行可）"
+            />
+          </Field>
+          <Field label="面接についてのアドバイス">
             <TextArea
               value={dressAdvice}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressAdvice(e.target.value)}
-              placeholder="面接時のおすすめの服装について入力してください"
+              placeholder="面接に向けたアドバイスを入力してください"
             />
           </Field>
-          <Field label="服装Tips">
+          <Field label="服装について">
+            <TextInput
+              value={dressCode}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCode(e.target.value)}
+              placeholder="例: 私服でOK / ワンピース推奨 / ドレス貸し出しあり"
+            />
+          </Field>
+          <Field label="服装についてのポイント（箇条書き）">
             <DynamicTextList
               items={dressTips}
               setItems={setDressTips}
               placeholder="例: ワンピースがおすすめ"
             />
           </Field>
-          <Field label="ドレスコード">
-            <TextInput
-              value={dressCode}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDressCode(e.target.value)}
-              placeholder="例: フリー / ドレス貸し出しあり"
-            />
-          </Field>
-          <Field label="採用基準">
-            <TextArea
-              value={hiringCriteria}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-                setHiringCriteria(e.target.value)
-              }
-              placeholder="採用時に重視するポイントを入力してください"
-            />
-          </Field>
+          {/* 「面接の流れ(会話)」→「面接で聞かれることリスト」。質問をタップで
+              回答が開く Q&A 形式 (公開ページ)。label=質問, value=回答。 */}
           <Field
-            label="面接サポート対話"
-            hint="面接の流れを会話形式で。話者は「面接官 / 応募者」を選択。"
+            label="面接で聞かれることリスト"
+            hint="面接でよく聞かれる質問と回答例。公開ページではタップで開くQ&Aになります。"
           >
             <DynamicPairList
-              items={interviewDialog}
-              setItems={setInterviewDialog}
-              labelPlaceholder="話者"
-              valuePlaceholder="セリフ"
-              labelOptions={["面接官", "応募者"]}
-              defaultLabel="面接官"
+              items={interviewQuestions}
+              setItems={setInterviewQuestions}
+              labelPlaceholder="質問（例: 出勤頻度は？）"
+              valuePlaceholder="回答例（例: 週1からOKです）"
             />
           </Field>
         </div>

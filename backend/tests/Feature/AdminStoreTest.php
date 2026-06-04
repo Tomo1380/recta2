@@ -282,6 +282,32 @@ class AdminStoreTest extends TestCase
     }
 
     /**
+     * 第2弾グループ3: 面接で聞かれることリスト (interview_info.questions) が
+     * 格納され Resource で返ること。
+     */
+    public function test_create_store_with_interview_questions(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/stores', [
+                'name' => 'Interview Q Store',
+                'area' => '銀座',
+                'category' => 'クラブ',
+                'interview_info' => [
+                    'criteria' => "明るい方歓迎\n未経験OK",
+                    'questions' => [
+                        ['question' => '出勤頻度は？', 'answer' => '週1からOKです'],
+                        ['question' => '体験はできますか？', 'answer' => 'はい、当日体験も可能です'],
+                    ],
+                ],
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertCount(2, $response->json('interview_info.questions'));
+        $this->assertSame('出勤頻度は？', $response->json('interview_info.questions.0.question'));
+        $this->assertSame('週1からOKです', $response->json('interview_info.questions.0.answer'));
+    }
+
+    /**
      * 第2弾グループ1: 給料システム / バックのフリーテキスト / 給与サイクル・
      * 給料日・日払い上限 が JSONB に格納され、Resource で flat に返ること。
      */

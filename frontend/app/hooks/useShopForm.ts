@@ -135,6 +135,8 @@ export interface ShopForm {
   dressCode: string;
   hiringCriteria: string;
   interviewDialog: LabelValue[];
+  /** 面接で聞かれることリスト (label=質問, value=回答)。Q&Aアコーディオンで表示。 */
+  interviewQuestions: LabelValue[];
   documents: string[];
   docNote: string;
   shiftInfo: string;
@@ -170,6 +172,13 @@ export interface ShopForm {
   priority: string;
 }
 
+/** 必要書類の基本3点。空の店舗ではこれを初期表示する (運営が変更可)。 */
+export const DEFAULT_DOCUMENTS = [
+  "身分証明書（顔写真付き）",
+  "住民票",
+  "マイナンバー",
+];
+
 const EMPTY_CHAMPAGNE = (): Record<ChampagneKey, ChampagnePriceDraft> => ({
   tequila: { amount: "", note: "" },
   belle_epoque: { amount: "", note: "" },
@@ -194,7 +203,8 @@ export const INITIAL_FORM: ShopForm = {
   castBijin: "", castKawaii: "", castGlamour: "", castNatural: "",
   clientAge: [], drinkStyle: 50,
   dressAdvice: "", dressTips: [], dressCode: "", hiringCriteria: "",
-  interviewDialog: [], documents: [], docNote: "", shiftInfo: "",
+  interviewDialog: [], interviewQuestions: [],
+  documents: [...DEFAULT_DOCUMENTS], docNote: "", shiftInfo: "",
   hiringEntries: [], hiringTotal: "",
   transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
@@ -502,7 +512,13 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
       label: normalizeSpeaker(d.speaker ?? d.label ?? ""),
       value: d.text ?? d.value ?? "",
     })),
-    documents,
+    // 面接で聞かれることリスト (label=質問, value=回答)
+    interviewQuestions: (interview.questions ?? []).map((q: AnyStore) => ({
+      label: q.question ?? q.label ?? "",
+      value: q.answer ?? q.value ?? "",
+    })),
+    // 必要書類は空なら基本3点を初期表示 (運営が変更可)。
+    documents: documents.length > 0 ? documents : [...DEFAULT_DOCUMENTS],
     docNote,
     shiftInfo:
       (store.shift_info as string | undefined) ??
@@ -665,13 +681,20 @@ export function formToPayload(
         // UI: label=話者 (面接官/応募者), value=セリフ
         // DB: { speaker: "staff" | "user", text: string }
         .map((i) => ({ text: i.value, speaker: speakerToDb(i.label) })),
+      // 面接で聞かれることリスト: { question, answer }。質問が空の行は捨てる。
+      questions: form.interviewQuestions
+        .filter((q) => q.label.trim())
+        .map((q) => ({ question: q.label.trim(), answer: q.value.trim() })),
     },
     schedule: form.shiftInfo ? { shift_info: form.shiftInfo } : null,
-    recent_hires: form.hiringEntries.map((h) => ({
-      month: h.month,
-      count: Number(h.count) || 0,
-      examples: h.examples,
-    })),
+    // 直近採用は相対月スロット(1〜5ヶ月前)。人数>0 の月だけ送る。
+    recent_hires: form.hiringEntries
+      .filter((h) => (Number(h.count) || 0) > 0)
+      .map((h) => ({
+        month: h.month,
+        count: Number(h.count) || 0,
+        examples: h.examples,
+      })),
     recent_hires_summary: form.hiringTotal,
     staff_comment: {
       name: form.staffName,

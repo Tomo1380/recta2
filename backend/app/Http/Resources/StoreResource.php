@@ -361,7 +361,7 @@ class StoreResource extends JsonResource
      */
     private static function interviewInfoLegacy(array $interview): ?array
     {
-        $keys = ['dress_advice', 'tips', 'dress_code', 'criteria', 'dialog'];
+        $keys = ['dress_advice', 'tips', 'dress_code', 'criteria', 'dialog', 'questions'];
         $out = [];
         foreach ($keys as $k) {
             if (array_key_exists($k, $interview)) {
