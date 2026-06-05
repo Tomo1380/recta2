@@ -1,5 +1,6 @@
 import StoreListPage from "~/components/user/StoreListPage";
 import { buildMetaTags } from "~/lib/seo";
+import { useTrackPageView } from "~/lib/tracking";
 
 export function meta() {
   return buildMetaTags({
@@ -11,5 +12,6 @@ export function meta() {
 }
 
 export default function Stores() {
+  useTrackPageView({ page_type: "store_list" });
   return <StoreListPage />;
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Http\Controllers\SeoController;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
 
 class Article extends Model
@@ -40,6 +41,7 @@ class Article extends Model
         'tags',
         'status',
         'published_at',
+        'author_id',
     ];
 
     protected function casts(): array
@@ -60,6 +62,20 @@ class Article extends Model
             return '';
         }
         return trim(preg_replace('/\s+/u', ' ', strip_tags($this->body_html)));
+    }
+
+    /**
+     * 本文の文字数（C1: 一覧で「文字数」を表示）。body_html からタグを除いて数える。
+     */
+    public function getCharCountAttribute(): int
+    {
+        return mb_strlen($this->body_plain_text);
+    }
+
+    /** 作成者（管理ユーザー）。 */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(AdminUser::class, 'author_id');
     }
 
     public function scopePublished($query)

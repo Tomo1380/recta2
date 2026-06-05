@@ -146,6 +146,18 @@ export function ArticlesPage() {
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
                       更新日
                     </th>
+                    <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
+                      作成者
+                    </th>
+                    <th className="text-right py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
+                      文字数
+                    </th>
+                    <th className="text-right py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
+                      PV
+                    </th>
+                    <th className="text-right py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">
+                      LINE導線
+                    </th>
                     <th className="text-left py-2.5 px-4"></th>
                   </tr>
                 </thead>
@@ -199,6 +211,18 @@ export function ArticlesPage() {
                       </td>
                       <td className="py-2.5 px-4 text-muted-foreground">
                         {formatDate(a.updated_at)}
+                      </td>
+                      <td className="py-2.5 px-4 text-muted-foreground text-[12px]">
+                        {a.author_name || "—"}
+                      </td>
+                      <td className="py-2.5 px-4 text-right text-muted-foreground tabular-nums">
+                        {Number(a.char_count ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right text-muted-foreground tabular-nums">
+                        {(a.pv_count ?? 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-4 text-right text-muted-foreground tabular-nums">
+                        {(a.line_clicks_count ?? 0).toLocaleString()}
                       </td>
                       <td className="py-2.5 px-4 text-right">
                         <span className="text-[12px] text-muted-foreground">編集 →</span>

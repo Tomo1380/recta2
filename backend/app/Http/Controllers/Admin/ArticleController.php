@@ -48,8 +48,23 @@ class ArticleController extends Controller
         }
 
         /** @var LengthAwarePaginator $articles */
-        $articles = $query->orderByDesc('updated_at')
+        $articles = $query->with('creator:id,name')
+            ->orderByDesc('updated_at')
             ->paginate($request->input('per_page', 20));
+
+        // C1: このページの記事の PV / LINE導線クリック数をまとめて集計して各記事に付与。
+        $ids = collect($articles->items())->pluck('id');
+        if ($ids->isNotEmpty()) {
+            $pv = \App\Models\PageView::whereIn('article_id', $ids)
+                ->selectRaw('article_id, COUNT(*) as c')->groupBy('article_id')->pluck('c', 'article_id');
+            $clicks = \App\Models\LinkClick::whereIn('article_id', $ids)
+                ->selectRaw('article_id, COUNT(*) as c')->groupBy('article_id')->pluck('c', 'article_id');
+
+            foreach ($articles->items() as $article) {
+                $article->pv_count = (int) ($pv[$article->id] ?? 0);
+                $article->line_clicks_count = (int) ($clicks[$article->id] ?? 0);
+            }
+        }
 
         return response()->json(PaginatorWithResource::map($articles, ArticleResource::class));
     }
@@ -73,6 +88,8 @@ class ArticleController extends Controller
         $payload = array_merge($data, [
             'slug' => $slug,
             'published_at' => $this->resolvePublishedAt($data),
+            // C1: 作成者を記録（一覧の「作成者」表示用）。
+            'author_id' => $request->user()?->id,
         ]);
 
         $article = Article::create($payload);

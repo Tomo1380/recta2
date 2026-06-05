@@ -1,4 +1,5 @@
 import { useLoaderData } from "react-router";
+import { useTrackPageView } from "~/lib/tracking";
 import type { LoaderFunctionArgs } from "react-router";
 import LandingPage, { type LandingPayload } from "~/components/user/landing/LandingPage";
 import { absoluteUrl, buildMetaTags } from "~/lib/seo";
@@ -57,6 +58,8 @@ export function meta({
 
 export default function AreaLanding() {
   const data = useLoaderData() as LandingPayload | null;
+  // アクセス解析: エリア別 PV。フックは早期 return より前で常に呼ぶ。
+  useTrackPageView({ page_type: "area_landing", area: data?.area?.name ?? null });
   if (!data) {
     return (
       <div className="px-6 py-12 text-center text-sm text-muted-foreground">

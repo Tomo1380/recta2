@@ -25,6 +25,12 @@ class ReviewResource extends JsonResource
             'tweet_id' => $this->tweet_id,
             'tweet_author_screen_name' => $this->tweet_author_screen_name,
             'status' => $this->status,
+            // 管理者運用フィールド (FB B)
+            'author_name' => $this->author_name,
+            'is_featured' => (bool) $this->is_featured,
+            'store_reply' => $this->store_reply,
+            'store_reply_at' => $this->store_reply_at?->toIso8601String(),
+            'display_author_name' => $this->displayAuthorName(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
 

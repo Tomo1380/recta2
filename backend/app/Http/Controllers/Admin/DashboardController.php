@@ -141,31 +141,6 @@ class DashboardController extends Controller
         });
 
         // ----------------------------------------------------------------
-        // Distribution: stores by area / category
-        // ----------------------------------------------------------------
-        $storesByArea = Store::select('area', DB::raw('COUNT(*) as count'))
-            ->where('publish_status', 'published')
-            ->whereNotNull('area')
-            ->where('area', '!=', '')
-            ->groupBy('area')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->get()
-            ->map(fn ($row) => ['name' => $row->area, 'count' => (int) $row->count])
-            ->values();
-
-        $storesByCategory = Store::select('category', DB::raw('COUNT(*) as count'))
-            ->where('publish_status', 'published')
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->groupBy('category')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->get()
-            ->map(fn ($row) => ['name' => $row->category, 'count' => (int) $row->count])
-            ->values();
-
-        // ----------------------------------------------------------------
         // Recent reviews
         // ----------------------------------------------------------------
         $recentReviews = Review::with(['user:id,line_display_name,nickname', 'store:id,name'])
@@ -263,8 +238,6 @@ class DashboardController extends Controller
             'kpis' => $kpis,
             'chat_trend' => $chatTrend,
             'line_friend_trend' => $lineFriendTrend,
-            'stores_by_area' => $storesByArea,
-            'stores_by_category' => $storesByCategory,
             'recent_reviews' => $recentReviews,
             'recent_messages' => $recentMessages,
             'recent_chats' => $recentChats,

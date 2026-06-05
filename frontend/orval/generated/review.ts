@@ -5,9 +5,11 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
+  AppHttpRequestsAdminStoreReviewRequest,
   ReviewIndex200,
   ReviewIndexParams,
   ReviewResource,
+  UpdateReviewRequest,
   UpdateReviewStatusRequest
 } from './api.schemas';
 
@@ -25,11 +27,39 @@ import { rectaMutator } from '../mutators/auth';
     },
       );
     }
+  /**
+ * @summary 管理者による口コミ作成（桜口コミ B2 / 有名キャバ嬢口コミ B3）。
+実ユーザーに紐付かないため user_id は null。
+ */
+export const reviewStore = (
+    appHttpRequestsAdminStoreReviewRequest: AppHttpRequestsAdminStoreReviewRequest,
+ ) => {
+      return rectaMutator<ReviewResource>(
+      {url: `/admin/reviews`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: appHttpRequestsAdminStoreReviewRequest
+    },
+      );
+    }
   export const reviewShow = (
     review: number,
  ) => {
       return rectaMutator<ReviewResource>(
       {url: `/admin/reviews/${review}`, method: 'GET'
+    },
+      );
+    }
+  /**
+ * @summary 管理者による口コミ更新（本文/評価/表示名/フィーチャー/店側返答 B4/ステータス）。
+ */
+export const reviewUpdate = (
+    review: number,
+    updateReviewRequest?: UpdateReviewRequest,
+ ) => {
+      return rectaMutator<ReviewResource>(
+      {url: `/admin/reviews/${review}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateReviewRequest
     },
       );
     }
@@ -45,5 +75,7 @@ import { rectaMutator } from '../mutators/auth';
       );
     }
   export type ReviewIndexResult = NonNullable<Awaited<ReturnType<typeof reviewIndex>>>
+export type ReviewStoreResult = NonNullable<Awaited<ReturnType<typeof reviewStore>>>
 export type ReviewShowResult = NonNullable<Awaited<ReturnType<typeof reviewShow>>>
+export type ReviewUpdateResult = NonNullable<Awaited<ReturnType<typeof reviewUpdate>>>
 export type ReviewUpdateStatusResult = NonNullable<Awaited<ReturnType<typeof reviewUpdateStatus>>>

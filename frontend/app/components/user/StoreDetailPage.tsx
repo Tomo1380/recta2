@@ -180,7 +180,13 @@ interface Review {
   tweet_id?: string | null;
   tweet_author_screen_name?: string | null;
   created_at: string;
-  user: ReviewUser;
+  user: ReviewUser | null;
+  /** 管理者入力の表示名（桜口コミ B2 / 有名嬢口コミ B3）。 */
+  author_name?: string | null;
+  /** 有名キャバ嬢などのフィーチャー口コミ (B3)。 */
+  is_featured?: boolean | null;
+  /** 店側からの返答 (B4)。 */
+  store_reply?: string | null;
 }
 
 // New JSONB shapes (DB redesign 2026-05)
@@ -341,6 +347,8 @@ export interface StoreDetailStore {
   related_stores?: RelatedStoreLite[] | null;
   transfer_zones?: TransferZone[] | null;
   experience_guaranteed?: boolean | null;
+  /** 上京ロゴ・バナーの表示 (D3)。東京・新地・ミナミ等のみ ON。 */
+  show_relocate_badge?: boolean | null;
   set_fee?: SetFee | null;
 }
 
@@ -844,7 +852,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
                   : []);
             const firstVideo = videos.slice(0, 1);
-            const restVideos = videos.slice(1);
+            // 2本目以降は店舗特徴セクションの後で別途レンダリング (D2)。
             return (
               <>
                 {firstVideo.length > 0 && (
@@ -878,15 +886,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   description="体入予約・条件交渉までLINEで完結"
                   ctaLabel="LINE追加"
                   source="store-detail:chat-inline"
+                  context={{ page_type: "store", store_id: store.id, area: store.area }}
                 />
-                {restVideos.length > 0 && (
-                  <StoreVideosBlock
-                    videos={restVideos}
-                    fallbackPosterUrl={sortedImages[0]?.url}
-                    controller={stickyController}
-                    startIndex={firstVideo.length}
-                  />
-                )}
+                {/* D2: 2本目以降の動画は「店舗特徴」セクションの後に移動した
+                    （FB 2026-06-05）。下の RestStoreVideos 参照。 */}
               </>
             );
           })()}
@@ -1095,9 +1098,30 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 }
               />
               {store.holidays && <InfoRow label="定休日" value={store.holidays} />}
-              {store.shift_info && <InfoRow label="シフト" value={store.shift_info} />}
+              {/* D1: 「シフト」項目は廃止（FB 2026-06-05）。勤務条件は特徴タグ
+                  （例「週3回〜採用可能」「ラウンジ枠対応可」）で表現する。 */}
             </div>
           </SectionCard>
+
+          {/* D2: 店舗特徴の後に 2 本目以降の動画を差し込む（FB 2026-06-05）。
+              1本目はページ上部（ルームツアー）、ここはそれ以降。 */}
+          {(() => {
+            const videos = (store.videos && store.videos.length > 0)
+              ? store.videos
+              : (store.video_url
+                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
+                  : []);
+            const restVideos = videos.slice(1);
+            if (restVideos.length === 0) return null;
+            return (
+              <StoreVideosBlock
+                videos={restVideos}
+                fallbackPosterUrl={sortedImages[0]?.url}
+                controller={stickyController}
+                startIndex={1}
+              />
+            );
+          })()}
 
           {/* ============================================================ */}
           {/* 6. Salary & Benefits */}
@@ -1690,6 +1714,12 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             >
               <FeatureText text={store.summary_text} />
             </SectionCard>
+          )}
+
+          {/* D4: 上京バナー — セット料金と系列店舗の間（FB 2026-06-05）。
+              店舗管理の「上京ロゴ・バナー表示」(show_relocate_badge) が ON のときだけ表示。 */}
+          {store.show_relocate_badge && (
+            <RelocateBanner storeId={store.id} area={store.area} />
           )}
 
           {/* ============================================================ */}
@@ -3949,6 +3979,64 @@ function SimSlider({
   );
 }
 
+// ── 上京バナー (D4) ──────────────────────────────────────────────────────
+// 店舗管理の「上京ロゴ・バナー表示」が ON の店舗だけ、セット料金と系列店舗の
+// 間に大きく表示する。地方から上京して働く層に向けた訴求 + LINE 導線。
+// デザインは暫定（FB「画像で大きく / デザインちゃんとしなきゃ」）。後で差し替え可。
+function RelocateBanner({ storeId, area }: { storeId: number; area: string }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl p-5 sm:p-6"
+      style={{
+        background: "linear-gradient(135deg, #1b2528 0%, #2c3e46 60%, #3a5560 100%)",
+        border: "1px solid rgba(212,175,55,0.35)",
+        boxShadow: "0 10px 28px rgba(27,37,40,0.25)",
+      }}
+    >
+      <div
+        className="absolute -right-6 -top-8 select-none pointer-events-none"
+        style={{ fontSize: 120, lineHeight: 1, opacity: 0.08 }}
+        aria-hidden
+      >
+        ✈
+      </div>
+      <div className="relative">
+        <span
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
+          style={{ background: "rgba(212,175,55,0.18)", color: GOLD_HEX, border: `1px solid ${GOLD_HEX}66` }}
+        >
+          ✈ 上京サポート
+        </span>
+        <h3
+          className="mt-2.5 text-[18px] sm:text-[20px] font-bold leading-snug"
+          style={{ color: "white", fontFamily: "'Noto Sans JP',sans-serif" }}
+        >
+          地方から{area}へ。上京して働くなら。
+        </h3>
+        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "rgba(255,255,255,0.72)" }}>
+          寮・家賃補助・上京交通費サポートなど、上京して働く女の子を歓迎しているお店です。
+          まずはLINEで気軽に相談してください。
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            openLineFriendAdd("store-detail:bottom-card", {
+              page_type: "store",
+              store_id: storeId,
+              area,
+            })
+          }
+          aria-label="上京について（LINEで友だち追加）"
+          className="mt-3.5 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl active:scale-[0.98] transition-transform"
+          style={{ background: "#06C755", color: "white", fontWeight: 700, fontSize: "13.5px", cursor: "pointer" }}
+        >
+          上京について相談する
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Set fee (セット料金) ─────────────────────────────────────────────────
 function SetFeeSection({ setFee }: { setFee?: SetFee | null }) {
   const items = setFee?.items ?? [];
@@ -4327,8 +4415,9 @@ function ReviewsSection({
 }
 
 function ReviewItem({ review }: { review: Review }) {
-  // 口コミは本人のニックネームのみを公開。LINEの実名や画像はプライバシー保護のため使わない。
-  const displayName = review.user?.nickname || "匿名";
+  // 表示名: 管理者入力の author_name (桜/有名嬢) を優先。実ユーザーはニックネームのみ
+  // 公開（LINEの実名・画像はプライバシー保護のため使わない）。
+  const displayName = review.author_name || review.user?.nickname || "匿名";
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
@@ -4339,8 +4428,16 @@ function ReviewItem({ review }: { review: Review }) {
           size={32}
         />
         <div className="flex-1">
-          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>
+          <p className="text-sm font-medium flex items-center gap-1.5" style={{ color: "#1b2528" }}>
             {displayName}
+            {review.is_featured && (
+              <span
+                className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                style={{ background: "rgba(212,175,55,0.16)", color: "#8a7124", border: "1px solid rgba(212,175,55,0.4)" }}
+              >
+                ★ 有名嬢
+              </span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             {renderStars(review.rating ?? 0, 12)}
@@ -4359,6 +4456,20 @@ function ReviewItem({ review }: { review: Review }) {
           authorHandle={review.tweet_author_screen_name}
           className="pl-11"
         />
+      )}
+      {/* B4: 店側からの返答 */}
+      {review.store_reply && review.store_reply.trim() !== "" && (
+        <div
+          className="ml-11 rounded-lg p-3"
+          style={{ background: "rgba(6,199,85,0.06)", border: "1px solid rgba(6,199,85,0.2)" }}
+        >
+          <p className="text-[11px] font-bold mb-0.5" style={{ color: "#04a447" }}>
+            店舗からの返信
+          </p>
+          <p className="text-[12.5px] leading-relaxed" style={{ color: "rgba(27,37,40,0.72)" }}>
+            {review.store_reply}
+          </p>
+        </div>
       )}
       <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
     </div>

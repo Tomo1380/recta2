@@ -149,6 +149,8 @@ export interface ShopForm {
   transferKm: string;
   transferZones: TransferZoneDraft[];
   relatedStoreIds: number[];
+  /** 上京ロゴ/バナーの表示 (D3)。東京・新地・ミナミ等のみ ON にする想定。 */
+  showRelocateBadge: boolean;
   champagneDescription: string;
   champagnePrices: Record<ChampagneKey, ChampagnePriceDraft>;
   dressCodeDescription: string;
@@ -210,6 +212,7 @@ export const INITIAL_FORM: ShopForm = {
   documents: [...DEFAULT_DOCUMENTS], docNote: "", shiftInfo: "",
   hiringEntries: [], hiringTotal: "", hiringExamples: [],
   transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
+  showRelocateBadge: false,
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
   dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [], dressPhotos: [],
   setFeeList: [], setFeeNotes: "",
@@ -544,6 +547,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     transferKm: store.transfer_km ?? "",
     transferZones,
     relatedStoreIds,
+    showRelocateBadge: Boolean((store as AnyStore).show_relocate_badge ?? false),
     payrollSystemType: store.payroll_system_type ?? "",
     payrollSystemDescription: store.payroll_system_description ?? "",
     champagneDescription: store.champagne_description ?? "",
@@ -715,6 +719,7 @@ export function formToPayload(
     },
     transfer_description: form.transferDescription,
     transfer_km: form.transferKm,
+    show_relocate_badge: form.showRelocateBadge,
     transfer_zones: form.transferZones
       .filter((z) => z.label.trim() || z.radius_km.trim() || z.fee.trim())
       .map((z) => ({

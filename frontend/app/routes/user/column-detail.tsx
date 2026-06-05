@@ -3,6 +3,7 @@ import { Link, useParams, useLoaderData, isRouteErrorResponse, useRouteError } f
 import type { LoaderFunctionArgs } from "react-router";
 import { FileText, ChevronRight } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
+import { useTrackPageView } from "~/lib/tracking";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { absoluteUrl, buildMetaTags } from "~/lib/seo";
@@ -217,6 +218,9 @@ export default function ColumnDetailPage() {
 
   const [article, setArticle] = useState<Article | null>(initial.article);
   const [related, setRelated] = useState<ArticleSummary[]>(initial.related ?? []);
+
+  // アクセス解析: コラム別 PV（C1 のランキング/CV率の分母）。
+  useTrackPageView({ page_type: "column", article_id: article?.id ?? null });
 
   // React Router の loader は CSR navigation でも自動で再実行されるので、
   // useLoaderData の変化を state に反映するだけで OK（手動 fetch 不要）。

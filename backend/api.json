@@ -1324,6 +1324,235 @@
                 }
             }
         },
+        "/admin/analytics/overview": {
+            "get": {
+                "operationId": "analytics.overview",
+                "tags": [
+                    "Analytics"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "range": {
+                                            "type": "object",
+                                            "properties": {
+                                                "days": {
+                                                    "type": "integer",
+                                                    "const": 30
+                                                },
+                                                "from": {
+                                                    "type": "string"
+                                                },
+                                                "to": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "days",
+                                                "from",
+                                                "to"
+                                            ]
+                                        },
+                                        "summary": {
+                                            "type": "object",
+                                            "properties": {
+                                                "pv": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                },
+                                                "line_clicks": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                },
+                                                "cv_rate": {
+                                                    "type": "number"
+                                                },
+                                                "line_friends_total": {
+                                                    "type": "integer",
+                                                    "description": "LINE \u516c\u5f0f\u30a2\u30ab\u30a6\u30f3\u30c8\u53cb\u3060\u3061\u8ffd\u52a0\u300c\u5b9f\u7e3e\u300d(line_friends)\u3002\nLINE \u4ed5\u69d8\u4e0a\u3001\u7d4c\u8def\u5225\u306b\u306f\u5272\u308c\u306a\u3044\u305f\u3081\u5168\u4f53\u5024\u306e\u307f\u3002",
+                                                    "minimum": 0
+                                                },
+                                                "line_friends_in_range": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "pv",
+                                                "line_clicks",
+                                                "cv_rate",
+                                                "line_friends_total",
+                                                "line_friends_in_range"
+                                            ]
+                                        },
+                                        "stores": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "array",
+                                                "items": {}
+                                            }
+                                        },
+                                        "areas": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "array",
+                                                "items": {}
+                                            }
+                                        },
+                                        "columns": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "array",
+                                                "items": {}
+                                            }
+                                        },
+                                        "line_routes": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "route": {
+                                                        "type": "string"
+                                                    },
+                                                    "kind": {
+                                                        "type": "string"
+                                                    },
+                                                    "clicks": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "route",
+                                                    "kind",
+                                                    "clicks"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "range",
+                                        "summary",
+                                        "stores",
+                                        "areas",
+                                        "columns",
+                                        "line_routes"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/analytics/breakdown": {
+            "get": {
+                "operationId": "analytics.breakdown",
+                "summary": "\u30e9\u30f3\u30ad\u30f3\u30b0\u884c\u306e\u30c9\u30ea\u30eb\u30c0\u30a6\u30f3: 1 \u5e97\u8217/\u30b3\u30e9\u30e0/\u30a8\u30ea\u30a2\u306e LINE \u5c0e\u7dda\u3092\u753b\u9762\u5225\u306b\u5185\u8a33\u3002",
+                "tags": [
+                    "Analytics"
+                ],
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "store",
+                                "column",
+                                "area"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 120
+                        }
+                    },
+                    {
+                        "name": "days",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "enum": [
+                                "7",
+                                "30",
+                                "90",
+                                "365"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string"
+                                        },
+                                        "key": {
+                                            "type": "string"
+                                        },
+                                        "rows": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "source": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "clicks": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "source",
+                                                    "clicks"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "type",
+                                        "key",
+                                        "rows"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/admin/areas": {
             "get": {
                 "operationId": "areaCategory.areas",
@@ -2703,42 +2932,6 @@
                                                 "type": "string"
                                             }
                                         },
-                                        "stores_by_area": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "count": {
-                                                        "type": "integer"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "name",
-                                                    "count"
-                                                ]
-                                            }
-                                        },
-                                        "stores_by_category": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "count": {
-                                                        "type": "integer"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "name",
-                                                    "count"
-                                                ]
-                                            }
-                                        },
                                         "recent_reviews": {
                                             "type": "array",
                                             "items": {
@@ -2911,8 +3104,6 @@
                                         "kpis",
                                         "chat_trend",
                                         "line_friend_trend",
-                                        "stores_by_area",
-                                        "stores_by_category",
                                         "recent_reviews",
                                         "recent_messages",
                                         "recent_chats",
@@ -5743,6 +5934,41 @@
                         "$ref": "#/components/responses/AuthenticationException"
                     }
                 }
+            },
+            "post": {
+                "operationId": "review.store",
+                "summary": "\u7ba1\u7406\u8005\u306b\u3088\u308b\u53e3\u30b3\u30df\u4f5c\u6210\uff08\u685c\u53e3\u30b3\u30df B2 / \u6709\u540d\u30ad\u30e3\u30d0\u5b22\u53e3\u30b3\u30df B3\uff09\u3002\n\u5b9f\u30e6\u30fc\u30b6\u30fc\u306b\u7d10\u4ed8\u304b\u306a\u3044\u305f\u3081 user_id \u306f null\u3002",
+                "tags": [
+                    "Review"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/App.Http.Requests.Admin.StoreReviewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ReviewResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReviewResource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
             }
         },
         "/admin/reviews/{review}": {
@@ -5778,6 +6004,54 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "review.update",
+                "summary": "\u7ba1\u7406\u8005\u306b\u3088\u308b\u53e3\u30b3\u30df\u66f4\u65b0\uff08\u672c\u6587/\u8a55\u4fa1/\u8868\u793a\u540d/\u30d5\u30a3\u30fc\u30c1\u30e3\u30fc/\u5e97\u5074\u8fd4\u7b54 B4/\u30b9\u30c6\u30fc\u30bf\u30b9\uff09\u3002",
+                "tags": [
+                    "Review"
+                ],
+                "parameters": [
+                    {
+                        "name": "review",
+                        "in": "path",
+                        "required": true,
+                        "description": "The review ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateReviewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ReviewResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReviewResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -6101,6 +6375,12 @@
                                         ]
                                     },
                                     "experience_guaranteed": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "show_relocate_badge": {
                                         "type": [
                                             "boolean",
                                             "null"
@@ -6754,6 +7034,12 @@
                                         ]
                                     },
                                     "experience_guaranteed": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
+                                    },
+                                    "show_relocate_badge": {
                                         "type": [
                                             "boolean",
                                             "null"
@@ -7686,6 +7972,202 @@
                 }
             }
         },
+        "/track/pv": {
+            "post": {
+                "operationId": "tracking.pageView",
+                "tags": [
+                    "Tracking"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TrackPageViewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/track/line-click": {
+            "post": {
+                "operationId": "tracking.lineClick",
+                "tags": [
+                    "Tracking"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TrackLineClickRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/admin/tracking-links": {
+            "get": {
+                "operationId": "trackingLink.index",
+                "tags": [
+                    "TrackingLink"
+                ],
+                "parameters": [
+                    {
+                        "name": "target_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `TrackingLinkResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/TrackingLinkResource"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "trackingLink.store",
+                "tags": [
+                    "TrackingLink"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreTrackingLinkRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`TrackingLinkResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TrackingLinkResource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/admin/tracking-links/{trackingLink}": {
+            "put": {
+                "operationId": "trackingLink.update",
+                "tags": [
+                    "TrackingLink"
+                ],
+                "parameters": [
+                    {
+                        "name": "trackingLink",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tracking link ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTrackingLinkRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`TrackingLinkResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TrackingLinkResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "trackingLink.destroy",
+                "tags": [
+                    "TrackingLink"
+                ],
+                "parameters": [
+                    {
+                        "name": "trackingLink",
+                        "in": "path",
+                        "required": true,
+                        "description": "The tracking link ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/admin/users": {
             "get": {
                 "operationId": "user.index",
@@ -8476,6 +8958,61 @@
                 ],
                 "title": "AiChatSetting"
             },
+            "App.Http.Requests.Admin.StoreReviewRequest": {
+                "type": "object",
+                "description": "\u7ba1\u7406\u8005\u306b\u3088\u308b\u53e3\u30b3\u30df\u4f5c\u6210\uff08\u685c\u53e3\u30b3\u30df B2 / \u6709\u540d\u30ad\u30e3\u30d0\u5b22\u53e3\u30b3\u30df B3\uff09\u3002\n\u5b9f\u30e6\u30fc\u30b6\u30fc\u306b\u7d10\u4ed8\u304b\u306a\u3044\u306e\u3067 author_name \u3067\u8868\u793a\u540d\u3092\u6307\u5b9a\u3059\u308b\u3002",
+                "properties": {
+                    "store_id": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                    },
+                    "body": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "author_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "is_featured": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "published",
+                            "unpublished"
+                        ]
+                    },
+                    "store_reply": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    }
+                },
+                "required": [
+                    "store_id",
+                    "rating",
+                    "body"
+                ],
+                "title": "App.Http.Requests.Admin.StoreReviewRequest"
+            },
             "Area": {
                 "type": "object",
                 "properties": {
@@ -8618,6 +9155,26 @@
                     },
                     "updated_at": {
                         "type": "string"
+                    },
+                    "author_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "C1: \u30b3\u30e9\u30e0\u5206\u6790\uff08\u4f5c\u6210\u8005 / \u6587\u5b57\u6570 / PV / LINE\u5c0e\u7dda\uff09\u3002"
+                    },
+                    "author_name": {
+                        "type": "string"
+                    },
+                    "char_count": {
+                        "type": "string"
+                    },
+                    "pv_count": {
+                        "type": "integer",
+                        "description": "index() \u304c\u4ed8\u4e0e\u3057\u305f\u3068\u304d\u3060\u3051\u51fa\u3059\uff08show \u3067\u306f\u672a\u96c6\u8a08\uff09\u3002"
+                    },
+                    "line_clicks_count": {
+                        "type": "integer"
                     }
                 },
                 "required": [
@@ -8633,7 +9190,9 @@
                     "status",
                     "published_at",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "author_id",
+                    "char_count"
                 ],
                 "title": "ArticleResource"
             },
@@ -9320,7 +9879,10 @@
                         "type": "integer"
                     },
                     "user_id": {
-                        "type": "integer"
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
                     },
                     "store_id": {
                         "type": "integer"
@@ -9344,6 +9906,28 @@
                         ]
                     },
                     "status": {
+                        "type": "string"
+                    },
+                    "author_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "\u7ba1\u7406\u8005\u904b\u7528\u30d5\u30a3\u30fc\u30eb\u30c9 (FB B)"
+                    },
+                    "is_featured": {
+                        "type": "boolean"
+                    },
+                    "store_reply": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "store_reply_at": {
+                        "type": "string"
+                    },
+                    "display_author_name": {
                         "type": "string"
                     },
                     "created_at": {
@@ -9419,6 +10003,11 @@
                     "tweet_id",
                     "tweet_author_screen_name",
                     "status",
+                    "author_name",
+                    "is_featured",
+                    "store_reply",
+                    "store_reply_at",
+                    "display_author_name",
                     "created_at",
                     "updated_at"
                 ],
@@ -9810,6 +10399,228 @@
                     "body"
                 ],
                 "title": "StoreReviewRequest"
+            },
+            "StoreTrackingLinkRequest": {
+                "type": "object",
+                "description": "\u8a08\u6e2c\u30ea\u30f3\u30af\uff08\u30a2\u30d5\u30a3\u30ea\u30a8\u30a4\u30c8/\u5e97\u8217\u5225LINE\u5c0e\u7dda/SNS\uff09\u306e\u65b0\u898f\u767a\u884c\u3002",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "enum": [
+                            "store",
+                            "area",
+                            "column",
+                            "standalone"
+                        ]
+                    },
+                    "store_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "article_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "area": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "destination_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "label",
+                    "target_type"
+                ],
+                "title": "StoreTrackingLinkRequest"
+            },
+            "TrackLineClickRequest": {
+                "type": "object",
+                "description": "\u516c\u958b LINE \u8ffd\u52a0\u30af\u30ea\u30c3\u30af\u30d3\u30fc\u30b3\u30f3\u306e\u5165\u529b\u3002\u3059\u3079\u3066\u4efb\u610f\u3002",
+                "properties": {
+                    "source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "page_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "store_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "article_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "area": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "session_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    }
+                },
+                "title": "TrackLineClickRequest"
+            },
+            "TrackPageViewRequest": {
+                "type": "object",
+                "description": "\u516c\u958b PV \u30d3\u30fc\u30b3\u30f3\u306e\u5165\u529b\u3002\u3059\u3079\u3066\u4efb\u610f\uff08\u7121\u540d\u306e append-only \u30ed\u30b0\uff09\u3002",
+                "properties": {
+                    "page_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "store_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "article_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "area": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "path": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 1024
+                    },
+                    "session_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    }
+                },
+                "title": "TrackPageViewRequest"
+            },
+            "TrackingLinkResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "target_type": {
+                        "type": "string"
+                    },
+                    "store_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "article_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "area": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "destination_url": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "public_url": {
+                        "type": "string"
+                    },
+                    "clicks_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "store_name": {
+                        "type": "string"
+                    },
+                    "article_title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "code",
+                    "label",
+                    "target_type",
+                    "store_id",
+                    "article_id",
+                    "area",
+                    "destination_url",
+                    "is_active",
+                    "public_url",
+                    "created_at"
+                ],
+                "title": "TrackingLinkResource"
             },
             "UpdateAdminUserRequest": {
                 "type": "object",
@@ -10266,6 +11077,48 @@
                 },
                 "title": "UpdateRelocateVoiceRequest"
             },
+            "UpdateReviewRequest": {
+                "type": "object",
+                "description": "\u7ba1\u7406\u8005\u306b\u3088\u308b\u53e3\u30b3\u30df\u66f4\u65b0\uff08\u672c\u6587/\u8a55\u4fa1/\u8868\u793a\u540d/\u30d5\u30a3\u30fc\u30c1\u30e3\u30fc/\u5e97\u5074\u8fd4\u7b54 B4/\u30b9\u30c6\u30fc\u30bf\u30b9\uff09\u3002",
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                    },
+                    "body": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                    },
+                    "author_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "is_featured": {
+                        "type": "boolean"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "published",
+                            "unpublished",
+                            "deleted"
+                        ]
+                    },
+                    "store_reply": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    }
+                },
+                "title": "UpdateReviewRequest"
+            },
             "UpdateReviewStatusRequest": {
                 "type": "object",
                 "properties": {
@@ -10282,6 +11135,28 @@
                     "status"
                 ],
                 "title": "UpdateReviewStatusRequest"
+            },
+            "UpdateTrackingLinkRequest": {
+                "type": "object",
+                "description": "\u8a08\u6e2c\u30ea\u30f3\u30af\u306e\u66f4\u65b0\uff08\u30e9\u30d9\u30eb / \u30ea\u30c0\u30a4\u30ec\u30af\u30c8\u5148 / \u6709\u52b9\u30fb\u7121\u52b9\uff09\u3002",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "destination_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateTrackingLinkRequest"
             },
             "UpdateUserNotesRequest": {
                 "type": "object",

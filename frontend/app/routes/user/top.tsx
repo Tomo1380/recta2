@@ -1,5 +1,6 @@
 import TopPage from "~/components/user/TopPage";
 import { buildMetaTags } from "~/lib/seo";
+import { useTrackPageView } from "~/lib/tracking";
 import {
   buildOrganizationSchema,
   buildSchemaGraph,
@@ -21,6 +22,7 @@ const SCHEMA_JSON = serializeSchema(
 );
 
 export default function Top() {
+  useTrackPageView({ page_type: "home" });
   return (
     <>
       <script
