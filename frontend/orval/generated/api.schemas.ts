@@ -83,6 +83,49 @@ export interface AiChatSetting {
   suggest_display_mode: string;
 }
 
+/**
+ * @nullable
+ */
+export type AppHttpRequestsAdminStoreReviewRequestStatus = typeof AppHttpRequestsAdminStoreReviewRequestStatus[keyof typeof AppHttpRequestsAdminStoreReviewRequestStatus] | null;
+
+
+export const AppHttpRequestsAdminStoreReviewRequestStatus = {
+  published: 'published',
+  unpublished: 'unpublished',
+} as const;
+
+/**
+ * 管理者による口コミ作成（桜口コミ B2 / 有名キャバ嬢口コミ B3）。
+ * 実ユーザーに紐付かないので author_name で表示名を指定する。
+ */
+export interface AppHttpRequestsAdminStoreReviewRequest {
+  store_id: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  body: string;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  author_name?: string | null;
+  /** @nullable */
+  is_featured?: boolean | null;
+  /** @nullable */
+  status?: AppHttpRequestsAdminStoreReviewRequestStatus;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  store_reply?: string | null;
+}
+
 export interface Area {
   id: number;
   name: string;
@@ -134,6 +177,16 @@ export interface ArticleResource {
   published_at: string;
   created_at: string;
   updated_at: string;
+  /**
+     * C1: コラム分析（作成者 / 文字数 / PV / LINE導線）。
+     * @nullable
+     */
+  author_id: number | null;
+  author_name?: string;
+  char_count: string;
+  /** index() が付与したときだけ出す（show では未集計）。 */
+  pv_count?: number;
+  line_clicks_count?: number;
 }
 
 export interface ArticleSummaryResource {
@@ -397,7 +450,8 @@ export type ReviewResourceStore = {
 
 export interface ReviewResource {
   id: number;
-  user_id: number;
+  /** @nullable */
+  user_id: number | null;
   store_id: number;
   rating: number;
   body: string;
@@ -406,6 +460,16 @@ export interface ReviewResource {
   /** @nullable */
   tweet_author_screen_name: string | null;
   status: string;
+  /**
+     * 管理者運用フィールド (FB B)
+     * @nullable
+     */
+  author_name: string | null;
+  is_featured: boolean;
+  /** @nullable */
+  store_reply: string | null;
+  store_reply_at: string;
+  display_author_name: string;
   created_at: string;
   updated_at: string;
   /** Lightweight relationships — only included when eager-loaded. */
@@ -603,6 +667,124 @@ export interface StoreReviewRequest {
      * @nullable
      */
   tweet_url?: string | null;
+}
+
+export type StoreTrackingLinkRequestTargetType = typeof StoreTrackingLinkRequestTargetType[keyof typeof StoreTrackingLinkRequestTargetType];
+
+
+export const StoreTrackingLinkRequestTargetType = {
+  store: 'store',
+  area: 'area',
+  column: 'column',
+  standalone: 'standalone',
+} as const;
+
+/**
+ * 計測リンク（アフィリエイト/店舗別LINE導線/SNS）の新規発行。
+ */
+export interface StoreTrackingLinkRequest {
+  /** @maxLength 120 */
+  label: string;
+  target_type: StoreTrackingLinkRequestTargetType;
+  /** @nullable */
+  store_id?: number | null;
+  /** @nullable */
+  article_id?: number | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  area?: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  destination_url?: string | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  code?: string | null;
+}
+
+/**
+ * 公開 LINE 追加クリックビーコンの入力。すべて任意。
+ */
+export interface TrackLineClickRequest {
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  source?: string | null;
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  page_type?: string | null;
+  /** @nullable */
+  store_id?: number | null;
+  /** @nullable */
+  article_id?: number | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  area?: string | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  session_id?: string | null;
+}
+
+/**
+ * 公開 PV ビーコンの入力。すべて任意（無名の append-only ログ）。
+ */
+export interface TrackPageViewRequest {
+  /**
+     * @maxLength 32
+     * @nullable
+     */
+  page_type?: string | null;
+  /** @nullable */
+  store_id?: number | null;
+  /** @nullable */
+  article_id?: number | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  area?: string | null;
+  /**
+     * @maxLength 1024
+     * @nullable
+     */
+  path?: string | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  session_id?: string | null;
+}
+
+export interface TrackingLinkResource {
+  id: number;
+  code: string;
+  label: string;
+  target_type: string;
+  /** @nullable */
+  store_id: number | null;
+  /** @nullable */
+  article_id: number | null;
+  /** @nullable */
+  area: string | null;
+  destination_url: string;
+  is_active: boolean;
+  public_url: string;
+  clicks_count?: number;
+  created_at: string;
+  store_name?: string;
+  article_title?: string;
 }
 
 export type UpdateAdminUserRequestRole = typeof UpdateAdminUserRequestRole[keyof typeof UpdateAdminUserRequestRole];
@@ -877,6 +1059,43 @@ export interface UpdateRelocateVoiceRequest {
   display_order?: number;
 }
 
+export type UpdateReviewRequestStatus = typeof UpdateReviewRequestStatus[keyof typeof UpdateReviewRequestStatus];
+
+
+export const UpdateReviewRequestStatus = {
+  published: 'published',
+  unpublished: 'unpublished',
+  deleted: 'deleted',
+} as const;
+
+/**
+ * 管理者による口コミ更新（本文/評価/表示名/フィーチャー/店側返答 B4/ステータス）。
+ */
+export interface UpdateReviewRequest {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating?: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  body?: string;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  author_name?: string | null;
+  is_featured?: boolean;
+  status?: UpdateReviewRequestStatus;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  store_reply?: string | null;
+}
+
 export type UpdateReviewStatusRequestStatus = typeof UpdateReviewStatusRequestStatus[keyof typeof UpdateReviewStatusRequestStatus];
 
 
@@ -888,6 +1107,20 @@ export const UpdateReviewStatusRequestStatus = {
 
 export interface UpdateReviewStatusRequest {
   status: UpdateReviewStatusRequestStatus;
+}
+
+/**
+ * 計測リンクの更新（ラベル / リダイレクト先 / 有効・無効）。
+ */
+export interface UpdateTrackingLinkRequest {
+  /** @maxLength 120 */
+  label?: string;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  destination_url?: string | null;
+  is_active?: boolean;
 }
 
 export interface UpdateUserNotesRequest {
@@ -1301,6 +1534,86 @@ export type AiChatSettingStats200 = {
   mode_daily_stats: AiChatLog[];
 };
 
+export type AnalyticsOverview200Range = {
+  days: 30;
+  from: string;
+  to: string;
+};
+
+export type AnalyticsOverview200Summary = {
+  /** @minimum 0 */
+  pv: number;
+  /** @minimum 0 */
+  line_clicks: number;
+  cv_rate: number;
+  /**
+     * LINE 公式アカウント友だち追加「実績」(line_friends)。
+   * LINE 仕様上、経路別には割れないため全体値のみ。
+     * @minimum 0
+     */
+  line_friends_total: number;
+  /** @minimum 0 */
+  line_friends_in_range: number;
+};
+
+export type AnalyticsOverview200LineRoutesItem = {
+  route: string;
+  kind: string;
+  clicks: number;
+};
+
+export type AnalyticsOverview200 = {
+  range: AnalyticsOverview200Range;
+  summary: AnalyticsOverview200Summary;
+  stores: unknown[][];
+  areas: unknown[][];
+  columns: unknown[][];
+  line_routes: AnalyticsOverview200LineRoutesItem[];
+};
+
+export type AnalyticsBreakdownParams = {
+type: AnalyticsBreakdownType;
+/**
+ * @maxLength 120
+ */
+key: string;
+/**
+ * @nullable
+ */
+days?: AnalyticsBreakdownDays;
+};
+
+export type AnalyticsBreakdownType = typeof AnalyticsBreakdownType[keyof typeof AnalyticsBreakdownType];
+
+
+export const AnalyticsBreakdownType = {
+  store: 'store',
+  column: 'column',
+  area: 'area',
+} as const;
+
+export type AnalyticsBreakdownDays = typeof AnalyticsBreakdownDays[keyof typeof AnalyticsBreakdownDays] | null;
+
+
+export const AnalyticsBreakdownDays = {
+  NUMBER_7: '7',
+  NUMBER_30: '30',
+  NUMBER_90: '90',
+  NUMBER_365: '365',
+} as const;
+
+export type AnalyticsBreakdown200RowsItem = {
+  /** @nullable */
+  source: string | null;
+  clicks: number;
+};
+
+export type AnalyticsBreakdown200 = {
+  type: string;
+  key: string;
+  rows: AnalyticsBreakdown200RowsItem[];
+};
+
 export type AreaCategoryReorderAreas200 = {
   message: 'OK';
 };
@@ -1401,16 +1714,6 @@ export type DashboardIndex200Kpis = {
   chat_today: DashboardIndex200KpisChatToday;
 };
 
-export type DashboardIndex200StoresByAreaItem = {
-  name: string;
-  count: number;
-};
-
-export type DashboardIndex200StoresByCategoryItem = {
-  name: string;
-  count: number;
-};
-
 export type DashboardIndex200RecentReviewsItem = {
   id: number;
   rating: number;
@@ -1459,8 +1762,6 @@ export type DashboardIndex200 = {
   kpis: DashboardIndex200Kpis;
   chat_trend: string[];
   line_friend_trend: string[];
-  stores_by_area: DashboardIndex200StoresByAreaItem[];
-  stores_by_category: DashboardIndex200StoresByCategoryItem[];
   recent_reviews: DashboardIndex200RecentReviewsItem[];
   recent_messages: DashboardIndex200RecentMessagesItem[];
   recent_chats: DashboardIndex200RecentChatsItem[];
@@ -2173,6 +2474,8 @@ export type StoresStoreBody = {
   /** @nullable */
   experience_guaranteed?: boolean | null;
   /** @nullable */
+  show_relocate_badge?: boolean | null;
+  /** @nullable */
   publish_status?: StoresStoreBodyPublishStatus;
   /**
      * @minimum -1000
@@ -2527,6 +2830,8 @@ export type StoresUpdateBody = {
   /** @nullable */
   experience_guaranteed?: boolean | null;
   /** @nullable */
+  show_relocate_badge?: boolean | null;
+  /** @nullable */
   publish_status?: StoresUpdateBodyPublishStatus;
   /**
      * @minimum -1000
@@ -2725,6 +3030,10 @@ export type StoreReorderImages200 = {
 export type StoreDeleteImage200 = {
   images: unknown[];
 } | null;
+
+export type TrackingLinkIndexParams = {
+target_type?: string;
+};
 
 export type UserIndexParams = {
 line_status?: string;

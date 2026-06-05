@@ -197,8 +197,6 @@ export interface DashboardData {
   };
   chat_trend: DashboardChatTrendPoint[];
   line_friend_trend: DashboardSimpleTrendPoint[];
-  stores_by_area: DashboardDistributionPoint[];
-  stores_by_category: DashboardDistributionPoint[];
   recent_reviews: DashboardRecentReview[];
   recent_messages: DashboardRecentMessage[];
   recent_chats: DashboardRecentChat[];
@@ -208,6 +206,69 @@ export interface DashboardData {
     published_articles: number;
     fine_tuning_qa_active: number;
   };
+}
+
+// ─── アクセス解析（FB 2026-06-05 A2/A3） ───
+
+/** ランキング1行: PV・LINE追加クリック・CV率（= クリック ÷ PV × 100）。 */
+export interface AnalyticsRankRow {
+  id?: number;
+  name: string;
+  pv: number;
+  line_clicks: number;
+  cv_rate: number;
+}
+
+/** LINE 追加クリックの経路ランキング1行。 */
+export interface AnalyticsRouteRow {
+  route: string;
+  kind: "affiliate" | "cta";
+  clicks: number;
+}
+
+/** ランキング行ドリルダウン: 1店舗/コラム/エリアの画面別LINE導線内訳。 */
+export interface AnalyticsBreakdownRow {
+  source: string;
+  clicks: number;
+}
+
+export interface AnalyticsBreakdown {
+  type: "store" | "column" | "area";
+  key: string;
+  rows: AnalyticsBreakdownRow[];
+}
+
+export interface AnalyticsOverview {
+  range: { days: number; from: string; to: string };
+  summary: {
+    pv: number;
+    line_clicks: number;
+    cv_rate: number;
+    line_friends_total: number;
+    line_friends_in_range: number;
+  };
+  stores: AnalyticsRankRow[];
+  areas: AnalyticsRankRow[];
+  columns: AnalyticsRankRow[];
+  line_routes: AnalyticsRouteRow[];
+}
+
+/** 計測リンク（アフィリエイト/店舗別LINE導線/SNS）。 */
+export interface TrackingLink {
+  id: number;
+  code: string;
+  label: string;
+  target_type: "store" | "area" | "column" | "standalone";
+  store_id: number | null;
+  article_id: number | null;
+  area: string | null;
+  destination_url: string;
+  is_active: boolean;
+  public_url: string;
+  clicks_count?: number;
+  created_at: string | null;
+  store_name?: string | null;
+  article_title?: string | null;
 }
 
 // LineFriend / LineMessage / LineMessageMeta は手書きで残す。

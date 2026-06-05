@@ -92,6 +92,7 @@ class StoreController extends Controller
             'transfer_km' => 'nullable|string|max:50',
             'champagne_description' => 'nullable|string',
             'experience_guaranteed' => 'nullable|boolean',
+            'show_relocate_badge' => 'nullable|boolean',
             'publish_status' => 'nullable|in:published,unpublished,draft',
             'priority' => 'nullable|integer|between:-1000,1000',
             // slug: lowercase / digit / hyphen のみ。store 自身を除いて unique。
@@ -189,7 +190,7 @@ class StoreController extends Controller
             'transfer_description', 'transfer_km', 'transfer_zones',
             'dress_code', 'set_fee',
             'recta_episodes', 'related_store_ids',
-            'experience_guaranteed', 'publish_status',
+            'experience_guaranteed', 'show_relocate_badge', 'publish_status',
             'priority',
             'slug',
             'seo_meta_description',

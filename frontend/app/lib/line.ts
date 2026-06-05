@@ -52,13 +52,25 @@ declare global {
 }
 
 /**
+ * LINE 追加クリックに付与する計測コンテキスト（どの店舗/コラム/エリア由来か）。
+ * 自社ダッシュボードの経路別 CV 集計（POST /api/track/line-click）に使う。
+ */
+export interface LineCtaContext {
+  page_type?: import("./tracking").TrackPageType | null;
+  store_id?: number | null;
+  article_id?: number | null;
+  area?: string | null;
+}
+
+/**
  * LINE 友だち追加ページを開く。
  * モバイルではLINEアプリが直接開き、PCではLINEのWebページが開く。
  *
- * `source` を渡すと dataLayer に `line_add_friend` イベントを push する。
- * GA4 や GTM 側で計測タグを設定すれば、どのCTAがクリックされたかを集計できる。
+ * `source` を渡すと dataLayer に `line_add_friend` イベントを push し（GA4/GTM 用）、
+ * さらに自社の計測エンドポイント（/api/track/line-click）へクリックを記録する。
+ * `context` で店舗/コラム/エリアを渡すと、ダッシュボードで経路別 CV 率に反映される。
  */
-export function openLineFriendAdd(source?: LineCtaSource) {
+export function openLineFriendAdd(source?: LineCtaSource, context?: LineCtaContext) {
   if (typeof window !== "undefined") {
     // dataLayer が無ければ作る（GTMロード前でも安全）
     window.dataLayer = window.dataLayer || [];
@@ -66,6 +78,14 @@ export function openLineFriendAdd(source?: LineCtaSource) {
       event: "line_add_friend",
       line_cta_source: source ?? "unknown",
     });
+
+    // 自社ダッシュボード用の計測（GTM とは独立。経路別 CV の分子）。
+    // 動的 import で循環参照と SSR バンドルへの巻き込みを避ける。
+    void import("./tracking")
+      .then(({ trackLineClick }) =>
+        trackLineClick({ source: source ?? "unknown", ...context }),
+      )
+      .catch(() => {});
   }
   if (typeof window !== "undefined") {
     window.open(LINE_ADD_FRIEND_URL, "_blank", "noopener,noreferrer");

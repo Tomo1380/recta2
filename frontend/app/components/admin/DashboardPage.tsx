@@ -18,7 +18,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -31,6 +30,7 @@ import { useNavigate } from "react-router";
 import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
 import type { DashboardData, DashboardKpiWithDelta } from "~/lib/types";
+import { AnalyticsSection } from "~/components/admin/AnalyticsSection";
 
 // ----------------------------------------------------------------
 // Helpers
@@ -76,12 +76,6 @@ const reviewStatusLabels: Record<string, { label: string; className: string }> =
   unpublished: { label: "非公開", className: "bg-amber-50 text-amber-700" },
   deleted: { label: "削除", className: "bg-rose-50 text-rose-700" },
 };
-
-const AREA_BAR_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
-  "#f59e0b", "#10b981", "#14b8a6", "#06b6d4",
-  "#3b82f6", "#a855f7",
-];
 
 // ----------------------------------------------------------------
 // Sub-components
@@ -488,123 +482,8 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Distribution charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm">エリア別 公開店舗数</h3>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              Top 10
-            </span>
-          </div>
-          <div
-            className="min-h-[260px]"
-            style={{
-              height: `${Math.max(260, data.stores_by_area.length * 32 + 40)}px`,
-            }}
-          >
-            {data.stores_by_area.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={data.stores_by_area}
-                  margin={{ left: 8, right: 16 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {data.stores_by_area.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={AREA_BAR_COLORS[i % AREA_BAR_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="エリアデータがありません" />
-            )}
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm">カテゴリ別 公開店舗数</h3>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              Top 10
-            </span>
-          </div>
-          <div
-            className="min-h-[260px]"
-            style={{
-              height: `${Math.max(260, data.stores_by_category.length * 32 + 40)}px`,
-            }}
-          >
-            {data.stores_by_category.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={data.stores_by_category}
-                  margin={{ left: 8, right: 16 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="カテゴリデータがありません" />
-            )}
-          </div>
-        </div>
-      </div>
+      {/* アクセス解析: 店舗/エリア/コラム ランキング + LINE経路 + 計測リンク発行 (FB A2-A4) */}
+      <AnalyticsSection />
 
       {/* Secondary indicators */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

@@ -27,6 +27,7 @@ class Store extends Model
         'dress_code', 'set_fee',
         'recta_episodes', 'related_store_ids',
         'experience_guaranteed', 'publish_status',
+        'show_relocate_badge',
         'priority',
         'seo_meta_description',
     ];
@@ -53,6 +54,7 @@ class Store extends Model
         'recta_episodes' => 'array',
         'related_store_ids' => 'array',
         'experience_guaranteed' => 'boolean',
+        'show_relocate_badge' => 'boolean',
         'lat' => 'float',
         'lng' => 'float',
     ];

@@ -74,8 +74,6 @@ class AdminDashboardTest extends TestCase
                 ],
                 'chat_trend',
                 'line_friend_trend',
-                'stores_by_area',
-                'stores_by_category',
                 'recent_reviews',
                 'recent_messages',
                 'recent_chats',
