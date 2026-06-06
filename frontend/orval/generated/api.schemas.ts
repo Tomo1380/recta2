@@ -1845,7 +1845,7 @@ export type DashboardIndex200RecentChatsItem = {
 
 export type DashboardIndex200Secondary = {
   /** @minimum 0 */
-  unread_messages: number;
+  new_inbound_threads_7d: number;
   /**
      * 口コミは承認制ではなく即公開→post-moderation(非公開/削除)。
    * なので「承認待ち」ではなく「直近で来た新着口コミ(要チェック)」を出す。
@@ -2212,6 +2212,12 @@ export type LineFriendUpdateName200Person = {
   is_following: boolean;
   is_talk: boolean;
   has_account: boolean;
+  /**
+     * 運営は返信を LINE 公式チャットで行うので、その人の公式チャットへの
+   * ディープリンクを渡す (OAチャットID未設定なら null でボタン非表示)。
+     * @nullable
+     */
+  line_chat_url: string | null;
   admin_notes: string;
   /** @nullable */
   user: LineFriendUpdateName200PersonUser;
@@ -2268,6 +2274,12 @@ export type LineFriendUpdateNotes200Person = {
   is_following: boolean;
   is_talk: boolean;
   has_account: boolean;
+  /**
+     * 運営は返信を LINE 公式チャットで行うので、その人の公式チャットへの
+   * ディープリンクを渡す (OAチャットID未設定なら null でボタン非表示)。
+     * @nullable
+     */
+  line_chat_url: string | null;
   admin_notes: string;
   /** @nullable */
   user: LineFriendUpdateNotes200PersonUser;

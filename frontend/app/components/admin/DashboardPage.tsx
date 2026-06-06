@@ -401,11 +401,11 @@ export function DashboardPage() {
         <h3 className="text-[12px] font-semibold text-muted-foreground tracking-wide">要対応</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <ActionCard
-            label="未返信のLINEトーク"
-            count={data.secondary.unread_messages}
+            label="新着の受信（7日）"
+            count={data.secondary.new_inbound_threads_7d}
             icon={MessageCircle}
             accent="#06c755"
-            cta="トークを開く"
+            cta="確認する"
             onClick={() => navigate("/admin/users")}
           />
           <ActionCard
@@ -519,8 +519,8 @@ export function DashboardPage() {
             title="LINE受信メッセージ"
             icon={MessageCircle}
             badge={
-              data.secondary.unread_messages > 0
-                ? `未読 ${data.secondary.unread_messages}`
+              data.secondary.new_inbound_threads_7d > 0
+                ? `新着 ${data.secondary.new_inbound_threads_7d}`
                 : undefined
             }
             href="/admin/users"

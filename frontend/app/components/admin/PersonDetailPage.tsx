@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Star,
   Bot,
+  ExternalLink,
 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AdminPerson, PersonShowResponse } from "~/lib/types";
@@ -172,6 +173,19 @@ export function PersonDetailPage() {
             )}
           </div>
         </div>
+        {person.line_chat_url && (
+          <a
+            href={person.line_chat_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#06C755] text-white text-[13px] font-medium hover:bg-[#05b34c] transition"
+            title="LINE公式アカウントのチャットでこの人に返信"
+          >
+            <MessageCircle className="w-4 h-4" />
+            LINE公式で返信
+            <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+          </a>
+        )}
       </div>
 
       {/* 2 カラム: 左=管理メモ+口コミ / 右=LINEトーク */}

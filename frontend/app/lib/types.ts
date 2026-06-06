@@ -78,6 +78,8 @@ export interface AdminPerson {
   is_following: boolean;
   is_talk: boolean;
   has_account: boolean;
+  /** LINE公式チャット(その人)へのディープリンク。OAチャットID未設定なら null。 */
+  line_chat_url: string | null;
   admin_notes: string | null;
   user: {
     id: number;
@@ -283,7 +285,7 @@ export interface DashboardData {
   recent_messages: DashboardRecentMessage[];
   recent_chats: DashboardRecentChat[];
   secondary: {
-    unread_messages: number;
+    new_inbound_threads_7d: number;
     new_reviews_7d: number;
     new_users_7d: number;
     published_articles: number;

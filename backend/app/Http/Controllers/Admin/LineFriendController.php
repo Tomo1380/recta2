@@ -191,6 +191,11 @@ class LineFriendController extends Controller
                 'is_following' => (bool) ($friend?->is_following ?? false),
                 'is_talk' => (bool) $friend,
                 'has_account' => (bool) $user,
+                // 運営は返信を LINE 公式チャットで行うので、その人の公式チャットへの
+                // ディープリンクを渡す (OAチャットID未設定なら null でボタン非表示)。
+                'line_chat_url' => config('services.line.oa_chat_id')
+                    ? 'https://chat.line.biz/' . config('services.line.oa_chat_id') . '/chat/' . $lineUserId
+                    : null,
                 'admin_notes' => $friend?->admin_notes ?? $user?->admin_notes,
                 'user' => $user ? [
                     'id' => $user->id,

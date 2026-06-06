@@ -3146,7 +3146,7 @@
                                         "secondary": {
                                             "type": "object",
                                             "properties": {
-                                                "unread_messages": {
+                                                "new_inbound_threads_7d": {
                                                     "type": "integer",
                                                     "minimum": 0
                                                 },
@@ -3169,7 +3169,7 @@
                                                 }
                                             },
                                             "required": [
-                                                "unread_messages",
+                                                "new_inbound_threads_7d",
                                                 "new_reviews_7d",
                                                 "new_users_7d",
                                                 "published_articles",
@@ -5023,6 +5023,13 @@
                                                 "has_account": {
                                                     "type": "boolean"
                                                 },
+                                                "line_chat_url": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "\u904b\u55b6\u306f\u8fd4\u4fe1\u3092 LINE \u516c\u5f0f\u30c1\u30e3\u30c3\u30c8\u3067\u884c\u3046\u306e\u3067\u3001\u305d\u306e\u4eba\u306e\u516c\u5f0f\u30c1\u30e3\u30c3\u30c8\u3078\u306e\n\u30c7\u30a3\u30fc\u30d7\u30ea\u30f3\u30af\u3092\u6e21\u3059 (OA\u30c1\u30e3\u30c3\u30c8ID\u672a\u8a2d\u5b9a\u306a\u3089 null \u3067\u30dc\u30bf\u30f3\u975e\u8868\u793a)\u3002"
+                                                },
                                                 "admin_notes": {
                                                     "type": "string"
                                                 },
@@ -5155,6 +5162,7 @@
                                                 "is_following",
                                                 "is_talk",
                                                 "has_account",
+                                                "line_chat_url",
                                                 "admin_notes",
                                                 "user",
                                                 "reviews",
@@ -5254,6 +5262,13 @@
                                                 "has_account": {
                                                     "type": "boolean"
                                                 },
+                                                "line_chat_url": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "\u904b\u55b6\u306f\u8fd4\u4fe1\u3092 LINE \u516c\u5f0f\u30c1\u30e3\u30c3\u30c8\u3067\u884c\u3046\u306e\u3067\u3001\u305d\u306e\u4eba\u306e\u516c\u5f0f\u30c1\u30e3\u30c3\u30c8\u3078\u306e\n\u30c7\u30a3\u30fc\u30d7\u30ea\u30f3\u30af\u3092\u6e21\u3059 (OA\u30c1\u30e3\u30c3\u30c8ID\u672a\u8a2d\u5b9a\u306a\u3089 null \u3067\u30dc\u30bf\u30f3\u975e\u8868\u793a)\u3002"
+                                                },
                                                 "admin_notes": {
                                                     "type": "string"
                                                 },
@@ -5386,6 +5401,7 @@
                                                 "is_following",
                                                 "is_talk",
                                                 "has_account",
+                                                "line_chat_url",
                                                 "admin_notes",
                                                 "user",
                                                 "reviews",

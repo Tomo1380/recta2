@@ -228,10 +228,14 @@ class DashboardController extends Controller
         // ----------------------------------------------------------------
         // Secondary stats
         // ----------------------------------------------------------------
+        // 返信は LINE 公式チャットで行う運用が多く、その返信は webhook で来ない=
+        // Recta 側では「返信済みか」を正確に判定できない。よって「未返信」ではなく、
+        // 確実に取れる「直近7日に受信があったトーク数」を出して確認のきっかけにする。
         $secondary = [
-            'unread_messages' => LineMessage::where('direction', 'inbound')
-                ->whereNull('read_at')
-                ->count(),
+            'new_inbound_threads_7d' => LineMessage::where('direction', 'inbound')
+                ->where('created_at', '>=', $now->copy()->subDays(7))
+                ->distinct('line_user_id')
+                ->count('line_user_id'),
             // 口コミは承認制ではなく即公開→post-moderation(非公開/削除)。
             // なので「承認待ち」ではなく「直近で来た新着口コミ(要チェック)」を出す。
             'new_reviews_7d' => Review::where('status', '!=', 'deleted')
