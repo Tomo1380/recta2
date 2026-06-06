@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\AiChatLog;
+use App\Models\LineFriend;
+use App\Models\Review;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -27,26 +30,34 @@ class VerificationSeeder extends Seeder
 {
     public function run(): void
     {
-        // コラム記事 (冪等)。
+        // 店舗 (StoreSeeder) は呼ばない＝手入力店舗をそのまま残す。
+        // 各テーブルは「空のときだけ」入れる＝既存データを壊さず、欠けてる分だけ補充。
+        // 記事だけは updateOrCreate で冪等なので毎回実行して最新化。
+
         $this->call(ArticleSeeder::class);
 
-        if (User::count() > 0) {
-            $this->command?->warn('VerificationSeeder: users already exist — skipping user/review/chat/friend seeders (重複防止)。記事のみ更新しました。');
-            return;
-        }
-
-        // ── User 依存のデータを一括投入 (User 0 件の初回のみ) ──
-        $this->call(UserSeeder::class);
-
-        // 口コミは既存の「公開店舗」に紐づく。店舗が無いと ReviewSeeder が
-        // ->random() で失敗するのでガードする。
-        if (Store::where('publish_status', 'published')->exists()) {
-            $this->call(ReviewSeeder::class);
+        if (User::count() === 0) {
+            $this->call(UserSeeder::class);
         } else {
-            $this->command?->warn('VerificationSeeder: 公開店舗が無いため口コミ(ReviewSeeder)はスキップしました。');
+            $this->command?->warn('VerificationSeeder: 既にユーザーがいるため UserSeeder はスキップ。');
         }
 
-        $this->call(AiChatLogSeeder::class);
-        $this->call(LineFriendSeeder::class);
+        // 口コミは公開店舗が前提 (ReviewSeeder が ->random() を使う)。
+        if (Review::count() === 0 && Store::where('publish_status', 'published')->exists()) {
+            $this->call(ReviewSeeder::class);
+        }
+
+        if (AiChatLog::count() === 0) {
+            $this->call(AiChatLogSeeder::class);
+        }
+
+        if (LineFriend::count() === 0) {
+            $this->call(LineFriendSeeder::class);
+        }
+
+        // 「フォロー中・未ログインのヘビーチャッター」デモは line_friends の状態に
+        // 依らず必ず用意する (未ログイン×AIチャット履歴=line_user_id 基準 の確認用)。
+        // 冪等 (firstOrCreate + チャット未投入時のみ) なので重複しない。
+        app(LineFriendSeeder::class)->seedHeavyChatterFriend();
     }
 }

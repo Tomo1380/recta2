@@ -127,8 +127,11 @@ class LineFriendSeeder extends Seeder
      * AIチャットは LINEトーク基準 (line_user_id) で紐づくので、user_id なしの
      * AiChatLog を多数作ると人物詳細に履歴が出る。詳細の履歴まとめ表示
      * (件数が多いと長くなるのを 3 件 + もっと見るに畳む) の確認用。
+     *
+     * 冪等 (firstOrCreate + チャットは未投入時のみ insert) なので、
+     * VerificationSeeder から状態に依らず呼んでも重複しない。
      */
-    private function seedHeavyChatterFriend(): void
+    public function seedHeavyChatterFriend(): void
     {
         $lineId = 'Uheavychatter000000000000000000001';
 
@@ -158,6 +161,11 @@ class LineFriendSeeder extends Seeder
             ['top', 'agent', '客層が落ち着いてるお店がいい', '客層が落ち着いた大人向けのラウンジ・クラブを中心にご紹介します。'],
             ['detail', 'agent', 'ここの時給っていくら？', 'こちらは体入時給5,000円〜、本入店後も同水準です。指名やバックで上乗せもあります。'],
         ];
+
+        // チャットは未投入時のみ (再実行で重複させない)。
+        if (AiChatLog::where('line_user_id', $lineId)->count() > 0) {
+            return;
+        }
 
         $logs = [];
         for ($i = 0; $i < 16; $i++) {
