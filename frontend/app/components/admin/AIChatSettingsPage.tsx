@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router";
+import { AiChatHistoryTab } from "~/components/admin/AiChatHistoryTab";
 import {
   LineChart,
   Line,
@@ -51,7 +52,7 @@ const LABEL_TO_TONE: Record<string, AiChatSetting["tone"]> = {
 };
 
 // --- Tabs ---
-type TabKey = "basic" | "suggest" | "limit" | "qa" | "knowledge" | "stats";
+type TabKey = "basic" | "suggest" | "limit" | "qa" | "knowledge" | "stats" | "history";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "基本設定" },
   { key: "suggest", label: "サジェスト" },
@@ -59,6 +60,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "qa", label: "Fine-tuning Q&A" },
   { key: "knowledge", label: "業界ナレッジ" },
   { key: "stats", label: "統計" },
+  { key: "history", label: "履歴" },
 ];
 
 const VALID_TABS = new Set<string>(TABS.map((t) => t.key));
@@ -1749,6 +1751,8 @@ export function AIChatSettingsPage() {
       )}
 
       {/* Tab: Stats */}
+      {activeTab === "history" && <AiChatHistoryTab />}
+
       {activeTab === "stats" && (
         <div className="space-y-4">
           {statsLoading ? (

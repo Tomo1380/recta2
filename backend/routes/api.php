@@ -164,6 +164,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/ai-chat/settings', [AiChatSettingController::class, 'index']);
         Route::put('/ai-chat/settings/{ai_chat_setting}', [AiChatSettingController::class, 'update']);
         Route::get('/ai-chat/stats', [AiChatSettingController::class, 'stats']);
+        Route::get('/ai-chat/logs', [AiChatSettingController::class, 'logs']);
         Route::get('/ai-chat/limits', [AiChatSettingController::class, 'limits']);
         Route::put('/ai-chat/limits', [AiChatSettingController::class, 'updateLimits']);
 

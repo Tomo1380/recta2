@@ -666,7 +666,7 @@ export function DashboardPage() {
           <SectionHeader
             title="AIチャット直近"
             icon={Bot}
-            href="/admin/ai-chat"
+            href="/admin/ai-chat?tab=history"
             navigate={navigate}
           />
           <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
@@ -677,7 +677,7 @@ export function DashboardPage() {
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => navigate("/admin/ai-chat")}
+                  onClick={() => navigate("/admin/ai-chat?tab=history")}
                   className="w-full text-left px-4 sm:px-5 py-3 hover:bg-muted/40 transition"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
