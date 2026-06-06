@@ -27,6 +27,10 @@ class ArticleResource extends JsonResource
             'body_html' => $this->body_html,
             'thumbnail_url' => $this->thumbnail_url,
             'category' => $this->category,
+            'section' => $this->section,
+            'related_store_ids' => $this->related_store_ids ?? [],
+            // controller が解決して attach したときだけ出す（一覧では未解決）。
+            'related_stores' => $this->when(isset($this->related_stores), fn () => $this->related_stores),
             'tags' => $this->tags,
             'status' => $this->status,
             'published_at' => $this->published_at?->toIso8601String(),

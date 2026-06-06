@@ -26,6 +26,7 @@ class ArticleSummaryResource extends JsonResource
             'excerpt' => $this->excerpt,
             'thumbnail_url' => $this->thumbnail_url,
             'category' => $this->category,
+            'section' => $this->section,
             'tags' => $this->tags,
             'published_at' => $this->published_at?->toIso8601String(),
         ];

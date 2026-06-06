@@ -36,6 +36,11 @@ class PublicArticleController extends Controller
             $query->where('category', $category);
         }
 
+        // C2: 大テーマ（夜の始め方 / エリア別比較 / 地方から上京 / Q&A）で絞り込み。
+        if ($section = $request->input('section')) {
+            $query->where('section', $section);
+        }
+
         if ($tag = $request->input('tag')) {
             $query->whereJsonContains('tags', $tag);
         }
@@ -51,7 +56,7 @@ class PublicArticleController extends Controller
         $articles = $query->orderByDesc('published_at')
             ->paginate($request->input('per_page', 12), [
                 'id', 'slug', 'title', 'excerpt', 'thumbnail_url',
-                'category', 'tags', 'published_at',
+                'category', 'section', 'tags', 'published_at',
             ]);
 
         // Distinct categories for filter chips
@@ -64,6 +69,8 @@ class PublicArticleController extends Controller
         return response()->json([
             'articles' => PaginatorWithResource::map($articles, ArticleSummaryResource::class),
             'categories' => $categories,
+            // C2: 上段ナビ（固定4テーマ）。
+            'sections' => Article::SECTIONS,
         ]);
     }
 
@@ -79,12 +86,20 @@ class PublicArticleController extends Controller
             abort(404);
         }
 
+        // 関連コラム: 同じ大テーマ(section)を優先、無ければ category。
         $related = Article::published()
             ->where('id', '!=', $article->id)
-            ->when($article->category, fn ($q) => $q->where('category', $article->category))
+            ->when(
+                $article->section,
+                fn ($q) => $q->where('section', $article->section),
+                fn ($q) => $q->when($article->category, fn ($q2) => $q2->where('category', $article->category)),
+            )
             ->orderByDesc('published_at')
             ->limit(3)
-            ->get(['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'published_at']);
+            ->get(['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'section', 'published_at']);
+
+        // C4: 「この記事で紹介した店舗」を解決して article に attach。
+        $article->related_stores = $article->relatedStoreSummaries();
 
         return response()->json([
             'article' => (new ArticleResource($article))->resolve(),

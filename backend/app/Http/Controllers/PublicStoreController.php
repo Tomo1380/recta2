@@ -57,6 +57,20 @@ class PublicStoreController extends Controller
             }
         }
 
+        // コラムの「条件で探す / 働き方で探す」チップ用: いずれかのタグに一致 (OR)。
+        // 表記ゆれ（日払いあり / 全額日払い / 体入全額日払い 等）を 1 チップで束ねる。
+        if ($anyTags = $request->input('any_tags')) {
+            $anyList = is_array($anyTags) ? $anyTags : explode(',', $anyTags);
+            $query->where(function ($q) use ($anyList) {
+                foreach ($anyList as $tag) {
+                    $tag = trim($tag);
+                    if ($tag !== '') {
+                        $q->orWhereJsonContains('feature_tags', $tag);
+                    }
+                }
+            });
+        }
+
         if ($minWage = $request->input('min_hourly')) {
             // 通常時給は廃止。時給フィルタは体入時給 (wage.trial) 基準。新キー
             // hourly_min を優先し旧キー avg_hourly にフォールバック。単位付き文字列も

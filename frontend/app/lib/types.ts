@@ -351,6 +351,8 @@ export type ArticleSummary = GeneratedArticleSummaryResource;
 export interface PublicArticleIndexResponse {
   articles: Paginated<ArticleSummary>;
   categories: string[];
+  /** C2: コラムTOP 上段ナビの大テーマ（夜の始め方/エリア別比較/地方から上京/Q&A）。 */
+  sections?: string[];
 }
 
 export interface PublicArticleShowResponse {
