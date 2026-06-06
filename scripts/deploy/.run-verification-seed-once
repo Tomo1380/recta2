@@ -1,0 +1,1 @@
+検証環境に「店舗以外」のデモデータを投入するための one-shot マーカー。次の deploy で db:seed --class=VerificationSeeder が走る。実行確認後は別コミットで削除すること。
