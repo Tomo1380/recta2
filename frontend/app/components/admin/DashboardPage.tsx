@@ -1,7 +1,9 @@
 import {
   Activity,
   ArrowDownRight,
+  ArrowRight,
   ArrowUpRight,
+  BarChart3,
   Bot,
   Building2,
   Clock,
@@ -321,6 +323,26 @@ export function DashboardPage() {
         />
       </div>
 
+      {/* アクセス解析への誘導カード */}
+      <button
+        onClick={() => navigate("/admin/analytics")}
+        className="order-2 group text-left rounded-xl p-4 sm:p-5 border border-indigo-200/70 bg-gradient-to-r from-indigo-50 to-violet-50 hover:from-indigo-100 hover:to-violet-100 transition-colors flex items-center gap-4"
+      >
+        <div className="size-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+          <BarChart3 className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-semibold text-foreground">アクセス解析</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            店舗・エリア・コラムのアクセス、LINE導線、CV率、計測リンクをまとめて分析
+          </p>
+        </div>
+        <span className="hidden sm:flex text-[12px] font-medium text-indigo-600 items-center gap-1 shrink-0">
+          解析を見る
+          <ArrowRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
+        </span>
+      </button>
+
       {/* Secondary indicators */}
       <div className="order-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card border border-border rounded-xl p-4">
@@ -370,7 +392,7 @@ export function DashboardPage() {
       </div>
 
       {/* Recent activity grids (FB: グラフより上に出す) */}
-      <div className="order-2 grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="order-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Recent reviews */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <SectionHeader
