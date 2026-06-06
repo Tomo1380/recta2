@@ -141,31 +141,6 @@ class DashboardController extends Controller
         });
 
         // ----------------------------------------------------------------
-        // Distribution: stores by area / category
-        // ----------------------------------------------------------------
-        $storesByArea = Store::select('area', DB::raw('COUNT(*) as count'))
-            ->where('publish_status', 'published')
-            ->whereNotNull('area')
-            ->where('area', '!=', '')
-            ->groupBy('area')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->get()
-            ->map(fn ($row) => ['name' => $row->area, 'count' => (int) $row->count])
-            ->values();
-
-        $storesByCategory = Store::select('category', DB::raw('COUNT(*) as count'))
-            ->where('publish_status', 'published')
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->groupBy('category')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->get()
-            ->map(fn ($row) => ['name' => $row->category, 'count' => (int) $row->count])
-            ->values();
-
-        // ----------------------------------------------------------------
         // Recent reviews
         // ----------------------------------------------------------------
         $recentReviews = Review::with(['user:id,line_display_name,nickname', 'store:id,name'])
@@ -199,11 +174,13 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
+        // 管理用の別名 (admin_name) 優先、無ければ LINE 名 (display_name)。
         $friendNamesByLineId = LineFriend::whereIn(
                 'line_user_id',
                 $recentInbound->pluck('line_user_id')->unique()->values()
             )
-            ->pluck('display_name', 'line_user_id');
+            ->get(['line_user_id', 'admin_name', 'display_name'])
+            ->mapWithKeys(fn ($f) => [$f->line_user_id => ($f->admin_name ?: $f->display_name)]);
 
         $recentMessages = $recentInbound->map(function (LineMessage $msg) use ($friendNamesByLineId) {
             $name = $msg->user?->nickname
@@ -214,6 +191,7 @@ class DashboardController extends Controller
             return [
                 'id' => $msg->id,
                 'user_id' => $msg->user_id,
+                'line_user_id' => $msg->line_user_id,
                 'name' => $name,
                 'avatar' => mb_substr($name, 0, 1),
                 'message' => mb_substr((string) $msg->content, 0, 100),
@@ -263,8 +241,6 @@ class DashboardController extends Controller
             'kpis' => $kpis,
             'chat_trend' => $chatTrend,
             'line_friend_trend' => $lineFriendTrend,
-            'stores_by_area' => $storesByArea,
-            'stores_by_category' => $storesByCategory,
             'recent_reviews' => $recentReviews,
             'recent_messages' => $recentMessages,
             'recent_chats' => $recentChats,

@@ -108,6 +108,8 @@ interface StoreInfo {
   business_hours?: string;
   same_day_trial?: boolean;
   trial_hourly?: string | number | null;
+  /** AI生成の店舗紹介文 (StoreIntroSummarizer)。あればスペック羅列の代わりにこれを出す。 */
+  ai_intro?: string | null;
 }
 
 /**
@@ -371,11 +373,6 @@ function formatWage(min?: number, max?: number): string {
 // Intro animation script (per page type)
 // ---------------------------------------------------------------------------
 
-function formatCurrencyShort(n?: number) {
-  if (!n) return "";
-  return n.toLocaleString();
-}
-
 function getIntroScript(
   pageType: string,
   storeName?: string,
@@ -383,26 +380,28 @@ function getIntroScript(
 ) {
   if (pageType === "detail" && storeInfo) {
     const s = storeInfo;
-    const hourly =
-      s.trial_hourly_min && s.trial_hourly_max
-        ? `体入時給${formatCurrencyShort(s.trial_hourly_min)}〜${formatCurrencyShort(s.trial_hourly_max)}円`
-        : "";
-    const location = [s.area, s.nearest_station].filter(Boolean).join("・");
-    const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
-    const trial = s.same_day_trial
-      ? `体入OK${s.trial_hourly ? `（体入時給: ${s.trial_hourly}）` : ""}`
-      : "";
 
-    let summary = `${s.name}の情報をまとめますね！\n\n`;
-    if (s.category && location) summary += `${s.category} ／ ${location}\n`;
-    if (hourly) summary += `${hourly}\n`;
-    if (s.business_hours) summary += `営業: ${s.business_hours}\n`;
-    if (trial) summary += `${trial}\n`;
-    if (tags) summary += `特徴: ${tags}\n`;
-    summary += `\n気になることがあれば何でも聞いてくださいね。`;
+    // 2026-06-06 FB: 旧 intro は カテゴリ/体入時給/営業/特徴タグ を並べていたが、
+    // ヒーロー直下のクイックスタッツ・店舗情報カードと丸被りだった。
+    // バックエンド (StoreIntroSummarizer) が自由入力を Gemini 要約した ai_intro が
+    // あれば、スペック羅列ではなく「雰囲気・人・安心」が伝わる紹介文を優先表示する。
+    const intro = (s.ai_intro ?? "").trim();
+    if (intro) {
+      return {
+        userMessage: `${s.name}ってどんなお店？`,
+        aiMessage: `${intro}\n\n気になることがあれば何でも聞いてくださいね。`,
+      };
+    }
+
+    // ── fallback (ai_intro 未生成・素材なし時) ───────────────────────────
+    // スペックは上のカードと重複するので最小限にし、相談を促す方向に倒す。
+    const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
+    let summary = `${s.name}の相談、お任せください！\n`;
+    if (tags) summary += `${tags}\n`;
+    summary += `雰囲気・体入の流れ・実際に稼げるかなど、気になることを何でも聞いてくださいね。`;
 
     return {
-      userMessage: `${s.name}について教えて`,
+      userMessage: `${s.name}ってどんなお店？`,
       aiMessage: summary,
     };
   }
@@ -424,6 +423,70 @@ function getIntroScript(
     aiMessage:
       "こんにちは！Rectaへようこそ。\nお仕事探しや業界についてのご相談、何でもお気軽にお聞きください！",
   };
+}
+
+// ---------------------------------------------------------------------------
+// 関連コラム導線 (回遊): AI回答テキストからコラムのタグ語を拾って読み物を出す
+// ---------------------------------------------------------------------------
+
+/** ゆるい言い回し → ArticleSeeder の実タグへの寄せ。 */
+const COLUMN_KEYWORD_TO_TAG: Record<string, string> = {
+  渋谷: "渋谷", 新宿: "新宿", 歌舞伎町: "歌舞伎町", 六本木: "六本木", 銀座: "銀座", 池袋: "池袋",
+  キャバクラ: "キャバクラ", ラウンジ: "ラウンジ", クラブ: "クラブ", ガールズバー: "ガールズバー",
+  未経験: "未経験歓迎", 日払い: "日払いOK", ノルマ: "ノルマなし", 高時給: "高時給",
+  送り: "送りあり", 上京: "上京", 学生: "学生歓迎", 主婦: "Wワーク歓迎", 副業: "Wワーク歓迎",
+};
+
+function matchColumnTags(text: string): string[] {
+  const found = new Set<string>();
+  for (const [kw, tag] of Object.entries(COLUMN_KEYWORD_TO_TAG)) {
+    if (text.includes(kw)) found.add(tag);
+  }
+  return [...found].slice(0, 3);
+}
+
+function AiRelatedColumns({ text }: { text: string }) {
+  const [cols, setCols] = useState<{ id: number; slug: string; title: string }[]>([]);
+  useEffect(() => {
+    const tags = matchColumnTags(text);
+    if (tags.length === 0) {
+      setCols([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/columns?tags=${encodeURIComponent(tags.join(","))}&per_page=2`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!cancelled && j?.articles?.data) setCols(j.articles.data.slice(0, 2));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [text]);
+
+  if (cols.length === 0) return null;
+
+  return (
+    <div className="mt-2 ml-8 flex flex-col gap-1.5">
+      <div className="flex items-center gap-1 text-[10.5px] font-bold" style={{ color: "rgba(27,37,40,0.5)" }}>
+        <BookOpen size={11} style={{ color: "#D4AF37" }} /> 関連コラム
+      </div>
+      {cols.map((c) => (
+        <Link
+          key={c.id}
+          to={`/columns/${c.slug}`}
+          className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 transition-all hover:shadow-sm"
+          style={{ border: "1px solid rgba(212,175,55,0.3)", background: "#fffdf7" }}
+        >
+          <BookOpen size={13} className="shrink-0" style={{ color: "#D4AF37" }} />
+          <span className="truncate text-[12px] font-medium" style={{ color: "#1b2528" }}>
+            {c.title}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1472,6 +1535,14 @@ export default function AiChatPanel({
                       );
                     })}
                   </div>
+                )}
+
+                {/* 関連コラム (回遊: AI回答のトピックに合う読み物)。最新の AI 回答にだけ、
+                    本文/直前の質問にコラムのタグ語が含まれるときだけ控えめに出す。 */}
+                {msg.role === "ai" && !msg.streaming && !!msg.content && i === messages.length - 1 && (
+                  <AiRelatedColumns
+                    text={`${msg.content} ${messages[i - 1]?.role === "user" ? messages[i - 1].content : ""}`}
+                  />
                 )}
 
                 {/* LINE CTA card — shown when stores are returned OR AI mentioned LINE */}

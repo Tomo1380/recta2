@@ -909,6 +909,8 @@ export function ShopEditPage() {
   // New schema fields
   const [transferDescription, setTransferDescription] = useState("");
   const [transferKm, setTransferKm] = useState("");
+  // 上京ロゴ/バナーの表示 (D3)。東京・新地・ミナミ等のみ ON。
+  const [showRelocateBadge, setShowRelocateBadge] = useState(false);
   // 距離別の足代テーブル（六本木・銀座の高級店向け）。空のままなら API に null を送る。
   const [transferZones, setTransferZones] = useState<
     Array<{ label: string; radius_km: string; fee: string; color: string }>
@@ -1126,6 +1128,7 @@ export function ShopEditPage() {
     if (f.hiringExamples !== undefined) setHiringExamples(f.hiringExamples);
     if (f.transferDescription !== undefined) setTransferDescription(f.transferDescription);
     if (f.transferKm !== undefined) setTransferKm(f.transferKm);
+    if (f.showRelocateBadge !== undefined) setShowRelocateBadge(f.showRelocateBadge);
     if (f.transferZones !== undefined) setTransferZones(f.transferZones);
     if (f.relatedStoreIds !== undefined) setRelatedStoreIds(f.relatedStoreIds);
     if (f.champagneDescription !== undefined) setChampagneDescription(f.champagneDescription);
@@ -1239,7 +1242,7 @@ export function ShopEditPage() {
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
       interviewQuestions,
       documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
-      transferDescription, transferKm, transferZones, relatedStoreIds,
+      transferDescription, transferKm, transferZones, relatedStoreIds, showRelocateBadge,
       champagneDescription, champagnePrices,
       dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
       setFeeList, setFeeNotes, rectaEpisodes, qaItems,
@@ -2282,6 +2285,20 @@ export function ShopEditPage() {
             />
           </Field>
           <Field
+            label="上京ロゴ・バナー (D3)"
+            hint="ONにすると店舗詳細に「地方から上京」訴求バナーを表示します。東京・新地・ミナミ等の上京需要があるエリアのみ推奨。"
+          >
+            <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+              <input
+                type="checkbox"
+                checked={showRelocateBadge}
+                onChange={(e) => setShowRelocateBadge(e.target.checked)}
+                className="size-4 rounded border-border accent-amber-600"
+              />
+              <span>上京バナーを表示する</span>
+            </label>
+          </Field>
+          <Field
             label="足代テーブル（高級店向け）"
             hint="距離別の足代を設定。色は自動で割り当てられます。空のままなら詳細ページに表示されません。"
           >
@@ -3138,6 +3155,7 @@ export function ShopEditPage() {
                       }
                     : null,
                   recruitment_standards: null,
+                  show_relocate_badge: showRelocateBadge,
                   transfer_description: transferDescription || null,
                   transfer_km: transferKm || null,
                   // BUG-Live-11: プレビューで距離別足代マップが出なかったのは

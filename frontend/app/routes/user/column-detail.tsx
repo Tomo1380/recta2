@@ -3,6 +3,7 @@ import { Link, useParams, useLoaderData, isRouteErrorResponse, useRouteError } f
 import type { LoaderFunctionArgs } from "react-router";
 import { FileText, ChevronRight } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
+import { useTrackPageView } from "~/lib/tracking";
 import LineCtaCard from "~/components/user/shared/LineCtaCard";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { absoluteUrl, buildMetaTags } from "~/lib/seo";
@@ -218,6 +219,9 @@ export default function ColumnDetailPage() {
   const [article, setArticle] = useState<Article | null>(initial.article);
   const [related, setRelated] = useState<ArticleSummary[]>(initial.related ?? []);
 
+  // アクセス解析: コラム別 PV（C1 のランキング/CV率の分母）。
+  useTrackPageView({ page_type: "column", article_id: article?.id ?? null });
+
   // React Router の loader は CSR navigation でも自動で再実行されるので、
   // useLoaderData の変化を state に反映するだけで OK（手動 fetch 不要）。
   useEffect(() => {
@@ -407,6 +411,9 @@ export function ColumnArticleView({
         </div>
       )}
 
+      {/* C4: この記事で紹介した店舗（回遊動線: 記事 → 店舗詳細 → LINE） */}
+      <RelatedStoresBlock article={article} />
+
       {/* LINE CTA */}
       <div className="px-5 pt-8">
         <LineCtaCard
@@ -526,6 +533,82 @@ export function ColumnArticleView({
         .column-body code { background: #f5f5f4; padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
         .column-body strong { font-weight: 700; }
       `}</style>
+    </div>
+  );
+}
+
+/** C4: 「この記事で紹介した店舗」の軽量サマリ（backend Article::relatedStoreSummaries と一致）。 */
+interface RelatedStoreSummary {
+  id: number;
+  name: string;
+  slug: string | null;
+  area: string | null;
+  category: string | null;
+  image: string | null;
+}
+
+/**
+ * C4: 記事 → 店舗詳細 → LINE の回遊動線。
+ * 管理者が手動で紐付けた related_stores を表示し、エリアの求人一覧へも誘導する。
+ * （生成型では related_stores が string 扱いになるため unknown 経由で読む）
+ */
+function RelatedStoresBlock({ article }: { article: Article }) {
+  const stores =
+    ((article as unknown as { related_stores?: RelatedStoreSummary[] }).related_stores ?? []);
+  if (stores.length === 0) return null;
+
+  const areas = Array.from(
+    new Set(stores.map((s) => s.area).filter((a): a is string => !!a)),
+  );
+
+  return (
+    <div className="px-5 pt-8">
+      <h2 style={{ fontFamily: J, fontWeight: 700, fontSize: "15px", color: DARK, margin: "0 0 12px" }}>
+        この記事で紹介したお店
+      </h2>
+      <div className="space-y-2">
+        {stores.map((s) => (
+          <Link
+            key={s.id}
+            to={`/stores/${s.slug ?? s.id}`}
+            className="flex items-center gap-3 p-2.5 rounded-2xl bg-white hover:shadow-sm transition"
+            style={{ border: "1px solid rgba(27,37,40,.06)" }}
+          >
+            <div
+              className="w-14 h-14 rounded-xl bg-stone-100 shrink-0"
+              style={{
+                backgroundImage: s.image ? `url(${s.image})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate" style={{ fontFamily: J, fontWeight: 700, fontSize: "14px", color: DARK, margin: 0 }}>
+                {s.name}
+              </p>
+              <p className="truncate" style={{ fontFamily: J, fontSize: "11.5px", color: "rgba(27,37,40,.5)", margin: "2px 0 0" }}>
+                {[s.area, s.category].filter(Boolean).join(" / ")}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: "rgba(27,37,40,.35)" }} />
+          </Link>
+        ))}
+      </div>
+
+      {areas.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {areas.map((a) => (
+            <Link
+              key={a}
+              to={`/stores?area=${encodeURIComponent(a)}`}
+              className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px]"
+              style={{ fontFamily: J, fontWeight: 600, background: "#f5f4f0", color: DARK, border: "1px solid rgba(27,37,40,.1)" }}
+            >
+              {a}の求人を見る →
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

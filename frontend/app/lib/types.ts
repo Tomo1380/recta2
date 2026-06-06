@@ -21,10 +21,91 @@ export type User = GeneratedUserResource;
 
 export interface UserIndexResponse {
   users: Paginated<User>;
+  /** アプリ User 未連携の LINE 友だち (LINEログインせずメッセージした人)。1ページ目に表示。 */
+  unlinked_friends?: LineFriend[];
   line_stats: {
     total_users: number;
     line_friend_count: number;
+    unlinked_friend_count?: number;
   };
+}
+
+/** ユーザー管理一覧の正規化「人」行 (LINEトーク主役・line_user_id 軸)。 */
+export interface AdminPersonRow {
+  line_user_id: string;
+  /** 表示名 (admin_name 優先) */
+  name: string | null;
+  /** LINE 本来の名前 */
+  display_name: string | null;
+  picture_url: string | null;
+  is_following: boolean;
+  messages_count: number;
+  user_id: number | null;
+  /** LINEログイン済 (User あり) か */
+  has_account: boolean;
+  status: string | null;
+  reviews_count: number | null;
+  last_activity: string | null;
+  kind: "talk" | "login_only";
+}
+
+export interface PeopleIndexResponse {
+  people: Paginated<AdminPersonRow>;
+  stats: {
+    talk_count: number;
+    login_only_count: number;
+    total_users: number;
+  };
+}
+
+export interface AdminPersonReview {
+  id: number;
+  store_id: number;
+  rating: number;
+  body: string | null;
+  status: string;
+  created_at: string | null;
+  store?: { id: number; name: string } | null;
+}
+
+/** 人物詳細 (line_user_id 基準)。トーク相手 + 連携Userの口コミ等を統合。 */
+export interface AdminPerson {
+  line_user_id: string;
+  name: string | null;
+  admin_name: string | null;
+  display_name: string | null;
+  picture_url: string | null;
+  is_following: boolean;
+  is_talk: boolean;
+  has_account: boolean;
+  admin_notes: string | null;
+  user: {
+    id: number;
+    status: string;
+    line_display_name: string | null;
+    nickname: string | null;
+    reviews_count: number;
+    created_at: string | null;
+  } | null;
+  reviews: AdminPersonReview[];
+  ai_chats: AdminPersonChat[];
+  ai_chats_total: number;
+  messages: LineMessage[];
+  messages_total: number;
+}
+
+export interface AdminPersonChat {
+  id: number;
+  user_message: string;
+  ai_response: string;
+  mode: string | null;
+  page_type: string | null;
+  total_tokens: number;
+  created_at: string | null;
+}
+
+export interface PersonShowResponse {
+  person: AdminPerson;
 }
 
 export interface UserShowResponse {
@@ -169,6 +250,7 @@ export interface DashboardRecentReview {
 export interface DashboardRecentMessage {
   id: number;
   user_id: number | null;
+  line_user_id: string | null;
   name: string;
   avatar: string;
   message: string;
@@ -197,8 +279,6 @@ export interface DashboardData {
   };
   chat_trend: DashboardChatTrendPoint[];
   line_friend_trend: DashboardSimpleTrendPoint[];
-  stores_by_area: DashboardDistributionPoint[];
-  stores_by_category: DashboardDistributionPoint[];
   recent_reviews: DashboardRecentReview[];
   recent_messages: DashboardRecentMessage[];
   recent_chats: DashboardRecentChat[];
@@ -210,6 +290,69 @@ export interface DashboardData {
   };
 }
 
+// ─── アクセス解析（FB 2026-06-05 A2/A3） ───
+
+/** ランキング1行: PV・LINE追加クリック・CV率（= クリック ÷ PV × 100）。 */
+export interface AnalyticsRankRow {
+  id?: number;
+  name: string;
+  pv: number;
+  line_clicks: number;
+  cv_rate: number;
+}
+
+/** LINE 追加クリックの経路ランキング1行。 */
+export interface AnalyticsRouteRow {
+  route: string;
+  kind: "affiliate" | "cta";
+  clicks: number;
+}
+
+/** ランキング行ドリルダウン: 1店舗/コラム/エリアの画面別LINE導線内訳。 */
+export interface AnalyticsBreakdownRow {
+  source: string;
+  clicks: number;
+}
+
+export interface AnalyticsBreakdown {
+  type: "store" | "column" | "area";
+  key: string;
+  rows: AnalyticsBreakdownRow[];
+}
+
+export interface AnalyticsOverview {
+  range: { days: number; from: string; to: string };
+  summary: {
+    pv: number;
+    line_clicks: number;
+    cv_rate: number;
+    line_friends_total: number;
+    line_friends_in_range: number;
+  };
+  stores: AnalyticsRankRow[];
+  areas: AnalyticsRankRow[];
+  columns: AnalyticsRankRow[];
+  line_routes: AnalyticsRouteRow[];
+}
+
+/** 計測リンク（アフィリエイト/店舗別LINE導線/SNS）。 */
+export interface TrackingLink {
+  id: number;
+  code: string;
+  label: string;
+  target_type: "store" | "area" | "column" | "standalone";
+  store_id: number | null;
+  article_id: number | null;
+  area: string | null;
+  destination_url: string;
+  is_active: boolean;
+  public_url: string;
+  clicks_count?: number;
+  created_at: string | null;
+  store_name?: string | null;
+  article_title?: string | null;
+}
+
 // LineFriend / LineMessage / LineMessageMeta は手書きで残す。
 // Wave 4 で backend は Resource 化したが、Scramble は
 // AnonymousResourceCollection を経由する型を実用的に推論できないため、
@@ -219,14 +362,19 @@ export interface LineFriend {
   id: number;
   user_id: number | null;
   line_user_id: string;
+  /** LINE 本来の表示名 (プロフィール取得 or ログイン由来) */
   display_name: string | null;
+  /** 管理画面上の別名 (運営が編集) */
+  admin_name?: string | null;
+  /** 表示用の解決名 (admin_name 優先)。API が付与。 */
+  name?: string | null;
   picture_url: string | null;
   followed_at: string | null;
   unfollowed_at: string | null;
   is_following: boolean;
   created_at: string;
   updated_at: string;
-  messages_count?: number;
+  messages_count?: number | null;
   user?: User;
 }
 
@@ -290,6 +438,8 @@ export type ArticleSummary = GeneratedArticleSummaryResource;
 export interface PublicArticleIndexResponse {
   articles: Paginated<ArticleSummary>;
   categories: string[];
+  /** C2: コラムTOP 上段ナビの大テーマ（夜の始め方/エリア別比較/地方から上京/Q&A）。 */
+  sections?: string[];
 }
 
 export interface PublicArticleShowResponse {

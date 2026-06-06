@@ -27,11 +27,23 @@ class ArticleResource extends JsonResource
             'body_html' => $this->body_html,
             'thumbnail_url' => $this->thumbnail_url,
             'category' => $this->category,
+            'section' => $this->section,
+            'related_store_ids' => $this->related_store_ids ?? [],
+            // controller が解決して attach したときだけ出す（一覧では未解決）。
+            'related_stores' => $this->when(isset($this->related_stores), fn () => $this->related_stores),
             'tags' => $this->tags,
             'status' => $this->status,
             'published_at' => $this->published_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+
+            // C1: コラム分析（作成者 / 文字数 / PV / LINE導線）。
+            'author_id' => $this->author_id,
+            'author_name' => $this->whenLoaded('creator', fn () => $this->creator?->name),
+            'char_count' => $this->char_count,
+            // index() が付与したときだけ出す（show では未集計）。
+            'pv_count' => $this->when(isset($this->pv_count), fn () => (int) $this->pv_count),
+            'line_clicks_count' => $this->when(isset($this->line_clicks_count), fn () => (int) $this->line_clicks_count),
         ];
     }
 }

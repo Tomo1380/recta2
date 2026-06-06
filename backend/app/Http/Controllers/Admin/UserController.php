@@ -7,8 +7,10 @@ use App\Http\Controllers\Admin\Concerns\SortsListByDate;
 use App\Http\Requests\Admin\SendUserLineMessageRequest;
 use App\Http\Requests\Admin\UpdateUserNotesRequest;
 use App\Http\Requests\Admin\UpdateUserStatusRequest;
+use App\Http\Resources\LineFriendResource;
 use App\Http\Resources\LineMessageResource;
 use App\Http\Resources\UserResource;
+use App\Models\LineFriend;
 use App\Models\LineMessage;
 use App\Models\User;
 use App\Services\LineMessagingService;
@@ -32,41 +34,110 @@ class UserController extends Controller
      *   line_stats: array{total_users: int, line_friend_count: int}
      * }
      */
+    /**
+     * 「LINE 利用者」一覧。大事なのは LINE トーク (公式アカウント) 側なので、
+     * line_user_id を軸にしたトーク相手 (LineFriend) を主役にする (2026-06-06 FB)。
+     * LINE ログイン (User) は付随属性として添える。
+     *
+     * mode: 'talk' (既定: トーク相手のみ) | 'login_only' (ログインのみ・未トーク)
+     *       | 'all' (両方)
+     *
+     * @response array{people: array{data: array<int, mixed>, current_page: int, last_page: int, per_page: int, total: int}, stats: array{talk_count: int, login_only_count: int, total_users: int}}
+     */
     public function index(Request $request): JsonResponse
     {
-        $query = User::with('lineFriend');
+        $mode = $request->input('mode', 'talk');
+        $search = trim((string) $request->input('search', ''));
+        $perPage = (int) $request->input('per_page', 20);
 
-        if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('line_display_name', 'ilike', "%{$search}%")
-                  ->orWhere('admin_notes', 'ilike', "%{$search}%");
-            });
-        }
-        if ($status = $request->input('status')) {
-            $query->where('status', $status);
-        }
-        $lineStatus = $request->input('line_status');
-        if ($lineStatus === 'friend') {
-            $query->whereHas('lineFriend', fn ($q) => $q->where('is_following', true));
-        } elseif ($lineStatus === 'not_friend') {
-            $query->where(function ($q) {
-                $q->whereDoesntHave('lineFriend')
-                  ->orWhereHas('lineFriend', fn ($sub) => $sub->where('is_following', false));
-            });
-        }
+        // LineFriend → 正規化 people 行 (トーク主役)
+        $normFriend = fn (LineFriend $f): array => [
+            'line_user_id' => $f->line_user_id,
+            'name' => $f->admin_name ?: $f->display_name ?: $f->user?->nickname ?: $f->user?->line_display_name ?: null,
+            'display_name' => $f->display_name,
+            'picture_url' => $f->picture_url ?: $f->user?->line_picture_url,
+            'is_following' => (bool) $f->is_following,
+            'messages_count' => (int) ($f->messages_count ?? 0),
+            'user_id' => $f->user_id,
+            'has_account' => ! is_null($f->user_id),
+            'status' => $f->user?->status,
+            'reviews_count' => $f->user && $f->user->reviews_count !== null ? (int) $f->user->reviews_count : null,
+            'last_activity' => optional($f->updated_at)->toIso8601String(),
+            'kind' => 'talk',
+        ];
 
-        $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
-        $users = $this->applyListSort($query, $request)
-            ->paginate($request->input('per_page', 20));
+        // User (未トーク) → 正規化 people 行
+        $normUser = fn (User $u): array => [
+            'line_user_id' => $u->line_user_id,
+            'name' => $u->nickname ?: $u->line_display_name ?: null,
+            'display_name' => $u->line_display_name,
+            'picture_url' => $u->line_picture_url,
+            'is_following' => false,
+            'messages_count' => 0,
+            'user_id' => $u->id,
+            'has_account' => true,
+            'status' => $u->status,
+            'reviews_count' => (int) ($u->reviews_count ?? 0),
+            'last_activity' => optional($u->created_at)->toIso8601String(),
+            'kind' => 'login_only',
+        ];
 
-        $totalUsers = User::count();
-        $lineFriendCount = User::whereHas('lineFriend', fn ($q) => $q->where('is_following', true))->count();
+        $friendQuery = function () use ($search) {
+            $q = LineFriend::query()
+                ->with(['user' => fn ($u) => $u->withCount(['reviews' => fn ($r) => $r->where('status', 'published')])])
+                ->withCount('messages');
+            if ($search !== '') {
+                $q->where(function ($w) use ($search) {
+                    $w->where('display_name', 'ilike', "%{$search}%")
+                      ->orWhere('admin_name', 'ilike', "%{$search}%")
+                      ->orWhere('line_user_id', 'ilike', "%{$search}%")
+                      ->orWhereHas('user', fn ($u) => $u
+                          ->where('line_display_name', 'ilike', "%{$search}%")
+                          ->orWhere('nickname', 'ilike', "%{$search}%"));
+                });
+            }
+            return $q;
+        };
+
+        $loginOnlyQuery = function () use ($search) {
+            $q = User::query()
+                ->whereDoesntHave('lineFriend')
+                ->withCount(['reviews' => fn ($r) => $r->where('status', 'published')]);
+            if ($search !== '') {
+                $q->where(function ($w) use ($search) {
+                    $w->where('line_display_name', 'ilike', "%{$search}%")
+                      ->orWhere('nickname', 'ilike', "%{$search}%")
+                      ->orWhere('admin_notes', 'ilike', "%{$search}%");
+                });
+            }
+            return $q;
+        };
+
+        if ($mode === 'login_only') {
+            $people = $loginOnlyQuery()->orderByDesc('created_at')->paginate($perPage)->through($normUser);
+        } elseif ($mode === 'all') {
+            // 管理規模なので in-memory マージ (上限 500)。最終アクティビティ順。
+            $friends = $friendQuery()->orderByDesc('updated_at')->limit(500)->get()->map($normFriend);
+            $logins = $loginOnlyQuery()->orderByDesc('created_at')->limit(500)->get()->map($normUser);
+            $merged = $friends->concat($logins)->sortByDesc('last_activity')->values();
+            $page = (int) $request->input('page', 1);
+            $people = new \Illuminate\Pagination\LengthAwarePaginator(
+                $merged->forPage($page, $perPage)->values(),
+                $merged->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()],
+            );
+        } else { // talk (default)
+            $people = $friendQuery()->orderByDesc('updated_at')->paginate($perPage)->through($normFriend);
+        }
 
         return response()->json([
-            'users' => PaginatorWithResource::map($users, UserResource::class),
-            'line_stats' => [
-                'total_users' => $totalUsers,
-                'line_friend_count' => $lineFriendCount,
+            'people' => $people,
+            'stats' => [
+                'talk_count' => LineFriend::where('is_following', true)->count(),
+                'login_only_count' => User::whereDoesntHave('lineFriend')->count(),
+                'total_users' => User::count(),
             ],
         ]);
     }

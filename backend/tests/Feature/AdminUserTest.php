@@ -44,25 +44,29 @@ class AdminUserTest extends TestCase
         $this->createUser();
         $this->createUser();
 
+        // 一覧は LINE トーク主役。createUser はトーク無し(=ログインのみ)なので
+        // mode=login_only で取得する。
         $response = $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/admin/users');
+            ->getJson('/api/admin/users?mode=login_only');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'users' => [
+                'people' => [
                     'data' => [
-                        '*' => ['id', 'line_user_id', 'line_display_name', 'status'],
+                        '*' => ['line_user_id', 'name', 'has_account', 'messages_count', 'kind'],
                     ],
                     'current_page',
                     'total',
                 ],
-                'line_stats' => [
+                'stats' => [
+                    'talk_count',
+                    'login_only_count',
                     'total_users',
-                    'line_friend_count',
                 ],
             ]);
 
-        $this->assertEquals(2, $response->json('users.total'));
+        $this->assertEquals(2, $response->json('people.total'));
+        $this->assertSame('login_only', $response->json('people.data.0.kind'));
     }
 
     public function test_admin_can_show_user(): void
@@ -161,15 +165,30 @@ class AdminUserTest extends TestCase
         $response->assertStatus(401);
     }
 
-    public function test_admin_can_filter_users_by_status(): void
+    public function test_people_list_is_talk_first_and_mode_filter_works(): void
     {
-        $this->createUser(['status' => 'active']);
-        $this->createUser(['status' => 'suspended']);
+        // トーク無しのログインユーザー 2 人
+        $this->createUser();
+        $this->createUser();
+        // トークありの友だち 1 人 (User 未連携)
+        \App\Models\LineFriend::create([
+            'line_user_id' => 'U_talk_only',
+            'display_name' => 'トーク太郎',
+            'is_following' => true,
+            'followed_at' => now(),
+        ]);
 
-        $response = $this->actingAs($this->admin, 'sanctum')
-            ->getJson('/api/admin/users?status=suspended');
+        // 既定 (talk) はトーク相手のみ → 友だち 1 人だけ
+        $talk = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/users');
+        $this->assertEquals(1, $talk->json('people.total'));
+        $this->assertSame('U_talk_only', $talk->json('people.data.0.line_user_id'));
 
-        $response->assertStatus(200);
-        $this->assertEquals(1, $response->json('users.total'));
+        // login_only はログインのみ 2 人
+        $login = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/users?mode=login_only');
+        $this->assertEquals(2, $login->json('people.total'));
+
+        // all は両方 = 3 人
+        $all = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/users?mode=all');
+        $this->assertEquals(3, $all->json('people.total'));
     }
 }

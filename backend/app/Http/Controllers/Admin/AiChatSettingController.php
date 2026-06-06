@@ -90,6 +90,46 @@ class AiChatSettingController extends Controller
         ]);
     }
 
+    /**
+     * AIチャット履歴 (個別の質問/回答ログ)。mode / page_type / 本文検索で絞り込み。
+     *
+     * @response array{data: array<int, mixed>, current_page: int, last_page: int, per_page: int, total: int}
+     */
+    public function logs(Request $request): JsonResponse
+    {
+        $query = AiChatLog::with('user:id,line_display_name,nickname')->latest();
+
+        if ($mode = $request->input('mode')) {
+            $query->where('mode', $mode);
+        }
+        if ($pageType = $request->input('page_type')) {
+            $query->where('page_type', $pageType);
+        }
+        if ($search = $request->input('q')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('user_message', 'ilike', "%{$search}%")
+                  ->orWhere('ai_response', 'ilike', "%{$search}%");
+            });
+        }
+
+        $logs = $query->paginate($request->input('per_page', 20))->through(fn (AiChatLog $log) => [
+            'id' => $log->id,
+            'user_message' => $log->user_message,
+            'ai_response' => $log->ai_response,
+            'mode' => $log->mode,
+            'page_type' => $log->page_type,
+            'input_tokens' => $log->input_tokens,
+            'output_tokens' => $log->output_tokens,
+            'total_tokens' => (int) $log->input_tokens + (int) $log->output_tokens,
+            'ip_address' => $log->ip_address,
+            'user_name' => $log->user?->nickname ?: $log->user?->line_display_name,
+            'user_id' => $log->user_id,
+            'created_at' => $log->created_at?->toIso8601String(),
+        ]);
+
+        return response()->json($logs);
+    }
+
     public function limits(): JsonResponse
     {
         return response()->json(AiChatLimit::current());

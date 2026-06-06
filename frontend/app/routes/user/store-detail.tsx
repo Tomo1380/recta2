@@ -1,4 +1,5 @@
 import { useParams, useLoaderData, redirect } from "react-router";
+import { useTrackPageView } from "~/lib/tracking";
 import type { LoaderFunctionArgs, LinksFunction } from "react-router";
 import StoreDetailPage from "~/components/user/StoreDetailPage";
 import type { StoreDetailResponse } from "~/components/user/StoreDetailPage";
@@ -123,6 +124,13 @@ export default function StoreDetail() {
   const loaderData = useLoaderData() as StoreDetailResponse | null;
   const id = loaderData?.store?.id ?? Number(slugOrId);
   const store = loaderData?.store;
+
+  // アクセス解析: 店舗別 PV（ダッシュボードのランキング/CV率の分母）。
+  useTrackPageView({
+    page_type: "store",
+    store_id: store?.id ?? null,
+    area: (store as { area?: string | null } | undefined)?.area ?? null,
+  });
 
   // SSR で構造化データを出す。SchemaGraph に LocalBusiness + JobPosting +
   // BreadcrumbList + (qa があれば) FAQPage を入れて 1 タグに集約。

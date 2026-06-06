@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import { Link } from "react-router";
 import { trialDailyEstimate } from "~/lib/wage";
+import type { ArticleSummary } from "~/lib/types";
 
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -180,7 +181,13 @@ interface Review {
   tweet_id?: string | null;
   tweet_author_screen_name?: string | null;
   created_at: string;
-  user: ReviewUser;
+  user: ReviewUser | null;
+  /** 管理者入力の表示名（桜口コミ B2 / 有名嬢口コミ B3）。 */
+  author_name?: string | null;
+  /** 有名キャバ嬢などのフィーチャー口コミ (B3)。 */
+  is_featured?: boolean | null;
+  /** 店側からの返答 (B4)。 */
+  store_reply?: string | null;
 }
 
 // New JSONB shapes (DB redesign 2026-05)
@@ -303,6 +310,8 @@ export interface StoreDetailStore {
   features_text: string;
   /** 店舗まとめ (改行＋内部リンク対応のフリーテキスト) */
   summary_text?: string | null;
+  /** AIチャット初期メッセージ用の紹介文 (StoreIntroSummarizer が生成・キャッシュ) */
+  ai_intro?: string | null;
   dress_code: string | DressCodeObject | null;
   images: StoreImage[] | null;
   /** Legacy single-video URL — still emitted by the API as the first videos[] entry. Prefer `videos`. */
@@ -341,11 +350,15 @@ export interface StoreDetailStore {
   related_stores?: RelatedStoreLite[] | null;
   transfer_zones?: TransferZone[] | null;
   experience_guaranteed?: boolean | null;
+  /** 上京ロゴ・バナーの表示 (D3)。東京・新地・ミナミ等のみ ON。 */
+  show_relocate_badge?: boolean | null;
   set_fee?: SetFee | null;
 }
 
 export interface StoreDetailResponse {
   store: StoreDetailStore;
+  /** 回遊動線: この店のエリア/業種に関連する公開コラム (最大3件)。 */
+  related_columns?: ArticleSummary[];
 }
 
 interface StoreDetailPageProps {
@@ -410,7 +423,8 @@ function QuickRangeValue({
   const minN = toAmountNumberSafe(min);
   const maxN = toAmountNumberSafe(max);
   const fmt = (n: number) => `¥${n.toLocaleString()}`;
-  const wrapper = "mt-0.5 font-bold tabular-nums leading-[1.15]";
+  // 縦中央揃えはセル側 (flex-1 の中央寄せ) で行うので、ここでは上マージンを付けない。
+  const wrapper = "font-bold tabular-nums leading-[1.15]";
   const style = { color, fontFamily: "'Outfit', sans-serif" } as const;
 
   if (minN == null && maxN == null) {
@@ -453,6 +467,36 @@ function toAmountString(v: number | string | null | undefined): string | null {
   // 数字のみ "0" は未入力扱い
   if (/^0+$/.test(s)) return null;
   return s;
+}
+
+/**
+ * クイックスタッツの「日払い」セル用ラベルを店舗データから導出する純粋関数。
+ * 日払いの有無は payroll.type / pay_system_types / feature_tags / 給与備考 など
+ * 複数の自由入力に散らばっているので、それらを横断して「日払い」を含むかで判定する。
+ *  - 「全額」も含む → "全額" (体入全額日払い等を強く打ち出す)
+ *  - 日払いに言及あり → "OK"
+ *  - 言及なし → null (セルは "—" 表示)
+ * 旧「体入日給」(= 体入時給×4 の派生値・最寄り駅同様ヒーローと情報重複) を置き換える枠。
+ */
+export function dailyPayLabel(store: {
+  payroll_system_type?: string | null;
+  payroll_system_description?: string | null;
+  pay_system_types?: string[] | null;
+  pay_system_note?: string | null;
+  feature_tags?: string[] | null;
+  salary_notes?: string | null;
+}): "全額" | "OK" | null {
+  const sources: string[] = [
+    store.payroll_system_type ?? "",
+    store.payroll_system_description ?? "",
+    store.pay_system_note ?? "",
+    store.salary_notes ?? "",
+    ...(store.pay_system_types ?? []),
+    ...(store.feature_tags ?? []),
+  ];
+  const combined = sources.join(" ");
+  if (!combined.includes("日払い")) return null;
+  return combined.includes("全額") ? "全額" : "OK";
 }
 
 /**
@@ -720,7 +764,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
     );
   }
 
-  const { store } = data;
+  const { store, related_columns: relatedColumns } = data;
   const sortedImages = (store.images ?? []).slice().sort((a, b) => a.order - b.order);
 
   return (
@@ -770,51 +814,63 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 4 セル横並びで桁が多いと 1 行に収まらないので、レンジは 2 行
                 ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。
                 通常時給 (本入店後) は表示せず、体入日給 (体入時給×4時間) を出す。 */}
-            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+            <div className="flex flex-col border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 体入時給
               </div>
-              <QuickRangeValue
-                min={store.trial_hourly_min ?? store.trial_avg_hourly}
-                max={store.trial_hourly_max ?? store.trial_hourly}
-                color="#D4AF37"
-              />
-            </div>
-            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                体入日給
+              {/* 値は flex-1 の中で縦中央。体入時給だけ 2 行に折り返すことがあるため、
+                  他セルの 1 行値 (全額 / 営業時間 / 即日OK) を縦中央に揃えて見た目を保つ。 */}
+              <div className="flex flex-1 items-center justify-center pt-0.5">
+                <QuickRangeValue
+                  min={store.trial_hourly_min ?? store.trial_avg_hourly}
+                  max={store.trial_hourly_max ?? store.trial_hourly}
+                  color="#D4AF37"
+                />
               </div>
-              {(() => {
-                // 体入日給 = 体入時給 × 1日4時間 (lib/wage.ts と同じ計算元)。
-                const x4 = (v: number | string | null | undefined): number | null => {
-                  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
-                  return Number.isFinite(n) && n > 0 ? n * 4 : null;
-                };
-                return (
-                  <QuickRangeValue
-                    min={x4(store.trial_hourly_min ?? store.trial_avg_hourly)}
-                    max={x4(store.trial_hourly_max ?? store.trial_hourly)}
-                    color="#1b2528"
-                  />
-                );
-              })()}
             </div>
-            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+            <div className="flex flex-col border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+              <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
+                日払い
+              </div>
+              <div className="flex flex-1 items-center justify-center pt-0.5">
+                {(() => {
+                  // 旧「体入日給」(= 体入時給×4 の派生値) は隣の体入時給と情報が重複する
+                  // ため廃止し、業界定番かつ他に表示のない「日払い」に差し替えた
+                  // (2026-06-06 FB)。判定は dailyPayLabel に集約。
+                  const label = dailyPayLabel(store);
+                  return (
+                    <div
+                      className="text-[13px] font-bold leading-[1.15]"
+                      style={{
+                        color: label ? "#6FB37D" : "rgba(27,37,40,0.4)",
+                        fontFamily: "'Outfit', sans-serif",
+                      }}
+                    >
+                      {label ?? "—"}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="flex flex-col border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 営業
               </div>
-              <div className="mt-0.5 text-[12px] font-bold tabular-nums leading-[1.15]" style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}>
-                {store.opening_time && store.closing_time
-                  ? `${store.opening_time}〜${store.closing_time}`
-                  : store.business_hours || "—"}
+              <div className="flex flex-1 items-center justify-center pt-0.5">
+                <div className="text-[12px] font-bold tabular-nums leading-[1.15]" style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}>
+                  {store.opening_time && store.closing_time
+                    ? `${store.opening_time}〜${store.closing_time}`
+                    : store.business_hours || "—"}
+                </div>
               </div>
             </div>
-            <div className="px-2 py-3 text-center">
+            <div className="flex flex-col px-2 py-3 text-center">
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 体入
               </div>
+              <div className="flex flex-1 items-center justify-center pt-0.5">
               <div
-                className="mt-0.5 text-[12px] font-bold"
+                className="text-[12px] font-bold"
                 style={{
                   color: store.trial_type === "same_day"
                     ? "#6FB37D"
@@ -828,6 +884,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   : store.trial_type === "normal"
                     ? "あり"
                     : "なし"}
+              </div>
               </div>
             </div>
           </div>
@@ -844,7 +901,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
                   : []);
             const firstVideo = videos.slice(0, 1);
-            const restVideos = videos.slice(1);
+            // 2本目以降は店舗特徴セクションの後で別途レンダリング (D2)。
             return (
               <>
                 {firstVideo.length > 0 && (
@@ -870,6 +927,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     business_hours: store.business_hours,
                     same_day_trial: store.trial_type === "same_day",
                     trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
+                    ai_intro: store.ai_intro,
                   }}
                 />
                 <LineCtaCard
@@ -878,15 +936,10 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   description="体入予約・条件交渉までLINEで完結"
                   ctaLabel="LINE追加"
                   source="store-detail:chat-inline"
+                  context={{ page_type: "store", store_id: store.id, area: store.area }}
                 />
-                {restVideos.length > 0 && (
-                  <StoreVideosBlock
-                    videos={restVideos}
-                    fallbackPosterUrl={sortedImages[0]?.url}
-                    controller={stickyController}
-                    startIndex={firstVideo.length}
-                  />
-                )}
+                {/* D2: 2本目以降の動画は「店舗特徴」セクションの後に移動した
+                    （FB 2026-06-05）。下の RestStoreVideos 参照。 */}
               </>
             );
           })()}
@@ -1095,9 +1148,30 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 }
               />
               {store.holidays && <InfoRow label="定休日" value={store.holidays} />}
-              {store.shift_info && <InfoRow label="シフト" value={store.shift_info} />}
+              {/* D1: 「シフト」項目は廃止（FB 2026-06-05）。勤務条件は特徴タグ
+                  （例「週3回〜採用可能」「ラウンジ枠対応可」）で表現する。 */}
             </div>
           </SectionCard>
+
+          {/* D2: 店舗特徴の後に 2 本目以降の動画を差し込む（FB 2026-06-05）。
+              1本目はページ上部（ルームツアー）、ここはそれ以降。 */}
+          {(() => {
+            const videos = (store.videos && store.videos.length > 0)
+              ? store.videos
+              : (store.video_url
+                  ? [{ video_url: store.video_url, label: null, description: null, poster_url: null, display_order: 0 }]
+                  : []);
+            const restVideos = videos.slice(1);
+            if (restVideos.length === 0) return null;
+            return (
+              <StoreVideosBlock
+                videos={restVideos}
+                fallbackPosterUrl={sortedImages[0]?.url}
+                controller={stickyController}
+                startIndex={1}
+              />
+            );
+          })()}
 
           {/* ============================================================ */}
           {/* 6. Salary & Benefits */}
@@ -1692,6 +1766,12 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             </SectionCard>
           )}
 
+          {/* D4: 上京バナー — セット料金と系列店舗の間（FB 2026-06-05）。
+              店舗管理の「上京ロゴ・バナー表示」(show_relocate_badge) が ON のときだけ表示。 */}
+          {store.show_relocate_badge && (
+            <RelocateBanner storeId={store.id} area={store.area} />
+          )}
+
           {/* ============================================================ */}
           {/* 16a. Related stores (系列店舗) — RecentlyViewedStores 直上 */}
           {/* ============================================================ */}
@@ -1704,6 +1784,9 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               currentId={store.id}
             />
           </div>
+
+          {/* 関連コラム (回遊動線): この店のエリア/業種に関連する読み物 */}
+          <RelatedColumnsSection columns={relatedColumns} area={store.area} />
 
           {/* ============================================================ */}
           {/* 16. Recently viewed stores (あなたが見た記事) */}
@@ -3949,6 +4032,64 @@ function SimSlider({
   );
 }
 
+// ── 上京バナー (D4) ──────────────────────────────────────────────────────
+// 店舗管理の「上京ロゴ・バナー表示」が ON の店舗だけ、セット料金と系列店舗の
+// 間に大きく表示する。地方から上京して働く層に向けた訴求 + LINE 導線。
+// デザインは暫定（FB「画像で大きく / デザインちゃんとしなきゃ」）。後で差し替え可。
+function RelocateBanner({ storeId, area }: { storeId: number; area: string }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl p-5 sm:p-6"
+      style={{
+        background: "linear-gradient(135deg, #1b2528 0%, #2c3e46 60%, #3a5560 100%)",
+        border: "1px solid rgba(212,175,55,0.35)",
+        boxShadow: "0 10px 28px rgba(27,37,40,0.25)",
+      }}
+    >
+      <div
+        className="absolute -right-6 -top-8 select-none pointer-events-none"
+        style={{ fontSize: 120, lineHeight: 1, opacity: 0.08 }}
+        aria-hidden
+      >
+        ✈
+      </div>
+      <div className="relative">
+        <span
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
+          style={{ background: "rgba(212,175,55,0.18)", color: GOLD_HEX, border: `1px solid ${GOLD_HEX}66` }}
+        >
+          ✈ 上京サポート
+        </span>
+        <h3
+          className="mt-2.5 text-[18px] sm:text-[20px] font-bold leading-snug"
+          style={{ color: "white", fontFamily: "'Noto Sans JP',sans-serif" }}
+        >
+          地方から{area}へ。上京して働くなら。
+        </h3>
+        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "rgba(255,255,255,0.72)" }}>
+          寮・家賃補助・上京交通費サポートなど、上京して働く女の子を歓迎しているお店です。
+          まずはLINEで気軽に相談してください。
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            openLineFriendAdd("store-detail:bottom-card", {
+              page_type: "store",
+              store_id: storeId,
+              area,
+            })
+          }
+          aria-label="上京について（LINEで友だち追加）"
+          className="mt-3.5 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl active:scale-[0.98] transition-transform"
+          style={{ background: "#06C755", color: "white", fontWeight: 700, fontSize: "13.5px", cursor: "pointer" }}
+        >
+          上京について相談する
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Set fee (セット料金) ─────────────────────────────────────────────────
 function SetFeeSection({ setFee }: { setFee?: SetFee | null }) {
   const items = setFee?.items ?? [];
@@ -4125,6 +4266,79 @@ function RelatedStoresSection({
             </div>
           </Link>
         ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── 関連コラム (回遊動線: 店舗 → 同エリア/業種の読み物) ───────────────
+function RelatedColumnsSection({
+  columns,
+  area,
+}: {
+  columns?: ArticleSummary[] | null;
+  area?: string | null;
+}) {
+  if (!columns || columns.length === 0) return null;
+  return (
+    <SectionCard icon={<FileText size={20} style={{ color: GOLD_HEX }} />} title="関連コラム">
+      <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {columns.map((c) => (
+          <Link
+            key={c.id}
+            to={`/columns/${c.slug}`}
+            className="shrink-0 rounded-xl overflow-hidden"
+            style={{
+              width: "170px",
+              background: "#fcfeff",
+              border: "1px solid rgba(27,37,40,0.06)",
+              textDecoration: "none",
+            }}
+          >
+            <div
+              className="relative w-full"
+              style={{
+                height: "100px",
+                background: c.thumbnail_url
+                  ? `center / cover url(${c.thumbnail_url})`
+                  : "linear-gradient(135deg, #1b2528, #2a3a3f)",
+              }}
+            >
+              {(c.section || c.category) && (
+                <span
+                  className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{ background: "rgba(255,255,255,0.92)", color: "#1b2528" }}
+                >
+                  {c.section || c.category}
+                </span>
+              )}
+            </div>
+            <div className="px-2.5 py-2">
+              <p className="line-clamp-2 text-xs font-bold" style={{ color: "#1b2528", lineHeight: 1.4 }}>
+                {c.title}
+              </p>
+            </div>
+          </Link>
+        ))}
+        {area && (
+          <Link
+            to={`/columns?tag=${encodeURIComponent(area)}`}
+            className="shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl"
+            style={{
+              width: "110px",
+              background: "linear-gradient(135deg, #1b2528 0%, #2c3e46 100%)",
+              border: "1px solid rgba(212,175,55,.3)",
+              textDecoration: "none",
+            }}
+          >
+            <span className="px-2 text-center text-[11px] font-bold" style={{ color: "white", lineHeight: 1.4 }}>
+              {area}のコラムを見る
+            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 6l6 6-6 6" stroke={GOLD_HEX} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        )}
       </div>
     </SectionCard>
   );
@@ -4327,8 +4541,9 @@ function ReviewsSection({
 }
 
 function ReviewItem({ review }: { review: Review }) {
-  // 口コミは本人のニックネームのみを公開。LINEの実名や画像はプライバシー保護のため使わない。
-  const displayName = review.user?.nickname || "匿名";
+  // 表示名: 管理者入力の author_name (桜/有名嬢) を優先。実ユーザーはニックネームのみ
+  // 公開（LINEの実名・画像はプライバシー保護のため使わない）。
+  const displayName = review.author_name || review.user?.nickname || "匿名";
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
@@ -4339,8 +4554,16 @@ function ReviewItem({ review }: { review: Review }) {
           size={32}
         />
         <div className="flex-1">
-          <p className="text-sm font-medium" style={{ color: "#1b2528" }}>
+          <p className="text-sm font-medium flex items-center gap-1.5" style={{ color: "#1b2528" }}>
             {displayName}
+            {review.is_featured && (
+              <span
+                className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                style={{ background: "rgba(212,175,55,0.16)", color: "#8a7124", border: "1px solid rgba(212,175,55,0.4)" }}
+              >
+                ★ 有名嬢
+              </span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             {renderStars(review.rating ?? 0, 12)}
@@ -4359,6 +4582,20 @@ function ReviewItem({ review }: { review: Review }) {
           authorHandle={review.tweet_author_screen_name}
           className="pl-11"
         />
+      )}
+      {/* B4: 店側からの返答 */}
+      {review.store_reply && review.store_reply.trim() !== "" && (
+        <div
+          className="ml-11 rounded-lg p-3"
+          style={{ background: "rgba(6,199,85,0.06)", border: "1px solid rgba(6,199,85,0.2)" }}
+        >
+          <p className="text-[11px] font-bold mb-0.5" style={{ color: "#04a447" }}>
+            店舗からの返信
+          </p>
+          <p className="text-[12.5px] leading-relaxed" style={{ color: "rgba(27,37,40,0.72)" }}>
+            {review.store_reply}
+          </p>
+        </div>
       )}
       <Separator style={{ backgroundColor: "rgba(27,37,40,0.06)" }} />
     </div>

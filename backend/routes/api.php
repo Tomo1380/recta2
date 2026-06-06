@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AiChatSettingController;
+use App\Http\Controllers\Admin\AnalyticsController;
+use App\Http\Controllers\Admin\TrackingLinkController;
 use App\Http\Controllers\Admin\ArticleController;
 use App\Http\Controllers\Admin\AreaCategoryController;
 use App\Http\Controllers\Admin\AuthController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\PublicReviewController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\TrackingController;
 use Illuminate\Support\Facades\Route;
 
 // ========== ヘルスチェック ==========
@@ -55,6 +58,11 @@ Route::post('/chat/stream', [AiChatController::class, 'chatStream'])->middleware
 // ========== コラム記事（公開） ==========
 Route::get('/columns', [PublicArticleController::class, 'index']);
 Route::get('/columns/{slug}', [PublicArticleController::class, 'show']);
+
+// ========== アクセス解析（公開ビーコン） ==========
+// PV / LINE追加クリックを navigator.sendBeacon で受ける。無認証・append-only。
+Route::post('/track/pv', [TrackingController::class, 'pageView'])->middleware('throttle:240,1');
+Route::post('/track/line-click', [TrackingController::class, 'lineClick'])->middleware('throttle:120,1');
 
 // ========== SEO (sitemap / robots) ==========
 // nginx で `/sitemap.xml` → `/api/sitemap`, `/robots.txt` → `/api/robots` に rewrite している。
@@ -104,6 +112,16 @@ Route::prefix('admin')->group(function () {
         // ダッシュボード
         Route::get('/dashboard', [DashboardController::class, 'index']);
 
+        // アクセス解析（店舗/エリア/コラム ランキング・LINE経路）
+        Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
+        Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown']);
+
+        // 計測リンク（アフィリエイト/店舗別LINE導線/SNS）発行・管理
+        Route::get('/tracking-links', [TrackingLinkController::class, 'index']);
+        Route::post('/tracking-links', [TrackingLinkController::class, 'store']);
+        Route::put('/tracking-links/{trackingLink}', [TrackingLinkController::class, 'update']);
+        Route::delete('/tracking-links/{trackingLink}', [TrackingLinkController::class, 'destroy']);
+
         // ユーザー管理
         Route::get('/users', [UserController::class, 'index']);
         Route::get('/users/{user}', [UserController::class, 'show']);
@@ -112,6 +130,14 @@ Route::prefix('admin')->group(function () {
         Route::post('/users/{user}/line-message', [UserController::class, 'sendLineMessage']);
         Route::get('/users/{user}/messages', [UserController::class, 'messages']);
         Route::post('/users/broadcast', [LineFriendController::class, 'broadcast']);
+
+        // LINE 友だち (line_user_id 基準のトーク)。アプリ User 未連携の相手でも
+        // トーク・送信・名前編集ができるようにする (2026-06-06 FB)。
+        Route::get('/line-friends/{lineUserId}/messages', [LineFriendController::class, 'messages']);
+        Route::get('/line-friends/{lineUserId}', [LineFriendController::class, 'show']);
+        Route::post('/line-friends/push', [LineFriendController::class, 'push']);
+        Route::put('/line-friends/{lineUserId}/name', [LineFriendController::class, 'updateName']);
+        Route::put('/line-friends/{lineUserId}/notes', [LineFriendController::class, 'updateNotes']);
 
         // 店舗管理
         // 住所 → 緯度経度 (Google Geocoding) — apiResource の {store} に飲まれないよう先に登録。
@@ -129,13 +155,16 @@ Route::prefix('admin')->group(function () {
 
         // 口コミ管理
         Route::get('/reviews', [ReviewController::class, 'index']);
+        Route::post('/reviews', [ReviewController::class, 'store']);
         Route::get('/reviews/{review}', [ReviewController::class, 'show']);
         Route::put('/reviews/{review}/status', [ReviewController::class, 'updateStatus']);
+        Route::put('/reviews/{review}', [ReviewController::class, 'update']);
 
         // AIチャット設定
         Route::get('/ai-chat/settings', [AiChatSettingController::class, 'index']);
         Route::put('/ai-chat/settings/{ai_chat_setting}', [AiChatSettingController::class, 'update']);
         Route::get('/ai-chat/stats', [AiChatSettingController::class, 'stats']);
+        Route::get('/ai-chat/logs', [AiChatSettingController::class, 'logs']);
         Route::get('/ai-chat/limits', [AiChatSettingController::class, 'limits']);
         Route::put('/ai-chat/limits', [AiChatSettingController::class, 'updateLimits']);
 

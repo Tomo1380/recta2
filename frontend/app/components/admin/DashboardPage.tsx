@@ -18,7 +18,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -31,6 +30,7 @@ import { useNavigate } from "react-router";
 import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
 import type { DashboardData, DashboardKpiWithDelta } from "~/lib/types";
+import { AnalyticsSection } from "~/components/admin/AnalyticsSection";
 
 // ----------------------------------------------------------------
 // Helpers
@@ -76,12 +76,6 @@ const reviewStatusLabels: Record<string, { label: string; className: string }> =
   unpublished: { label: "非公開", className: "bg-amber-50 text-amber-700" },
   deleted: { label: "削除", className: "bg-rose-50 text-rose-700" },
 };
-
-const AREA_BAR_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
-  "#f59e0b", "#10b981", "#14b8a6", "#06b6d4",
-  "#3b82f6", "#a855f7",
-];
 
 // ----------------------------------------------------------------
 // Sub-components
@@ -302,7 +296,8 @@ export function DashboardPage() {
   const k = data.kpis;
 
   return (
-    <div className="space-y-6">
+    // 並び順は CSS order で制御 (2026-06-06 FB: 直近3リストをグラフの上に)。
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
         <div>
@@ -323,7 +318,7 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="order-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           icon={Building2}
           label="公開店舗数"
@@ -366,7 +361,7 @@ export function DashboardPage() {
       </div>
 
       {/* Time-series charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="order-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* AI Chat trend by mode */}
         <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
@@ -488,126 +483,13 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Distribution charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm">エリア別 公開店舗数</h3>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              Top 10
-            </span>
-          </div>
-          <div
-            className="min-h-[260px]"
-            style={{
-              height: `${Math.max(260, data.stores_by_area.length * 32 + 40)}px`,
-            }}
-          >
-            {data.stores_by_area.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={data.stores_by_area}
-                  margin={{ left: 8, right: 16 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {data.stores_by_area.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={AREA_BAR_COLORS[i % AREA_BAR_COLORS.length]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="エリアデータがありません" />
-            )}
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm">カテゴリ別 公開店舗数</h3>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              Top 10
-            </span>
-          </div>
-          <div
-            className="min-h-[260px]"
-            style={{
-              height: `${Math.max(260, data.stores_by_category.length * 32 + 40)}px`,
-            }}
-          >
-            {data.stores_by_category.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={data.stores_by_category}
-                  margin={{ left: 8, right: 16 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="カテゴリデータがありません" />
-            )}
-          </div>
-        </div>
+      {/* アクセス解析: 店舗/エリア/コラム ランキング + LINE経路 + 計測リンク発行 (FB A2-A4) */}
+      <div className="order-4">
+        <AnalyticsSection />
       </div>
 
       {/* Secondary indicators */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="order-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
             未読LINE
@@ -654,8 +536,8 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent activity grids */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* Recent activity grids (FB: グラフより上に出す) */}
+      <div className="order-2 grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Recent reviews */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <SectionHeader
@@ -736,7 +618,11 @@ export function DashboardPage() {
                   key={m.id}
                   type="button"
                   onClick={() =>
-                    navigate(m.user_id ? `/admin/users/${m.user_id}` : "/admin/users")
+                    navigate(
+                      m.line_user_id
+                        ? `/admin/people/${m.line_user_id}`
+                        : "/admin/users"
+                    )
                   }
                   className={`w-full text-left px-4 sm:px-5 py-3 flex items-start gap-3 hover:bg-muted/40 transition ${
                     m.unread ? "bg-indigo-50/50" : ""
@@ -780,7 +666,7 @@ export function DashboardPage() {
           <SectionHeader
             title="AIチャット直近"
             icon={Bot}
-            href="/admin/ai-chat"
+            href="/admin/ai-chat?tab=history"
             navigate={navigate}
           />
           <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
@@ -788,9 +674,11 @@ export function DashboardPage() {
               <EmptyState message="AIチャットの履歴がまだありません" />
             ) : (
               data.recent_chats.map((c) => (
-                <div
+                <button
                   key={c.id}
-                  className="px-4 sm:px-5 py-3"
+                  type="button"
+                  onClick={() => navigate("/admin/ai-chat?tab=history")}
+                  className="w-full text-left px-4 sm:px-5 py-3 hover:bg-muted/40 transition"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -818,7 +706,7 @@ export function DashboardPage() {
                     {numberFmt.format(c.total_tokens)} tokens
                     {c.page_type ? ` ・ ${c.page_type}` : ""}
                   </p>
-                </div>
+                </button>
               ))
             )}
           </div>

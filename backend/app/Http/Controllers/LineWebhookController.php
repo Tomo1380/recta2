@@ -63,6 +63,8 @@ class LineWebhookController extends Controller
 
         // Try to link to existing user
         $this->linkUserToFriend($friend);
+        // 表示名が無ければ LINE プロフィールから補完 (管理画面の Unknown 対策)
+        $this->fillFriendProfile($friend);
 
         Log::info('LINE webhook: follow', ['line_user_id' => $lineUserId]);
     }
@@ -118,6 +120,8 @@ class LineWebhookController extends Controller
 
         // Try to link user
         $this->linkUserToFriend($friend);
+        // 表示名が無ければ LINE プロフィールから補完 (管理画面の Unknown 対策)
+        $this->fillFriendProfile($friend);
 
         // Store message
         LineMessage::create([
@@ -181,6 +185,26 @@ class LineWebhookController extends Controller
                 'user_id' => $user->id,
                 'display_name' => $friend->display_name ?: $user->line_display_name,
                 'picture_url' => $friend->picture_url ?: $user->line_picture_url,
+            ]);
+        }
+    }
+
+    /**
+     * display_name が空なら LINE プロフィール (Messaging API) から補完する。
+     * これをしないと、LINE ログイン未連携の送信者が管理画面で「Unknown」になる
+     * (2026-06-06 FB)。admin_name (管理用の別名) は上書きしない。
+     */
+    private function fillFriendProfile(LineFriend $friend): void
+    {
+        if (!empty($friend->display_name)) {
+            return;
+        }
+
+        $profile = $this->lineService->getProfile($friend->line_user_id);
+        if ($profile && !empty($profile['display_name'])) {
+            $friend->update([
+                'display_name' => $profile['display_name'],
+                'picture_url' => $friend->picture_url ?: ($profile['picture_url'] ?? null),
             ]);
         }
     }

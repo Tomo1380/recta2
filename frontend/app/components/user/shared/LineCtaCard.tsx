@@ -1,5 +1,5 @@
 import { LineIcon } from "~/components/user/shared/LineIcon";
-import { openLineFriendAdd, type LineCtaSource } from "~/lib/line";
+import { openLineFriendAdd, type LineCtaSource, type LineCtaContext } from "~/lib/line";
 
 /**
  * LINE 公式アカウント友だち追加への CTA カード。
@@ -26,6 +26,8 @@ interface LineCtaCardProps {
   ctaLabel?: string;
   /** 計測用ソースキー（推奨） */
   source?: LineCtaSource;
+  /** 自社ダッシュボードの経路別CV計測用コンテキスト（店舗/コラム/エリア） */
+  context?: LineCtaContext;
 }
 
 const LINE_GREEN = "#06C755";
@@ -39,6 +41,7 @@ export default function LineCtaCard({
   description,
   ctaLabel = "LINEで相談する",
   source,
+  context,
 }: LineCtaCardProps) {
   if (variant === "card") {
     return (
@@ -64,7 +67,7 @@ export default function LineCtaCard({
         </div>
         <button
           type="button"
-          onClick={() => openLineFriendAdd(source)}
+          onClick={() => openLineFriendAdd(source, context)}
           aria-label={`${title}（LINEで友だち追加）`}
           className="px-3.5 py-2 rounded-lg active:scale-95 transition-transform shrink-0"
           style={{
@@ -106,7 +109,7 @@ export default function LineCtaCard({
         )}
         <button
           type="button"
-          onClick={() => openLineFriendAdd(source)}
+          onClick={() => openLineFriendAdd(source, context)}
           aria-label={`${title}（LINEで友だち追加）`}
           className="mt-3.5 w-full flex items-center justify-center gap-2 py-3 rounded-xl active:scale-[0.98] transition-transform"
           style={{
@@ -130,7 +133,7 @@ export default function LineCtaCard({
   return (
     <button
       type="button"
-      onClick={() => openLineFriendAdd(source)}
+      onClick={() => openLineFriendAdd(source, context)}
       aria-label={`${title}（LINEで友だち追加）`}
       className="w-full rounded-xl px-3.5 py-3 flex items-center gap-3 active:scale-[0.99] transition-transform"
       style={{
