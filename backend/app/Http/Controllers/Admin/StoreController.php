@@ -94,7 +94,8 @@ class StoreController extends Controller
             'experience_guaranteed' => 'nullable|boolean',
             'show_relocate_badge' => 'nullable|boolean',
             'publish_status' => 'nullable|in:published,unpublished,draft',
-            'priority' => 'nullable|integer|between:-1000,1000',
+            // 表示優先度は UI 同様 1〜10 (0 は未設定扱い)。範囲外値を API でも弾く。
+            'priority' => 'nullable|integer|between:0,10',
             // slug: lowercase / digit / hyphen のみ。store 自身を除いて unique。
             'slug' => ['nullable', 'string', 'max:160', 'regex:/^[a-z0-9](?:[a-z0-9\-]*[a-z0-9])?$/'],
             'seo_meta_description' => 'nullable|string|max:500',

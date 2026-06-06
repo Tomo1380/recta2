@@ -4132,8 +4132,8 @@ function SetFeeSection({ setFee }: { setFee?: SetFee | null }) {
         <p
           className="mt-3 rounded-[10px] px-3 py-2 text-xs"
           style={{
-            backgroundColor: "rgba(212,175,55,0.08)",
-            color: "rgba(27,37,40,0.7)",
+            backgroundColor: "rgba(27,37,40,0.04)",
+            color: "rgba(27,37,40,0.6)",
           }}
         >
           {notes}
