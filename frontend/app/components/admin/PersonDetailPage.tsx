@@ -37,6 +37,9 @@ export function PersonDetailPage() {
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesDirty, setNotesDirty] = useState(false);
 
+  const [chatsExpanded, setChatsExpanded] = useState(false);
+  const CHATS_COLLAPSED = 3;
+
   const fetchPerson = useCallback(async () => {
     if (!lineUserId) return;
     try {
@@ -228,16 +231,31 @@ export function PersonDetailPage() {
             <section className="bg-card border border-border rounded-xl p-4">
               <h3 className="text-[13px] font-bold flex items-center gap-1.5 mb-2">
                 <Bot className="w-4 h-4 text-emerald-500" />
-                AIチャット履歴{person.ai_chats.length > 0 ? `（${person.ai_chats.length}件）` : ""}
+                AIチャット履歴{person.ai_chats_total > 0 ? `（${person.ai_chats_total}件）` : ""}
               </h3>
               {person.ai_chats.length === 0 ? (
                 <p className="text-[12px] text-muted-foreground py-2">まだAIチャットの履歴はありません</p>
               ) : (
-                <div className="space-y-2.5">
-                  {person.ai_chats.map((c) => (
-                    <ChatLogItem key={c.id} log={c} showUser={false} />
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-2.5">
+                    {(chatsExpanded ? person.ai_chats : person.ai_chats.slice(0, CHATS_COLLAPSED)).map((c) => (
+                      <ChatLogItem key={c.id} log={c} showUser={false} />
+                    ))}
+                  </div>
+                  {person.ai_chats.length > CHATS_COLLAPSED && (
+                    <button
+                      onClick={() => setChatsExpanded((v) => !v)}
+                      className="mt-2.5 w-full py-2 rounded-lg border border-border text-[12px] text-indigo-600 hover:bg-muted/40 transition"
+                    >
+                      {chatsExpanded ? "閉じる" : `もっと見る（あと${person.ai_chats.length - CHATS_COLLAPSED}件）`}
+                    </button>
+                  )}
+                  {person.ai_chats_total > person.ai_chats.length && (
+                    <p className="mt-1.5 text-[11px] text-muted-foreground text-center">
+                      最新{person.ai_chats.length}件を表示（全{person.ai_chats_total}件）
+                    </p>
+                  )}
+                </>
               )}
             </section>
           )}

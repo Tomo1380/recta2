@@ -89,6 +89,7 @@ export interface AdminPerson {
   } | null;
   reviews: AdminPersonReview[];
   ai_chats: AdminPersonChat[];
+  ai_chats_total: number;
   messages: LineMessage[];
   messages_total: number;
 }

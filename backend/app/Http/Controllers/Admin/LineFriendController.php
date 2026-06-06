@@ -162,6 +162,8 @@ class LineFriendController extends Controller
         // この人 (line_user_id) の AIチャット履歴。チャットは LINEログイン時に
         // line_user_id が写されるので、LINEトーク基準で本人のチャットを引ける
         // (2026-06-07 FB)。匿名チャットは紐づかない (IPのみ)。
+        // ヘビーチャッターで詳細が長くなりすぎないよう最新20件 + 総件数を返す。
+        $aiChatsTotal = \App\Models\AiChatLog::where('line_user_id', $lineUserId)->count();
         $aiChats = \App\Models\AiChatLog::where('line_user_id', $lineUserId)
             ->orderByDesc('created_at')
                 ->limit(20)
@@ -201,6 +203,7 @@ class LineFriendController extends Controller
                 ] : null,
                 'reviews' => $reviews,
                 'ai_chats' => $aiChats,
+                'ai_chats_total' => $aiChatsTotal,
                 'messages' => LineMessageResource::collection($messages)->resolve(),
                 'messages_total' => $messagesTotal,
             ],
