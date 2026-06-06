@@ -63,6 +63,8 @@ export interface AiChatLog {
   created_at: string | null;
   /** @nullable */
   updated_at: string | null;
+  /** @nullable */
+  line_user_id: string | null;
 }
 
 export interface AiChatSetting {
@@ -152,6 +154,37 @@ export interface AreaResource {
      * @nullable
      */
   shop_count: number | null;
+}
+
+export interface Article {
+  id: number;
+  slug: string;
+  title: string;
+  /** @nullable */
+  excerpt: string | null;
+  /** @nullable */
+  body: unknown[] | null;
+  /** @nullable */
+  body_html: string | null;
+  /** @nullable */
+  thumbnail_url: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  tags: unknown[] | null;
+  status: string;
+  /** @nullable */
+  published_at: string | null;
+  /** @nullable */
+  created_at: string | null;
+  /** @nullable */
+  updated_at: string | null;
+  /** @nullable */
+  author_id: number | null;
+  /** @nullable */
+  section: string | null;
+  /** @nullable */
+  related_store_ids: unknown[] | null;
 }
 
 export interface ArticleResource {
@@ -389,13 +422,21 @@ export type PickupShopResourceStore = {
      * @nullable
      */
   average_rating: number | null;
+  /**
+     * 直近30日の指標 (P1)。pickupShops 一覧でだけ付く。
+     * @nullable
+     */
+  pv: number | null;
+  /** @nullable */
+  line_clicks: number | null;
+  /** @nullable */
+  cv_rate: number | null;
 };
 
 export interface PickupShopResource {
   id: number;
   store_id: number;
   sort_order: number;
-  is_pr: boolean;
   visible: boolean;
   store?: PickupShopResourceStore;
 }
@@ -433,6 +474,31 @@ export interface ReorderStoreImagesRequest {
 export interface ResetAdminPasswordRequest {
   /** @minLength 8 */
   password: string;
+}
+
+export interface Review {
+  id: number;
+  /** @nullable */
+  user_id: number | null;
+  store_id: number;
+  rating: number;
+  body: string;
+  /** @nullable */
+  tweet_id: string | null;
+  /** @nullable */
+  tweet_author_screen_name: string | null;
+  status: string;
+  /** @nullable */
+  created_at: string | null;
+  /** @nullable */
+  updated_at: string | null;
+  /** @nullable */
+  author_name: string | null;
+  is_featured: boolean;
+  /** @nullable */
+  store_reply: string | null;
+  /** @nullable */
+  store_reply_at: string | null;
 }
 
 /**
@@ -484,7 +550,8 @@ export interface ReviewResource {
   store?: ReviewResourceStore;
 }
 
-export interface SendLineBroadcastRequest {
+export interface SendLinePushRequest {
+  line_user_id: string;
   /** @maxLength 5000 */
   message: string;
 }
@@ -671,7 +738,6 @@ export interface StoreIndustryKnowledgeRequest {
 export interface StorePickupShopRequest {
   store_id: number;
   sort_order?: number;
-  is_pr?: boolean;
   visible?: boolean;
 }
 
@@ -700,32 +766,12 @@ export interface StoreReviewRequest {
   tweet_url?: string | null;
 }
 
-export type StoreTrackingLinkRequestTargetType = typeof StoreTrackingLinkRequestTargetType[keyof typeof StoreTrackingLinkRequestTargetType];
-
-
-export const StoreTrackingLinkRequestTargetType = {
-  store: 'store',
-  area: 'area',
-  column: 'column',
-  standalone: 'standalone',
-} as const;
-
 /**
  * 計測リンク（アフィリエイト/店舗別LINE導線/SNS）の新規発行。
  */
 export interface StoreTrackingLinkRequest {
   /** @maxLength 120 */
   label: string;
-  target_type: StoreTrackingLinkRequestTargetType;
-  /** @nullable */
-  store_id?: number | null;
-  /** @nullable */
-  article_id?: number | null;
-  /**
-     * @maxLength 64
-     * @nullable
-     */
-  area?: string | null;
   /**
      * @maxLength 2048
      * @nullable
@@ -802,20 +848,11 @@ export interface TrackingLinkResource {
   id: number;
   code: string;
   label: string;
-  target_type: string;
-  /** @nullable */
-  store_id: number | null;
-  /** @nullable */
-  article_id: number | null;
-  /** @nullable */
-  area: string | null;
   destination_url: string;
   is_active: boolean;
   public_url: string;
   clicks_count?: number;
   created_at: string;
-  store_name?: string;
-  article_title?: string;
 }
 
 export type UpdateAdminUserRequestRole = typeof UpdateAdminUserRequestRole[keyof typeof UpdateAdminUserRequestRole];
@@ -1085,7 +1122,6 @@ export interface UpdateIndustryKnowledgeRequest {
 export interface UpdatePickupShopRequest {
   store_id?: number;
   sort_order?: number;
-  is_pr?: boolean;
   visible?: boolean;
 }
 
@@ -1582,6 +1618,18 @@ export type AiChatSettingStats200 = {
   mode_daily_stats: AiChatLog[];
 };
 
+export type AiChatSettingLogsParams = {
+per_page?: string;
+};
+
+export type AiChatSettingLogs200 = {
+  data: unknown[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
 export type AnalyticsOverview200Range = {
   days: 30;
   from: string;
@@ -1777,7 +1825,8 @@ export type DashboardIndex200RecentMessagesItem = {
   id: number;
   /** @nullable */
   user_id: number | null;
-  name: unknown;
+  line_user_id: string;
+  name: string | null;
   avatar: string;
   message: string;
   created_at: string;
@@ -1796,13 +1845,24 @@ export type DashboardIndex200RecentChatsItem = {
 
 export type DashboardIndex200Secondary = {
   /** @minimum 0 */
-  unread_messages: number;
+  new_inbound_threads_7d: number;
+  /**
+     * 口コミは承認制ではなく即公開→post-moderation(非公開/削除)。
+   * なので「承認待ち」ではなく「直近で来た新着口コミ(要チェック)」を出す。
+     * @minimum 0
+     */
+  new_reviews_7d: number;
   /** @minimum 0 */
-  pending_reviews: number;
+  new_users_7d: number;
   /** @minimum 0 */
   published_articles: number;
   /** @minimum 0 */
   fine_tuning_qa_active: number;
+};
+
+export type DashboardIndex200AnalyticsHighlight = {
+  stores: unknown[][];
+  columns: unknown[][];
 };
 
 export type DashboardIndex200 = {
@@ -1814,6 +1874,7 @@ export type DashboardIndex200 = {
   recent_messages: DashboardIndex200RecentMessagesItem[];
   recent_chats: DashboardIndex200RecentChatsItem[];
   secondary: DashboardIndex200Secondary;
+  analytics_highlight: DashboardIndex200AnalyticsHighlight;
 };
 
 export type FineTuningStatus200TrainingDataSize = { [key: string]: unknown } | number;
@@ -2086,8 +2147,153 @@ export type LineAuthExchange422 = {
   message: 'コードが指定されていません。';
 };
 
-export type LineFriendBroadcast200 = {
+export type LineFriendMessagesParams = {
+per_page?: string;
+};
+
+export type LineFriendMessages200Messages = {
+  data: LineMessageResource[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
+export type LineFriendMessages200 = {
+  friend: string;
+  messages: LineFriendMessages200Messages;
+};
+
+export type LineFriendShow200 = {
+  person: unknown;
+};
+
+export type LineFriendPush200 = {
   message: string;
+};
+
+export type LineFriendUpdateNameBody = {
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  admin_name?: string | null;
+};
+
+/**
+ * @nullable
+ */
+export type LineFriendUpdateName200PersonUser = {
+  id: string | number;
+  status: string;
+  line_display_name: string;
+  nickname: string | null;
+  reviews_count: string | number;
+  created_at: string;
+} | null;
+
+export type LineFriendUpdateName200PersonAiChatsItem = {
+  id: number;
+  user_message: string;
+  ai_response: string;
+  mode: string;
+  page_type: string;
+  total_tokens: string;
+  created_at: string;
+};
+
+export type LineFriendUpdateName200Person = {
+  line_user_id: string;
+  /** @nullable */
+  name: string | null;
+  admin_name: string;
+  display_name: string;
+  picture_url: string;
+  is_following: boolean;
+  is_talk: boolean;
+  has_account: boolean;
+  /**
+     * 運営は返信を LINE 公式チャットで行うので、その人の公式チャットへの
+   * ディープリンクを渡す (OAチャットID未設定なら null でボタン非表示)。
+     * @nullable
+     */
+  line_chat_url: string | null;
+  admin_notes: string;
+  /** @nullable */
+  user: LineFriendUpdateName200PersonUser;
+  reviews: string | Review[];
+  ai_chats: LineFriendUpdateName200PersonAiChatsItem[];
+  /** @minimum 0 */
+  ai_chats_total: number;
+  messages: unknown[];
+  /** @minimum 0 */
+  messages_total: number;
+};
+
+export type LineFriendUpdateName200 = {
+  person: LineFriendUpdateName200Person;
+};
+
+export type LineFriendUpdateNotesBody = {
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  admin_notes?: string | null;
+};
+
+/**
+ * @nullable
+ */
+export type LineFriendUpdateNotes200PersonUser = {
+  id: string | number;
+  status: string;
+  line_display_name: string;
+  nickname: string | null;
+  reviews_count: string | number;
+  created_at: string;
+} | null;
+
+export type LineFriendUpdateNotes200PersonAiChatsItem = {
+  id: number;
+  user_message: string;
+  ai_response: string;
+  mode: string;
+  page_type: string;
+  total_tokens: string;
+  created_at: string;
+};
+
+export type LineFriendUpdateNotes200Person = {
+  line_user_id: string;
+  /** @nullable */
+  name: string | null;
+  admin_name: string;
+  display_name: string;
+  picture_url: string;
+  is_following: boolean;
+  is_talk: boolean;
+  has_account: boolean;
+  /**
+     * 運営は返信を LINE 公式チャットで行うので、その人の公式チャットへの
+   * ディープリンクを渡す (OAチャットID未設定なら null でボタン非表示)。
+     * @nullable
+     */
+  line_chat_url: string | null;
+  admin_notes: string;
+  /** @nullable */
+  user: LineFriendUpdateNotes200PersonUser;
+  reviews: string | Review[];
+  ai_chats: LineFriendUpdateNotes200PersonAiChatsItem[];
+  /** @minimum 0 */
+  ai_chats_total: number;
+  messages: unknown[];
+  /** @minimum 0 */
+  messages_total: number;
+};
+
+export type LineFriendUpdateNotes200 = {
+  person: LineFriendUpdateNotes200Person;
 };
 
 export type LineWebhookHandleBody = {
@@ -2157,7 +2363,6 @@ export type PublicStoreHome200PickupShopsItem = {
   feature_tags: unknown[] | null;
   /** @nullable */
   images: unknown[] | null;
-  is_pr: boolean;
   reviews_count: number;
   average_rating: number;
 };
@@ -2227,6 +2432,7 @@ export type PublicStoreIndex200 = { [key: string]: unknown };
 export type PublicStoreShow200 = {
   store: unknown[];
   related: unknown[];
+  related_columns: Article[];
 };
 
 export type RelocateVoiceReorder200 = {
@@ -2526,8 +2732,9 @@ export type StoresStoreBody = {
   /** @nullable */
   publish_status?: StoresStoreBodyPublishStatus;
   /**
-     * @minimum -1000
-     * @maximum 1000
+     * 表示優先度は UI 同様 1〜10 (0 は未設定扱い)。範囲外値を API でも弾く。
+     * @minimum 0
+     * @maximum 10
      * @nullable
      */
   priority?: number | null;
@@ -2632,6 +2839,19 @@ export const StoresUpdateBodySameDayTrial = {
   same_day: 'same_day',
   normal: 'normal',
   none: 'none',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StoresUpdateBodyDailyPayType = typeof StoresUpdateBodyDailyPayType[keyof typeof StoresUpdateBodyDailyPayType] | null;
+
+
+export const StoresUpdateBodyDailyPayType = {
+  none: 'none',
+  yes: 'yes',
+  full: 'full',
+  capped: 'capped',
 } as const;
 
 export type StoresUpdateBodyWageTrial = {
@@ -2882,8 +3102,8 @@ export type StoresUpdateBody = {
   /** @nullable */
   publish_status?: StoresUpdateBodyPublishStatus;
   /**
-     * @minimum -1000
-     * @maximum 1000
+     * @minimum 0
+     * @maximum 10
      * @nullable
      */
   priority?: number | null;
@@ -2956,8 +3176,6 @@ export type StoresUpdateBody = {
   salary_notes?: string | null;
   /** @nullable */
   back_text?: string | null;
-  /** @nullable */
-  pay_system_note?: string | null;
   /**
      * @maxLength 255
      * @nullable
@@ -2994,8 +3212,6 @@ export type StoresUpdateBody = {
      * @nullable
      */
   payroll_system_type?: string | null;
-  /** @nullable */
-  payroll_system_description?: string | null;
   /**
      * @maxLength 60
      * @nullable
@@ -3006,11 +3222,14 @@ export type StoresUpdateBody = {
      * @nullable
      */
   payroll_pay_day?: string | null;
+  /** @nullable */
+  daily_pay_type?: StoresUpdateBodyDailyPayType;
   /**
-     * @maxLength 120
+     * @minimum 0
+     * @maximum 100000000
      * @nullable
      */
-  daily_pay_limit?: string | null;
+  daily_pay_limit?: number | null;
   /**
      * @maxLength 255
      * @nullable
@@ -3079,31 +3298,27 @@ export type StoreDeleteImage200 = {
   images: unknown[];
 } | null;
 
-export type TrackingLinkIndexParams = {
-target_type?: string;
-};
-
 export type UserIndexParams = {
-line_status?: string;
-per_page?: string;
+mode?: string;
 };
 
-export type UserIndex200Users = {
-  data: UserResource[];
+export type UserIndex200People = {
+  data: unknown[];
   current_page: number;
   last_page: number;
   per_page: number;
   total: number;
 };
 
-export type UserIndex200LineStats = {
+export type UserIndex200Stats = {
+  talk_count: number;
+  login_only_count: number;
   total_users: number;
-  line_friend_count: number;
 };
 
 export type UserIndex200 = {
-  users: UserIndex200Users;
-  line_stats: UserIndex200LineStats;
+  people: UserIndex200People;
+  stats: UserIndex200Stats;
 };
 
 export type UserShow200 = {

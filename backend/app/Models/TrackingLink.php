@@ -14,18 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class TrackingLink extends Model
 {
-    public const TARGET_STORE = 'store';
-    public const TARGET_AREA = 'area';
-    public const TARGET_COLUMN = 'column';
-    public const TARGET_STANDALONE = 'standalone';
-
     protected $fillable = [
         'code',
         'label',
-        'target_type',
-        'store_id',
-        'article_id',
-        'area',
         'destination_url',
         'created_by',
         'is_active',
@@ -34,16 +25,6 @@ class TrackingLink extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
-
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
-    }
-
-    public function article(): BelongsTo
-    {
-        return $this->belongsTo(Article::class);
-    }
 
     public function creator(): BelongsTo
     {

@@ -11,6 +11,7 @@ use App\Models\LineMessage;
 use App\Models\Review;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\Analytics\RankingService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon as SupportCarbon;
@@ -25,7 +26,7 @@ class DashboardController extends Controller
      * Provides KPI cards, 30-day time series, distribution charts and
      * recent activity for the night-work matching platform.
      */
-    public function index(): JsonResponse
+    public function index(RankingService $ranking): JsonResponse
     {
         $now = now();
         $today = $now->copy()->startOfDay();
@@ -227,13 +228,29 @@ class DashboardController extends Controller
         // ----------------------------------------------------------------
         // Secondary stats
         // ----------------------------------------------------------------
+        // 返信は LINE 公式チャットで行う運用が多く、その返信は webhook で来ない=
+        // Recta 側では「返信済みか」を正確に判定できない。よって「未返信」ではなく、
+        // 確実に取れる「直近7日に受信があったトーク数」を出して確認のきっかけにする。
         $secondary = [
-            'unread_messages' => LineMessage::where('direction', 'inbound')
-                ->whereNull('read_at')
+            'new_inbound_threads_7d' => LineMessage::where('direction', 'inbound')
+                ->where('created_at', '>=', $now->copy()->subDays(7))
+                ->distinct('line_user_id')
+                ->count('line_user_id'),
+            // 口コミは承認制ではなく即公開→post-moderation(非公開/削除)。
+            // なので「承認待ち」ではなく「直近で来た新着口コミ(要チェック)」を出す。
+            'new_reviews_7d' => Review::where('status', '!=', 'deleted')
+                ->where('created_at', '>=', $now->copy()->subDays(7))
                 ->count(),
-            'pending_reviews' => Review::where('status', 'unpublished')->count(),
+            'new_users_7d' => User::where('created_at', '>=', $now->copy()->subDays(7))->count(),
             'published_articles' => Article::where('status', 'published')->count(),
             'fine_tuning_qa_active' => FineTuningQa::where('status', FineTuningQa::STATUS_ACTIVE)->count(),
+        ];
+
+        // 「効いてるコンテンツ」ハイライト: 直近30日でアクセス上位の店舗/コラム TOP3。
+        $from30 = $now->copy()->subDays(30);
+        $highlight = [
+            'stores' => $ranking->stores($from30, $now)->take(3)->values(),
+            'columns' => $ranking->columns($from30, $now)->take(3)->values(),
         ];
 
         return response()->json([
@@ -245,6 +262,7 @@ class DashboardController extends Controller
             'recent_messages' => $recentMessages,
             'recent_chats' => $recentChats,
             'secondary' => $secondary,
+            'analytics_highlight' => $highlight,
         ]);
     }
 

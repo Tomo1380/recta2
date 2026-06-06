@@ -31,25 +31,12 @@ class ContentSeeder extends Seeder
             ->pluck('id')
             ->all();
 
-        $pickupVariations = [
-            ['is_pr' => true,  'visible' => true],
-            ['is_pr' => false, 'visible' => true],
-            ['is_pr' => false, 'visible' => true],
-            ['is_pr' => true,  'visible' => true],
-            ['is_pr' => false, 'visible' => true],
-            ['is_pr' => false, 'visible' => true],
-            ['is_pr' => true,  'visible' => true],
-            ['is_pr' => false, 'visible' => true],
-            ['is_pr' => false, 'visible' => false], // hidden
-            ['is_pr' => false, 'visible' => false], // hidden
-        ];
-
+        // 末尾2件だけ非表示にして visible トグルの確認用にする。
         foreach ($storeIds as $i => $storeId) {
-            $variation = $pickupVariations[$i] ?? ['is_pr' => false, 'visible' => true];
             PickupShop::create([
                 'store_id' => $storeId,
                 'sort_order' => $i,
-                ...$variation,
+                'visible' => $i < count($storeIds) - 2,
             ]);
         }
 

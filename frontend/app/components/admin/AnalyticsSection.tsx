@@ -1,16 +1,21 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
-  BarChart3,
   Check,
   ChevronDown,
   ChevronRight,
   Copy,
+  Eye,
   ExternalLink,
   Link2,
   Loader2,
+  MousePointerClick,
+  Pencil,
+  Percent,
   Plus,
   Route,
+  Search,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -66,13 +71,6 @@ const RANK_TABS: { key: RankTab; label: string }[] = [
   { key: "routes", label: "LINE導線（画面別）" },
 ];
 
-const TARGET_LABELS: Record<TrackingLink["target_type"], string> = {
-  standalone: "SNS/直リンク",
-  store: "店舗",
-  area: "エリア",
-  column: "コラム",
-};
-
 function nf(n: number): string {
   return n.toLocaleString("ja-JP");
 }
@@ -108,28 +106,29 @@ export function AnalyticsSection() {
   }, [days]);
 
   const summary = overview?.summary;
+  const tabCount = (key: RankTab): number =>
+    key === "routes" ? overview?.line_routes?.length ?? 0 : overview?.[key]?.length ?? 0;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 sm:p-5 space-y-5">
-      {/* Header + range selector */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="size-4 text-muted-foreground" />
-          <div>
-            <h3 className="text-sm font-medium">アクセス解析</h3>
-            <p className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
-              「LINE導線」はボタン押下（どの画面から進んだか）。実際の友だち追加は
-              下の「友だち追加 実績」で全体数を表示（LINE仕様で経路別には割れません）。
-            </p>
-          </div>
+    <div className="space-y-5">
+      {/* Page header + range selector */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-foreground" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}>
+            アクセス解析
+          </h2>
+          <p className="text-[13px] text-muted-foreground mt-0.5 max-w-2xl">
+            PV・LINE導線・CV率を店舗 / エリア / コラム別に。「LINE導線」はCTAの押下（どの画面から進んだか）で、
+            実際の友だち追加とは別。友だち追加の実数は右端のカードに全体数で出る（LINE仕様で経路別には割れない）。
+          </p>
         </div>
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 shrink-0">
           {DAY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => setDays(opt.value)}
-              className={`px-2.5 py-1 text-[11px] rounded-md transition-colors ${
+              className={`px-3 py-1.5 text-[12px] rounded-md transition-colors ${
                 days === opt.value
                   ? "bg-card shadow-sm font-medium"
                   : "text-muted-foreground hover:text-foreground"
@@ -141,51 +140,64 @@ export function AnalyticsSection() {
         </div>
       </div>
 
-      {/* Summary cards */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard label="PV (期間内)" value={summary ? nf(summary.pv) : "—"} loading={loading} />
+        <SummaryCard label="PV（期間内）" value={summary ? nf(summary.pv) : "—"} icon={Eye} accent="#6366f1" loading={loading} />
         <SummaryCard
           label="LINE導線クリック"
           value={summary ? nf(summary.line_clicks) : "—"}
-          hint="ボタン押下（実追加ではない）"
+          hint="CTA押下（実追加ではない）"
+          icon={MousePointerClick}
+          accent="#06c755"
           loading={loading}
         />
         <SummaryCard
           label="導線CV率"
           value={summary ? `${summary.cv_rate}%` : "—"}
           hint="導線クリック ÷ PV"
+          icon={Percent}
+          accent="#059669"
           loading={loading}
         />
         <SummaryCard
           label="友だち追加 実績"
           value={summary ? nf(summary.line_friends_total) : "—"}
           hint={summary ? `期間内 +${nf(summary.line_friends_in_range)}（全体）` : "公式アカ追加・全体"}
+          icon={UserPlus}
+          accent="#06c755"
           loading={loading}
         />
       </div>
 
-      {/* Ranking tabs */}
-      <div>
-        <div className="flex items-center gap-1 border-b border-border mb-3">
-          {RANK_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={`px-3 py-2 text-[12px] -mb-px border-b-2 transition-colors ${
-                tab === t.key
-                  ? "border-foreground font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+      {/* Rankings */}
+      <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
+        <div className="flex items-center gap-1 border-b border-border mb-3 overflow-x-auto">
+          {RANK_TABS.map((t) => {
+            const active = tab === t.key;
+            const count = tabCount(t.key);
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`px-3 py-2 text-[12px] -mb-px border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                  active ? "border-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+                {!loading && count > 0 && (
+                  <span className={`text-[10px] px-1.5 rounded-full tabular-nums ${active ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {loading ? (
           <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-8 w-full" />
             ))}
           </div>
@@ -201,8 +213,10 @@ export function AnalyticsSection() {
         )}
       </div>
 
-      {/* Tracking link issuer */}
-      <TrackingLinks />
+      {/* Tracking links */}
+      <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
+        <TrackingLinks />
+      </div>
     </div>
   );
 }
@@ -212,21 +226,32 @@ function SummaryCard({
   value,
   hint,
   loading,
+  icon: Icon,
+  accent,
 }: {
   label: string;
   value: string;
   hint?: string;
   loading: boolean;
+  icon?: typeof Eye;
+  accent?: string;
 }) {
   return (
-    <div className="bg-muted/40 border border-border rounded-lg p-3">
-      <p className="text-[10.5px] text-muted-foreground uppercase tracking-wider">{label}</p>
+    <div className="bg-card border border-border rounded-xl p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        {Icon && (
+          <div className="size-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}14` }}>
+            <Icon className="size-3.5" style={{ color: accent }} />
+          </div>
+        )}
+      </div>
       {loading ? (
-        <Skeleton className="h-6 w-16 mt-1" />
+        <Skeleton className="h-7 w-20 mt-2" />
       ) : (
-        <p className="text-xl font-semibold mt-0.5 tabular-nums">{value}</p>
+        <p className="text-2xl font-semibold mt-1.5 tabular-nums">{value}</p>
       )}
-      {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
+      {hint && <p className="text-[10.5px] text-muted-foreground mt-1">{hint}</p>}
     </div>
   );
 }
@@ -245,11 +270,13 @@ function RankTable({
   // 展開中の行キーと、画面別内訳のキャッシュ（"loading" or 行配列）。
   const [expanded, setExpanded] = useState<string | null>(null);
   const [cache, setCache] = useState<Record<string, AnalyticsBreakdownRow[] | "loading">>({});
+  const [search, setSearch] = useState("");
 
-  // 期間 / ディメンション変更時は展開とキャッシュをリセット。
+  // 期間 / ディメンション変更時は展開・キャッシュ・検索をリセット。
   useEffect(() => {
     setExpanded(null);
     setCache({});
+    setSearch("");
   }, [dimension, days]);
 
   const rowKey = (row: AnalyticsRankRow) => String(row.id ?? row.name);
@@ -276,61 +303,92 @@ function RankTable({
     return <EmptyRows message={`${unit}のアクセスデータがまだありません`} />;
   }
 
+  // 順位（PV降順の元の並び）は保ったまま検索で絞り込む。
+  const q = search.trim().toLowerCase();
+  const ranked = rows.map((row, idx) => ({ row, rank: idx + 1 }));
+  const visible = q ? ranked.filter(({ row }) => row.name.toLowerCase().includes(q)) : ranked;
+
   return (
-    <div className="overflow-x-auto">
-      <p className="text-[10.5px] text-muted-foreground mb-1.5">
-        行をクリックすると、その{unit}のLINE導線を画面別に展開します。
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-[10.5px] text-muted-foreground">
+          行をクリックで、その{unit}のLINE導線を画面別に展開。CV率5%以上は緑。
+        </p>
+        {rows.length > 8 && (
+          <div className="relative shrink-0">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`${unit}名で検索`}
+              className="h-7 w-44 pl-6 pr-2 text-[11px] rounded-md border border-input bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        )}
+      </div>
+      <div className="overflow-auto max-h-[440px] rounded-md border border-border/60">
+        <table className="w-full text-[12px]">
+          <thead className="sticky top-0 bg-card z-10">
+            <tr className="text-muted-foreground text-[10.5px] uppercase tracking-wider border-b border-border">
+              <th className="text-left font-normal py-2 px-2 w-8" />
+              <th className="text-left font-normal py-2 w-6">#</th>
+              <th className="text-left font-normal py-2">{unit}</th>
+              <th className="text-right font-normal py-2 w-16">PV</th>
+              <th className="text-right font-normal py-2 w-20">LINE導線</th>
+              <th className="text-right font-normal py-2 px-2 w-16">CV率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-6 text-center text-[11px] text-muted-foreground">
+                  「{search}」に一致する{unit}はありません
+                </td>
+              </tr>
+            ) : (
+              visible.map(({ row, rank }) => {
+                const key = rowKey(row);
+                const isOpen = expanded === key;
+                const detail = cache[key];
+                return (
+                  <Fragment key={key}>
+                    <tr
+                      className="border-t border-border/60 cursor-pointer hover:bg-muted/40"
+                      onClick={() => toggle(row)}
+                    >
+                      <td className="py-1.5 px-2 text-muted-foreground">
+                        {isOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                      </td>
+                      <td className="py-1.5 text-muted-foreground tabular-nums">{rank}</td>
+                      <td className="py-1.5 pr-2 truncate max-w-[220px]" title={row.name}>
+                        {row.name}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">{nf(row.pv)}</td>
+                      <td className="py-1.5 text-right tabular-nums">{nf(row.line_clicks)}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums">
+                        <span className={row.cv_rate >= 5 ? "text-emerald-600 font-medium" : ""}>
+                          {row.cv_rate}%
+                        </span>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-muted/30">
+                        <td />
+                        <td colSpan={5} className="py-2 pr-2">
+                          <BreakdownDetail detail={detail} unit={unit} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-1.5 text-right">
+        {q ? `${visible.length} / ${rows.length} 件` : `上位 ${rows.length} 件（最大100）`}
       </p>
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="text-muted-foreground text-[10.5px] uppercase tracking-wider">
-            <th className="text-left font-normal py-1.5 w-8" />
-            <th className="text-left font-normal py-1.5 w-6">#</th>
-            <th className="text-left font-normal py-1.5">{unit}</th>
-            <th className="text-right font-normal py-1.5 w-16">PV</th>
-            <th className="text-right font-normal py-1.5 w-20">LINE導線</th>
-            <th className="text-right font-normal py-1.5 w-16">CV率</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => {
-            const key = rowKey(row);
-            const isOpen = expanded === key;
-            const detail = cache[key];
-            return (
-              <Fragment key={`${key}-${i}`}>
-                <tr
-                  className="border-t border-border/60 cursor-pointer hover:bg-muted/40"
-                  onClick={() => toggle(row)}
-                >
-                  <td className="py-1.5 text-muted-foreground">
-                    {isOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                  </td>
-                  <td className="py-1.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="py-1.5 pr-2 truncate max-w-[200px]" title={row.name}>
-                    {row.name}
-                  </td>
-                  <td className="py-1.5 text-right tabular-nums">{nf(row.pv)}</td>
-                  <td className="py-1.5 text-right tabular-nums">{nf(row.line_clicks)}</td>
-                  <td className="py-1.5 text-right tabular-nums">
-                    <span className={row.cv_rate >= 5 ? "text-emerald-600 font-medium" : ""}>
-                      {row.cv_rate}%
-                    </span>
-                  </td>
-                </tr>
-                {isOpen && (
-                  <tr className="bg-muted/30">
-                    <td />
-                    <td colSpan={5} className="py-2 pr-2">
-                      <BreakdownDetail detail={detail} unit={unit} />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -378,33 +436,38 @@ function RouteTable({ rows }: { rows: AnalyticsOverview["line_routes"] }) {
     return <EmptyRows message="LINE導線クリックがまだありません" />;
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="text-muted-foreground text-[10.5px] uppercase tracking-wider">
-            <th className="text-left font-normal py-1.5 w-8">#</th>
-            <th className="text-left font-normal py-1.5">画面 / 経路</th>
-            <th className="text-left font-normal py-1.5 w-28">種別</th>
-            <th className="text-right font-normal py-1.5 w-20">クリック</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={`${row.route}-${i}`} className="border-t border-border/60">
-              <td className="py-1.5 text-muted-foreground tabular-nums">{i + 1}</td>
-              <td className="py-1.5 pr-2 truncate max-w-[260px]" title={row.route}>
-                {row.route}
-              </td>
-              <td className="py-1.5">
-                <Badge variant={row.kind === "affiliate" ? "default" : "secondary"}>
-                  {row.kind === "affiliate" ? "外部リンク(発行)" : "サイト内(画面)"}
-                </Badge>
-              </td>
-              <td className="py-1.5 text-right tabular-nums">{nf(row.clicks)}</td>
+    <div>
+      <p className="text-[10.5px] text-muted-foreground mb-2">
+        LINE導線クリックを「サイト内の画面（CTA配置）」「外部リンク（発行した計測リンク）」別に集計。
+      </p>
+      <div className="overflow-auto max-h-[440px] rounded-md border border-border/60">
+        <table className="w-full text-[12px]">
+          <thead className="sticky top-0 bg-card z-10">
+            <tr className="text-muted-foreground text-[10.5px] uppercase tracking-wider border-b border-border">
+              <th className="text-left font-normal py-2 px-2 w-8">#</th>
+              <th className="text-left font-normal py-2">画面 / 経路</th>
+              <th className="text-left font-normal py-2 w-28">種別</th>
+              <th className="text-right font-normal py-2 px-2 w-20">クリック</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={`${row.route}-${i}`} className="border-t border-border/60">
+                <td className="py-1.5 px-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                <td className="py-1.5 pr-2 truncate max-w-[260px]" title={row.route}>
+                  {sourceLabel(row.route)}
+                </td>
+                <td className="py-1.5">
+                  <Badge variant={row.kind === "affiliate" ? "default" : "secondary"}>
+                    {row.kind === "affiliate" ? "外部リンク(発行)" : "サイト内(画面)"}
+                  </Badge>
+                </td>
+                <td className="py-1.5 px-2 text-right tabular-nums">{nf(row.clicks)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -439,17 +502,20 @@ function TrackingLinks() {
   };
 
   return (
-    <div className="border-t border-border pt-4">
-      <div className="flex items-center justify-between mb-3">
+    <div>
+      <div className="flex items-start justify-between mb-1 gap-2">
         <div className="flex items-center gap-2">
           <Link2 className="size-4 text-muted-foreground" />
-          <h4 className="text-[13px] font-medium">計測リンク（アフィリエイト / SNS / 店舗別）</h4>
+          <h4 className="text-[13px] font-medium">計測リンク（経路別クリック計測）</h4>
         </div>
         <Button size="sm" variant={open ? "secondary" : "default"} onClick={() => setOpen((v) => !v)}>
           <Plus className="size-3.5" />
           発行
         </Button>
       </div>
+      <p className="text-[10.5px] text-muted-foreground mb-3 leading-snug">
+        SNS / アフィリエイト等に貼る短縮URL。クリック数がラベル別に上の「LINE導線」に出る。飛び先は既定でLINE友だち追加。
+      </p>
 
       {open && (
         <IssueForm
@@ -471,7 +537,12 @@ function TrackingLinks() {
       ) : (
         <ul className="space-y-1.5 mt-2">
           {links.map((link) => (
-            <LinkRow key={link.id} link={link} onDelete={() => remove(link.id)} />
+            <LinkRow
+              key={link.id}
+              link={link}
+              onDelete={() => remove(link.id)}
+              onUpdated={(u) => setLinks((prev) => prev.map((l) => (l.id === u.id ? u : l)))}
+            />
           ))}
         </ul>
       )}
@@ -479,8 +550,19 @@ function TrackingLinks() {
   );
 }
 
-function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void }) {
+function LinkRow({
+  link,
+  onDelete,
+  onUpdated,
+}: {
+  link: TrackingLink;
+  onDelete: () => void;
+  onUpdated: (l: TrackingLink) => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(link.label);
+  const [saving, setSaving] = useState(false);
 
   const copy = async () => {
     try {
@@ -492,14 +574,44 @@ function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void 
     }
   };
 
+  const save = async () => {
+    const v = draft.trim();
+    if (!v || v === link.label) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await api.put<TrackingLink>(`/admin/tracking-links/${link.id}`, { label: v });
+      onUpdated(updated);
+      setEditing(false);
+    } catch {
+      /* 失敗時は編集状態のまま */
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <li className="flex items-center gap-2 bg-muted/40 border border-border rounded-lg px-3 py-2">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium truncate" title={link.label}>
-            {link.label}
-          </span>
-          <Badge variant="secondary">{TARGET_LABELS[link.target_type]}</Badge>
+          {editing ? (
+            <Input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              autoFocus
+              className="h-7 text-[12px]"
+            />
+          ) : (
+            <span className="text-[12px] font-medium truncate" title={link.label}>
+              {link.label}
+            </span>
+          )}
           {!link.is_active && <Badge variant="outline">停止中</Badge>}
         </div>
         <code className="text-[11px] text-muted-foreground truncate block">{link.public_url}</code>
@@ -507,6 +619,24 @@ function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void 
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
         {nf(link.clicks_count ?? 0)} click
       </span>
+      {editing ? (
+        <Button size="icon" variant="ghost" className="size-8 shrink-0" onClick={save} disabled={saving} title="ラベルを保存">
+          {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5 text-emerald-600" />}
+        </Button>
+      ) : (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 shrink-0"
+          onClick={() => {
+            setDraft(link.label);
+            setEditing(true);
+          }}
+          title="ラベルを編集"
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+      )}
       <Button size="icon" variant="ghost" className="size-8 shrink-0" onClick={copy} title="URLをコピー">
         {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
       </Button>
@@ -528,35 +658,20 @@ function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void 
 
 function IssueForm({ onCreated }: { onCreated: (link: TrackingLink) => void }) {
   const [label, setLabel] = useState("");
-  const [targetType, setTargetType] = useState<TrackingLink["target_type"]>("standalone");
-  const [storeId, setStoreId] = useState("");
-  const [articleId, setArticleId] = useState("");
-  const [area, setArea] = useState("");
   const [destination, setDestination] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = useMemo(() => {
-    if (!label.trim()) return false;
-    if (targetType === "store" && !storeId.trim()) return false;
-    if (targetType === "column" && !articleId.trim()) return false;
-    if (targetType === "area" && !area.trim()) return false;
-    return true;
-  }, [label, targetType, storeId, articleId, area]);
+  const canSubmit = label.trim().length > 0;
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = {
+      const link = await api.post<TrackingLink>("/admin/tracking-links", {
         label: label.trim(),
-        target_type: targetType,
         destination_url: destination.trim() || undefined,
-      };
-      if (targetType === "store") body.store_id = Number(storeId);
-      if (targetType === "column") body.article_id = Number(articleId);
-      if (targetType === "area") body.area = area.trim();
-      const link = await api.post<TrackingLink>("/admin/tracking-links", body);
+      });
       onCreated(link);
     } catch (e) {
       setError(e instanceof Error ? e.message : "発行に失敗しました");
@@ -567,65 +682,19 @@ function IssueForm({ onCreated }: { onCreated: (link: TrackingLink) => void }) {
 
   return (
     <div className="bg-muted/40 border border-border rounded-lg p-3 mb-3 space-y-2.5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 gap-2.5">
         <div>
-          <label className="text-[11px] text-muted-foreground">ラベル（管理用の名前）</label>
+          <label className="text-[11px] text-muted-foreground">
+            ラベル（経路がわかる名前。例: インスタbio / 店舗X用 / アフィリA）
+          </label>
           <Input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="例: X投稿_体入キャンペーン"
+            placeholder="例: インスタbio"
             className="h-8 text-[12px] mt-0.5"
           />
         </div>
         <div>
-          <label className="text-[11px] text-muted-foreground">種別</label>
-          <select
-            value={targetType}
-            onChange={(e) => setTargetType(e.target.value as TrackingLink["target_type"])}
-            className="mt-0.5 h-8 w-full text-[12px] rounded-md border border-input bg-transparent px-2"
-          >
-            <option value="standalone">SNS/直リンク</option>
-            <option value="store">店舗別</option>
-            <option value="area">エリア別</option>
-            <option value="column">コラム別</option>
-          </select>
-        </div>
-        {targetType === "store" && (
-          <div>
-            <label className="text-[11px] text-muted-foreground">店舗ID</label>
-            <Input
-              value={storeId}
-              onChange={(e) => setStoreId(e.target.value)}
-              inputMode="numeric"
-              placeholder="例: 12"
-              className="h-8 text-[12px] mt-0.5"
-            />
-          </div>
-        )}
-        {targetType === "column" && (
-          <div>
-            <label className="text-[11px] text-muted-foreground">コラムID</label>
-            <Input
-              value={articleId}
-              onChange={(e) => setArticleId(e.target.value)}
-              inputMode="numeric"
-              placeholder="例: 3"
-              className="h-8 text-[12px] mt-0.5"
-            />
-          </div>
-        )}
-        {targetType === "area" && (
-          <div>
-            <label className="text-[11px] text-muted-foreground">エリア名</label>
-            <Input
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              placeholder="例: 六本木"
-              className="h-8 text-[12px] mt-0.5"
-            />
-          </div>
-        )}
-        <div className="sm:col-span-2">
           <label className="text-[11px] text-muted-foreground">
             リダイレクト先URL（空欄ならLINE公式アカウント友だち追加）
           </label>

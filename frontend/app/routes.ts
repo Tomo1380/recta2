@@ -39,6 +39,7 @@ export default [
   route("admin/login", "routes/admin/login.tsx"),
   layout("routes/admin/layout.tsx", [
     route("admin", "routes/admin/dashboard.tsx", { index: true }),
+    route("admin/analytics", "routes/admin/analytics.tsx"),
     route("admin/users", "routes/admin/users.tsx"),
     route("admin/users/:id", "routes/admin/user-detail.tsx"),
     route("admin/shops", "routes/admin/shops.tsx"),
@@ -56,7 +57,6 @@ export default [
     route("admin/fine-tuning-qa", "routes/admin/fine-tuning-qa.tsx"),
     route("admin/fine-tuning-qa/new", "routes/admin/fine-tuning-qa-new.tsx"),
     route("admin/fine-tuning-qa/:id/edit", "routes/admin/fine-tuning-qa-edit.tsx"),
-    route("admin/users/broadcast", "routes/admin/line-broadcast.tsx"),
     route("admin/people/:lineUserId", "routes/admin/person-detail.tsx"),
   ]),
 ] satisfies RouteConfig;

@@ -20,7 +20,6 @@ class PickupShopResource extends JsonResource
             'id' => $this->id,
             'store_id' => $this->store_id,
             'sort_order' => (int) $this->sort_order,
-            'is_pr' => (bool) $this->is_pr,
             'visible' => (bool) $this->visible,
             'store' => $this->whenLoaded('store', function () {
                 return [
@@ -32,6 +31,10 @@ class PickupShopResource extends JsonResource
                     'average_rating' => isset($this->store->average_rating)
                         ? (float) $this->store->average_rating
                         : null,
+                    // 直近30日の指標 (P1)。pickupShops 一覧でだけ付く。
+                    'pv' => isset($this->store->pv) ? (int) $this->store->pv : null,
+                    'line_clicks' => isset($this->store->line_clicks) ? (int) $this->store->line_clicks : null,
+                    'cv_rate' => isset($this->store->cv_rate) ? (float) $this->store->cv_rate : null,
                 ];
             }),
         ];

@@ -420,11 +420,12 @@ class AdminStoreTest extends TestCase
                 'area' => '六本木',
                 'category' => 'ラウンジ',
                 'pay_system_types' => ['完全時給制', '時給+バックor売上の高い方'],
-                'pay_system_note' => "売上の20%還元。\nポイントは1pt=100円。",
+                'salary_notes' => "売上の20%還元。\nポイントは1pt=100円。",
                 'back_text' => "同伴バック：21:30まで\n1回目→5,000円",
                 'payroll_cycle' => '月末締め翌月払い',
                 'payroll_pay_day' => '月末締め翌月15日払い',
-                'daily_pay_limit' => '30,000円まで',
+                'daily_pay_type' => 'capped',
+                'daily_pay_limit' => 30000,
                 'facility_photos' => [
                     ['image_url' => 'https://example.com/locker.jpg', 'caption' => '更衣室'],
                     ['image_url' => '/storage/stores/extra/toilet.jpg', 'caption' => 'パウダールーム'],
@@ -436,11 +437,12 @@ class AdminStoreTest extends TestCase
         $this->assertCount(2, $response->json('facility_photos'));
         $this->assertSame('更衣室', $response->json('facility_photos.0.caption'));
         $this->assertCount(2, $response->json('pay_system_types'));
-        $this->assertStringContainsString('ポイント', $response->json('pay_system_note'));
+        $this->assertStringContainsString('ポイント', $response->json('salary_notes'));
         $this->assertStringContainsString('同伴バック', $response->json('back_text'));
         $this->assertSame('月末締め翌月払い', $response->json('payroll_cycle'));
         $this->assertSame('月末締め翌月15日払い', $response->json('payroll_pay_day'));
-        $this->assertSame('30,000円まで', $response->json('daily_pay_limit'));
+        $this->assertSame('capped', $response->json('daily_pay_type'));
+        $this->assertSame(30000, $response->json('daily_pay_limit'));
     }
 
     /**

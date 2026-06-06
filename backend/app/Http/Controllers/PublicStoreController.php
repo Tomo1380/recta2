@@ -272,7 +272,6 @@ class PublicStoreController extends Controller
                     'trial_hourly_max' => $full['trial_hourly_max'] ?? null,
                     'feature_tags' => $store->feature_tags,
                     'images' => $store->images,
-                    'is_pr' => $pickup->is_pr,
                     'reviews_count' => (int) ($store->reviews_count ?? 0),
                     'average_rating' => round((float) ($store->reviews_avg_rating ?? 0), 1),
                 ];

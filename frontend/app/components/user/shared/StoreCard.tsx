@@ -12,7 +12,6 @@ interface StoreCardProps {
   images?: (string | { url: string })[];
   average_rating?: number;
   reviews_count?: number;
-  is_pr?: boolean;
   className?: string;
 }
 
@@ -40,7 +39,6 @@ export default function StoreCard({
   images,
   average_rating,
   reviews_count,
-  is_pr,
   className,
 }: StoreCardProps) {
   const imageUrl = images && images.length > 0 ? getImageUrl(images[0]) : undefined;
@@ -95,16 +93,6 @@ export default function StoreCard({
             style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
           >
             {category}
-          </span>
-        )}
-
-        {/* PR badge */}
-        {is_pr && (
-          <span
-            className="absolute right-2.5 top-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold text-white"
-            style={{ backgroundColor: "#D4AF37" }}
-          >
-            PR
           </span>
         )}
 

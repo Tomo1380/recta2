@@ -83,19 +83,20 @@ export interface ShopForm {
   dailyPay: string;
   /** 給料システム (複数選択: 完全時給制 / 時給+バック など) */
   paySystemTypes: string[];
-  /** 給料システムの詳細備考 (売上制/ポイント制の具体ロジック等) */
-  paySystemNote: string;
   /** バックをフリーテキストで記載 (同伴/本指名/場内など月本数で変わる複雑なものに対応) */
   backText: string;
   backItems: LabelValue[];
   /** 引かれ物 (旧「控除/手数料」) */
   feeItems: LabelValue[];
+  /** 給与備考 (給料システム詳細・支払い補足も統合した唯一の自由文) */
   salaryNote: string;
   /** 給与サイクル (旧 payrollSystemType を置き換え。月末締め翌月払い 等) */
   payrollCycle: string;
   /** 給料日 (サイクルにより条件表示。締め日・支払日) */
   payrollPayDay: string;
-  /** 日払い上限金額 (「日払い可」の代わり) */
+  /** 日払い: none(なし) / yes(あり) / full(全額) / capped(上限あり) */
+  dailyPayType: "none" | "yes" | "full" | "capped";
+  /** 日払い上限金額 (capped のときのみ。数値文字列) */
   dailyPayLimit: string;
   guaranteePeriod: string;
   guaranteeDetail: string;
@@ -111,7 +112,6 @@ export interface ShopForm {
       ラベル変換する。 */
   sameDayTrial: "same_day" | "normal" | "none";
   payrollSystemType: string;
-  payrollSystemDescription: string;
 
   // 特徴・分析
   tags: string[];
@@ -196,13 +196,13 @@ export const INITIAL_FORM: ShopForm = {
   category: "", openingTime: "", closingTime: "", holiday: "", phone: "", website: "",
   videos: [], staffPhotos: [], facilityPhotos: [],
   dailyPay: "",
-  paySystemTypes: [], paySystemNote: "",
+  paySystemTypes: [],
   backText: "", backItems: [], feeItems: [], salaryNote: "",
-  payrollCycle: "", payrollPayDay: "", dailyPayLimit: "",
+  payrollCycle: "", payrollPayDay: "", dailyPayType: "none", dailyPayLimit: "",
   guaranteePeriod: "", guaranteeDetail: "", normaInfo: "",
   trialMinWage: "", trialMaxWage: "",
   interviewStart: "", interviewEnd: "", sameDayTrial: "normal",
-  payrollSystemType: "", payrollSystemDescription: "",
+  payrollSystemType: "",
   tags: [], description: "", featureText: "", summaryText: "",
   expLevel: 50, atmosphere: 50,
   castBijin: "", castKawaii: "", castGlamour: "", castNatural: "",
@@ -452,7 +452,6 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     facilityPhotos,
     dailyPay: store.daily_estimate ?? "",
     paySystemTypes: Array.isArray(store.pay_system_types) ? store.pay_system_types : [],
-    paySystemNote: store.pay_system_note ?? "",
     // バックはフリーテキストに移行。新フィールド (back_text) が無い既存店舗は
     // 旧 back_items を「名前: 金額」改行テキストへ自動変換して初期表示する
     // (初回保存でフリーテキストに引き継がれ、データを失わない)。
@@ -477,7 +476,8 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     salaryNote: store.salary_notes ?? "",
     payrollCycle: store.payroll_cycle ?? store.payroll_system_type ?? "",
     payrollPayDay: store.payroll_pay_day ?? "",
-    dailyPayLimit: store.daily_pay_limit ?? "",
+    dailyPayType: (store.daily_pay_type as ShopForm["dailyPayType"]) ?? "none",
+    dailyPayLimit: store.daily_pay_limit != null ? String(store.daily_pay_limit) : "",
     guaranteePeriod: store.guarantee_period ?? "",
     guaranteeDetail: store.guarantee_details ?? "",
     normaInfo: store.norma_info ?? "",
@@ -549,7 +549,6 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     relatedStoreIds,
     showRelocateBadge: Boolean((store as AnyStore).show_relocate_badge ?? false),
     payrollSystemType: store.payroll_system_type ?? "",
-    payrollSystemDescription: store.payroll_system_description ?? "",
     champagneDescription: store.champagne_description ?? "",
     champagnePrices,
     dressCodeDescription,
@@ -636,7 +635,6 @@ export function formToPayload(
     daily_estimate: trialDailyEstimate(form.trialMinWage, form.trialMaxWage),
     back_text: form.backText.trim() || null,
     pay_system_types: form.paySystemTypes,
-    pay_system_note: form.paySystemNote.trim() || null,
     back_items: form.backItems
       .filter((i) => i.label)
       .map((i) => ({ label: i.label, amount: i.value })),
@@ -735,10 +733,14 @@ export function formToPayload(
     related_store_ids:
       form.relatedStoreIds.length > 0 ? form.relatedStoreIds : null,
     payroll_system_type: form.payrollSystemType || null,
-    payroll_system_description: form.payrollSystemDescription,
     payroll_cycle: form.payrollCycle || null,
     payroll_pay_day: form.payrollPayDay.trim() || null,
-    daily_pay_limit: form.dailyPayLimit.trim() || null,
+    // 日払い: type が capped のときだけ上限金額(数値)を送る。他は null。
+    daily_pay_type: form.dailyPayType,
+    daily_pay_limit:
+      form.dailyPayType === "capped"
+        ? Number(form.dailyPayLimit.replace(/[^\d]/g, "")) || null
+        : null,
     champagne_description: form.champagneDescription,
     champagne_prices: (() => {
       const out: Record<string, { amount: number; note?: string }> = {};

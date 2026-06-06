@@ -71,6 +71,11 @@ return [
     'line' => [
         // LINE公式アカウントBot基本ID (@xxx形式) — Official Managerへのジャンプ用
         'official_account_id' => env('LINE_OFFICIAL_ACCOUNT_ID'),
+        // LINE Official Account Manager のチャット画面ID。
+        // 個人チャットURLは https://chat.line.biz/{oa_chat_id}/chat/{line_user_id}。
+        // 運営は返信を公式チャットで行うので、管理画面から該当者の公式チャットへ飛ばす。
+        // 公式アカウントは本番/DEVで別なので env 管理 (未設定ならボタン非表示)。
+        'oa_chat_id' => env('LINE_OA_CHAT_ID'),
     ],
 
 ];

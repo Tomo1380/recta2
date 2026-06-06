@@ -78,10 +78,15 @@ class AdminDashboardTest extends TestCase
                 'recent_messages',
                 'recent_chats',
                 'secondary' => [
-                    'unread_messages',
-                    'pending_reviews',
+                    'new_inbound_threads_7d',
+                    'new_reviews_7d',
+                    'new_users_7d',
                     'published_articles',
                     'fine_tuning_qa_active',
+                ],
+                'analytics_highlight' => [
+                    'stores',
+                    'columns',
                 ],
             ]);
 

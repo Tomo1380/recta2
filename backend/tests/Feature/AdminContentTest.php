@@ -44,7 +44,6 @@ class AdminContentTest extends TestCase
         PickupShop::create([
             'store_id' => $this->store->id,
             'sort_order' => 0,
-            'is_pr' => true,
             'visible' => true,
         ]);
 
@@ -61,14 +60,13 @@ class AdminContentTest extends TestCase
             ->postJson('/api/admin/pickup-shops', [
                 'store_id' => $this->store->id,
                 'sort_order' => 1,
-                'is_pr' => true,
                 'visible' => true,
             ]);
 
         $response->assertStatus(201)
             ->assertJson([
                 'store_id' => $this->store->id,
-                'is_pr' => true,
+                'visible' => true,
             ]);
     }
 
@@ -76,19 +74,16 @@ class AdminContentTest extends TestCase
     {
         $pickup = PickupShop::create([
             'store_id' => $this->store->id,
-            'is_pr' => false,
             'visible' => true,
         ]);
 
         $response = $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/admin/pickup-shops/{$pickup->id}", [
-                'is_pr' => true,
                 'visible' => false,
             ]);
 
         $response->assertStatus(200)
             ->assertJson([
-                'is_pr' => true,
                 'visible' => false,
             ]);
     }

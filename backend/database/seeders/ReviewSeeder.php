@@ -52,6 +52,11 @@ class ReviewSeeder extends Seeder
         //  ため、現在 published な店の先頭から拾う)
         $anchorIds = $stores->take(5)->pluck('id')->all();
 
+        // (user_id, store_id) は status≠deleted で unique 制約があるため、
+        // 同一店舗には同一ユーザーの口コミを 1 件しか作れない。使用済みペアを記録し、
+        // 各店舗では重複しないユーザーを選んで衝突を防ぐ。
+        $used = [];
+
         foreach ($stores as $store) {
             $isAnchor = in_array($store->id, $anchorIds, true);
 
@@ -60,13 +65,16 @@ class ReviewSeeder extends Seeder
             }
 
             $reviewCount = $isAnchor ? rand(3, 5) : rand(1, 4);
-            for ($i = 0; $i < $reviewCount; $i++) {
+            // この店舗用に重複しないユーザーを reviewCount 人 (ユーザー総数が上限) 選ぶ。
+            $pickUsers = collect($userIds)->shuffle()->take(min($reviewCount, count($userIds)))->all();
+
+            foreach ($pickUsers as $uid) {
                 $rating = $this->weightedRating();
                 $bodies = self::REVIEW_BODIES[$rating] ?? self::REVIEW_BODIES[4];
                 $body = $bodies[array_rand($bodies)];
 
                 Review::create([
-                    'user_id' => $userIds[array_rand($userIds)],
+                    'user_id' => $uid,
                     'store_id' => $store->id,
                     'rating' => $rating,
                     'body' => $body,
@@ -75,18 +83,24 @@ class ReviewSeeder extends Seeder
                     // 全レビューが seed 実行時刻 (例: 03:37) でクラスタリングしていた。
                     'created_at' => $this->randomPastTimestamp(1, 90),
                 ]);
+                $used["{$uid}-{$store->id}"] = true;
             }
         }
 
-        // A few unpublished/deleted reviews
-        Review::create([
-            'user_id' => $userIds[array_rand($userIds)],
-            'store_id' => $stores->random()->id,
-            'rating' => 2,
-            'body' => 'スタッフの対応がイマイチだった。',
-            'status' => 'unpublished',
-            'created_at' => $this->randomPastTimestamp(1, 30),
-        ]);
+        // 非公開の口コミ 1 件。既存の公開口コミと衝突しない未使用ペアを選ぶ。
+        $pair = $this->findUnusedPair($userIds, $stores, $used);
+        if ($pair !== null) {
+            Review::create([
+                'user_id' => $pair[0],
+                'store_id' => $pair[1],
+                'rating' => 2,
+                'body' => 'スタッフの対応がイマイチだった。',
+                'status' => 'unpublished',
+                'created_at' => $this->randomPastTimestamp(1, 30),
+            ]);
+        }
+
+        // 削除済みの口コミ 1 件。status='deleted' は unique 制約の対象外なので衝突しない。
         Review::create([
             'user_id' => $userIds[array_rand($userIds)],
             'store_id' => $stores->random()->id,
@@ -95,6 +109,27 @@ class ReviewSeeder extends Seeder
             'status' => 'deleted',
             'created_at' => $this->randomPastTimestamp(1, 30),
         ]);
+    }
+
+    /**
+     * まだ口コミの無い (user_id, store_id) ペアを 1 つ探す。無ければ null。
+     *
+     * @param  array<int>  $userIds
+     * @param  \Illuminate\Support\Collection<int,\App\Models\Store>  $stores
+     * @param  array<string,bool>  $used
+     * @return array{0:int,1:int}|null
+     */
+    private function findUnusedPair(array $userIds, $stores, array $used): ?array
+    {
+        foreach ($stores as $store) {
+            foreach ($userIds as $uid) {
+                if (!isset($used["{$uid}-{$store->id}"])) {
+                    return [$uid, $store->id];
+                }
+            }
+        }
+
+        return null;
     }
 
     private function weightedRating(): int

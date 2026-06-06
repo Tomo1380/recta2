@@ -129,6 +129,48 @@ class RankingService
     }
 
     /**
+     * 指定店舗群の PV / LINE導線クリック / CV率 を [store_id => metrics] で返す。
+     * ピックアップ管理など、特定の店舗だけの指標を出したい時に使う。
+     * CV率は他ランキングと同じく「クリック ÷ PV」(LINE誘導への食いつき率)。
+     *
+     * @param  array<int>  $storeIds
+     * @return array<int,array{pv:int,line_clicks:int,cv_rate:float}>
+     */
+    public function storeMetrics(array $storeIds, Carbon $from, Carbon $to): array
+    {
+        if (empty($storeIds)) {
+            return [];
+        }
+
+        $pv = PageView::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->whereIn('store_id', $storeIds)
+            ->groupBy('store_id')
+            ->select('store_id', DB::raw('COUNT(*) as aggregate'))
+            ->pluck('aggregate', 'store_id');
+
+        $clicks = LinkClick::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->whereIn('store_id', $storeIds)
+            ->groupBy('store_id')
+            ->select('store_id', DB::raw('COUNT(*) as aggregate'))
+            ->pluck('aggregate', 'store_id');
+
+        $out = [];
+        foreach ($storeIds as $id) {
+            $views = (int) ($pv[$id] ?? 0);
+            $lineClicks = (int) ($clicks[$id] ?? 0);
+            $out[$id] = [
+                'pv' => $views,
+                'line_clicks' => $lineClicks,
+                'cv_rate' => $views > 0 ? round($lineClicks / $views * 100, 1) : 0.0,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * 指定カラムで件数を数えて [key => count] のマップを返す（null / 空は除外）。
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query

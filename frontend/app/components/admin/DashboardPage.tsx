@@ -1,36 +1,25 @@
 import {
   Activity,
   ArrowDownRight,
+  ArrowRight,
   ArrowUpRight,
+  BarChart3,
   Bot,
   Building2,
+  ChevronRight,
   Clock,
   MessageCircle,
   MessageSquare,
   Minus,
   Star,
-  TrendingUp,
   Users,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
-import type { DashboardData, DashboardKpiWithDelta } from "~/lib/types";
-import { AnalyticsSection } from "~/components/admin/AnalyticsSection";
+import type { AnalyticsRankRow, DashboardData, DashboardKpiWithDelta } from "~/lib/types";
 
 // ----------------------------------------------------------------
 // Helpers
@@ -51,12 +40,6 @@ function formatRelativeTime(iso: string | null): string {
   const diffDay = Math.round(diffHr / 24);
   if (diffDay < 30) return `${diffDay}日前`;
   return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
-}
-
-function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function getDelta(kpi: DashboardKpiWithDelta): number | null {
@@ -192,6 +175,78 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+/** 「要対応」カード: 件数があれば色で強調し、クリックでその画面へジャンプ。 */
+function ActionCard({
+  label,
+  count,
+  icon: Icon,
+  accent,
+  cta,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  icon: typeof MessageCircle;
+  accent: string;
+  cta: string;
+  onClick: () => void;
+}) {
+  const has = count > 0;
+  return (
+    <button
+      onClick={onClick}
+      className="group text-left rounded-xl p-4 border bg-card hover:bg-muted/30 transition-colors flex items-center gap-3"
+      style={has ? { borderColor: `${accent}55` } : undefined}
+    >
+      <div className="size-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}14` }}>
+        <Icon className="size-[18px]" style={{ color: accent }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] text-muted-foreground truncate">{label}</p>
+        <p className="text-2xl font-bold tabular-nums leading-tight" style={has ? { color: accent } : undefined}>
+          {count}
+        </p>
+      </div>
+      <span className="text-[11px] text-muted-foreground flex items-center gap-0.5 shrink-0 group-hover:text-foreground transition-colors">
+        {cta}
+        <ChevronRight className="size-3.5" />
+      </span>
+    </button>
+  );
+}
+
+/** アクセス解析ハイライトの片側リスト（店舗 or コラム TOP3）。 */
+function HighlightList({ title, rows }: { title: string; rows: AnalyticsRankRow[] }) {
+  return (
+    <div className="p-4 sm:p-5">
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2.5">{title}</p>
+      {rows.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground py-2">データがまだありません</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r, i) => (
+            <li key={r.id ?? r.name} className="flex items-center gap-2 text-[12.5px]">
+              <span className="size-5 rounded bg-muted text-muted-foreground text-[10px] flex items-center justify-center tabular-nums shrink-0">
+                {i + 1}
+              </span>
+              <span className="flex-1 truncate" title={r.name}>{r.name}</span>
+              <span className="text-muted-foreground tabular-nums shrink-0 text-[11px] w-14 text-right">
+                {numberFmt.format(r.pv)} PV
+              </span>
+              <span
+                className="tabular-nums shrink-0 text-[11px] w-16 text-right"
+                style={r.line_clicks > 0 ? { color: "#06c755" } : undefined}
+              >
+                {numberFmt.format(r.line_clicks)} 導線
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
@@ -218,8 +273,6 @@ function LoadingSkeleton() {
 // ----------------------------------------------------------------
 
 export function DashboardPage() {
-  const rawId = useId();
-  const chartId = rawId.replace(/:/g, "");
   const navigate = useNavigate();
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -254,23 +307,6 @@ export function DashboardPage() {
       cancelled = true;
     };
   }, []);
-
-  const chatTrendData = useMemo(() => {
-    if (!data) return [];
-    return data.chat_trend.map((p) => ({
-      date: formatShortDate(p.date),
-      Agent: p.agent,
-      "Fine-tuned": p.finetuned,
-    }));
-  }, [data]);
-
-  const lineFriendTrendData = useMemo(() => {
-    if (!data) return [];
-    return data.line_friend_trend.map((p) => ({
-      date: formatShortDate(p.date),
-      count: p.count,
-    }));
-  }, [data]);
 
   if (loading || !data) {
     return (
@@ -360,184 +396,65 @@ export function DashboardPage() {
         />
       </div>
 
-      {/* Time-series charts */}
-      <div className="order-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* AI Chat trend by mode */}
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm">AIチャット利用数（モード別）</h3>
-            </div>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              30日
-            </span>
-          </div>
-          <div className="min-h-[260px] h-[260px] sm:h-[280px]">
-            {chatTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chatTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                    minTickGap={20}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="Agent" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="Fine-tuned" stackId="a" fill="#a78bfa" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="チャット利用ログがまだありません" />
-            )}
-          </div>
-        </div>
-
-        {/* LINE friends trend */}
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm">LINE友だち追加（日別）</h3>
-            </div>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              30日
-            </span>
-          </div>
-          <div className="min-h-[260px] h-[260px] sm:h-[280px]">
-            {lineFriendTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={lineFriendTrendData}>
-                  <defs>
-                    <linearGradient
-                      id={`lineGrad-${chartId}`}
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#06c755" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#06c755" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                    minTickGap={20}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    name="新規追加"
-                    stroke="#06c755"
-                    strokeWidth={2}
-                    fill={`url(#lineGrad-${chartId})`}
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="LINE友だちのデータがまだありません" />
-            )}
-          </div>
+      {/* ── 要対応（運営が今やること）── */}
+      <div className="order-2 space-y-2">
+        <h3 className="text-[12px] font-semibold text-muted-foreground tracking-wide">要対応</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <ActionCard
+            label="新着の受信（7日）"
+            count={data.secondary.new_inbound_threads_7d}
+            icon={MessageCircle}
+            accent="#06c755"
+            cta="確認する"
+            onClick={() => navigate("/admin/users")}
+          />
+          <ActionCard
+            label="新着口コミ（7日・要チェック）"
+            count={data.secondary.new_reviews_7d}
+            icon={MessageSquare}
+            accent="#f59e0b"
+            cta="確認する"
+            onClick={() => navigate("/admin/reviews")}
+          />
+          <ActionCard
+            label="新規ユーザー（7日）"
+            count={data.secondary.new_users_7d}
+            icon={Users}
+            accent="#6366f1"
+            cta="一覧を見る"
+            onClick={() => navigate("/admin/users")}
+          />
         </div>
       </div>
 
-      {/* アクセス解析: 店舗/エリア/コラム ランキング + LINE経路 + 計測リンク発行 (FB A2-A4) */}
-      <div className="order-4">
-        <AnalyticsSection />
-      </div>
-
-      {/* Secondary indicators */}
-      <div className="order-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            未読LINE
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
+      {/* ── アクセス解析ハイライト ── */}
+      <div className="order-3 bg-card border border-border rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-border bg-gradient-to-r from-indigo-50/70 to-violet-50/70">
+          <div className="flex items-center gap-2.5">
+            <div className="size-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+              <BarChart3 className="size-4" />
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-foreground leading-tight">アクセス解析</p>
+              <p className="text-[11px] text-muted-foreground">直近30日でアクセスが多い店舗・コラム</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/admin/analytics")}
+            className="group text-[12px] font-medium text-indigo-600 flex items-center gap-1 shrink-0"
           >
-            {numberFmt.format(data.secondary.unread_messages)}
-          </p>
+            解析を見る
+            <ArrowRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            非公開口コミ
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-          >
-            {numberFmt.format(data.secondary.pending_reviews)}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            公開コラム
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-          >
-            {numberFmt.format(data.secondary.published_articles)}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            Fine-tuning Q&amp;A
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-          >
-            {numberFmt.format(data.secondary.fine_tuning_qa_active)}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+          <HighlightList title="店舗 TOP3" rows={data.analytics_highlight.stores} />
+          <HighlightList title="コラム TOP3" rows={data.analytics_highlight.columns} />
         </div>
       </div>
 
       {/* Recent activity grids (FB: グラフより上に出す) */}
-      <div className="order-2 grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="order-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Recent reviews */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <SectionHeader
@@ -602,8 +519,8 @@ export function DashboardPage() {
             title="LINE受信メッセージ"
             icon={MessageCircle}
             badge={
-              data.secondary.unread_messages > 0
-                ? `未読 ${data.secondary.unread_messages}`
+              data.secondary.new_inbound_threads_7d > 0
+                ? `新着 ${data.secondary.new_inbound_threads_7d}`
                 : undefined
             }
             href="/admin/users"

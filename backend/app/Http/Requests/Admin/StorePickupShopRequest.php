@@ -19,7 +19,6 @@ class StorePickupShopRequest extends FormRequest
         return [
             'store_id' => 'required|integer|exists:stores,id',
             'sort_order' => 'integer',
-            'is_pr' => 'boolean',
             'visible' => 'boolean',
         ];
     }

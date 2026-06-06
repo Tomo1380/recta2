@@ -389,10 +389,16 @@ class StoreSeeder extends Seeder
 
         // ---------- Wage JSONB ----------
         $unitWageType = ['時給', '時給', '時給', '日給'][array_rand(['時給', '時給', '時給', '日給'])];
-        $payrollType = ['全額日払い', '日払い可', '月2回', '月末締め翌月払い'][array_rand(['全額日払い', '日払い可', '月2回', '月末締め翌月払い'])];
-        $payrollDescription = $this->chance(0.5)
-            ? ['体入時も全額日払い。', '日払い・週払い選択可。', '月末締め翌月15日払い。前払い相談可。'][array_rand([0, 1, 2])]
-            : null;
+        $cycle = ['月末締め翌月払い', '月2回', '月1回'][array_rand([0, 1, 2])];
+        // 日払い (構造化): none / yes / full / capped。capped のときだけ上限金額(円)。
+        $dailyPayType = ['none', 'yes', 'full', 'capped'][array_rand([0, 1, 2, 3])];
+        $payroll = [
+            'cycle' => $cycle,
+            'daily_pay_type' => $dailyPayType,
+        ];
+        if ($dailyPayType === 'capped') {
+            $payroll['daily_limit'] = [10000, 20000, 30000][array_rand([0, 1, 2])];
+        }
 
         $wage = [
             'regular' => [
@@ -400,10 +406,7 @@ class StoreSeeder extends Seeder
                 'max' => (int) $hourlyMax,
                 'unit' => $unitWageType === '日給' ? 'day' : 'hour',
             ],
-            'payroll' => [
-                'type' => $payrollType,
-                'description' => $payrollDescription,
-            ],
+            'payroll' => $payroll,
             // daily_estimate は number に統一。表示側で range として描画する。
             'daily_estimate_min' => (int) ($hourlyMin * 5),
             'daily_estimate_max' => (int) ($hourlyMax * 6),
@@ -724,8 +727,8 @@ class StoreSeeder extends Seeder
                     'regular' => ['min' => 4000, 'max' => 8000, 'unit' => 'hour'],
                     'trial' => ['hourly' => '4,500円', 'avg_hourly' => '5,000円', 'days' => 3],
                     'payroll' => [
-                        'type' => '全額日払い',
-                        'description' => '体験入店時も全額日払いOK。月末締め翌月払いも選択可。',
+                        'cycle' => '月末締め翌月払い',
+                        'daily_pay_type' => 'full',
                     ],
                     'daily_estimate' => '30,000円〜60,000円',
                 ],
@@ -858,7 +861,7 @@ class StoreSeeder extends Seeder
                 'wage' => [
                     'regular' => ['min' => 5000, 'max' => 12000, 'unit' => 'hour'],
                     'trial' => ['hourly' => '5,500円', 'avg_hourly' => '6,000円', 'days' => 1],
-                    'payroll' => ['type' => '月末締め翌月払い', 'description' => null],
+                    'payroll' => ['cycle' => '月末締め翌月払い', 'daily_pay_type' => 'capped', 'daily_limit' => 20000],
                     'daily_estimate' => '40,000円〜80,000円',
                 ],
                 'compensation' => [
@@ -963,7 +966,7 @@ class StoreSeeder extends Seeder
                 'wage' => [
                     'regular' => ['min' => 2500, 'max' => 4000, 'unit' => 'hour'],
                     'trial' => ['hourly' => '2,800円', 'avg_hourly' => '3,000円', 'days' => 1],
-                    'payroll' => ['type' => '全額日払い', 'description' => null],
+                    'payroll' => ['cycle' => '月末締め翌月払い', 'daily_pay_type' => 'full'],
                     'daily_estimate' => '15,000円〜25,000円',
                 ],
                 'compensation' => [
@@ -1035,7 +1038,7 @@ class StoreSeeder extends Seeder
                 'wage' => [
                     'regular' => ['min' => 5000, 'max' => 10000, 'unit' => 'hour'],
                     'trial' => ['hourly' => '6,000円', 'avg_hourly' => '6,500円', 'days' => 3],
-                    'payroll' => ['type' => '全額日払い', 'description' => '体入も日払い対応。'],
+                    'payroll' => ['cycle' => '月末締め翌月払い', 'daily_pay_type' => 'full'],
                     'daily_estimate' => '40,000円〜70,000円',
                 ],
                 'compensation' => [
@@ -1149,7 +1152,7 @@ class StoreSeeder extends Seeder
                 'wage' => [
                     'regular' => ['min' => 4000, 'max' => 7000, 'unit' => 'hour'],
                     'trial' => ['hourly' => '4,500円', 'avg_hourly' => '4,800円', 'days' => 1],
-                    'payroll' => ['type' => '月末締め翌月15日払い', 'description' => null],
+                    'payroll' => ['cycle' => '月末締め翌月払い', 'pay_day' => '月末締め翌月15日払い', 'daily_pay_type' => 'yes'],
                     'daily_estimate' => '25,000円〜45,000円',
                 ],
                 'compensation' => [

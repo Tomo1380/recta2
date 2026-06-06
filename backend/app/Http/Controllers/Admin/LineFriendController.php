@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\SendLineBroadcastRequest;
 use App\Http\Requests\Admin\SendLinePushRequest;
 use App\Http\Resources\LineFriendResource;
 use App\Http\Resources\LineMessageResource;
@@ -192,6 +191,11 @@ class LineFriendController extends Controller
                 'is_following' => (bool) ($friend?->is_following ?? false),
                 'is_talk' => (bool) $friend,
                 'has_account' => (bool) $user,
+                // 運営は返信を LINE 公式チャットで行うので、その人の公式チャットへの
+                // ディープリンクを渡す (OAチャットID未設定なら null でボタン非表示)。
+                'line_chat_url' => config('services.line.oa_chat_id')
+                    ? 'https://chat.line.biz/' . config('services.line.oa_chat_id') . '/chat/' . $lineUserId
+                    : null,
                 'admin_notes' => $friend?->admin_notes ?? $user?->admin_notes,
                 'user' => $user ? [
                     'id' => $user->id,
@@ -251,35 +255,5 @@ class LineFriendController extends Controller
             return;
         }
         LineFriend::create(array_merge(['line_user_id' => $lineUserId, 'is_following' => false], $friendFields));
-    }
-
-    /**
-     * Broadcast message to all friends.
-     *
-     * @response array{message: string}
-     */
-    public function broadcast(SendLineBroadcastRequest $request): JsonResponse
-    {
-        $messageText = $request->validated()['message'];
-
-        $messages = [['type' => 'text', 'text' => $messageText]];
-        $result = $this->lineService->broadcastMessage($messages);
-
-        if (!$result['success']) {
-            return response()->json([
-                'message' => 'ブロードキャストの送信に失敗しました',
-                'details' => $result['body'],
-            ], 422);
-        }
-
-        LineMessage::create([
-            'line_user_id' => 'broadcast',
-            'user_id' => null,
-            'direction' => 'outbound',
-            'message_type' => 'text',
-            'content' => $messageText,
-        ]);
-
-        return response()->json(['message' => '配信しました']);
     }
 }

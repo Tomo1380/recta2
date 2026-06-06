@@ -78,6 +78,8 @@ export interface AdminPerson {
   is_following: boolean;
   is_talk: boolean;
   has_account: boolean;
+  /** LINE公式チャット(その人)へのディープリンク。OAチャットID未設定なら null。 */
+  line_chat_url: string | null;
   admin_notes: string | null;
   user: {
     id: number;
@@ -139,7 +141,9 @@ export interface Store {
   norma_info: string | null;
   unit_wage_type: string | null;
   payroll_system_type: string | null;
-  payroll_system_description: string | null;
+  /** 日払い: none/yes/full/capped。上限金額(円)は capped 時のみ。 */
+  daily_pay_type: string | null;
+  daily_pay_limit: number | null;
   /** 体入時給（最低額） */
   trial_hourly_min: string | null;
   /** 体入時給（最高額） */
@@ -283,10 +287,15 @@ export interface DashboardData {
   recent_messages: DashboardRecentMessage[];
   recent_chats: DashboardRecentChat[];
   secondary: {
-    unread_messages: number;
-    pending_reviews: number;
+    new_inbound_threads_7d: number;
+    new_reviews_7d: number;
+    new_users_7d: number;
     published_articles: number;
     fine_tuning_qa_active: number;
+  };
+  analytics_highlight: {
+    stores: AnalyticsRankRow[];
+    columns: AnalyticsRankRow[];
   };
 }
 

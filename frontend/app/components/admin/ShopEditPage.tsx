@@ -844,7 +844,6 @@ export function ShopEditPage() {
   // 通常時給 (minWage/maxWage) は廃止。給与は体入時給 (trialMinWage/Max) に一本化。
   const [dailyPay, setDailyPay] = useState("");
   const [paySystemTypes, setPaySystemTypes] = useState<string[]>([]);
-  const [paySystemNote, setPaySystemNote] = useState("");
   const [backText, setBackText] = useState("");
   const [backItems, setBackItems] = useState<
     { label: string; value: string }[]
@@ -855,6 +854,7 @@ export function ShopEditPage() {
   const [salaryNote, setSalaryNote] = useState("");
   const [payrollCycle, setPayrollCycle] = useState("");
   const [payrollPayDay, setPayrollPayDay] = useState("");
+  const [dailyPayType, setDailyPayType] = useState<"none" | "yes" | "full" | "capped">("none");
   const [dailyPayLimit, setDailyPayLimit] = useState("");
   const [guaranteePeriod, setGuaranteePeriod] = useState("");
   const [guaranteeDetail, setGuaranteeDetail] = useState("");
@@ -922,7 +922,6 @@ export function ShopEditPage() {
     Array<{ id: number; name: string; area: string | null }>
   >([]);
   const [payrollSystemType, setPayrollSystemType] = useState("");
-  const [payrollSystemDescription, setPayrollSystemDescription] = useState("");
   const [champagneDescription, setChampagneDescription] = useState("");
 
   // FB-driven detail-page features (Part B)
@@ -1084,13 +1083,13 @@ export function ShopEditPage() {
     if (f.facilityPhotos !== undefined) setFacilityPhotos(f.facilityPhotos);
     if (f.dailyPay !== undefined) setDailyPay(f.dailyPay);
     if (f.paySystemTypes !== undefined) setPaySystemTypes(f.paySystemTypes);
-    if (f.paySystemNote !== undefined) setPaySystemNote(f.paySystemNote);
     if (f.backText !== undefined) setBackText(f.backText);
     if (f.backItems !== undefined) setBackItems(f.backItems);
     if (f.feeItems !== undefined) setFeeItems(f.feeItems);
     if (f.salaryNote !== undefined) setSalaryNote(f.salaryNote);
     if (f.payrollCycle !== undefined) setPayrollCycle(f.payrollCycle);
     if (f.payrollPayDay !== undefined) setPayrollPayDay(f.payrollPayDay);
+    if (f.dailyPayType !== undefined) setDailyPayType(f.dailyPayType);
     if (f.dailyPayLimit !== undefined) setDailyPayLimit(f.dailyPayLimit);
     if (f.guaranteePeriod !== undefined) setGuaranteePeriod(f.guaranteePeriod);
     if (f.guaranteeDetail !== undefined) setGuaranteeDetail(f.guaranteeDetail);
@@ -1101,7 +1100,6 @@ export function ShopEditPage() {
     if (f.interviewEnd !== undefined) setInterviewEnd(f.interviewEnd);
     if (f.sameDayTrial !== undefined) setSameDayTrial(f.sameDayTrial);
     if (f.payrollSystemType !== undefined) setPayrollSystemType(f.payrollSystemType);
-    if (f.payrollSystemDescription !== undefined) setPayrollSystemDescription(f.payrollSystemDescription);
     if (f.tags !== undefined) setTags(f.tags);
     if (f.description !== undefined) setDescription(f.description);
     if (f.featureText !== undefined) setFeatureText(f.featureText);
@@ -1231,12 +1229,12 @@ export function ShopEditPage() {
       openingTime, closingTime, holiday, phone, website,
       videos, staffPhotos, facilityPhotos,
       dailyPay,
-      paySystemTypes, paySystemNote, backText,
-      payrollCycle, payrollPayDay, dailyPayLimit,
+      paySystemTypes, backText,
+      payrollCycle, payrollPayDay, dailyPayType, dailyPayLimit,
       backItems, feeItems, salaryNote,
       guaranteePeriod, guaranteeDetail, normaInfo,
       trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
-      payrollSystemType, payrollSystemDescription,
+      payrollSystemType,
       tags, description, featureText, summaryText, expLevel, atmosphere,
       castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
@@ -1256,12 +1254,12 @@ export function ShopEditPage() {
     openingTime, closingTime, holiday, phone, website,
     videos, staffPhotos,
     dailyPay,
-    paySystemTypes, paySystemNote, backText,
-    payrollCycle, payrollPayDay, dailyPayLimit,
+    paySystemTypes, backText,
+    payrollCycle, payrollPayDay, dailyPayType, dailyPayLimit,
     backItems, feeItems, salaryNote,
     guaranteePeriod, guaranteeDetail, normaInfo,
     trialMinWage, trialMaxWage, interviewStart, interviewEnd, sameDayTrial,
-    payrollSystemType, payrollSystemDescription,
+    payrollSystemType,
     tags, description, featureText, summaryText, expLevel, atmosphere,
     castBijin, castKawaii, castGlamour, castNatural, clientAge, drinkStyle,
     dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
@@ -1878,14 +1876,6 @@ export function ShopEditPage() {
               })}
             </div>
           </Field>
-          <Field label="給料システムの詳細備考" hint="売上スライド/ポイント制などの具体的な計算ルール">
-            <TextArea
-              value={paySystemNote}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaySystemNote(e.target.value)}
-              placeholder="例: 売上の◯%還元。ポイントは1pt=◯円で時給に加算。改行で見やすく書けます。"
-              rows={3}
-            />
-          </Field>
           {/* バックは月本数で変わる複雑な体系もそのまま書けるようフリーテキスト。 */}
           <Field label="バック" hint="同伴/本指名/場内など、自由に記載できます">
             <TextArea
@@ -1906,11 +1896,15 @@ export function ShopEditPage() {
               valuePlaceholder="金額"
             />
           </Field>
-          <Field label="給与備考">
+          <Field
+            label="給与備考"
+            hint="給与に関する自由記述。売上制/ポイント制の計算ルール・支払いの補足もここに（改行OK）"
+          >
             <TextArea
               value={salaryNote}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSalaryNote(e.target.value)}
-              placeholder="その他、給与に関する補足情報があれば入力してください"
+              placeholder={"例:\n売上の◯%還元。ポイントは1pt=◯円で時給に加算。\n給料日は末締め翌月15日払い。"}
+              rows={4}
             />
           </Field>
           {/* 給与サイクル → 月締め系を選んだら締め日・支払日を条件表示。
@@ -1932,21 +1926,30 @@ export function ShopEditPage() {
               />
             </Field>
           )}
-          <Field label="日払い上限金額" hint="日払いの有無・上限。なければ空欄でOK">
-            <TextInput
-              value={dailyPayLimit}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPayLimit(e.target.value)}
-              placeholder="例: 30,000円まで / 上限なし / 要相談"
-            />
+          {/* 日払い: 給料日前にもらえる前借り。給与サイクルとは別軸の構造化項目。
+              なし / あり / 全額 / 上限あり(数値)。上限ありのときだけ金額欄を出す。 */}
+          <Field label="日払い" hint="給料日前にもらえる前借り。給与サイクルとは別">
+            <select
+              value={dailyPayType}
+              onChange={(e) => setDailyPayType(e.target.value as typeof dailyPayType)}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground/30 appearance-none transition-all"
+            >
+              <option value="none">なし</option>
+              <option value="yes">あり</option>
+              <option value="full">全額</option>
+              <option value="capped">上限あり</option>
+            </select>
           </Field>
-          <Field label="給与支払い補足">
-            <TextArea
-              value={payrollSystemDescription}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPayrollSystemDescription(e.target.value)}
-              placeholder="給与支払いに関する補足（改行で2行目以降も書けます）"
-              rows={2}
-            />
-          </Field>
+          {dailyPayType === "capped" && (
+            <Field label="日払い上限金額（円）" hint="1日に受け取れる上限。数値のみ">
+              <TextInput
+                value={dailyPayLimit}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDailyPayLimit(e.target.value)}
+                inputMode="numeric"
+                placeholder="例: 30000"
+              />
+            </Field>
+          )}
           {/* 保証・ノルマはユーザー画面では報酬・待遇カード内に同居するため、
               管理画面も同じセクション内にまとめる。保証詳細は廃止し、永久保証等も
               保証期間にまとめて書く。 */}
@@ -3186,12 +3189,11 @@ export function ShopEditPage() {
                     : null,
                   back_text: backText || null,
                   pay_system_types: paySystemTypes,
-                  pay_system_note: paySystemNote || null,
                   payroll_cycle: payrollCycle || null,
                   payroll_pay_day: payrollPayDay || null,
-                  daily_pay_limit: dailyPayLimit || null,
+                  daily_pay_type: dailyPayType,
+                  daily_pay_limit: dailyPayType === "capped" ? Number(dailyPayLimit.replace(/[^\d]/g, "")) || null : null,
                   payroll_system_type: payrollSystemType || null,
-                  payroll_system_description: payrollSystemDescription || null,
                   champagne_description: champagneDescription || null,
                   champagne_prices: (() => {
                     const out: Record<string, { amount: number; note?: string }> = {};

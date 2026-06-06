@@ -7,6 +7,8 @@
 import type {
   AiChatLimit,
   AiChatSetting,
+  AiChatSettingLogs200,
+  AiChatSettingLogsParams,
   AiChatSettingStats200,
   AiChatSettingStatsParams,
   UpdateAiChatLimitsRequest,
@@ -46,6 +48,18 @@ import { rectaMutator } from '../mutators/auth';
     },
       );
     }
+  /**
+ * @summary AIチャット履歴 (個別の質問/回答ログ)。mode / page_type / 本文検索で絞り込み。
+ */
+export const aiChatSettingLogs = (
+    params?: AiChatSettingLogsParams,
+ ) => {
+      return rectaMutator<AiChatSettingLogs200>(
+      {url: `/admin/ai-chat/logs`, method: 'GET',
+        params
+    },
+      );
+    }
   export const aiChatSettingLimits = (
 
  ) => {
@@ -67,5 +81,6 @@ import { rectaMutator } from '../mutators/auth';
   export type AiChatSettingIndexResult = NonNullable<Awaited<ReturnType<typeof aiChatSettingIndex>>>
 export type AiChatSettingUpdateResult = NonNullable<Awaited<ReturnType<typeof aiChatSettingUpdate>>>
 export type AiChatSettingStatsResult = NonNullable<Awaited<ReturnType<typeof aiChatSettingStats>>>
+export type AiChatSettingLogsResult = NonNullable<Awaited<ReturnType<typeof aiChatSettingLogs>>>
 export type AiChatSettingLimitsResult = NonNullable<Awaited<ReturnType<typeof aiChatSettingLimits>>>
 export type AiChatSettingUpdateLimitsResult = NonNullable<Awaited<ReturnType<typeof aiChatSettingUpdateLimits>>>
