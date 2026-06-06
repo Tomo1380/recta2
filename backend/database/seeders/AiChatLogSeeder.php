@@ -14,7 +14,11 @@ class AiChatLogSeeder extends Seeder
 {
     public function run(): void
     {
-        $userIds = User::pluck('id')->all();
+        // [user_id => line_user_id]。ログインユーザーのチャットは line_user_id も
+        // 入れておく (insert は AiChatLog の creating フックを通らないため明示)。
+        // これで人物詳細の「AIチャット履歴」(line_user_id 基準) にも出る。
+        $lineByUser = User::pluck('line_user_id', 'id');
+        $userIds = $lineByUser->keys()->all();
         if (empty($userIds)) {
             return;
         }
@@ -39,9 +43,11 @@ class AiChatLogSeeder extends Seeder
             // production composer install では使えない。素の PHP で代替。
             $hasUser = rand(1, 100) <= 70;
             $ip = sprintf('%d.%d.%d.%d', rand(1, 254), rand(0, 254), rand(0, 254), rand(1, 254));
+            $uid = $hasUser ? $userIds[array_rand($userIds)] : null;
 
             $logs[] = [
-                'user_id' => $hasUser ? $userIds[array_rand($userIds)] : null,
+                'user_id' => $uid,
+                'line_user_id' => $uid ? $lineByUser[$uid] : null,
                 'ip_address' => $ip,
                 'page_type' => $sample[0],
                 'user_message' => $sample[2],

@@ -71,6 +71,14 @@ elif [ -f scripts/deploy/.run-seed-once ]; then
   echo "=== One-shot seed (additive, marker file present) ==="
   echo "    -> db:seed --class=ProductionSeeder (idempotent)"
   docker compose -f docker-compose.prod.yml exec -T laravel php artisan db:seed --class=Database\\Seeders\\ProductionSeeder --force
+elif [ -f scripts/deploy/.run-verification-seed-once ]; then
+  # 検証環境専用: 店舗 (手入力分) は残したまま、それ以外のデモデータ
+  # (ユーザー/口コミ/AIチャット履歴/コラム/LINE友だち) を追加する。
+  # VerificationSeeder は店舗に触れず、User が 0 件のときだけ User 依存分を入れる
+  # ガード付きなので再実行しても重複しない。本番では使わないこと。
+  echo "=== One-shot verification seed (additive, marker file present) ==="
+  echo "    -> db:seed --class=VerificationSeeder (店舗以外のデモデータ・検証用)"
+  docker compose -f docker-compose.prod.yml exec -T laravel php artisan db:seed --class=Database\\Seeders\\VerificationSeeder --force
 fi
 
 echo "=== Refreshing caches ==="
