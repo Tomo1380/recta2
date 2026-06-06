@@ -159,6 +159,26 @@ class LineFriendController extends Controller
         $messages = LineMessage::where('line_user_id', $lineUserId)
             ->orderByDesc('created_at')->limit(5)->get();
 
+        // この人 (ログイン済 User) の AIチャット履歴。チャットは user_id に紐づくので
+        // ログインしている人だけ取れる (2026-06-07 FB)。
+        $aiChats = [];
+        if ($user) {
+            $aiChats = \App\Models\AiChatLog::where('user_id', $user->id)
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get(['id', 'user_message', 'ai_response', 'mode', 'page_type', 'input_tokens', 'output_tokens', 'created_at'])
+                ->map(fn ($l) => [
+                    'id' => $l->id,
+                    'user_message' => $l->user_message,
+                    'ai_response' => $l->ai_response,
+                    'mode' => $l->mode,
+                    'page_type' => $l->page_type,
+                    'total_tokens' => (int) $l->input_tokens + (int) $l->output_tokens,
+                    'created_at' => $l->created_at?->toIso8601String(),
+                ])
+                ->all();
+        }
+
         $adminName = $friend?->admin_name;
         $displayName = $friend?->display_name ?: $user?->line_display_name;
 
@@ -182,6 +202,7 @@ class LineFriendController extends Controller
                     'created_at' => $user->created_at?->toIso8601String(),
                 ] : null,
                 'reviews' => $reviews,
+                'ai_chats' => $aiChats,
                 'messages' => LineMessageResource::collection($messages)->resolve(),
                 'messages_total' => $messagesTotal,
             ],

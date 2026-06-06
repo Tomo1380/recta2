@@ -1,28 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, ChevronLeft, ChevronRight, Loader2, Bot, User as UserIcon } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { Paginated } from "~/lib/types";
+import { ChatLogItem, type ChatLogItemData } from "~/components/admin/ChatLogItem";
 
-interface AiChatLogRow {
-  id: number;
-  user_message: string;
-  ai_response: string;
-  mode: string | null;
-  page_type: string | null;
-  total_tokens: number;
-  ip_address: string | null;
-  user_name: string | null;
-  user_id: number | null;
-  created_at: string | null;
-}
-
-const MODE_LABEL: Record<string, string> = { agent: "Agent", finetuned: "Fine-tuned" };
-const PAGE_TYPE_LABEL: Record<string, string> = { top: "トップ", list: "一覧", detail: "店舗詳細" };
-
-function formatTime(s: string | null): string {
-  if (!s) return "—";
-  return new Date(s).toLocaleString("ja-JP", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
+type AiChatLogRow = ChatLogItemData & { user_id: number | null };
 
 /**
  * AIチャット履歴タブ。個別の質問/回答ログを一覧・絞り込みする (2026-06-07 FB)。
@@ -108,26 +90,7 @@ export function AiChatHistoryTab() {
       ) : (
         <div className="space-y-3">
           {logs.map((log) => (
-            <div key={log.id} className="bg-card border border-border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2 text-[11px] text-muted-foreground flex-wrap">
-                {log.mode && (
-                  <span className={`px-1.5 py-0.5 rounded ${log.mode === "finetuned" ? "bg-violet-50 text-violet-700" : "bg-indigo-50 text-indigo-700"}`}>
-                    {MODE_LABEL[log.mode] ?? log.mode}
-                  </span>
-                )}
-                {log.page_type && <span className="px-1.5 py-0.5 rounded bg-muted">{PAGE_TYPE_LABEL[log.page_type] ?? log.page_type}</span>}
-                <span>{log.user_name ?? (log.ip_address ? `IP: ${log.ip_address}` : "匿名")}</span>
-                <span className="ml-auto">{formatTime(log.created_at)} ・ {log.total_tokens} tokens</span>
-              </div>
-              <div className="flex items-start gap-2 mb-2">
-                <UserIcon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                <p className="text-[13px] text-foreground whitespace-pre-wrap">{log.user_message || "（空）"}</p>
-              </div>
-              <div className="flex items-start gap-2 rounded-lg bg-muted/40 p-2.5">
-                <Bot className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <p className="text-[13px] text-muted-foreground whitespace-pre-wrap line-clamp-6">{log.ai_response || "（空）"}</p>
-              </div>
-            </div>
+            <ChatLogItem key={log.id} log={log} />
           ))}
         </div>
       )}

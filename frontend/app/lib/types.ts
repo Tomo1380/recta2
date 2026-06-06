@@ -88,8 +88,19 @@ export interface AdminPerson {
     created_at: string | null;
   } | null;
   reviews: AdminPersonReview[];
+  ai_chats: AdminPersonChat[];
   messages: LineMessage[];
   messages_total: number;
+}
+
+export interface AdminPersonChat {
+  id: number;
+  user_message: string;
+  ai_response: string;
+  mode: string | null;
+  page_type: string | null;
+  total_tokens: number;
+  created_at: string | null;
 }
 
 export interface PersonShowResponse {

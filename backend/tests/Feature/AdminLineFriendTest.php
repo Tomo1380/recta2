@@ -137,6 +137,25 @@ class AdminLineFriendTest extends TestCase
             ->assertJsonPath('person.reviews.0.body', 'よかった');
     }
 
+    public function test_person_show_includes_users_ai_chats(): void
+    {
+        $user = User::create(['line_user_id' => 'U_chatter', 'line_display_name' => 'チャット子', 'status' => 'active']);
+        LineFriend::create(['line_user_id' => 'U_chatter', 'user_id' => $user->id, 'is_following' => true]);
+        \App\Models\AiChatLog::create([
+            'user_id' => $user->id, 'page_type' => 'top', 'mode' => 'agent',
+            'user_message' => '渋谷で働ける？', 'ai_response' => 'はい働けます', 'input_tokens' => 5, 'output_tokens' => 7,
+        ]);
+        // 別ユーザーのチャットは混ざらない
+        \App\Models\AiChatLog::create(['user_id' => null, 'page_type' => 'top', 'mode' => 'agent', 'user_message' => '匿名', 'ai_response' => 'x']);
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/line-friends/U_chatter');
+
+        $res->assertOk();
+        $this->assertCount(1, $res->json('person.ai_chats'));
+        $this->assertSame('渋谷で働ける？', $res->json('person.ai_chats.0.user_message'));
+    }
+
     public function test_person_show_backfills_line_name_for_following_friend(): void
     {
         // フォロー中なのに名前が空の相手は、詳細を開いた時に Messaging API から補完。
