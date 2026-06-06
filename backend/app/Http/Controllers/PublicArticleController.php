@@ -41,8 +41,18 @@ class PublicArticleController extends Controller
             $query->where('section', $section);
         }
 
-        if ($tag = $request->input('tag')) {
-            $query->whereJsonContains('tags', $tag);
+        // 探すハブのタグ絞り込み。複数選択 (tags=キャバクラ,ラウンジ) は OR 結合
+        // （いずれかのタグを持つ記事を表示）。単一 tag= も後方互換で受ける。
+        $tags = collect(explode(',', (string) ($request->input('tags') ?? $request->input('tag') ?? '')))
+            ->map(fn ($t) => trim($t))
+            ->filter()
+            ->all();
+        if (!empty($tags)) {
+            $query->where(function ($q) use ($tags) {
+                foreach ($tags as $tag) {
+                    $q->orWhereJsonContains('tags', $tag);
+                }
+            });
         }
 
         if ($search = $request->input('q')) {

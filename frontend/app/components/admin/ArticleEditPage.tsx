@@ -45,6 +45,18 @@ const COMMON_CATEGORIES = [
 /** C2: コラムTOP 上段ナビの大テーマ（backend Article::SECTIONS と一致させる）。 */
 const SECTIONS = ["夜の始め方", "エリア別比較", "地方から上京", "Q&A"];
 
+/**
+ * コラムTOP「探すハブ」のファセットを動かすタグ。記事にこのタグを付けると、
+ * 該当ファセット（条件 / エリア / 業種 / 働き方で探す）の絞り込みに出る。
+ * フロントの columns.tsx FACET_TAGS と一致させること。
+ */
+const FACET_TAG_GROUPS: { label: string; tags: string[] }[] = [
+  { label: "条件", tags: ["未経験歓迎", "日払いOK", "ノルマなし", "高時給", "送りあり"] },
+  { label: "エリア", tags: ["渋谷", "新宿", "歌舞伎町", "六本木", "銀座", "池袋"] },
+  { label: "業種", tags: ["キャバクラ", "ラウンジ", "クラブ", "ガールズバー"] },
+  { label: "働き方", tags: ["週1OK", "Wワーク歓迎", "学生歓迎"] },
+];
+
 /** C4: 関連店舗ピッカーで保持する軽量サマリ。 */
 interface RelatedStoreLite {
   id: number;
@@ -426,7 +438,44 @@ export function ArticleEditPage() {
               placeholder="キャバクラ, ラウンジ, 体入"
               className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
-            <p className="text-[11px] text-muted-foreground">カンマ区切りで複数指定</p>
+            <p className="text-[11px] text-muted-foreground">
+              カンマ区切りで複数指定。下のタグはコラムTOPの「探すハブ」（条件/エリア/業種/働き方で探す）の絞り込みに使われます。クリックで追加・解除。
+            </p>
+            {(() => {
+              const list = form.tags.split(",").map((s) => s.trim()).filter(Boolean);
+              const toggle = (t: string) =>
+                setForm((f) => {
+                  const cur = f.tags.split(",").map((s) => s.trim()).filter(Boolean);
+                  const next = cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t];
+                  return { ...f, tags: next.join(", ") };
+                });
+              return (
+                <div className="space-y-1.5 pt-1">
+                  {FACET_TAG_GROUPS.map((g) => (
+                    <div key={g.label} className="flex flex-wrap items-center gap-1">
+                      <span className="w-9 shrink-0 text-[10px] text-muted-foreground">{g.label}</span>
+                      {g.tags.map((t) => {
+                        const on = list.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => toggle(t)}
+                            className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                              on
+                                ? "border-indigo-600 bg-indigo-600 text-white"
+                                : "border-border bg-white text-foreground hover:border-indigo-300"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Thumbnail */}

@@ -191,9 +191,25 @@ class PublicStoreController extends Controller
             ->limit(6)
             ->get();
 
+        // 関連コラム (回遊動線): この店のエリア / 業種を tags に持つ公開記事。
+        // 「渋谷のキャバを見た → 渋谷 / キャバクラの読み物」へ送客する。
+        $relatedColumns = \App\Models\Article::published()
+            ->where(function ($q) use ($store) {
+                if ($store->area) {
+                    $q->orWhereJsonContains('tags', $store->area);
+                }
+                if ($store->category) {
+                    $q->orWhereJsonContains('tags', $store->category);
+                }
+            })
+            ->orderByDesc('published_at')
+            ->limit(3)
+            ->get(['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'section', 'published_at']);
+
         return response()->json([
             'store' => $storePayload,
             'related' => StoreResource::collection($related)->resolve(),
+            'related_columns' => $relatedColumns,
         ]);
     }
 

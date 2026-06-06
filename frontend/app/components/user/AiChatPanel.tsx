@@ -426,6 +426,70 @@ function getIntroScript(
 }
 
 // ---------------------------------------------------------------------------
+// 関連コラム導線 (回遊): AI回答テキストからコラムのタグ語を拾って読み物を出す
+// ---------------------------------------------------------------------------
+
+/** ゆるい言い回し → ArticleSeeder の実タグへの寄せ。 */
+const COLUMN_KEYWORD_TO_TAG: Record<string, string> = {
+  渋谷: "渋谷", 新宿: "新宿", 歌舞伎町: "歌舞伎町", 六本木: "六本木", 銀座: "銀座", 池袋: "池袋",
+  キャバクラ: "キャバクラ", ラウンジ: "ラウンジ", クラブ: "クラブ", ガールズバー: "ガールズバー",
+  未経験: "未経験歓迎", 日払い: "日払いOK", ノルマ: "ノルマなし", 高時給: "高時給",
+  送り: "送りあり", 上京: "上京", 学生: "学生歓迎", 主婦: "Wワーク歓迎", 副業: "Wワーク歓迎",
+};
+
+function matchColumnTags(text: string): string[] {
+  const found = new Set<string>();
+  for (const [kw, tag] of Object.entries(COLUMN_KEYWORD_TO_TAG)) {
+    if (text.includes(kw)) found.add(tag);
+  }
+  return [...found].slice(0, 3);
+}
+
+function AiRelatedColumns({ text }: { text: string }) {
+  const [cols, setCols] = useState<{ id: number; slug: string; title: string }[]>([]);
+  useEffect(() => {
+    const tags = matchColumnTags(text);
+    if (tags.length === 0) {
+      setCols([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/columns?tags=${encodeURIComponent(tags.join(","))}&per_page=2`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!cancelled && j?.articles?.data) setCols(j.articles.data.slice(0, 2));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [text]);
+
+  if (cols.length === 0) return null;
+
+  return (
+    <div className="mt-2 ml-8 flex flex-col gap-1.5">
+      <div className="flex items-center gap-1 text-[10.5px] font-bold" style={{ color: "rgba(27,37,40,0.5)" }}>
+        <BookOpen size={11} style={{ color: "#D4AF37" }} /> 関連コラム
+      </div>
+      {cols.map((c) => (
+        <Link
+          key={c.id}
+          to={`/columns/${c.slug}`}
+          className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 transition-all hover:shadow-sm"
+          style={{ border: "1px solid rgba(212,175,55,0.3)", background: "#fffdf7" }}
+        >
+          <BookOpen size={13} className="shrink-0" style={{ color: "#D4AF37" }} />
+          <span className="truncate text-[12px] font-medium" style={{ color: "#1b2528" }}>
+            {c.title}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Meta badge component
 // ---------------------------------------------------------------------------
 
@@ -1471,6 +1535,14 @@ export default function AiChatPanel({
                       );
                     })}
                   </div>
+                )}
+
+                {/* 関連コラム (回遊: AI回答のトピックに合う読み物)。最新の AI 回答にだけ、
+                    本文/直前の質問にコラムのタグ語が含まれるときだけ控えめに出す。 */}
+                {msg.role === "ai" && !msg.streaming && !!msg.content && i === messages.length - 1 && (
+                  <AiRelatedColumns
+                    text={`${msg.content} ${messages[i - 1]?.role === "user" ? messages[i - 1].content : ""}`}
+                  />
                 )}
 
                 {/* LINE CTA card — shown when stores are returned OR AI mentioned LINE */}

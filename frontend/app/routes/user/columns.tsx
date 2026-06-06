@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import {
   Loader2,
   ChevronLeft,
@@ -7,7 +7,6 @@ import {
   ChevronDown,
   FileText,
   Search,
-  Menu,
   X,
   Sparkles,
   MapPin,
@@ -15,6 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 import { userApi } from "~/lib/api";
+import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import TrendingTopics, { type TrendingItem } from "~/components/user/shared/TrendingTopics";
 import { buildMetaTags } from "~/lib/seo";
 import type {
@@ -29,33 +29,33 @@ const J = "'Noto Sans JP',sans-serif";
 /** C2: 上段ナビの大テーマ（backend Article::SECTIONS と一致。fallback 用）。 */
 const SECTIONS_FALLBACK = ["夜の始め方", "エリア別比較", "地方から上京", "Q&A"];
 
-/** C3: 「条件で探す」チップ。表記ゆれを束ねて /stores?any_tags= に流す。 */
-const CONDITION_CHIPS: { label: string; tags: string[] }[] = [
-  { label: "未経験歓迎", tags: ["未経験歓迎"] },
-  { label: "日払いOK", tags: ["日払いあり", "全額日払い", "体入全額日払い", "日払いOK"] },
-  { label: "ノルマなし", tags: ["ノルマなし"] },
-  { label: "高時給", tags: ["高時給"] },
-  { label: "送りあり", tags: ["送りあり"] },
-  { label: "寮・上京サポート", tags: ["寮完備", "上京サポート"] },
-];
-
-/** C3: 「働き方で探す」チップ。 */
-const WORKSTYLE_CHIPS: { label: string; tags: string[] }[] = [
-  { label: "週1〜OK", tags: ["週1OK"] },
-  { label: "Wワーク歓迎", tags: ["Wワーク歓迎"] },
-  { label: "学生歓迎", tags: ["学生歓迎"] },
-  { label: "終電上がりOK", tags: ["終電上がりOK"] },
-  { label: "衣装貸出", tags: ["衣装貸出", "ドレス無料", "制服あり"] },
-];
-
 type Facet = "condition" | "area" | "category" | "workstyle";
-interface MasterItem { slug: string; name: string }
+
+/**
+ * 探すハブのタグ。クリックすると「記事」を tags 絞り込み (whereJsonContains) する。
+ * 旧実装は /stores へ飛ばす店舗検索だったが、コラムページでは記事検索が自然なので
+ * 記事フィルタに作り変えた (2026-06-06 FB)。タグ文字列は ArticleSeeder の tags と
+ * 一致させること。
+ */
+const FACET_TAGS: Record<Facet, string[]> = {
+  condition: ["未経験歓迎", "日払いOK", "ノルマなし", "高時給", "送りあり"],
+  area: ["渋谷", "新宿", "歌舞伎町", "六本木", "銀座", "池袋"],
+  category: ["キャバクラ", "ラウンジ", "クラブ", "ガールズバー"],
+  workstyle: ["週1OK", "Wワーク歓迎", "学生歓迎"],
+};
+
+const FACET_META: { key: Facet; label: string; Icon: typeof Sparkles; sub: string }[] = [
+  { key: "condition", label: "条件で探す", Icon: Sparkles, sub: "未経験・日払い・ノルマなし" },
+  { key: "area", label: "エリアで探す", Icon: MapPin, sub: "渋谷・新宿・六本木 ほか" },
+  { key: "category", label: "業種で探す", Icon: Briefcase, sub: "キャバクラ・ラウンジ ほか" },
+  { key: "workstyle", label: "働き方で探す", Icon: Clock, sub: "週1・Wワーク・学生OK" },
+];
 
 export function meta() {
   return buildMetaTags({
     title: "コラム | Recta - ナイトワーク業界ガイド",
     description:
-      "夜の始め方・エリア別比較・地方から上京・Q&A。ナイトワーク業界をやさしく学べるコラムと、条件・エリア・業種・働き方からの店舗探し。",
+      "夜の始め方・エリア別比較・地方から上京・Q&A。ナイトワーク業界をやさしく学べるコラムを、条件・エリア・業種・働き方から探せます。",
     path: "/columns",
   });
 }
@@ -66,27 +66,38 @@ function formatDate(s: string | null): string {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function storeSearchUrl(tags: string[]): string {
-  return `/stores?any_tags=${encodeURIComponent(tags.join(","))}`;
-}
-
 export default function ColumnsPage() {
+  // URL クエリ (?section= / ?tag= / ?q=) で着地できるようにする。トップのテーマ入口・
+  // 店舗詳細やエリアLPの関連コラム導線から、絞り込み状態でリンクされる前提。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initTags = (searchParams.get("tags") ?? searchParams.get("tag") ?? "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [sections, setSections] = useState<string[]>(SECTIONS_FALLBACK);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
+  // タグ絞り込み (探すハブ) と上タブ (section) は併用すると AND で空になりやすいので
+  // 排他にする: タグを選んだら上タブは「すべて」、上タブを選んだらタグは解除。
+  const [activeSection, setActiveSection] = useState<string | null>(
+    initTags.length > 0 ? null : searchParams.get("section"),
+  );
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [consultations, setConsultations] = useState<TrendingItem[]>([]);
-  // C3: 探すハブ
+  // C3: 探すハブ（記事を tags で絞り込む）
   const [openFacet, setOpenFacet] = useState<Facet | null>(null);
-  const [areas, setAreas] = useState<MasterItem[]>([]);
-  const [categories, setCategories] = useState<MasterItem[]>([]);
-  // ハンバーガー
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeTags, setActiveTags] = useState<string[]>(initTags);
+
+  // セクション選択 → タグ解除 / タグ選択 → セクション「すべて」へ (AND 衝突回避)。
+  const selectSection = (s: string | null) => {
+    setActiveSection(s);
+    setActiveTags([]);
+  };
+  const toggleTag = (tag: string) => {
+    setActiveSection(null);
+    setActiveTags((cur) => (cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]));
+  };
 
   useEffect(() => {
     fetch("/api/home")
@@ -103,10 +114,6 @@ export default function ColumnsPage() {
         setConsultations(list);
       })
       .catch(() => setConsultations([]));
-
-    // 探すハブ用のマスタ（エリア / 業種）。
-    userApi.get<MasterItem[]>("/areas").then(setAreas).catch(() => setAreas([]));
-    userApi.get<MasterItem[]>("/categories").then(setCategories).catch(() => setCategories([]));
   }, []);
 
   const fetchArticles = useCallback(async () => {
@@ -116,6 +123,7 @@ export default function ColumnsPage() {
       params.set("page", String(page));
       if (activeSection) params.set("section", activeSection);
       if (search) params.set("q", search);
+      if (activeTags.length > 0) params.set("tags", activeTags.join(","));
       const res = await userApi.get<PublicArticleIndexResponse>(
         `/columns?${params.toString()}`,
       );
@@ -129,38 +137,75 @@ export default function ColumnsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, activeSection, search]);
+  }, [page, activeSection, search, activeTags]);
 
   useEffect(() => {
     fetchArticles();
   }, [fetchArticles]);
 
+  const tagsKey = activeTags.join(",");
   useEffect(() => {
     setPage(1);
-  }, [activeSection, search]);
+  }, [activeSection, search, tagsKey]);
 
-  const facetTile = (key: Facet, label: string, Icon: typeof Sparkles, bg: string) => (
-    <button
-      onClick={() => setOpenFacet((f) => (f === key ? null : key))}
-      className="relative rounded-2xl p-4 text-left overflow-hidden active:scale-[0.98] transition-transform"
-      style={{ background: bg, border: "1px solid rgba(27,37,40,.06)" }}
-    >
-      <Icon className="w-6 h-6 mb-6" style={{ color: DARK, opacity: 0.85 }} />
-      <span style={{ fontFamily: J, fontWeight: 700, fontSize: "15px", color: DARK }}>{label}</span>
-      <ChevronDown
-        className="absolute top-3 right-3 w-4 h-4 transition-transform"
-        style={{ color: DARK, opacity: 0.5, transform: openFacet === key ? "rotate(180deg)" : "none" }}
-      />
-    </button>
-  );
+  // 絞り込み状態を URL に反映 (共有・戻る操作に対応)。replace で履歴を汚さない。
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (activeSection) next.set("section", activeSection);
+    if (activeTags.length > 0) next.set("tags", tagsKey);
+    if (search) next.set("q", search);
+    setSearchParams(next, { replace: true });
+    // setSearchParams は参照が変わるので依存に入れない (無限ループ回避)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, tagsKey, search]);
+
+  const facetTile = (key: Facet, label: string, Icon: typeof Sparkles, sub: string) => {
+    const open = openFacet === key;
+    return (
+      <button
+        key={key}
+        onClick={() => setOpenFacet((f) => (f === key ? null : key))}
+        className="relative rounded-2xl p-3.5 text-left overflow-hidden active:scale-[0.98] transition-all"
+        style={{
+          background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 100%)`,
+          border: `1px solid ${open ? "rgba(212,175,55,.7)" : "rgba(212,175,55,.3)"}`,
+          boxShadow: open
+            ? "0 8px 22px rgba(212,175,55,.16), inset 0 1px 0 rgba(212,175,55,.18)"
+            : "0 6px 18px rgba(27,37,40,.18), inset 0 1px 0 rgba(212,175,55,.1)",
+        }}
+      >
+        {/* 角のゴールドグロー（高級感のアクセント） */}
+        <span
+          aria-hidden
+          className="absolute -right-6 -top-6 w-16 h-16 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(212,175,55,.22), transparent 70%)" }}
+        />
+        <div className="flex items-center justify-between">
+          <span
+            className="inline-flex items-center justify-center rounded-xl"
+            style={{ width: 34, height: 34, background: "rgba(212,175,55,.12)", border: "1px solid rgba(212,175,55,.25)" }}
+          >
+            <Icon className="w-[18px] h-[18px]" style={{ color: GOLD }} />
+          </span>
+          <ChevronDown
+            className="w-4 h-4 transition-transform"
+            style={{ color: GOLD, opacity: 0.85, transform: open ? "rotate(180deg)" : "none" }}
+          />
+        </div>
+        <div className="mt-3" style={{ fontFamily: J, fontWeight: 700, fontSize: "14px", color: "white", letterSpacing: ".02em" }}>
+          {label}
+        </div>
+        <div className="mt-0.5 truncate" style={{ fontFamily: J, fontSize: "10px", color: "rgba(212,175,55,.85)" }}>
+          {sub}
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div style={{ background: "#faf9f5", minHeight: "100%" }}>
-      {/* Header bar (logo + 検索 + ハンバーガー) */}
-      <div
-        className="flex items-center justify-between px-5 py-3"
-        style={{ background: DARK }}
-      >
+      {/* Header bar (logo のみ。検索は常時表示・サイト導線はパンくずに統一) */}
+      <div className="flex items-center px-5 py-3" style={{ background: DARK }}>
         <Link to="/columns" style={{ textDecoration: "none" }}>
           <span
             style={{
@@ -174,64 +219,52 @@ export default function ColumnsPage() {
             Recta <span style={{ color: GOLD }}>Columns</span>
           </span>
         </Link>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setShowSearch((v) => !v)}
-            aria-label="検索"
-            className="p-2 rounded-lg active:scale-95"
-            style={{ color: "white" }}
-          >
-            <Search className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            aria-label="メニュー"
-            className="p-2 rounded-lg active:scale-95"
-            style={{ color: "white" }}
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
       </div>
 
       {/* 上段ナビ (大テーマ section) */}
       <div className="flex gap-4 px-5 py-2.5 overflow-x-auto" style={{ background: DARK }}>
-        <SectionTab label="すべて" active={activeSection === null} onClick={() => setActiveSection(null)} />
+        <SectionTab label="すべて" active={activeSection === null} onClick={() => selectSection(null)} />
         {sections.map((s) => (
           <SectionTab
             key={s}
             label={s}
             active={activeSection === s}
-            onClick={() => setActiveSection(s)}
+            onClick={() => selectSection(s)}
           />
         ))}
       </div>
 
-      {/* 検索バー (トグル) */}
-      {showSearch && (
-        <div className="px-5 pt-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-            <input
-              type="text"
-              value={search}
-              autoFocus
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="記事を検索..."
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-stone-200 focus:outline-none focus:border-stone-400"
-              style={{ fontFamily: J, fontSize: "16px" }}
-            />
-          </div>
-        </div>
-      )}
+      {/* パンくず（サイト導線はハンバーガーではなくパンくずに統一） */}
+      <Breadcrumb items={[{ label: "ホーム", to: "/" }, { label: "コラム" }]} />
 
-      {/* 探すハブ (2x2 パネル) */}
+      {/* 検索バー（常時表示） */}
+      <div className="px-5 pt-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="記事を検索..."
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-stone-200 focus:outline-none focus:border-stone-400"
+            style={{ fontFamily: J, fontSize: "16px" }}
+          />
+        </div>
+      </div>
+
+      {/* 探すハブ (2x2 パネル) — 記事を tags で絞り込む */}
       <div className="px-5 pt-4">
+        <div className="flex items-center gap-2 mb-2.5">
+          <span
+            className="w-[5px] h-[5px] rounded-full shrink-0"
+            style={{ background: GOLD, boxShadow: "0 0 8px rgba(212,175,55,.8)" }}
+          />
+          <span style={{ fontFamily: J, fontWeight: 700, fontSize: "13px", color: DARK, letterSpacing: ".04em" }}>
+            コラムを探す
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-2.5">
-          {facetTile("condition", "条件で探す", Sparkles, "#fef3e2")}
-          {facetTile("area", "エリアで探す", MapPin, "#e8f3ef")}
-          {facetTile("category", "業種で探す", Briefcase, "#eef0fb")}
-          {facetTile("workstyle", "働き方で探す", Clock, "#fdeef0")}
+          {FACET_META.map((f) => facetTile(f.key, f.label, f.Icon, f.sub))}
         </div>
 
         {/* 展開チップ */}
@@ -239,12 +272,44 @@ export default function ColumnsPage() {
           <div className="mt-2.5 rounded-2xl bg-white p-3.5" style={{ border: "1px solid rgba(27,37,40,.08)" }}>
             <FacetChips
               facet={openFacet}
-              areas={areas}
-              categories={categories}
+              activeTags={activeTags}
+              onToggle={toggleTag}
             />
           </div>
         )}
       </div>
+
+      {/* 絞り込み中インジケータ（複数タグ。各ピルで個別解除 / まとめて解除も可） */}
+      {activeTags.length > 0 && (
+        <div className="px-5 pt-3 flex flex-wrap items-center gap-1.5">
+          {activeTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => toggleTag(tag)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full active:scale-95"
+              style={{
+                fontFamily: J,
+                fontSize: "12px",
+                fontWeight: 700,
+                background: `linear-gradient(135deg, ${GOLD} 0%, #c8960c 100%)`,
+                color: DARK,
+                boxShadow: "0 2px 10px rgba(212,175,55,.35)",
+              }}
+            >
+              #{tag}
+              <X className="w-3.5 h-3.5" />
+            </button>
+          ))}
+          {activeTags.length > 1 && (
+            <button
+              onClick={() => setActiveTags([])}
+              style={{ fontFamily: J, fontSize: "11.5px", color: "rgba(27,37,40,.5)", textDecoration: "underline" }}
+            >
+              すべて解除
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="px-5 pt-4 space-y-4">
         {/* Article cards */}
@@ -258,7 +323,7 @@ export default function ColumnsPage() {
             style={{ fontFamily: J, color: "rgba(27,37,40,.5)", fontSize: "13px" }}
           >
             <FileText className="w-7 h-7 text-stone-300" />
-            まだ記事がありません
+            条件に合う記事がありません
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -343,18 +408,6 @@ export default function ColumnsPage() {
       <div className="pb-10">
         <TrendingTopics pool={consultations} />
       </div>
-
-      {/* ハンバーガー ドロワー */}
-      {drawerOpen && (
-        <NavDrawer
-          sections={sections}
-          onClose={() => setDrawerOpen(false)}
-          onSection={(s) => {
-            setActiveSection(s);
-            setDrawerOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -376,81 +429,37 @@ function SectionTab({ label, active, onClick }: { label: string; active: boolean
   );
 }
 
-function FacetChips({ facet, areas, categories }: { facet: Facet; areas: MasterItem[]; categories: MasterItem[] }) {
-  const chipClass = "inline-flex items-center px-3 py-1.5 rounded-full text-[12px] active:scale-95 transition-transform";
-  const chipStyle = { fontFamily: J, fontWeight: 600 as const, background: "#f5f4f0", color: DARK, border: "1px solid rgba(27,37,40,.1)" };
-
-  if (facet === "area") {
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        {areas.map((a) => (
-          <Link key={a.slug} to={`/jobs/areas/${a.slug}`} className={chipClass} style={chipStyle}>
-            {a.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
-  if (facet === "category") {
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        {categories.map((c) => (
-          <Link key={c.slug} to={`/jobs/categories/${c.slug}`} className={chipClass} style={chipStyle}>
-            {c.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
-  const chips = facet === "condition" ? CONDITION_CHIPS : WORKSTYLE_CHIPS;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {chips.map((c) => (
-        <Link key={c.label} to={storeSearchUrl(c.tags)} className={chipClass} style={chipStyle}>
-          {c.label}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function NavDrawer({
-  sections,
-  onClose,
-  onSection,
+function FacetChips({
+  facet,
+  activeTags,
+  onToggle,
 }: {
-  sections: string[];
-  onClose: () => void;
-  onSection: (s: string | null) => void;
+  facet: Facet;
+  activeTags: string[];
+  onToggle: (tag: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
-      <div
-        className="absolute right-0 top-0 bottom-0 w-72 max-w-[80%] bg-white p-5 overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-        style={{ fontFamily: J }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <span style={{ fontWeight: 700, color: DARK }}>メニュー</span>
-          <button onClick={onClose} aria-label="閉じる"><X className="w-5 h-5" style={{ color: DARK }} /></button>
-        </div>
-
-        <p className="text-[11px] text-stone-400 mb-1.5">コラム</p>
-        <div className="flex flex-col gap-0.5 mb-4">
-          <button className="text-left py-1.5 text-[14px]" style={{ color: DARK }} onClick={() => onSection(null)}>すべての記事</button>
-          {sections.map((s) => (
-            <button key={s} className="text-left py-1.5 text-[14px]" style={{ color: DARK }} onClick={() => onSection(s)}>{s}</button>
-          ))}
-        </div>
-
-        <p className="text-[11px] text-stone-400 mb-1.5">サイト</p>
-        <div className="flex flex-col gap-0.5">
-          <Link to="/" className="py-1.5 text-[14px]" style={{ color: DARK }}>トップ</Link>
-          <Link to="/stores" className="py-1.5 text-[14px]" style={{ color: DARK }}>店舗を探す</Link>
-          <Link to="/relocate-support" className="py-1.5 text-[14px]" style={{ color: DARK }}>上京サポート</Link>
-        </div>
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {FACET_TAGS[facet].map((tag) => {
+        const selected = activeTags.includes(tag);
+        return (
+          <button
+            key={tag}
+            onClick={() => onToggle(tag)}
+            className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] active:scale-95 transition-transform"
+            style={{
+              fontFamily: J,
+              fontWeight: selected ? 700 : 600,
+              background: selected ? GOLD : "#f5f4f0",
+              color: selected ? DARK : DARK,
+              border: `1px solid ${selected ? "rgba(212,175,55,.9)" : "rgba(27,37,40,.1)"}`,
+              boxShadow: selected ? "0 2px 8px rgba(212,175,55,.35)" : undefined,
+            }}
+          >
+            {tag}
+          </button>
+        );
+      })}
     </div>
   );
 }

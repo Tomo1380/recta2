@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import { Link } from "react-router";
 import { trialDailyEstimate } from "~/lib/wage";
+import type { ArticleSummary } from "~/lib/types";
 
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -356,6 +357,8 @@ export interface StoreDetailStore {
 
 export interface StoreDetailResponse {
   store: StoreDetailStore;
+  /** 回遊動線: この店のエリア/業種に関連する公開コラム (最大3件)。 */
+  related_columns?: ArticleSummary[];
 }
 
 interface StoreDetailPageProps {
@@ -420,7 +423,8 @@ function QuickRangeValue({
   const minN = toAmountNumberSafe(min);
   const maxN = toAmountNumberSafe(max);
   const fmt = (n: number) => `¥${n.toLocaleString()}`;
-  const wrapper = "mt-0.5 font-bold tabular-nums leading-[1.15]";
+  // 縦中央揃えはセル側 (flex-1 の中央寄せ) で行うので、ここでは上マージンを付けない。
+  const wrapper = "font-bold tabular-nums leading-[1.15]";
   const style = { color, fontFamily: "'Outfit', sans-serif" } as const;
 
   if (minN == null && maxN == null) {
@@ -760,7 +764,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
     );
   }
 
-  const { store } = data;
+  const { store, related_columns: relatedColumns } = data;
   const sortedImages = (store.images ?? []).slice().sort((a, b) => a.order - b.order);
 
   return (
@@ -810,54 +814,63 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                 4 セル横並びで桁が多いと 1 行に収まらないので、レンジは 2 行
                 ("¥8,000〜" / "¥10,000") に縦積みする。同値・片側のみは 1 行。
                 通常時給 (本入店後) は表示せず、体入日給 (体入時給×4時間) を出す。 */}
-            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+            <div className="flex flex-col border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 体入時給
               </div>
-              <QuickRangeValue
-                min={store.trial_hourly_min ?? store.trial_avg_hourly}
-                max={store.trial_hourly_max ?? store.trial_hourly}
-                color="#D4AF37"
-              />
+              {/* 値は flex-1 の中で縦中央。体入時給だけ 2 行に折り返すことがあるため、
+                  他セルの 1 行値 (全額 / 営業時間 / 即日OK) を縦中央に揃えて見た目を保つ。 */}
+              <div className="flex flex-1 items-center justify-center pt-0.5">
+                <QuickRangeValue
+                  min={store.trial_hourly_min ?? store.trial_avg_hourly}
+                  max={store.trial_hourly_max ?? store.trial_hourly}
+                  color="#D4AF37"
+                />
+              </div>
             </div>
-            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+            <div className="flex flex-col border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 日払い
               </div>
-              {(() => {
-                // 旧「体入日給」(= 体入時給×4 の派生値) は隣の体入時給と情報が重複する
-                // ため廃止し、業界定番かつ他に表示のない「日払い」に差し替えた
-                // (2026-06-06 FB)。判定は dailyPayLabel に集約。
-                const label = dailyPayLabel(store);
-                return (
-                  <div
-                    className="mt-0.5 text-[13px] font-bold leading-[1.15]"
-                    style={{
-                      color: label ? "#6FB37D" : "rgba(27,37,40,0.4)",
-                      fontFamily: "'Outfit', sans-serif",
-                    }}
-                  >
-                    {label ?? "—"}
-                  </div>
-                );
-              })()}
+              <div className="flex flex-1 items-center justify-center pt-0.5">
+                {(() => {
+                  // 旧「体入日給」(= 体入時給×4 の派生値) は隣の体入時給と情報が重複する
+                  // ため廃止し、業界定番かつ他に表示のない「日払い」に差し替えた
+                  // (2026-06-06 FB)。判定は dailyPayLabel に集約。
+                  const label = dailyPayLabel(store);
+                  return (
+                    <div
+                      className="text-[13px] font-bold leading-[1.15]"
+                      style={{
+                        color: label ? "#6FB37D" : "rgba(27,37,40,0.4)",
+                        fontFamily: "'Outfit', sans-serif",
+                      }}
+                    >
+                      {label ?? "—"}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
-            <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
+            <div className="flex flex-col border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 営業
               </div>
-              <div className="mt-0.5 text-[12px] font-bold tabular-nums leading-[1.15]" style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}>
-                {store.opening_time && store.closing_time
-                  ? `${store.opening_time}〜${store.closing_time}`
-                  : store.business_hours || "—"}
+              <div className="flex flex-1 items-center justify-center pt-0.5">
+                <div className="text-[12px] font-bold tabular-nums leading-[1.15]" style={{ color: "#1b2528", fontFamily: "'Outfit', sans-serif" }}>
+                  {store.opening_time && store.closing_time
+                    ? `${store.opening_time}〜${store.closing_time}`
+                    : store.business_hours || "—"}
+                </div>
               </div>
             </div>
-            <div className="px-2 py-3 text-center">
+            <div className="flex flex-col px-2 py-3 text-center">
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
                 体入
               </div>
+              <div className="flex flex-1 items-center justify-center pt-0.5">
               <div
-                className="mt-0.5 text-[12px] font-bold"
+                className="text-[12px] font-bold"
                 style={{
                   color: store.trial_type === "same_day"
                     ? "#6FB37D"
@@ -871,6 +884,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   : store.trial_type === "normal"
                     ? "あり"
                     : "なし"}
+              </div>
               </div>
             </div>
           </div>
@@ -1770,6 +1784,9 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               currentId={store.id}
             />
           </div>
+
+          {/* 関連コラム (回遊動線): この店のエリア/業種に関連する読み物 */}
+          <RelatedColumnsSection columns={relatedColumns} area={store.area} />
 
           {/* ============================================================ */}
           {/* 16. Recently viewed stores (あなたが見た記事) */}
@@ -4249,6 +4266,79 @@ function RelatedStoresSection({
             </div>
           </Link>
         ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── 関連コラム (回遊動線: 店舗 → 同エリア/業種の読み物) ───────────────
+function RelatedColumnsSection({
+  columns,
+  area,
+}: {
+  columns?: ArticleSummary[] | null;
+  area?: string | null;
+}) {
+  if (!columns || columns.length === 0) return null;
+  return (
+    <SectionCard icon={<FileText size={20} style={{ color: GOLD_HEX }} />} title="関連コラム">
+      <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {columns.map((c) => (
+          <Link
+            key={c.id}
+            to={`/columns/${c.slug}`}
+            className="shrink-0 rounded-xl overflow-hidden"
+            style={{
+              width: "170px",
+              background: "#fcfeff",
+              border: "1px solid rgba(27,37,40,0.06)",
+              textDecoration: "none",
+            }}
+          >
+            <div
+              className="relative w-full"
+              style={{
+                height: "100px",
+                background: c.thumbnail_url
+                  ? `center / cover url(${c.thumbnail_url})`
+                  : "linear-gradient(135deg, #1b2528, #2a3a3f)",
+              }}
+            >
+              {(c.section || c.category) && (
+                <span
+                  className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{ background: "rgba(255,255,255,0.92)", color: "#1b2528" }}
+                >
+                  {c.section || c.category}
+                </span>
+              )}
+            </div>
+            <div className="px-2.5 py-2">
+              <p className="line-clamp-2 text-xs font-bold" style={{ color: "#1b2528", lineHeight: 1.4 }}>
+                {c.title}
+              </p>
+            </div>
+          </Link>
+        ))}
+        {area && (
+          <Link
+            to={`/columns?tag=${encodeURIComponent(area)}`}
+            className="shrink-0 flex flex-col items-center justify-center gap-1 rounded-xl"
+            style={{
+              width: "110px",
+              background: "linear-gradient(135deg, #1b2528 0%, #2c3e46 100%)",
+              border: "1px solid rgba(212,175,55,.3)",
+              textDecoration: "none",
+            }}
+          >
+            <span className="px-2 text-center text-[11px] font-bold" style={{ color: "white", lineHeight: 1.4 }}>
+              {area}のコラムを見る
+            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 6l6 6-6 6" stroke={GOLD_HEX} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        )}
       </div>
     </SectionCard>
   );
