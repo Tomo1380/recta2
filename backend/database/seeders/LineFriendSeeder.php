@@ -132,10 +132,15 @@ class LineFriendSeeder extends Seeder
     {
         $lineId = 'Uheavychatter000000000000000000001';
 
+        // display_name は「LINE プロフィールから取得した表示名」を想定したリアルな名前。
+        // 本番では detail を開いた時に getProfile が実際の LINE 表示名を取得する
+        // (フォロー中＝公式追加済みなので未ログインでも取れる)。dev はトークン未設定の
+        // ため、ここで入れた値が getProfile 結果の代わりに表示される。
         LineFriend::firstOrCreate(
             ['line_user_id' => $lineId],
             [
-                'display_name' => 'チャット好きの未ログインさん',
+                'display_name' => 'ゆうな🌙',
+                'picture_url' => 'https://i.pravatar.cc/150?img=47',
                 'is_following' => true,
                 'followed_at' => now()->subDays(8),
             ],
