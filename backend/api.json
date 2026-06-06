@@ -3150,8 +3150,9 @@
                                                     "type": "integer",
                                                     "minimum": 0
                                                 },
-                                                "pending_reviews": {
+                                                "new_reviews_7d": {
                                                     "type": "integer",
+                                                    "description": "\u53e3\u30b3\u30df\u306f\u627f\u8a8d\u5236\u3067\u306f\u306a\u304f\u5373\u516c\u958b\u2192post-moderation(\u975e\u516c\u958b/\u524a\u9664)\u3002\n\u306a\u306e\u3067\u300c\u627f\u8a8d\u5f85\u3061\u300d\u3067\u306f\u306a\u304f\u300c\u76f4\u8fd1\u3067\u6765\u305f\u65b0\u7740\u53e3\u30b3\u30df(\u8981\u30c1\u30a7\u30c3\u30af)\u300d\u3092\u51fa\u3059\u3002",
                                                     "minimum": 0
                                                 },
                                                 "new_users_7d": {
@@ -3169,7 +3170,7 @@
                                             },
                                             "required": [
                                                 "unread_messages",
-                                                "pending_reviews",
+                                                "new_reviews_7d",
                                                 "new_users_7d",
                                                 "published_articles",
                                                 "fine_tuning_qa_active"

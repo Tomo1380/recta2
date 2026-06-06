@@ -409,11 +409,11 @@ export function DashboardPage() {
             onClick={() => navigate("/admin/users")}
           />
           <ActionCard
-            label="承認待ちの口コミ"
-            count={data.secondary.pending_reviews}
+            label="新着口コミ（7日・要チェック）"
+            count={data.secondary.new_reviews_7d}
             icon={MessageSquare}
             accent="#f59e0b"
-            cta="モデレーション"
+            cta="確認する"
             onClick={() => navigate("/admin/reviews")}
           />
           <ActionCard

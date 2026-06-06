@@ -232,7 +232,11 @@ class DashboardController extends Controller
             'unread_messages' => LineMessage::where('direction', 'inbound')
                 ->whereNull('read_at')
                 ->count(),
-            'pending_reviews' => Review::where('status', 'unpublished')->count(),
+            // 口コミは承認制ではなく即公開→post-moderation(非公開/削除)。
+            // なので「承認待ち」ではなく「直近で来た新着口コミ(要チェック)」を出す。
+            'new_reviews_7d' => Review::where('status', '!=', 'deleted')
+                ->where('created_at', '>=', $now->copy()->subDays(7))
+                ->count(),
             'new_users_7d' => User::where('created_at', '>=', $now->copy()->subDays(7))->count(),
             'published_articles' => Article::where('status', 'published')->count(),
             'fine_tuning_qa_active' => FineTuningQa::where('status', FineTuningQa::STATUS_ACTIVE)->count(),

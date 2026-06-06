@@ -1846,8 +1846,12 @@ export type DashboardIndex200RecentChatsItem = {
 export type DashboardIndex200Secondary = {
   /** @minimum 0 */
   unread_messages: number;
-  /** @minimum 0 */
-  pending_reviews: number;
+  /**
+     * 口コミは承認制ではなく即公開→post-moderation(非公開/削除)。
+   * なので「承認待ち」ではなく「直近で来た新着口コミ(要チェック)」を出す。
+     * @minimum 0
+     */
+  new_reviews_7d: number;
   /** @minimum 0 */
   new_users_7d: number;
   /** @minimum 0 */
