@@ -7949,12 +7949,6 @@
                                             "null"
                                         ]
                                     },
-                                    "pay_system_note": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
                                     "guarantee_period": {
                                         "type": [
                                             "string",
@@ -8020,12 +8014,6 @@
                                         ],
                                         "maxLength": 100
                                     },
-                                    "payroll_system_description": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ]
-                                    },
                                     "payroll_cycle": {
                                         "type": [
                                             "string",
@@ -8040,12 +8028,25 @@
                                         ],
                                         "maxLength": 255
                                     },
-                                    "daily_pay_limit": {
+                                    "daily_pay_type": {
                                         "type": [
                                             "string",
                                             "null"
                                         ],
-                                        "maxLength": 120
+                                        "enum": [
+                                            "none",
+                                            "yes",
+                                            "full",
+                                            "capped"
+                                        ]
+                                    },
+                                    "daily_pay_limit": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 0,
+                                        "maximum": 100000000
                                     },
                                     "interview_hours": {
                                         "type": [

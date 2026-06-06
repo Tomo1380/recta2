@@ -141,7 +141,9 @@ export interface Store {
   norma_info: string | null;
   unit_wage_type: string | null;
   payroll_system_type: string | null;
-  payroll_system_description: string | null;
+  /** 日払い: none/yes/full/capped。上限金額(円)は capped 時のみ。 */
+  daily_pay_type: string | null;
+  daily_pay_limit: number | null;
   /** 体入時給（最低額） */
   trial_hourly_min: string | null;
   /** 体入時給（最高額） */

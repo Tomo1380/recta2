@@ -60,21 +60,22 @@ class StoreResource extends JsonResource
             'daily_estimate_min'  => self::toInt($wage['daily_estimate_min'] ?? null),
             'daily_estimate_max'  => self::toInt($wage['daily_estimate_max'] ?? null),
             'payroll_system_type'        => $payroll['type']        ?? null,
-            'payroll_system_description' => $payroll['description'] ?? null,
-            // 給与サイクル/給料日/日払い上限 (旧 payroll_system_type は後方互換で残置)
+            // 給与サイクル/給料日/日払い (旧 payroll_system_type は後方互換で残置)
             'payroll_cycle'     => $payroll['cycle']        ?? null,
             'payroll_pay_day'   => $payroll['pay_day']      ?? null,
-            'daily_pay_limit'   => $payroll['daily_limit']  ?? null,
+            // 日払い (構造化): type=none/yes/full/capped、上限金額は capped 時のみ
+            'daily_pay_type'    => $payroll['daily_pay_type'] ?? null,
+            'daily_pay_limit'   => isset($payroll['daily_limit']) ? (int) $payroll['daily_limit'] : null,
 
             // compensation — back_items / fee_items は {label, value, unit} の new shape。
             // back_text はバックをフリーテキストで持つ新フィールド (項目別 back と併存)。
             'back_items'    => self::projectAmountItems($compensation['back']  ?? null),
             'back_text'     => $compensation['back_text'] ?? null,
             'fee_items'     => self::projectAmountItems($compensation['fees']  ?? null),
+            // 給与備考 (給料システム詳細・支払い補足もここに統合した唯一の自由文)
             'salary_notes'  => $compensation['notes'] ?? null,
-            // 給料システム (複数選択 + 詳細備考)
+            // 給料システム (複数選択)。詳細は salary_notes に書く。
             'pay_system_types' => $compensation['pay_system']['types'] ?? [],
-            'pay_system_note'  => $compensation['pay_system']['note']  ?? null,
 
             // guarantee
             'guarantee_period'  => $guarantee['period']  ?? null,

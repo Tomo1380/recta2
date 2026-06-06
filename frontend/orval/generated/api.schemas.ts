@@ -2841,6 +2841,19 @@ export const StoresUpdateBodySameDayTrial = {
   none: 'none',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StoresUpdateBodyDailyPayType = typeof StoresUpdateBodyDailyPayType[keyof typeof StoresUpdateBodyDailyPayType] | null;
+
+
+export const StoresUpdateBodyDailyPayType = {
+  none: 'none',
+  yes: 'yes',
+  full: 'full',
+  capped: 'capped',
+} as const;
+
 export type StoresUpdateBodyWageTrial = {
   /**
      * @minimum 0
@@ -3163,8 +3176,6 @@ export type StoresUpdateBody = {
   salary_notes?: string | null;
   /** @nullable */
   back_text?: string | null;
-  /** @nullable */
-  pay_system_note?: string | null;
   /**
      * @maxLength 255
      * @nullable
@@ -3201,8 +3212,6 @@ export type StoresUpdateBody = {
      * @nullable
      */
   payroll_system_type?: string | null;
-  /** @nullable */
-  payroll_system_description?: string | null;
   /**
      * @maxLength 60
      * @nullable
@@ -3213,11 +3222,14 @@ export type StoresUpdateBody = {
      * @nullable
      */
   payroll_pay_day?: string | null;
+  /** @nullable */
+  daily_pay_type?: StoresUpdateBodyDailyPayType;
   /**
-     * @maxLength 120
+     * @minimum 0
+     * @maximum 100000000
      * @nullable
      */
-  daily_pay_limit?: string | null;
+  daily_pay_limit?: number | null;
   /**
      * @maxLength 255
      * @nullable

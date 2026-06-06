@@ -278,20 +278,21 @@ export interface StoreDetailStore {
   /** バックのフリーテキスト (新)。あれば back_items より優先表示。 */
   back_text?: string | null;
   fee_items: FeeItem[];
+  /** 給与備考 (給料システム詳細・支払い補足も統合した唯一の自由文) */
   salary_notes: string;
-  /** 給料システム (複数選択 + 詳細備考) */
+  /** 給料システム (複数選択)。詳細は salary_notes に書く。 */
   pay_system_types?: string[] | null;
-  pay_system_note?: string | null;
   guarantee_period: string;
   guarantee_details: string;
   norma_info: string;
   unit_wage_type: string | null;
   payroll_system_type: string | null;
-  payroll_system_description: string | null;
-  /** 給与サイクル / 給料日 / 日払い上限金額 (新) */
+  /** 給与サイクル / 給料日 / 日払い (構造化) */
   payroll_cycle?: string | null;
   payroll_pay_day?: string | null;
-  daily_pay_limit?: string | null;
+  /** 日払い: none/yes/full/capped。上限金額は capped 時のみ(円・数値)。 */
+  daily_pay_type?: string | null;
+  daily_pay_limit?: number | null;
   /** 体入時給（最低額） */
   trial_hourly_min: number | string | null;
   /** 体入時給（最高額） */
@@ -470,31 +471,41 @@ function toAmountString(v: number | string | null | undefined): string | null {
 }
 
 /**
- * クイックスタッツの「日払い」セル用ラベルを店舗データから導出する純粋関数。
- *
- * 判定は構造化フィールド「日払い上限金額(daily_pay_limit)」を最優先にする。
- *  - daily_pay_limit が「全額/上限なし/無制限」→ "全額"
- *  - daily_pay_limit に金額等が入っている → "OK"
- *  - 未設定なら feature_tags の明示的な「日払い」だけ拾う
- *  - いずれも無ければ null (セルは "—")
- *
- * 旧実装は給与備考などの自由文を横断して "全額" を部分一致で拾っていたが、
- * 「全額日払い：不可能」のような否定文も "全額" と誤検出するバグがあったため、
- * 否定混入しやすい自由文(salary_notes 等)はソースから除外した。
+ * 金額をコンパクトに整形する（クイックスタッツの狭いセル向け）。
+ * 10000→「1万」、15000→「1.5万」、5000→「5,000」。
+ */
+function formatYenCompact(n: number): string {
+  if (n >= 10000) {
+    const man = n / 10000;
+    return `${Number.isInteger(man) ? man : man.toFixed(1)}万円`;
+  }
+  return `${n.toLocaleString("ja-JP")}円`;
+}
+
+/**
+ * クイックスタッツの「日払い」セル用ラベルを構造化フィールドから導出する純粋関数。
+ * 管理画面の「日払い」(daily_pay_type) を唯一の根拠にする（自由文は判定に使わない）。
+ *  - full   → "全額"
+ *  - capped → "上限◯万円"（上限金額があるとき。無ければ "OK"）
+ *  - yes    → "OK"
+ *  - none / 未設定 → null（セルは "—"）
  */
 export function dailyPayLabel(store: {
-  daily_pay_limit?: string | null;
-  feature_tags?: string[] | null;
-}): "全額" | "OK" | null {
-  const limit = (store.daily_pay_limit ?? "").trim();
-  if (limit) {
-    return /全額|上限なし|上限無し|無制限/.test(limit) ? "全額" : "OK";
+  daily_pay_type?: string | null;
+  daily_pay_limit?: number | null;
+}): string | null {
+  switch (store.daily_pay_type) {
+    case "full":
+      return "全額";
+    case "capped":
+      return store.daily_pay_limit && store.daily_pay_limit > 0
+        ? `上限${formatYenCompact(store.daily_pay_limit)}`
+        : "OK";
+    case "yes":
+      return "OK";
+    default:
+      return null;
   }
-  const tags = (store.feature_tags ?? []).join(" ");
-  if (tags.includes("日払い")) {
-    return tags.includes("全額") ? "全額" : "OK";
-  }
-  return null;
 }
 
 /**
@@ -1182,23 +1193,28 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             // サイクル＋給料日＋日払い上限＋補足を1つの文字列に束ねる。
             // サイクル系は1行に束ね、補足(description)は改行して別行に出す
             // (運営要望: 補足は2行目に改行できるように)。
-            const payHead = [
+            // 日払い (構造化) を表示用テキストに。
+            const dailyPayText =
+              store.daily_pay_type === "full"
+                ? "日払い: 全額"
+                : store.daily_pay_type === "capped"
+                  ? `日払い: 上限${store.daily_pay_limit && store.daily_pay_limit > 0 ? formatYenCompact(store.daily_pay_limit) : "あり"}`
+                  : store.daily_pay_type === "yes"
+                    ? "日払い: あり"
+                    : null;
+            const payValue = [
               store.payroll_cycle || store.payroll_system_type,
               store.payroll_pay_day,
-              store.daily_pay_limit ? `日払い上限: ${store.daily_pay_limit}` : null,
+              dailyPayText,
             ]
               .filter((v): v is string => !!v && String(v).trim() !== "")
               .join("／");
-            const payValue = [payHead, store.payroll_system_description]
-              .filter((v): v is string => !!v && String(v).trim() !== "")
-              .join("\n");
             const paySystem = (store.pay_system_types ?? []).filter(Boolean);
             const hasBack =
               (store.back_text && store.back_text.trim() !== "") ||
               (store.back_items ?? []).length > 0;
             const show =
               paySystem.length > 0 ||
-              !!store.pay_system_note ||
               hasBack ||
               (store.fee_items ?? []).length > 0 ||
               !!payValue ||
@@ -1213,29 +1229,20 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             previewAnchor="salary"
           >
             <div className="divide-y" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
-              {(paySystem.length > 0 || store.pay_system_note) && (
+              {paySystem.length > 0 && (
                 <InfoRow
                   label="給料システム"
                   value={
-                    <div className="space-y-1">
-                      {paySystem.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {paySystem.map((t) => (
-                            <span
-                              key={t}
-                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                              style={{ background: "rgba(212,175,55,0.12)", color: "#9a7a17" }}
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {store.pay_system_note && (
-                        <p className="text-sm" style={{ color: "rgba(27,37,40,0.7)" }}>
-                          <RichText text={store.pay_system_note} />
-                        </p>
-                      )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {paySystem.map((t) => (
+                        <span
+                          key={t}
+                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{ background: "rgba(212,175,55,0.12)", color: "#9a7a17" }}
+                        >
+                          {t}
+                        </span>
+                      ))}
                     </div>
                   }
                 />
