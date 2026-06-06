@@ -106,32 +106,6 @@ class LineMessagingService
     }
 
     /**
-     * Broadcast a message to all friends.
-     */
-    public function broadcastMessage(array $messages): array
-    {
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$this->accessToken}",
-            'Content-Type' => 'application/json',
-        ])->post("{$this->baseUrl}/message/broadcast", [
-            'messages' => $messages,
-        ]);
-
-        if ($response->failed()) {
-            Log::error('LINE broadcast message failed', [
-                'status' => $response->status(),
-                'body' => $response->json(),
-            ]);
-        }
-
-        return [
-            'success' => $response->successful(),
-            'status' => $response->status(),
-            'body' => $response->json(),
-        ];
-    }
-
-    /**
      * Verify webhook signature using HMAC-SHA256.
      */
     public function verifySignature(string $body, string $signature): bool

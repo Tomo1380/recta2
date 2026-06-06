@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, Radio, ChevronRight as ChevronR } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, ChevronRight as ChevronR } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AdminPersonRow, PeopleIndexResponse, Paginated } from "~/lib/types";
 
@@ -141,13 +141,6 @@ export function UsersPage() {
               </span>
             </>
           )}
-          <button
-            onClick={() => navigate("/admin/users/broadcast")}
-            className="px-3 py-1.5 rounded-lg bg-[#06C755] text-white text-[13px] hover:bg-[#05b04d] transition flex items-center gap-1.5"
-          >
-            <Radio className="w-3.5 h-3.5" />
-            一斉配信
-          </button>
         </div>
       </div>
 

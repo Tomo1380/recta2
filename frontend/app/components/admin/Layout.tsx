@@ -57,8 +57,6 @@ function getBreadcrumbs(pathname: string) {
 
     if (breadcrumbMap[currentPath]) {
       crumbs.push({ label: breadcrumbMap[currentPath], path: currentPath });
-    } else if (segments[i - 1] === "users" && segments[i] === "broadcast") {
-      crumbs.push({ label: "一斉配信", path: currentPath });
     } else if (segments[i] === "messages" && segments[i - 2] === "users") {
       crumbs.push({ label: "メッセージ", path: currentPath });
     } else if (segments[i - 1] === "users") {

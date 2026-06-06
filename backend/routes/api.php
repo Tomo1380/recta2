@@ -129,7 +129,6 @@ Route::prefix('admin')->group(function () {
         Route::put('/users/{user}/notes', [UserController::class, 'updateNotes']);
         Route::post('/users/{user}/line-message', [UserController::class, 'sendLineMessage']);
         Route::get('/users/{user}/messages', [UserController::class, 'messages']);
-        Route::post('/users/broadcast', [LineFriendController::class, 'broadcast']);
 
         // LINE 友だち (line_user_id 基準のトーク)。アプリ User 未連携の相手でも
         // トーク・送信・名前編集ができるようにする (2026-06-06 FB)。
@@ -240,8 +239,5 @@ Route::prefix('admin')->group(function () {
         Route::put('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'update']);
         Route::delete('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'destroy']);
         Route::post('/ai-chat/knowledge/reorder', [IndustryKnowledgeController::class, 'reorder']);
-
-        // LINE一斉配信（ユーザー管理から利用）
-        // broadcast は上の /users/broadcast で定義済み
     });
 });
