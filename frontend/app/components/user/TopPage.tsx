@@ -8,7 +8,7 @@ import SectionHeader from "~/components/user/shared/SectionHeader";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import { useUserAuthSafe } from "~/lib/user-auth";
 import { LUXE } from "~/lib/luxe-tokens";
-import { getPreferredArea, setPreferredArea } from "~/lib/preferred-area";
+import { setPreferredArea } from "~/lib/preferred-area";
 import type { ArticleSummary, PublicArticleIndexResponse } from "~/lib/types";
 
 // ─── Constants ─────────────────────────────────────
@@ -335,11 +335,6 @@ export default function TopPage({
   const [areasVisible, setAreasVisible] = useState(AREA_INITIAL);
   // 最新コラム。0 件ならセクションごと非表示にするので別 state で軽く取る。
   const [columns, setColumns] = useState<ArticleSummary[]>([]);
-  const [preferredArea, setPreferredAreaState] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPreferredAreaState(getPreferredArea());
-  }, []);
 
   useEffect(() => {
     fetch("/api/home")
@@ -390,15 +385,11 @@ export default function TopPage({
   const heroBadge = pick(heroBanner.hero_badge, "ナイトワーク求人");
   const heroAiLabel = pick(heroBanner.hero_ai_label, "AI MATCHING");
 
-  // preferred area が選ばれていればピックアップを絞り込む。
-  // 該当 0 件なら全件にフォールバック (空棚を出さない)。
-  const preferredAreaName = preferredArea
-    ? areas.find((a) => a.slug === preferredArea)?.name ?? null
-    : null;
-  const filteredPickup = preferredAreaName
-    ? allPickupShops.filter((s) => s.area === preferredAreaName)
-    : allPickupShops;
-  const pickupShops = filteredPickup.length > 0 ? filteredPickup : allPickupShops;
+  // ピックアップは「運営のおすすめ枠」。エリアでの絞り込みはしない
+  // (管理画面の並び順=キュレーションをそのまま全ユーザーに見せる)。
+  // 旧実装は preferred area で他エリアを除外していたが、運営の推しが
+  // 埋もれる/消える問題があったため撤去 (2026-06-07 FB)。
+  const pickupShops = allPickupShops;
 
   return (
     <>
@@ -454,8 +445,9 @@ export default function TopPage({
           areasVisible={areasVisible}
           setAreasVisible={setAreasVisible}
           onAreaSelect={(slug) => {
+            // 選んだエリアを記録だけしておく (将来の行動ベース・エリアサジェスト P2 の土台)。
+            // 現状ピックアップの絞り込みには使わない。
             setPreferredArea(slug);
-            setPreferredAreaState(slug);
           }}
         />
 
