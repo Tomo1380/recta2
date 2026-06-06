@@ -74,7 +74,9 @@ return [
         // LINE Official Account Manager のチャット画面ID。
         // 個人チャットURLは https://chat.line.biz/{oa_chat_id}/chat/{line_user_id}。
         // 運営は返信を公式チャットで行うので、管理画面から該当者の公式チャットへ飛ばす。
-        'oa_chat_id' => env('LINE_OA_CHAT_ID'),
+        // 秘匿情報ではない (URLに出る識別子・利用には chat.line.biz への認証が別途必要) ため
+        // デフォルト値を入れておき、env 無しの環境 (検証/本番) でも動くようにする。
+        'oa_chat_id' => env('LINE_OA_CHAT_ID', 'Uf6399e18c18dba40eda802fadec3359a'),
     ],
 
 ];
