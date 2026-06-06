@@ -9,6 +9,7 @@ use App\Http\Resources\LineFriendResource;
 use App\Http\Resources\LineMessageResource;
 use App\Models\LineFriend;
 use App\Models\LineMessage;
+use App\Models\User;
 use App\Services\LineMessagingService;
 use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
@@ -112,6 +113,109 @@ class LineFriendController extends Controller
         ]);
 
         return response()->json(['message' => '送信しました']);
+    }
+
+    /**
+     * 人物詳細 (line_user_id 基準)。トーク相手 (LineFriend) を主に、LINEログイン
+     * (User) があれば口コミ等を添える。友だちのみの相手でも詳細が見られる
+     * (2026-06-06 FB)。
+     *
+     * @response array{person: mixed}
+     */
+    public function show(string $lineUserId): JsonResponse
+    {
+        $friend = LineFriend::where('line_user_id', $lineUserId)->with('user')->first();
+        $user = $friend?->user ?? User::where('line_user_id', $lineUserId)->first();
+
+        if (! $friend && ! $user) {
+            abort(404);
+        }
+
+        $reviews = [];
+        $reviewsCount = 0;
+        if ($user) {
+            $reviewsCount = $user->reviews()->where('status', 'published')->count();
+            $reviews = $user->reviews()
+                ->with('store:id,name')
+                ->latest()
+                ->limit(20)
+                ->get(['id', 'user_id', 'store_id', 'rating', 'body', 'status', 'created_at']);
+        }
+
+        $messagesTotal = LineMessage::where('line_user_id', $lineUserId)->count();
+        $messages = LineMessage::where('line_user_id', $lineUserId)
+            ->orderByDesc('created_at')->limit(5)->get();
+
+        $adminName = $friend?->admin_name;
+        $displayName = $friend?->display_name ?: $user?->line_display_name;
+
+        return response()->json([
+            'person' => [
+                'line_user_id' => $lineUserId,
+                'name' => $adminName ?: $displayName ?: $user?->nickname ?: null,
+                'admin_name' => $adminName,
+                'display_name' => $displayName,
+                'picture_url' => $friend?->picture_url ?: $user?->line_picture_url,
+                'is_following' => (bool) ($friend?->is_following ?? false),
+                'is_talk' => (bool) $friend,
+                'has_account' => (bool) $user,
+                'admin_notes' => $friend?->admin_notes ?? $user?->admin_notes,
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'status' => $user->status,
+                    'line_display_name' => $user->line_display_name,
+                    'nickname' => $user->nickname,
+                    'reviews_count' => $reviewsCount,
+                    'created_at' => $user->created_at?->toIso8601String(),
+                ] : null,
+                'reviews' => $reviews,
+                'messages' => LineMessageResource::collection($messages)->resolve(),
+                'messages_total' => $messagesTotal,
+            ],
+        ]);
+    }
+
+    /**
+     * 管理用の表示名 (admin_name) を更新。LINE 本来の名前 (display_name) は触らない。
+     * トーク相手は LineFriend に、ログインのみの相手は User.nickname に書く。
+     */
+    public function updateName(Request $request, string $lineUserId): JsonResponse
+    {
+        $name = $request->validate(['admin_name' => ['nullable', 'string', 'max:100']])['admin_name'] ?: null;
+        $this->writeAdminField($lineUserId, ['admin_name' => $name], ['nickname' => $name]);
+        return $this->show($lineUserId);
+    }
+
+    /**
+     * 管理メモ (admin_notes) を更新。トーク相手は LineFriend に、ログインのみは User に書く。
+     */
+    public function updateNotes(Request $request, string $lineUserId): JsonResponse
+    {
+        $notes = $request->validate(['admin_notes' => ['nullable', 'string', 'max:2000']])['admin_notes'] ?: null;
+        $this->writeAdminField($lineUserId, ['admin_notes' => $notes], ['admin_notes' => $notes]);
+        return $this->show($lineUserId);
+    }
+
+    /**
+     * 管理メタデータの書き込み先を決める: トーク相手(LineFriend) があればそこ、
+     * 無くてログインユーザーがあれば User、どちらも無ければ新規 LineFriend を作る。
+     *
+     * @param  array<string, mixed>  $friendFields
+     * @param  array<string, mixed>  $userFields
+     */
+    private function writeAdminField(string $lineUserId, array $friendFields, array $userFields): void
+    {
+        $friend = LineFriend::where('line_user_id', $lineUserId)->first();
+        if ($friend) {
+            $friend->update($friendFields);
+            return;
+        }
+        $user = User::where('line_user_id', $lineUserId)->first();
+        if ($user) {
+            $user->update($userFields);
+            return;
+        }
+        LineFriend::create(array_merge(['line_user_id' => $lineUserId, 'is_following' => false], $friendFields));
     }
 
     /**

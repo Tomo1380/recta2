@@ -21,10 +21,79 @@ export type User = GeneratedUserResource;
 
 export interface UserIndexResponse {
   users: Paginated<User>;
+  /** アプリ User 未連携の LINE 友だち (LINEログインせずメッセージした人)。1ページ目に表示。 */
+  unlinked_friends?: LineFriend[];
   line_stats: {
     total_users: number;
     line_friend_count: number;
+    unlinked_friend_count?: number;
   };
+}
+
+/** ユーザー管理一覧の正規化「人」行 (LINEトーク主役・line_user_id 軸)。 */
+export interface AdminPersonRow {
+  line_user_id: string;
+  /** 表示名 (admin_name 優先) */
+  name: string | null;
+  /** LINE 本来の名前 */
+  display_name: string | null;
+  picture_url: string | null;
+  is_following: boolean;
+  messages_count: number;
+  user_id: number | null;
+  /** LINEログイン済 (User あり) か */
+  has_account: boolean;
+  status: string | null;
+  reviews_count: number | null;
+  last_activity: string | null;
+  kind: "talk" | "login_only";
+}
+
+export interface PeopleIndexResponse {
+  people: Paginated<AdminPersonRow>;
+  stats: {
+    talk_count: number;
+    login_only_count: number;
+    total_users: number;
+  };
+}
+
+export interface AdminPersonReview {
+  id: number;
+  store_id: number;
+  rating: number;
+  body: string | null;
+  status: string;
+  created_at: string | null;
+  store?: { id: number; name: string } | null;
+}
+
+/** 人物詳細 (line_user_id 基準)。トーク相手 + 連携Userの口コミ等を統合。 */
+export interface AdminPerson {
+  line_user_id: string;
+  name: string | null;
+  admin_name: string | null;
+  display_name: string | null;
+  picture_url: string | null;
+  is_following: boolean;
+  is_talk: boolean;
+  has_account: boolean;
+  admin_notes: string | null;
+  user: {
+    id: number;
+    status: string;
+    line_display_name: string | null;
+    nickname: string | null;
+    reviews_count: number;
+    created_at: string | null;
+  } | null;
+  reviews: AdminPersonReview[];
+  messages: LineMessage[];
+  messages_total: number;
+}
+
+export interface PersonShowResponse {
+  person: AdminPerson;
 }
 
 export interface UserShowResponse {
@@ -169,6 +238,7 @@ export interface DashboardRecentReview {
 export interface DashboardRecentMessage {
   id: number;
   user_id: number | null;
+  line_user_id: string | null;
   name: string;
   avatar: string;
   message: string;
@@ -280,14 +350,19 @@ export interface LineFriend {
   id: number;
   user_id: number | null;
   line_user_id: string;
+  /** LINE 本来の表示名 (プロフィール取得 or ログイン由来) */
   display_name: string | null;
+  /** 管理画面上の別名 (運営が編集) */
+  admin_name?: string | null;
+  /** 表示用の解決名 (admin_name 優先)。API が付与。 */
+  name?: string | null;
   picture_url: string | null;
   followed_at: string | null;
   unfollowed_at: string | null;
   is_following: boolean;
   created_at: string;
   updated_at: string;
-  messages_count?: number;
+  messages_count?: number | null;
   user?: User;
 }
 

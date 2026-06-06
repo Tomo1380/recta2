@@ -131,6 +131,14 @@ Route::prefix('admin')->group(function () {
         Route::get('/users/{user}/messages', [UserController::class, 'messages']);
         Route::post('/users/broadcast', [LineFriendController::class, 'broadcast']);
 
+        // LINE 友だち (line_user_id 基準のトーク)。アプリ User 未連携の相手でも
+        // トーク・送信・名前編集ができるようにする (2026-06-06 FB)。
+        Route::get('/line-friends/{lineUserId}/messages', [LineFriendController::class, 'messages']);
+        Route::get('/line-friends/{lineUserId}', [LineFriendController::class, 'show']);
+        Route::post('/line-friends/push', [LineFriendController::class, 'push']);
+        Route::put('/line-friends/{lineUserId}/name', [LineFriendController::class, 'updateName']);
+        Route::put('/line-friends/{lineUserId}/notes', [LineFriendController::class, 'updateNotes']);
+
         // 店舗管理
         // 住所 → 緯度経度 (Google Geocoding) — apiResource の {store} に飲まれないよう先に登録。
         Route::post('/stores/geocode', [StoreController::class, 'geocode']);
