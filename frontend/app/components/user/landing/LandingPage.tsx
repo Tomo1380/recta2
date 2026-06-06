@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Star, MapPin, Briefcase, ChevronRight } from "lucide-react";
+import { Star, MapPin, Briefcase, ChevronRight, FileText } from "lucide-react";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 
 export interface LandingStore {
@@ -215,6 +216,9 @@ export default function LandingPage({ data }: { data: LandingPayload }) {
         </p>
       </section>
 
+      {/* このエリアのコラム (回遊動線: エリアLP → 記事) */}
+      {area && <AreaColumns areaName={area.name} />}
+
       {/* Related LPs */}
       {(related.areas?.length || related.categories?.length) && (
         <section className="mx-4 mb-8 rounded-2xl bg-white p-4" style={{ border: "1px solid rgba(27,37,40,0.06)" }}>
@@ -358,5 +362,88 @@ function buildAboutText(
     `Recta では各店舗の時給レンジ、面接情報、体入の流れ、口コミ評価を一覧で比較でき、` +
     `気になる店舗は LINE から直接担当者へ相談できます。体入確約・住居サポート・上京サポートも、` +
     `各店舗ページに条件が明示されているので、自分に合う一店を効率よく見つけられます。`
+  );
+}
+
+interface AreaColumnSummary {
+  id: number;
+  slug: string;
+  title: string;
+  thumbnail_url?: string | null;
+  section?: string | null;
+  category?: string | null;
+}
+
+/**
+ * エリアLP → このエリアのコラム (回遊動線)。エリア名を tags に持つ記事を
+ * クライアントで取得して表示。SEO 本文ではなく補助コンテンツなので client-fetch。
+ */
+function AreaColumns({ areaName }: { areaName: string }) {
+  const [cols, setCols] = useState<AreaColumnSummary[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/columns?tags=${encodeURIComponent(areaName)}&per_page=4`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!cancelled && j?.articles?.data) setCols(j.articles.data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [areaName]);
+
+  if (cols.length === 0) return null;
+
+  return (
+    <section className="mx-4 mb-6 rounded-2xl bg-white p-4" style={{ border: "1px solid rgba(27,37,40,0.06)" }}>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="flex items-center gap-1.5 text-[14px] font-bold" style={{ color: DARK }}>
+          <FileText size={14} style={{ color: GOLD }} />
+          {areaName}のコラム
+        </h2>
+        <Link
+          to={`/columns?tag=${encodeURIComponent(areaName)}`}
+          className="text-[12px]"
+          style={{ color: "rgba(27,37,40,0.55)", textDecoration: "none" }}
+        >
+          もっと見る →
+        </Link>
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {cols.map((c) => (
+          <Link
+            key={c.id}
+            to={`/columns/${c.slug}`}
+            className="shrink-0 overflow-hidden rounded-xl"
+            style={{ width: 170, background: "#fcfeff", border: "1px solid rgba(27,37,40,0.06)", textDecoration: "none" }}
+          >
+            <div
+              className="relative w-full"
+              style={{
+                height: 100,
+                background: c.thumbnail_url
+                  ? `center / cover url(${c.thumbnail_url})`
+                  : "linear-gradient(135deg,#1b2528,#2a3a3f)",
+              }}
+            >
+              {(c.section || c.category) && (
+                <span
+                  className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{ background: "rgba(255,255,255,0.92)", color: DARK }}
+                >
+                  {c.section || c.category}
+                </span>
+              )}
+            </div>
+            <div className="px-2.5 py-2">
+              <p className="line-clamp-2 text-xs font-bold" style={{ color: DARK, lineHeight: 1.4 }}>
+                {c.title}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }

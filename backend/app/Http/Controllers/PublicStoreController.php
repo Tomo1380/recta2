@@ -57,6 +57,20 @@ class PublicStoreController extends Controller
             }
         }
 
+        // コラムの「条件で探す / 働き方で探す」チップ用: いずれかのタグに一致 (OR)。
+        // 表記ゆれ（日払いあり / 全額日払い / 体入全額日払い 等）を 1 チップで束ねる。
+        if ($anyTags = $request->input('any_tags')) {
+            $anyList = is_array($anyTags) ? $anyTags : explode(',', $anyTags);
+            $query->where(function ($q) use ($anyList) {
+                foreach ($anyList as $tag) {
+                    $tag = trim($tag);
+                    if ($tag !== '') {
+                        $q->orWhereJsonContains('feature_tags', $tag);
+                    }
+                }
+            });
+        }
+
         if ($minWage = $request->input('min_hourly')) {
             // 通常時給は廃止。時給フィルタは体入時給 (wage.trial) 基準。新キー
             // hourly_min を優先し旧キー avg_hourly にフォールバック。単位付き文字列も
@@ -159,6 +173,10 @@ class PublicStoreController extends Controller
         // videos / staffPhotos を eager load → Resource が projectVideos/projectStaffPhotos で取り出す
         $store->load(['videos', 'staffPhotos']);
 
+        // AIチャット初期メッセージ用の紹介文を必要なら生成 (素材未変更ならキャッシュ即返却)。
+        // 失敗・キー未設定でも例外は飲み込まれ、フロントは従来 fallback で表示する。
+        app(\App\Services\AiChat\StoreIntroSummarizer::class)->intro($store);
+
         $storePayload = (new StoreResource($store))->resolve();
 
         // Related stores (same area, same category)
@@ -173,9 +191,25 @@ class PublicStoreController extends Controller
             ->limit(6)
             ->get();
 
+        // 関連コラム (回遊動線): この店のエリア / 業種を tags に持つ公開記事。
+        // 「渋谷のキャバを見た → 渋谷 / キャバクラの読み物」へ送客する。
+        $relatedColumns = \App\Models\Article::published()
+            ->where(function ($q) use ($store) {
+                if ($store->area) {
+                    $q->orWhereJsonContains('tags', $store->area);
+                }
+                if ($store->category) {
+                    $q->orWhereJsonContains('tags', $store->category);
+                }
+            })
+            ->orderByDesc('published_at')
+            ->limit(3)
+            ->get(['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'section', 'published_at']);
+
         return response()->json([
             'store' => $storePayload,
             'related' => StoreResource::collection($related)->resolve(),
+            'related_columns' => $relatedColumns,
         ]);
     }
 

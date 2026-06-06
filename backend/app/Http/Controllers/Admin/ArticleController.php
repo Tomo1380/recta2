@@ -71,6 +71,9 @@ class ArticleController extends Controller
 
     public function show(Article $article): ArticleResource
     {
+        // C4: 編集画面で「関連店舗」ピッカーの初期値を名前付きで表示するため解決。
+        $article->related_stores = $article->relatedStoreSummaries();
+
         return new ArticleResource($article);
     }
 

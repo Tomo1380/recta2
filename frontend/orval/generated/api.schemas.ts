@@ -172,6 +172,11 @@ export interface ArticleResource {
   /** @nullable */
   category: string | null;
   /** @nullable */
+  section: string | null;
+  related_store_ids: unknown[];
+  /** controller が解決して attach したときだけ出す（一覧では未解決）。 */
+  related_stores?: string;
+  /** @nullable */
   tags: unknown[] | null;
   status: string;
   published_at: string;
@@ -199,6 +204,8 @@ export interface ArticleSummaryResource {
   thumbnail_url: string | null;
   /** @nullable */
   category: string | null;
+  /** @nullable */
+  section: string | null;
   /** @nullable */
   tags: unknown[] | null;
   published_at: string;
@@ -514,6 +521,20 @@ export interface StoreAreaRequest {
 }
 
 /**
+ * C2: コラムTOPの大テーマ（4種）。
+ * @nullable
+ */
+export type StoreArticleRequestSection = typeof StoreArticleRequestSection[keyof typeof StoreArticleRequestSection] | null;
+
+
+export const StoreArticleRequestSection = {
+  夜の始め方: '夜の始め方',
+  エリア別比較: 'エリア別比較',
+  地方から上京: '地方から上京',
+  'Q&A': 'Q&A',
+} as const;
+
+/**
  * @nullable
  */
 export type StoreArticleRequestStatus = typeof StoreArticleRequestStatus[keyof typeof StoreArticleRequestStatus] | null;
@@ -552,10 +573,20 @@ export interface StoreArticleRequest {
      * @nullable
      */
   category?: string | null;
+  /**
+     * C2: コラムTOPの大テーマ（4種）。
+     * @nullable
+     */
+  section?: StoreArticleRequestSection;
   /** @nullable */
   status?: StoreArticleRequestStatus;
   /** @nullable */
   published_at?: string | null;
+  /**
+     * C4: 「この記事で紹介した店舗」（手動紐付け）。
+     * @nullable
+     */
+  related_store_ids?: number[] | null;
   /**
      * @nullable
      * @items.maxLength 50
@@ -894,6 +925,19 @@ export interface UpdateAreaRequest {
 /**
  * @nullable
  */
+export type UpdateArticleRequestSection = typeof UpdateArticleRequestSection[keyof typeof UpdateArticleRequestSection] | null;
+
+
+export const UpdateArticleRequestSection = {
+  夜の始め方: '夜の始め方',
+  エリア別比較: 'エリア別比較',
+  地方から上京: '地方から上京',
+  'Q&A': 'Q&A',
+} as const;
+
+/**
+ * @nullable
+ */
 export type UpdateArticleRequestStatus = typeof UpdateArticleRequestStatus[keyof typeof UpdateArticleRequestStatus] | null;
 
 
@@ -931,9 +975,13 @@ export interface UpdateArticleRequest {
      */
   category?: string | null;
   /** @nullable */
+  section?: UpdateArticleRequestSection;
+  /** @nullable */
   status?: UpdateArticleRequestStatus;
   /** @nullable */
   published_at?: string | null;
+  /** @nullable */
+  related_store_ids?: number[] | null;
   /**
      * @nullable
      * @items.maxLength 50

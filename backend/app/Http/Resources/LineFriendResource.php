@@ -20,7 +20,15 @@ class LineFriendResource extends JsonResource
             'id' => $this->id,
             'user_id' => $this->user_id,
             'line_user_id' => $this->line_user_id,
+            // display_name = LINE 本来の名前 / admin_name = 管理用の別名。
+            // name = 表示用の解決名 (admin_name 優先)。
             'display_name' => $this->display_name,
+            'admin_name' => $this->admin_name,
+            'name' => $this->admin_name
+                ?: $this->display_name
+                ?: ($this->user?->nickname)
+                ?: ($this->user?->line_display_name)
+                ?: null,
             'picture_url' => $this->picture_url,
             'followed_at' => $this->followed_at?->toIso8601String(),
             'unfollowed_at' => $this->unfollowed_at?->toIso8601String(),

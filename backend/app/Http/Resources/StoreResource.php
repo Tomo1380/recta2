@@ -106,6 +106,10 @@ class StoreResource extends JsonResource
             //   - seo_meta_description: 運営入力の生値 (null 可)
             //   - meta_description: 表示用 (常に文字列)
             'meta_description' => self::resolveMetaDescription($this->resource, $trial),
+
+            // AIチャット初期メッセージ用の紹介文 (StoreIntroSummarizer が生成・キャッシュ)。
+            // 未生成 / 素材なしなら null → フロントは従来の fallback intro を出す。
+            'ai_intro' => $this->resource->ai_intro ?? null,
         ];
 
         $merged = array_merge($base, $flat);

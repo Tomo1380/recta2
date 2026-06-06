@@ -12,6 +12,8 @@ class LineFriend extends Model
         'user_id',
         'line_user_id',
         'display_name',
+        'admin_name',
+        'admin_notes',
         'picture_url',
         'followed_at',
         'unfollowed_at',

@@ -46,6 +46,39 @@ class LineMessagingService
     }
 
     /**
+     * フォロワーの LINE プロフィール (表示名 / アイコン) を取得する。
+     * GET /v2/bot/profile/{userId}。失敗時 (トークン未設定 / ブロック済み等) は null。
+     *
+     * @return array{display_name: ?string, picture_url: ?string}|null
+     */
+    public function getProfile(string $lineUserId): ?array
+    {
+        if (($this->accessToken ?? '') === '') {
+            return null;
+        }
+
+        // プロフィール取得は補助機能。接続不可・タイムアウト・ロギング失敗等の
+        // どんな例外でもリクエスト本体を落とさないよう、全体を握り潰して null を返す。
+        try {
+            $response = Http::timeout(5)->withHeaders([
+                'Authorization' => "Bearer {$this->accessToken}",
+            ])->get("{$this->baseUrl}/profile/{$lineUserId}");
+
+            if ($response->failed()) {
+                return null;
+            }
+
+            $data = $response->json();
+            return [
+                'display_name' => $data['displayName'] ?? null,
+                'picture_url' => $data['pictureUrl'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * Reply to a message using a reply token.
      */
     public function replyMessage(string $replyToken, array $messages): array

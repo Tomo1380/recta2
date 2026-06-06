@@ -21,6 +21,15 @@ const AI_AVATAR_BG = "linear-gradient(135deg,#D4AF37,#9a7a20)";
 const ROBOT_SVG_PATH = "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1a7 7 0 0 1-7 7H9a7 7 0 0 1-7-7H1a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 12 2zm-4 9a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm8 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z";
 const BASE_GRADIENT = LUXE.baseGradient;
 
+/** トップ→コラムのテーマ入口。/columns?section= にディープリンクする
+ *  (Article::SECTIONS と一致)。コラムの探し方を入口から見せる導線。 */
+const COLUMN_THEMES: { label: string; sub: string }[] = [
+  { label: "夜の始め方", sub: "未経験から安心スタート" },
+  { label: "エリア別比較", sub: "街ごとの特徴がわかる" },
+  { label: "地方から上京", sub: "上京の不安を解消" },
+  { label: "Q&A", sub: "よくある疑問に回答" },
+];
+
 // ─── Types ─────────────────────────────────────────
 interface PickupShop {
   id: number;
@@ -677,6 +686,40 @@ export default function TopPage({
               >
                 もっと見る →
               </Link>
+            </div>
+
+            {/* テーマ入口 — /columns?section= にディープリンク (ダーク×ゴールド) */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {COLUMN_THEMES.map((t) => (
+                <Link
+                  key={t.label}
+                  to={`/columns?section=${encodeURIComponent(t.label)}`}
+                  className="relative overflow-hidden rounded-xl px-3 py-2.5 active:scale-[0.98] transition-transform"
+                  style={{
+                    background: `linear-gradient(135deg, ${DARK} 0%, #2c3e46 100%)`,
+                    border: "1px solid rgba(212,175,55,.3)",
+                    boxShadow: "0 4px 14px rgba(27,37,40,.16), inset 0 1px 0 rgba(212,175,55,.1)",
+                    textDecoration: "none",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    className="absolute -right-5 -top-5 w-12 h-12 rounded-full"
+                    style={{ background: "radial-gradient(circle, rgba(212,175,55,.2), transparent 70%)" }}
+                  />
+                  <div className="flex items-center justify-between gap-1">
+                    <span style={{ fontFamily: J, fontWeight: 700, fontSize: "13px", color: "white", letterSpacing: ".02em" }}>
+                      {t.label}
+                    </span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M9 6l6 6-6 6" stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div className="mt-0.5 truncate" style={{ fontFamily: J, fontSize: "10px", color: "rgba(212,175,55,.85)" }}>
+                    {t.sub}
+                  </div>
+                </Link>
+              ))}
             </div>
 
             <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>

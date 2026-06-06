@@ -537,7 +537,7 @@ export function UserDetailPage() {
               </h3>
               {lineMessages.length > 5 && (
                 <button
-                  onClick={() => navigate(`/admin/users/${user.id}/messages`)}
+                  onClick={() => navigate(`/admin/people/${user.line_user_id}`)}
                   className="text-[12px] text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition"
                 >
                   全て見る

@@ -57,6 +57,6 @@ export default [
     route("admin/fine-tuning-qa/new", "routes/admin/fine-tuning-qa-new.tsx"),
     route("admin/fine-tuning-qa/:id/edit", "routes/admin/fine-tuning-qa-edit.tsx"),
     route("admin/users/broadcast", "routes/admin/line-broadcast.tsx"),
-    route("admin/users/:userId/messages", "routes/admin/line-messages.tsx"),
+    route("admin/people/:lineUserId", "routes/admin/person-detail.tsx"),
   ]),
 ] satisfies RouteConfig;

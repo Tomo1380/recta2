@@ -296,7 +296,8 @@ export function DashboardPage() {
   const k = data.kpis;
 
   return (
-    <div className="space-y-6">
+    // 並び順は CSS order で制御 (2026-06-06 FB: 直近3リストをグラフの上に)。
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
         <div>
@@ -317,7 +318,7 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="order-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           icon={Building2}
           label="公開店舗数"
@@ -360,7 +361,7 @@ export function DashboardPage() {
       </div>
 
       {/* Time-series charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="order-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* AI Chat trend by mode */}
         <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
@@ -483,10 +484,12 @@ export function DashboardPage() {
       </div>
 
       {/* アクセス解析: 店舗/エリア/コラム ランキング + LINE経路 + 計測リンク発行 (FB A2-A4) */}
-      <AnalyticsSection />
+      <div className="order-4">
+        <AnalyticsSection />
+      </div>
 
       {/* Secondary indicators */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="order-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
             未読LINE
@@ -533,8 +536,8 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent activity grids */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* Recent activity grids (FB: グラフより上に出す) */}
+      <div className="order-2 grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Recent reviews */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <SectionHeader
@@ -615,7 +618,11 @@ export function DashboardPage() {
                   key={m.id}
                   type="button"
                   onClick={() =>
-                    navigate(m.user_id ? `/admin/users/${m.user_id}` : "/admin/users")
+                    navigate(
+                      m.line_user_id
+                        ? `/admin/people/${m.line_user_id}`
+                        : "/admin/users"
+                    )
                   }
                   className={`w-full text-left px-4 sm:px-5 py-3 flex items-start gap-3 hover:bg-muted/40 transition ${
                     m.unread ? "bg-indigo-50/50" : ""
@@ -659,7 +666,7 @@ export function DashboardPage() {
           <SectionHeader
             title="AIチャット直近"
             icon={Bot}
-            href="/admin/ai-chat"
+            href="/admin/ai-chat?tab=history"
             navigate={navigate}
           />
           <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
@@ -667,9 +674,11 @@ export function DashboardPage() {
               <EmptyState message="AIチャットの履歴がまだありません" />
             ) : (
               data.recent_chats.map((c) => (
-                <div
+                <button
                   key={c.id}
-                  className="px-4 sm:px-5 py-3"
+                  type="button"
+                  onClick={() => navigate("/admin/ai-chat?tab=history")}
+                  className="w-full text-left px-4 sm:px-5 py-3 hover:bg-muted/40 transition"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -697,7 +706,7 @@ export function DashboardPage() {
                     {numberFmt.format(c.total_tokens)} tokens
                     {c.page_type ? ` ・ ${c.page_type}` : ""}
                   </p>
-                </div>
+                </button>
               ))
             )}
           </div>
