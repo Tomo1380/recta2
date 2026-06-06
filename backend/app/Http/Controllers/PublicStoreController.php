@@ -173,6 +173,10 @@ class PublicStoreController extends Controller
         // videos / staffPhotos を eager load → Resource が projectVideos/projectStaffPhotos で取り出す
         $store->load(['videos', 'staffPhotos']);
 
+        // AIチャット初期メッセージ用の紹介文を必要なら生成 (素材未変更ならキャッシュ即返却)。
+        // 失敗・キー未設定でも例外は飲み込まれ、フロントは従来 fallback で表示する。
+        app(\App\Services\AiChat\StoreIntroSummarizer::class)->intro($store);
+
         $storePayload = (new StoreResource($store))->resolve();
 
         // Related stores (same area, same category)

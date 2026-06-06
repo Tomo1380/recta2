@@ -13,6 +13,7 @@ import {
   type CompareTrayItem,
 } from "~/lib/compare-tray";
 import { getViewedStores } from "~/lib/viewed-stores";
+import { useFabWarmUp } from "~/hooks/useFabWarmUp";
 
 /**
  * UserFab — 全ユーザー画面共通の右下フローティングボタン群。
@@ -73,6 +74,9 @@ export default function UserFab() {
   const location = useLocation();
   const [tray, setTray] = useState<CompareTrayItem[]>([]);
   const [sheet, setSheet] = useState<SheetMode>(null);
+  // LINE FAB は「温まってから」表示 (UX FB #2: 押し売り感の低減)。比較ボタンは
+  // ユーザーが店を追加した時だけ出る別シグナルなので warm-up の対象外。
+  const { warmed, animate: warmAnimate } = useFabWarmUp();
 
   useEffect(() => {
     setTray(getCompareTray());
@@ -162,7 +166,9 @@ export default function UserFab() {
           </button>
         )}
 
-        {/* LINE CTA — ダークガラス 1 枚に統一し、LINE は右端の緑円アイコンに留める */}
+        {/* LINE CTA — ダークガラス 1 枚に統一し、LINE は右端の緑円アイコンに留める。
+            warm-up (スクロール/滞在) で温まってから表示する (UX FB #2)。 */}
+        {warmed && (
         <button
           type="button"
           onClick={() => setSheet("line")}
@@ -182,6 +188,8 @@ export default function UserFab() {
             cursor: "pointer",
             fontFamily: J,
             whiteSpace: "nowrap",
+            // 生の遷移 (warm-up 達成) でだけ登場アニメ。セッション再訪の即表示では付けない。
+            animation: warmAnimate ? "fab-warm-in .42s cubic-bezier(.2,.8,.2,1) both" : undefined,
           }}
         >
           {/* コピー — 数字を強調 */}
@@ -217,6 +225,7 @@ export default function UserFab() {
             <LineIcon size={23} fill="white" />
           </span>
         </button>
+        )}
       </div>
 
       {/* ボトムシート */}
@@ -304,6 +313,13 @@ export default function UserFab() {
         @keyframes fab-sheet-in {
           from { transform: translateY(100%); }
           to   { transform: translateY(0); }
+        }
+        @keyframes fab-warm-in {
+          from { opacity: 0; transform: translateY(12px) scale(0.96); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="fab-warm-in"] { animation: none !important; }
         }
       `}</style>
     </>

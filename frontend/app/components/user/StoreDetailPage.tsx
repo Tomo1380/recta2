@@ -309,6 +309,8 @@ export interface StoreDetailStore {
   features_text: string;
   /** 店舗まとめ (改行＋内部リンク対応のフリーテキスト) */
   summary_text?: string | null;
+  /** AIチャット初期メッセージ用の紹介文 (StoreIntroSummarizer が生成・キャッシュ) */
+  ai_intro?: string | null;
   dress_code: string | DressCodeObject | null;
   images: StoreImage[] | null;
   /** Legacy single-video URL — still emitted by the API as the first videos[] entry. Prefer `videos`. */
@@ -461,6 +463,36 @@ function toAmountString(v: number | string | null | undefined): string | null {
   // 数字のみ "0" は未入力扱い
   if (/^0+$/.test(s)) return null;
   return s;
+}
+
+/**
+ * クイックスタッツの「日払い」セル用ラベルを店舗データから導出する純粋関数。
+ * 日払いの有無は payroll.type / pay_system_types / feature_tags / 給与備考 など
+ * 複数の自由入力に散らばっているので、それらを横断して「日払い」を含むかで判定する。
+ *  - 「全額」も含む → "全額" (体入全額日払い等を強く打ち出す)
+ *  - 日払いに言及あり → "OK"
+ *  - 言及なし → null (セルは "—" 表示)
+ * 旧「体入日給」(= 体入時給×4 の派生値・最寄り駅同様ヒーローと情報重複) を置き換える枠。
+ */
+export function dailyPayLabel(store: {
+  payroll_system_type?: string | null;
+  payroll_system_description?: string | null;
+  pay_system_types?: string[] | null;
+  pay_system_note?: string | null;
+  feature_tags?: string[] | null;
+  salary_notes?: string | null;
+}): "全額" | "OK" | null {
+  const sources: string[] = [
+    store.payroll_system_type ?? "",
+    store.payroll_system_description ?? "",
+    store.pay_system_note ?? "",
+    store.salary_notes ?? "",
+    ...(store.pay_system_types ?? []),
+    ...(store.feature_tags ?? []),
+  ];
+  const combined = sources.join(" ");
+  if (!combined.includes("日払い")) return null;
+  return combined.includes("全額") ? "全額" : "OK";
 }
 
 /**
@@ -790,20 +822,23 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
             </div>
             <div className="border-r px-2 py-3 text-center" style={{ borderColor: "rgba(27,37,40,0.06)" }}>
               <div className="text-[9px] font-medium" style={{ color: "rgba(27,37,40,0.5)" }}>
-                体入日給
+                日払い
               </div>
               {(() => {
-                // 体入日給 = 体入時給 × 1日4時間 (lib/wage.ts と同じ計算元)。
-                const x4 = (v: number | string | null | undefined): number | null => {
-                  const n = Number(String(v ?? "").replace(/[^\d]/g, ""));
-                  return Number.isFinite(n) && n > 0 ? n * 4 : null;
-                };
+                // 旧「体入日給」(= 体入時給×4 の派生値) は隣の体入時給と情報が重複する
+                // ため廃止し、業界定番かつ他に表示のない「日払い」に差し替えた
+                // (2026-06-06 FB)。判定は dailyPayLabel に集約。
+                const label = dailyPayLabel(store);
                 return (
-                  <QuickRangeValue
-                    min={x4(store.trial_hourly_min ?? store.trial_avg_hourly)}
-                    max={x4(store.trial_hourly_max ?? store.trial_hourly)}
-                    color="#1b2528"
-                  />
+                  <div
+                    className="mt-0.5 text-[13px] font-bold leading-[1.15]"
+                    style={{
+                      color: label ? "#6FB37D" : "rgba(27,37,40,0.4)",
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    {label ?? "—"}
+                  </div>
                 );
               })()}
             </div>
@@ -878,6 +913,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                     business_hours: store.business_hours,
                     same_day_trial: store.trial_type === "same_day",
                     trial_hourly: store.trial_hourly_min ?? store.trial_hourly_max ?? store.trial_avg_hourly ?? store.trial_hourly ?? null,
+                    ai_intro: store.ai_intro,
                   }}
                 />
                 <LineCtaCard

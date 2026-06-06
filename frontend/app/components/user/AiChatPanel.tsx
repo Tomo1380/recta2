@@ -108,6 +108,8 @@ interface StoreInfo {
   business_hours?: string;
   same_day_trial?: boolean;
   trial_hourly?: string | number | null;
+  /** AI生成の店舗紹介文 (StoreIntroSummarizer)。あればスペック羅列の代わりにこれを出す。 */
+  ai_intro?: string | null;
 }
 
 /**
@@ -371,11 +373,6 @@ function formatWage(min?: number, max?: number): string {
 // Intro animation script (per page type)
 // ---------------------------------------------------------------------------
 
-function formatCurrencyShort(n?: number) {
-  if (!n) return "";
-  return n.toLocaleString();
-}
-
 function getIntroScript(
   pageType: string,
   storeName?: string,
@@ -383,26 +380,28 @@ function getIntroScript(
 ) {
   if (pageType === "detail" && storeInfo) {
     const s = storeInfo;
-    const hourly =
-      s.trial_hourly_min && s.trial_hourly_max
-        ? `体入時給${formatCurrencyShort(s.trial_hourly_min)}〜${formatCurrencyShort(s.trial_hourly_max)}円`
-        : "";
-    const location = [s.area, s.nearest_station].filter(Boolean).join("・");
-    const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
-    const trial = s.same_day_trial
-      ? `体入OK${s.trial_hourly ? `（体入時給: ${s.trial_hourly}）` : ""}`
-      : "";
 
-    let summary = `${s.name}の情報をまとめますね！\n\n`;
-    if (s.category && location) summary += `${s.category} ／ ${location}\n`;
-    if (hourly) summary += `${hourly}\n`;
-    if (s.business_hours) summary += `営業: ${s.business_hours}\n`;
-    if (trial) summary += `${trial}\n`;
-    if (tags) summary += `特徴: ${tags}\n`;
-    summary += `\n気になることがあれば何でも聞いてくださいね。`;
+    // 2026-06-06 FB: 旧 intro は カテゴリ/体入時給/営業/特徴タグ を並べていたが、
+    // ヒーロー直下のクイックスタッツ・店舗情報カードと丸被りだった。
+    // バックエンド (StoreIntroSummarizer) が自由入力を Gemini 要約した ai_intro が
+    // あれば、スペック羅列ではなく「雰囲気・人・安心」が伝わる紹介文を優先表示する。
+    const intro = (s.ai_intro ?? "").trim();
+    if (intro) {
+      return {
+        userMessage: `${s.name}ってどんなお店？`,
+        aiMessage: `${intro}\n\n気になることがあれば何でも聞いてくださいね。`,
+      };
+    }
+
+    // ── fallback (ai_intro 未生成・素材なし時) ───────────────────────────
+    // スペックは上のカードと重複するので最小限にし、相談を促す方向に倒す。
+    const tags = (s.feature_tags ?? []).slice(0, 4).join("、");
+    let summary = `${s.name}の相談、お任せください！\n`;
+    if (tags) summary += `${tags}\n`;
+    summary += `雰囲気・体入の流れ・実際に稼げるかなど、気になることを何でも聞いてくださいね。`;
 
     return {
-      userMessage: `${s.name}について教えて`,
+      userMessage: `${s.name}ってどんなお店？`,
       aiMessage: summary,
     };
   }
