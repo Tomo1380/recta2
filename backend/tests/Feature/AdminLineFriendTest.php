@@ -7,6 +7,7 @@ use App\Models\LineFriend;
 use App\Models\LineMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
@@ -134,6 +135,29 @@ class AdminLineFriendTest extends TestCase
         $res->assertOk()
             ->assertJsonPath('person.has_account', true)
             ->assertJsonPath('person.reviews.0.body', 'よかった');
+    }
+
+    public function test_person_show_backfills_line_name_for_following_friend(): void
+    {
+        // フォロー中なのに名前が空の相手は、詳細を開いた時に Messaging API から補完。
+        // フォロー中＝公式アカウント追加済みなので LINE ログイン未連携でも取得できる。
+        config(['services.line_messaging.access_token' => 'test-token']);
+        Http::fake([
+            'api.line.me/v2/bot/profile/*' => Http::response([
+                'displayName' => 'LINEで取得太郎',
+                'pictureUrl' => 'https://example.com/p.jpg',
+            ], 200),
+        ]);
+        LineFriend::create(['line_user_id' => 'U_follow_noname', 'display_name' => null, 'is_following' => true]);
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/admin/line-friends/U_follow_noname');
+
+        $res->assertOk()->assertJsonPath('person.display_name', 'LINEで取得太郎');
+        $this->assertDatabaseHas('line_friends', [
+            'line_user_id' => 'U_follow_noname',
+            'display_name' => 'LINEで取得太郎',
+        ]);
     }
 
     public function test_update_notes_saves_admin_memo(): void
