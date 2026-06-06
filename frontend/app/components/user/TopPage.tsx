@@ -40,7 +40,6 @@ interface PickupShop {
   trial_hourly_max?: number;
   feature_tags?: string[];
   images?: (string | { url: string })[];
-  is_pr?: boolean;
   reviews_count?: number;
   average_rating?: number;
 }
@@ -468,7 +467,6 @@ export default function TopPage({
           <div className="px-5 mb-3">
             <SectionHeader
               title="ピックアップ店舗"
-              badge="PR"
               right={
                 <Link to="/stores" style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: GOLD, textDecoration: "none" }}>すべて見る →</Link>
               }

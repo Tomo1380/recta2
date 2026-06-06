@@ -10,12 +10,10 @@ class PickupShop extends Model
     protected $fillable = [
         'store_id',
         'sort_order',
-        'is_pr',
         'visible',
     ];
 
     protected $casts = [
-        'is_pr' => 'boolean',
         'visible' => 'boolean',
     ];
 

@@ -19,7 +19,6 @@ class UpdatePickupShopRequest extends FormRequest
         return [
             'store_id' => 'sometimes|integer|exists:stores,id',
             'sort_order' => 'sometimes|integer',
-            'is_pr' => 'sometimes|boolean',
             'visible' => 'sometimes|boolean',
         ];
     }

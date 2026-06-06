@@ -20,7 +20,6 @@ class PickupShopResource extends JsonResource
             'id' => $this->id,
             'store_id' => $this->store_id,
             'sort_order' => (int) $this->sort_order,
-            'is_pr' => (bool) $this->is_pr,
             'visible' => (bool) $this->visible,
             'store' => $this->whenLoaded('store', function () {
                 return [
