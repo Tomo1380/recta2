@@ -25,9 +25,7 @@ class TrackingLinkController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $links = TrackingLink::query()
-            ->with(['store:id,name', 'article:id,title'])
             ->withCount('clicks')
-            ->when($request->query('target_type'), fn ($q, $t) => $q->where('target_type', $t))
             ->orderByDesc('created_at')
             ->get();
 
@@ -41,7 +39,7 @@ class TrackingLinkController extends Controller
             $request->user()?->id,
         );
 
-        $link->loadCount('clicks')->load(['store:id,name', 'article:id,title']);
+        $link->loadCount('clicks');
 
         return new TrackingLinkResource($link);
     }
@@ -49,7 +47,7 @@ class TrackingLinkController extends Controller
     public function update(UpdateTrackingLinkRequest $request, TrackingLink $trackingLink): TrackingLinkResource
     {
         $trackingLink->update($request->validated());
-        $trackingLink->loadCount('clicks')->load(['store:id,name', 'article:id,title']);
+        $trackingLink->loadCount('clicks');
 
         return new TrackingLinkResource($trackingLink);
     }

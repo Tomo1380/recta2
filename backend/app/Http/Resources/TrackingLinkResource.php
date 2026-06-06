@@ -21,17 +21,11 @@ class TrackingLinkResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'label' => $this->label,
-            'target_type' => $this->target_type,
-            'store_id' => $this->store_id,
-            'article_id' => $this->article_id,
-            'area' => $this->area,
             'destination_url' => $this->destination_url,
             'is_active' => (bool) $this->is_active,
             'public_url' => app(TrackingLinkService::class)->publicUrl($this->resource),
             'clicks_count' => $this->whenCounted('clicks'),
             'created_at' => $this->created_at?->toIso8601String(),
-            'store_name' => $this->whenLoaded('store', fn () => $this->store?->name),
-            'article_title' => $this->whenLoaded('article', fn () => $this->article?->title),
         ];
     }
 }

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   BarChart3,
   Check,
@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Link2,
   Loader2,
+  Pencil,
   Plus,
   Route,
   Trash2,
@@ -65,13 +66,6 @@ const RANK_TABS: { key: RankTab; label: string }[] = [
   { key: "columns", label: "コラム" },
   { key: "routes", label: "LINE導線（画面別）" },
 ];
-
-const TARGET_LABELS: Record<TrackingLink["target_type"], string> = {
-  standalone: "SNS/直リンク",
-  store: "店舗",
-  area: "エリア",
-  column: "コラム",
-};
 
 function nf(n: number): string {
   return n.toLocaleString("ja-JP");
@@ -443,7 +437,7 @@ function TrackingLinks() {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Link2 className="size-4 text-muted-foreground" />
-          <h4 className="text-[13px] font-medium">計測リンク（アフィリエイト / SNS / 店舗別）</h4>
+          <h4 className="text-[13px] font-medium">計測リンク（経路別クリック計測）</h4>
         </div>
         <Button size="sm" variant={open ? "secondary" : "default"} onClick={() => setOpen((v) => !v)}>
           <Plus className="size-3.5" />
@@ -471,7 +465,12 @@ function TrackingLinks() {
       ) : (
         <ul className="space-y-1.5 mt-2">
           {links.map((link) => (
-            <LinkRow key={link.id} link={link} onDelete={() => remove(link.id)} />
+            <LinkRow
+              key={link.id}
+              link={link}
+              onDelete={() => remove(link.id)}
+              onUpdated={(u) => setLinks((prev) => prev.map((l) => (l.id === u.id ? u : l)))}
+            />
           ))}
         </ul>
       )}
@@ -479,8 +478,19 @@ function TrackingLinks() {
   );
 }
 
-function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void }) {
+function LinkRow({
+  link,
+  onDelete,
+  onUpdated,
+}: {
+  link: TrackingLink;
+  onDelete: () => void;
+  onUpdated: (l: TrackingLink) => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(link.label);
+  const [saving, setSaving] = useState(false);
 
   const copy = async () => {
     try {
@@ -492,14 +502,44 @@ function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void 
     }
   };
 
+  const save = async () => {
+    const v = draft.trim();
+    if (!v || v === link.label) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await api.put<TrackingLink>(`/admin/tracking-links/${link.id}`, { label: v });
+      onUpdated(updated);
+      setEditing(false);
+    } catch {
+      /* 失敗時は編集状態のまま */
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <li className="flex items-center gap-2 bg-muted/40 border border-border rounded-lg px-3 py-2">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium truncate" title={link.label}>
-            {link.label}
-          </span>
-          <Badge variant="secondary">{TARGET_LABELS[link.target_type]}</Badge>
+          {editing ? (
+            <Input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              autoFocus
+              className="h-7 text-[12px]"
+            />
+          ) : (
+            <span className="text-[12px] font-medium truncate" title={link.label}>
+              {link.label}
+            </span>
+          )}
           {!link.is_active && <Badge variant="outline">停止中</Badge>}
         </div>
         <code className="text-[11px] text-muted-foreground truncate block">{link.public_url}</code>
@@ -507,6 +547,24 @@ function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void 
       <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
         {nf(link.clicks_count ?? 0)} click
       </span>
+      {editing ? (
+        <Button size="icon" variant="ghost" className="size-8 shrink-0" onClick={save} disabled={saving} title="ラベルを保存">
+          {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5 text-emerald-600" />}
+        </Button>
+      ) : (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 shrink-0"
+          onClick={() => {
+            setDraft(link.label);
+            setEditing(true);
+          }}
+          title="ラベルを編集"
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+      )}
       <Button size="icon" variant="ghost" className="size-8 shrink-0" onClick={copy} title="URLをコピー">
         {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
       </Button>
@@ -528,35 +586,20 @@ function LinkRow({ link, onDelete }: { link: TrackingLink; onDelete: () => void 
 
 function IssueForm({ onCreated }: { onCreated: (link: TrackingLink) => void }) {
   const [label, setLabel] = useState("");
-  const [targetType, setTargetType] = useState<TrackingLink["target_type"]>("standalone");
-  const [storeId, setStoreId] = useState("");
-  const [articleId, setArticleId] = useState("");
-  const [area, setArea] = useState("");
   const [destination, setDestination] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = useMemo(() => {
-    if (!label.trim()) return false;
-    if (targetType === "store" && !storeId.trim()) return false;
-    if (targetType === "column" && !articleId.trim()) return false;
-    if (targetType === "area" && !area.trim()) return false;
-    return true;
-  }, [label, targetType, storeId, articleId, area]);
+  const canSubmit = label.trim().length > 0;
 
   const submit = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = {
+      const link = await api.post<TrackingLink>("/admin/tracking-links", {
         label: label.trim(),
-        target_type: targetType,
         destination_url: destination.trim() || undefined,
-      };
-      if (targetType === "store") body.store_id = Number(storeId);
-      if (targetType === "column") body.article_id = Number(articleId);
-      if (targetType === "area") body.area = area.trim();
-      const link = await api.post<TrackingLink>("/admin/tracking-links", body);
+      });
       onCreated(link);
     } catch (e) {
       setError(e instanceof Error ? e.message : "発行に失敗しました");
@@ -567,65 +610,19 @@ function IssueForm({ onCreated }: { onCreated: (link: TrackingLink) => void }) {
 
   return (
     <div className="bg-muted/40 border border-border rounded-lg p-3 mb-3 space-y-2.5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 gap-2.5">
         <div>
-          <label className="text-[11px] text-muted-foreground">ラベル（管理用の名前）</label>
+          <label className="text-[11px] text-muted-foreground">
+            ラベル（経路がわかる名前。例: インスタbio / 店舗X用 / アフィリA）
+          </label>
           <Input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="例: X投稿_体入キャンペーン"
+            placeholder="例: インスタbio"
             className="h-8 text-[12px] mt-0.5"
           />
         </div>
         <div>
-          <label className="text-[11px] text-muted-foreground">種別</label>
-          <select
-            value={targetType}
-            onChange={(e) => setTargetType(e.target.value as TrackingLink["target_type"])}
-            className="mt-0.5 h-8 w-full text-[12px] rounded-md border border-input bg-transparent px-2"
-          >
-            <option value="standalone">SNS/直リンク</option>
-            <option value="store">店舗別</option>
-            <option value="area">エリア別</option>
-            <option value="column">コラム別</option>
-          </select>
-        </div>
-        {targetType === "store" && (
-          <div>
-            <label className="text-[11px] text-muted-foreground">店舗ID</label>
-            <Input
-              value={storeId}
-              onChange={(e) => setStoreId(e.target.value)}
-              inputMode="numeric"
-              placeholder="例: 12"
-              className="h-8 text-[12px] mt-0.5"
-            />
-          </div>
-        )}
-        {targetType === "column" && (
-          <div>
-            <label className="text-[11px] text-muted-foreground">コラムID</label>
-            <Input
-              value={articleId}
-              onChange={(e) => setArticleId(e.target.value)}
-              inputMode="numeric"
-              placeholder="例: 3"
-              className="h-8 text-[12px] mt-0.5"
-            />
-          </div>
-        )}
-        {targetType === "area" && (
-          <div>
-            <label className="text-[11px] text-muted-foreground">エリア名</label>
-            <Input
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              placeholder="例: 六本木"
-              className="h-8 text-[12px] mt-0.5"
-            />
-          </div>
-        )}
-        <div className="sm:col-span-2">
           <label className="text-[11px] text-muted-foreground">
             リダイレクト先URL（空欄ならLINE公式アカウント友だち追加）
           </label>

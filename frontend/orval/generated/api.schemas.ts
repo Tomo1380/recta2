@@ -766,32 +766,12 @@ export interface StoreReviewRequest {
   tweet_url?: string | null;
 }
 
-export type StoreTrackingLinkRequestTargetType = typeof StoreTrackingLinkRequestTargetType[keyof typeof StoreTrackingLinkRequestTargetType];
-
-
-export const StoreTrackingLinkRequestTargetType = {
-  store: 'store',
-  area: 'area',
-  column: 'column',
-  standalone: 'standalone',
-} as const;
-
 /**
  * 計測リンク（アフィリエイト/店舗別LINE導線/SNS）の新規発行。
  */
 export interface StoreTrackingLinkRequest {
   /** @maxLength 120 */
   label: string;
-  target_type: StoreTrackingLinkRequestTargetType;
-  /** @nullable */
-  store_id?: number | null;
-  /** @nullable */
-  article_id?: number | null;
-  /**
-     * @maxLength 64
-     * @nullable
-     */
-  area?: string | null;
   /**
      * @maxLength 2048
      * @nullable
@@ -868,20 +848,11 @@ export interface TrackingLinkResource {
   id: number;
   code: string;
   label: string;
-  target_type: string;
-  /** @nullable */
-  store_id: number | null;
-  /** @nullable */
-  article_id: number | null;
-  /** @nullable */
-  area: string | null;
   destination_url: string;
   is_active: boolean;
   public_url: string;
   clicks_count?: number;
   created_at: string;
-  store_name?: string;
-  article_title?: string;
 }
 
 export type UpdateAdminUserRequestRole = typeof UpdateAdminUserRequestRole[keyof typeof UpdateAdminUserRequestRole];
@@ -3290,10 +3261,6 @@ export type StoreReorderImages200 = {
 export type StoreDeleteImage200 = {
   images: unknown[];
 } | null;
-
-export type TrackingLinkIndexParams = {
-target_type?: string;
-};
 
 export type UserIndexParams = {
 mode?: string;

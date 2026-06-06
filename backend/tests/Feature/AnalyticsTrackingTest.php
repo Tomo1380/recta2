@@ -56,7 +56,6 @@ class AnalyticsTrackingTest extends TestCase
         $link = TrackingLink::create([
             'code' => 'abc123',
             'label' => 'X campaign',
-            'target_type' => 'standalone',
             'destination_url' => 'https://line.me/R/ti/p/@example',
             'is_active' => true,
         ]);
@@ -134,7 +133,6 @@ class AnalyticsTrackingTest extends TestCase
         $res = $this->actingAs($this->admin(), 'sanctum')
             ->postJson('/api/admin/tracking-links', [
                 'label' => 'SNS direct',
-                'target_type' => 'standalone',
             ]);
 
         $res->assertStatus(201)

@@ -8690,15 +8690,6 @@
                 "tags": [
                     "TrackingLink"
                 ],
-                "parameters": [
-                    {
-                        "name": "target_type",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Array of `TrackingLinkResource`",
@@ -11344,34 +11335,6 @@
                         "type": "string",
                         "maxLength": 120
                     },
-                    "target_type": {
-                        "type": "string",
-                        "enum": [
-                            "store",
-                            "area",
-                            "column",
-                            "standalone"
-                        ]
-                    },
-                    "store_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "article_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "area": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "maxLength": 64
-                    },
                     "destination_url": {
                         "type": [
                             "string",
@@ -11389,8 +11352,7 @@
                     }
                 },
                 "required": [
-                    "label",
-                    "target_type"
+                    "label"
                 ],
                 "title": "StoreTrackingLinkRequest"
             },
@@ -11500,27 +11462,6 @@
                     "label": {
                         "type": "string"
                     },
-                    "target_type": {
-                        "type": "string"
-                    },
-                    "store_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "article_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "area": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
                     "destination_url": {
                         "type": "string"
                     },
@@ -11535,22 +11476,12 @@
                     },
                     "created_at": {
                         "type": "string"
-                    },
-                    "store_name": {
-                        "type": "string"
-                    },
-                    "article_title": {
-                        "type": "string"
                     }
                 },
                 "required": [
                     "id",
                     "code",
                     "label",
-                    "target_type",
-                    "store_id",
-                    "article_id",
-                    "area",
                     "destination_url",
                     "is_active",
                     "public_url",

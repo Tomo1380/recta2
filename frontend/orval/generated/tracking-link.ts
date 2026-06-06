@@ -6,7 +6,6 @@
  */
 import type {
   StoreTrackingLinkRequest,
-  TrackingLinkIndexParams,
   TrackingLinkResource,
   UpdateTrackingLinkRequest
 } from './api.schemas';
@@ -17,11 +16,10 @@ import { rectaMutator } from '../mutators/auth';
 
 
   export const trackingLinkIndex = (
-    params?: TrackingLinkIndexParams,
+
  ) => {
       return rectaMutator<TrackingLinkResource[]>(
-      {url: `/admin/tracking-links`, method: 'GET',
-        params
+      {url: `/admin/tracking-links`, method: 'GET'
     },
       );
     }
