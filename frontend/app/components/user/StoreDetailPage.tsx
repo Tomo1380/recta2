@@ -471,32 +471,30 @@ function toAmountString(v: number | string | null | undefined): string | null {
 
 /**
  * クイックスタッツの「日払い」セル用ラベルを店舗データから導出する純粋関数。
- * 日払いの有無は payroll.type / pay_system_types / feature_tags / 給与備考 など
- * 複数の自由入力に散らばっているので、それらを横断して「日払い」を含むかで判定する。
- *  - 「全額」も含む → "全額" (体入全額日払い等を強く打ち出す)
- *  - 日払いに言及あり → "OK"
- *  - 言及なし → null (セルは "—" 表示)
- * 旧「体入日給」(= 体入時給×4 の派生値・最寄り駅同様ヒーローと情報重複) を置き換える枠。
+ *
+ * 判定は構造化フィールド「日払い上限金額(daily_pay_limit)」を最優先にする。
+ *  - daily_pay_limit が「全額/上限なし/無制限」→ "全額"
+ *  - daily_pay_limit に金額等が入っている → "OK"
+ *  - 未設定なら feature_tags の明示的な「日払い」だけ拾う
+ *  - いずれも無ければ null (セルは "—")
+ *
+ * 旧実装は給与備考などの自由文を横断して "全額" を部分一致で拾っていたが、
+ * 「全額日払い：不可能」のような否定文も "全額" と誤検出するバグがあったため、
+ * 否定混入しやすい自由文(salary_notes 等)はソースから除外した。
  */
 export function dailyPayLabel(store: {
-  payroll_system_type?: string | null;
-  payroll_system_description?: string | null;
-  pay_system_types?: string[] | null;
-  pay_system_note?: string | null;
+  daily_pay_limit?: string | null;
   feature_tags?: string[] | null;
-  salary_notes?: string | null;
 }): "全額" | "OK" | null {
-  const sources: string[] = [
-    store.payroll_system_type ?? "",
-    store.payroll_system_description ?? "",
-    store.pay_system_note ?? "",
-    store.salary_notes ?? "",
-    ...(store.pay_system_types ?? []),
-    ...(store.feature_tags ?? []),
-  ];
-  const combined = sources.join(" ");
-  if (!combined.includes("日払い")) return null;
-  return combined.includes("全額") ? "全額" : "OK";
+  const limit = (store.daily_pay_limit ?? "").trim();
+  if (limit) {
+    return /全額|上限なし|上限無し|無制限/.test(limit) ? "全額" : "OK";
+  }
+  const tags = (store.feature_tags ?? []).join(" ");
+  if (tags.includes("日払い")) {
+    return tags.includes("全額") ? "全額" : "OK";
+  }
+  return null;
 }
 
 /**
