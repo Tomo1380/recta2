@@ -39,6 +39,7 @@ export default [
   route("admin/login", "routes/admin/login.tsx"),
   layout("routes/admin/layout.tsx", [
     route("admin", "routes/admin/dashboard.tsx", { index: true }),
+    route("admin/analytics", "routes/admin/analytics.tsx"),
     route("admin/users", "routes/admin/users.tsx"),
     route("admin/users/:id", "routes/admin/user-detail.tsx"),
     route("admin/shops", "routes/admin/shops.tsx"),

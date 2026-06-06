@@ -15,12 +15,14 @@ import {
   Loader2,
   FileText,
   Plane,
+  BarChart3,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "~/lib/auth";
 
 const menuItems = [
   { path: "/admin", label: "ダッシュボード", icon: LayoutDashboard },
+  { path: "/admin/analytics", label: "アクセス解析", icon: BarChart3 },
   { path: "/admin/users", label: "ユーザー管理", icon: Users },
   { path: "/admin/shops", label: "店舗管理", icon: Building2 },
   { path: "/admin/reviews", label: "口コミ管理", icon: MessageSquare },
@@ -34,6 +36,7 @@ const menuItems = [
 
 const breadcrumbMap: Record<string, string> = {
   "/admin": "ダッシュボード",
+  "/admin/analytics": "アクセス解析",
   "/admin/users": "ユーザー管理",
   "/admin/shops": "店舗管理",
   "/admin/reviews": "口コミ管理",

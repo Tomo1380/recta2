@@ -17,7 +17,6 @@ import { useNavigate } from "react-router";
 import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
 import type { DashboardData, DashboardKpiWithDelta } from "~/lib/types";
-import { AnalyticsSection } from "~/components/admin/AnalyticsSection";
 
 // ----------------------------------------------------------------
 // Helpers
@@ -320,11 +319,6 @@ export function DashboardPage() {
           unit="件"
           hint={`平均 ${numberFmt.format(k.chat_today.avg_tokens ?? 0)} tok`}
         />
-      </div>
-
-      {/* アクセス解析: 店舗/エリア/コラム ランキング + LINE経路 + 計測リンク発行 (FB A2-A4) */}
-      <div className="order-4">
-        <AnalyticsSection />
       </div>
 
       {/* Secondary indicators */}
