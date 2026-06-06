@@ -131,15 +131,15 @@ class LineFriendController extends Controller
             abort(404);
         }
 
-        // フォロー中なのに LINE 名が未取得なら、その場で Messaging API から補完する。
-        // フォロー中＝公式アカウントを友だち追加済みなので、LINE ログイン未連携でも
-        // getProfile で表示名・アイコンが取れる (2026-06-07 FB)。
-        if ($friend && $friend->is_following && empty($friend->display_name)) {
+        // 詳細を開くたびに、フォロー中の相手は Messaging API で LINE 名・アイコンを
+        // 取り直して最新化する (2026-06-07 FB)。フォロー中＝公式アカウント追加済みなので
+        // LINE ログイン未連携でも取得できる。admin_name (管理用の別名) は触らない。
+        if ($friend && $friend->is_following) {
             $profile = $this->lineService->getProfile($friend->line_user_id);
             if ($profile && ! empty($profile['display_name'])) {
                 $friend->update([
                     'display_name' => $profile['display_name'],
-                    'picture_url' => $friend->picture_url ?: ($profile['picture_url'] ?? null),
+                    'picture_url' => $profile['picture_url'] ?? $friend->picture_url,
                 ]);
             }
         }

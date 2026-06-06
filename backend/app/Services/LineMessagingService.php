@@ -57,23 +57,25 @@ class LineMessagingService
             return null;
         }
 
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$this->accessToken}",
-        ])->get("{$this->baseUrl}/profile/{$lineUserId}");
+        // プロフィール取得は補助機能。接続不可・タイムアウト・ロギング失敗等の
+        // どんな例外でもリクエスト本体を落とさないよう、全体を握り潰して null を返す。
+        try {
+            $response = Http::timeout(5)->withHeaders([
+                'Authorization' => "Bearer {$this->accessToken}",
+            ])->get("{$this->baseUrl}/profile/{$lineUserId}");
 
-        if ($response->failed()) {
-            Log::warning('LINE getProfile failed', [
-                'status' => $response->status(),
-                'line_user_id' => $lineUserId,
-            ]);
+            if ($response->failed()) {
+                return null;
+            }
+
+            $data = $response->json();
+            return [
+                'display_name' => $data['displayName'] ?? null,
+                'picture_url' => $data['pictureUrl'] ?? null,
+            ];
+        } catch (\Throwable $e) {
             return null;
         }
-
-        $data = $response->json();
-        return [
-            'display_name' => $data['displayName'] ?? null,
-            'picture_url' => $data['pictureUrl'] ?? null,
-        ];
     }
 
     /**

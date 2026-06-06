@@ -10,15 +10,15 @@ import {
   UserX,
   MessageCircle,
   Star,
-  ExternalLink,
 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AdminPerson, PersonShowResponse } from "~/lib/types";
+import { ConversationPanel } from "~/components/admin/ConversationPanel";
 
 /**
- * 人物詳細 (line_user_id 基準・LINEトーク主役)。表示名・管理メモを編集でき、
- * トークの直近プレビュー＋「全て見る」、口コミ (未ログインなら「LINE未ログイン」) を出す。
- * 友だちのみの相手 (LINEログイン未連携) でも同じ枠組みで詳細が見られる (2026-06-07 FB)。
+ * 人物詳細 (line_user_id 基準・LINEトーク主役)。1ページで完結し、
+ * 左カラム = 管理メモ + 口コミ、右カラム = LINEトーク (会話 + 送信)。
+ * 友だちのみ (LINEログイン未連携) の相手でも同じ枠組みで扱える (2026-06-07 FB)。
  */
 export function PersonDetailPage() {
   const navigate = useNavigate();
@@ -103,7 +103,7 @@ export function PersonDetailPage() {
   const displayName = person.name || person.display_name || "名前なし";
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-4">
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-[13px] text-red-700 flex items-center justify-between">
           <span>{error}</span>
@@ -111,7 +111,7 @@ export function PersonDetailPage() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header (full width) */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate("/admin/users")} className="p-2 rounded-lg hover:bg-muted transition">
           <ArrowLeft className="w-5 h-5" />
@@ -169,79 +169,68 @@ export function PersonDetailPage() {
         </div>
       </div>
 
-      {/* 管理メモ */}
-      <section className="bg-card border border-border rounded-xl p-4">
-        <h3 className="text-[13px] font-bold mb-2">管理メモ</h3>
-        <textarea
-          value={notesDraft}
-          onChange={(e) => { setNotesDraft(e.target.value); setNotesDirty(true); }}
-          rows={3}
-          placeholder="この人についての社内メモ（友だちのみの相手でも書けます）"
-          className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
-        />
-        {notesDirty && (
-          <div className="flex justify-end mt-2">
-            <button onClick={saveNotes} disabled={savingNotes} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] disabled:opacity-50 flex items-center gap-1.5">
-              {savingNotes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              メモを保存
-            </button>
-          </div>
-        )}
-      </section>
+      {/* 2 カラム: 左=管理メモ+口コミ / 右=LINEトーク */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        {/* 左 */}
+        <div className="space-y-4">
+          {/* 管理メモ */}
+          <section className="bg-card border border-border rounded-xl p-4">
+            <h3 className="text-[13px] font-bold mb-2">管理メモ</h3>
+            <textarea
+              value={notesDraft}
+              onChange={(e) => { setNotesDraft(e.target.value); setNotesDirty(true); }}
+              rows={3}
+              placeholder="この人についての社内メモ（友だちのみの相手でも書けます）"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+            />
+            {notesDirty && (
+              <div className="flex justify-end mt-2">
+                <button onClick={saveNotes} disabled={savingNotes} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] disabled:opacity-50 flex items-center gap-1.5">
+                  {savingNotes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  メモを保存
+                </button>
+              </div>
+            )}
+          </section>
 
-      {/* LINEトーク プレビュー */}
-      <section className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-[13px] font-bold flex items-center gap-1.5">
-            <MessageCircle className="w-4 h-4 text-emerald-500" />
-            LINEトーク（{person.messages_total}件）
-          </h3>
-          <button onClick={() => navigate(`/admin/line-threads/${person.line_user_id}`)} className="text-[12px] text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-            全て見る・返信 <ExternalLink className="w-3 h-3" />
-          </button>
+          {/* 口コミ */}
+          <section className="bg-card border border-border rounded-xl p-4">
+            <h3 className="text-[13px] font-bold flex items-center gap-1.5 mb-2">
+              <Star className="w-4 h-4 text-amber-400" />
+              口コミ{person.has_account ? `（${person.user?.reviews_count ?? 0}件）` : ""}
+            </h3>
+            {!person.has_account ? (
+              <div className="py-4 text-center">
+                <p className="text-[13px] text-amber-700 font-medium">LINE未ログイン</p>
+                <p className="text-[11.5px] text-muted-foreground mt-1">この相手はLINEログインしていないため、口コミは投稿できません。</p>
+              </div>
+            ) : person.reviews.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground py-2">まだ口コミはありません</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {person.reviews.map((r) => (
+                  <div key={r.id} className="py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-medium truncate">{r.store?.name ?? `店舗#${r.store_id}`}</span>
+                      <span className="text-[11px] text-amber-500 shrink-0">{"★".repeat(r.rating)}</span>
+                    </div>
+                    {r.body && <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2">{r.body}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
-        {person.messages.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground py-2">まだメッセージはありません</p>
-        ) : (
-          <div className="space-y-2">
-            {person.messages.slice(0, 3).map((m) => (
-              <div key={m.id} className={`flex ${m.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[75%] px-3 py-1.5 rounded-xl text-[12px] whitespace-pre-wrap ${m.direction === "outbound" ? "bg-[#06C755] text-white" : "bg-muted"}`}>
-                  {m.content}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
-      {/* 口コミ */}
-      <section className="bg-card border border-border rounded-xl p-4">
-        <h3 className="text-[13px] font-bold flex items-center gap-1.5 mb-2">
-          <Star className="w-4 h-4 text-amber-400" />
-          口コミ{person.has_account ? `（${person.user?.reviews_count ?? 0}件）` : ""}
-        </h3>
-        {!person.has_account ? (
-          <div className="py-4 text-center">
-            <p className="text-[13px] text-amber-700 font-medium">LINE未ログイン</p>
-            <p className="text-[11.5px] text-muted-foreground mt-1">この相手はLINEログインしていないため、口コミは投稿できません。</p>
+        {/* 右: LINEトーク */}
+        <section className="bg-card border border-border rounded-xl overflow-hidden flex flex-col">
+          <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border">
+            <MessageCircle className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-[13px] font-bold">LINEトーク（{person.messages_total}件）</h3>
           </div>
-        ) : person.reviews.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground py-2">まだ口コミはありません</p>
-        ) : (
-          <div className="divide-y divide-border">
-            {person.reviews.map((r) => (
-              <div key={r.id} className="py-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] font-medium truncate">{r.store?.name ?? `店舗#${r.store_id}`}</span>
-                  <span className="text-[11px] text-amber-500 shrink-0">{"★".repeat(r.rating)}</span>
-                </div>
-                {r.body && <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2">{r.body}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+          <ConversationPanel lineUserId={person.line_user_id} isFollowing={person.is_following} />
+        </section>
+      </div>
     </div>
   );
 }

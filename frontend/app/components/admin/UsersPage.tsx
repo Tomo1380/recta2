@@ -115,7 +115,6 @@ export function UsersPage() {
   const lastPage = data?.last_page ?? 1;
   const total = data?.total ?? 0;
 
-  const openThread = (p: AdminPersonRow) => navigate(`/admin/line-threads/${p.line_user_id}`);
   const openPerson = (p: AdminPersonRow) => navigate(`/admin/people/${p.line_user_id}`);
 
   return (
@@ -219,14 +218,9 @@ export function UsersPage() {
                       <td className="py-2.5 px-4 text-muted-foreground">{p.messages_count}</td>
                       <td className="py-2.5 px-4 text-muted-foreground">{formatDate(p.last_activity)}</td>
                       <td className="py-2.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => openPerson(p)} className="text-[12px] text-indigo-600 hover:text-indigo-700 transition">
-                            詳細 →
-                          </button>
-                          <button onClick={() => openThread(p)} className="text-[12px] text-muted-foreground hover:text-foreground transition">
-                            トーク
-                          </button>
-                        </div>
+                        <button onClick={() => openPerson(p)} className="text-[12px] text-indigo-600 hover:text-indigo-700 transition">
+                          詳細 →
+                        </button>
                       </td>
                     </tr>
                   ))}

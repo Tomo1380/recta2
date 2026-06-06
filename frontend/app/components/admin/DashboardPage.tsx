@@ -620,7 +620,7 @@ export function DashboardPage() {
                   onClick={() =>
                     navigate(
                       m.line_user_id
-                        ? `/admin/line-threads/${m.line_user_id}`
+                        ? `/admin/people/${m.line_user_id}`
                         : "/admin/users"
                     )
                   }
