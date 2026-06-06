@@ -11,6 +11,7 @@ use App\Models\LineMessage;
 use App\Models\Review;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\Analytics\RankingService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon as SupportCarbon;
@@ -25,7 +26,7 @@ class DashboardController extends Controller
      * Provides KPI cards, 30-day time series, distribution charts and
      * recent activity for the night-work matching platform.
      */
-    public function index(): JsonResponse
+    public function index(RankingService $ranking): JsonResponse
     {
         $now = now();
         $today = $now->copy()->startOfDay();
@@ -232,8 +233,16 @@ class DashboardController extends Controller
                 ->whereNull('read_at')
                 ->count(),
             'pending_reviews' => Review::where('status', 'unpublished')->count(),
+            'new_users_7d' => User::where('created_at', '>=', $now->copy()->subDays(7))->count(),
             'published_articles' => Article::where('status', 'published')->count(),
             'fine_tuning_qa_active' => FineTuningQa::where('status', FineTuningQa::STATUS_ACTIVE)->count(),
+        ];
+
+        // 「効いてるコンテンツ」ハイライト: 直近30日でアクセス上位の店舗/コラム TOP3。
+        $from30 = $now->copy()->subDays(30);
+        $highlight = [
+            'stores' => $ranking->stores($from30, $now)->take(3)->values(),
+            'columns' => $ranking->columns($from30, $now)->take(3)->values(),
         ];
 
         return response()->json([
@@ -245,6 +254,7 @@ class DashboardController extends Controller
             'recent_messages' => $recentMessages,
             'recent_chats' => $recentChats,
             'secondary' => $secondary,
+            'analytics_highlight' => $highlight,
         ]);
     }
 

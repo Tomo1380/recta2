@@ -285,8 +285,13 @@ export interface DashboardData {
   secondary: {
     unread_messages: number;
     pending_reviews: number;
+    new_users_7d: number;
     published_articles: number;
     fine_tuning_qa_active: number;
+  };
+  analytics_highlight: {
+    stores: AnalyticsRankRow[];
+    columns: AnalyticsRankRow[];
   };
 }
 

@@ -6,6 +6,7 @@ import {
   BarChart3,
   Bot,
   Building2,
+  ChevronRight,
   Clock,
   MessageCircle,
   MessageSquare,
@@ -18,7 +19,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
-import type { DashboardData, DashboardKpiWithDelta } from "~/lib/types";
+import type { AnalyticsRankRow, DashboardData, DashboardKpiWithDelta } from "~/lib/types";
 
 // ----------------------------------------------------------------
 // Helpers
@@ -174,6 +175,78 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+/** 「要対応」カード: 件数があれば色で強調し、クリックでその画面へジャンプ。 */
+function ActionCard({
+  label,
+  count,
+  icon: Icon,
+  accent,
+  cta,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  icon: typeof MessageCircle;
+  accent: string;
+  cta: string;
+  onClick: () => void;
+}) {
+  const has = count > 0;
+  return (
+    <button
+      onClick={onClick}
+      className="group text-left rounded-xl p-4 border bg-card hover:bg-muted/30 transition-colors flex items-center gap-3"
+      style={has ? { borderColor: `${accent}55` } : undefined}
+    >
+      <div className="size-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accent}14` }}>
+        <Icon className="size-[18px]" style={{ color: accent }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] text-muted-foreground truncate">{label}</p>
+        <p className="text-2xl font-bold tabular-nums leading-tight" style={has ? { color: accent } : undefined}>
+          {count}
+        </p>
+      </div>
+      <span className="text-[11px] text-muted-foreground flex items-center gap-0.5 shrink-0 group-hover:text-foreground transition-colors">
+        {cta}
+        <ChevronRight className="size-3.5" />
+      </span>
+    </button>
+  );
+}
+
+/** アクセス解析ハイライトの片側リスト（店舗 or コラム TOP3）。 */
+function HighlightList({ title, rows }: { title: string; rows: AnalyticsRankRow[] }) {
+  return (
+    <div className="p-4 sm:p-5">
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2.5">{title}</p>
+      {rows.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground py-2">データがまだありません</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r, i) => (
+            <li key={r.id ?? r.name} className="flex items-center gap-2 text-[12.5px]">
+              <span className="size-5 rounded bg-muted text-muted-foreground text-[10px] flex items-center justify-center tabular-nums shrink-0">
+                {i + 1}
+              </span>
+              <span className="flex-1 truncate" title={r.name}>{r.name}</span>
+              <span className="text-muted-foreground tabular-nums shrink-0 text-[11px] w-14 text-right">
+                {numberFmt.format(r.pv)} PV
+              </span>
+              <span
+                className="tabular-nums shrink-0 text-[11px] w-16 text-right"
+                style={r.line_clicks > 0 ? { color: "#06c755" } : undefined}
+              >
+                {numberFmt.format(r.line_clicks)} 導線
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
@@ -323,71 +396,60 @@ export function DashboardPage() {
         />
       </div>
 
-      {/* アクセス解析への誘導カード */}
-      <button
-        onClick={() => navigate("/admin/analytics")}
-        className="order-2 group text-left rounded-xl p-4 sm:p-5 border border-indigo-200/70 bg-gradient-to-r from-indigo-50 to-violet-50 hover:from-indigo-100 hover:to-violet-100 transition-colors flex items-center gap-4"
-      >
-        <div className="size-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-          <BarChart3 className="size-5" />
+      {/* ── 要対応（運営が今やること）── */}
+      <div className="order-2 space-y-2">
+        <h3 className="text-[12px] font-semibold text-muted-foreground tracking-wide">要対応</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <ActionCard
+            label="未返信のLINEトーク"
+            count={data.secondary.unread_messages}
+            icon={MessageCircle}
+            accent="#06c755"
+            cta="トークを開く"
+            onClick={() => navigate("/admin/users")}
+          />
+          <ActionCard
+            label="承認待ちの口コミ"
+            count={data.secondary.pending_reviews}
+            icon={MessageSquare}
+            accent="#f59e0b"
+            cta="モデレーション"
+            onClick={() => navigate("/admin/reviews")}
+          />
+          <ActionCard
+            label="新規ユーザー（7日）"
+            count={data.secondary.new_users_7d}
+            icon={Users}
+            accent="#6366f1"
+            cta="一覧を見る"
+            onClick={() => navigate("/admin/users")}
+          />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold text-foreground">アクセス解析</p>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
-            店舗・エリア・コラムのアクセス、LINE導線、CV率、計測リンクをまとめて分析
-          </p>
-        </div>
-        <span className="hidden sm:flex text-[12px] font-medium text-indigo-600 items-center gap-1 shrink-0">
-          解析を見る
-          <ArrowRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
-        </span>
-      </button>
+      </div>
 
-      {/* Secondary indicators */}
-      <div className="order-5 grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            未読LINE
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
+      {/* ── アクセス解析ハイライト ── */}
+      <div className="order-3 bg-card border border-border rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-border bg-gradient-to-r from-indigo-50/70 to-violet-50/70">
+          <div className="flex items-center gap-2.5">
+            <div className="size-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+              <BarChart3 className="size-4" />
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-foreground leading-tight">アクセス解析</p>
+              <p className="text-[11px] text-muted-foreground">直近30日でアクセスが多い店舗・コラム</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/admin/analytics")}
+            className="group text-[12px] font-medium text-indigo-600 flex items-center gap-1 shrink-0"
           >
-            {numberFmt.format(data.secondary.unread_messages)}
-          </p>
+            解析を見る
+            <ArrowRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            非公開口コミ
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-          >
-            {numberFmt.format(data.secondary.pending_reviews)}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            公開コラム
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-          >
-            {numberFmt.format(data.secondary.published_articles)}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-            Fine-tuning Q&amp;A
-          </p>
-          <p
-            className="text-2xl mt-1"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-          >
-            {numberFmt.format(data.secondary.fine_tuning_qa_active)}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+          <HighlightList title="店舗 TOP3" rows={data.analytics_highlight.stores} />
+          <HighlightList title="コラム TOP3" rows={data.analytics_highlight.columns} />
         </div>
       </div>
 

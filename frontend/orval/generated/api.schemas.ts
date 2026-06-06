@@ -1849,9 +1849,16 @@ export type DashboardIndex200Secondary = {
   /** @minimum 0 */
   pending_reviews: number;
   /** @minimum 0 */
+  new_users_7d: number;
+  /** @minimum 0 */
   published_articles: number;
   /** @minimum 0 */
   fine_tuning_qa_active: number;
+};
+
+export type DashboardIndex200AnalyticsHighlight = {
+  stores: unknown[][];
+  columns: unknown[][];
 };
 
 export type DashboardIndex200 = {
@@ -1863,6 +1870,7 @@ export type DashboardIndex200 = {
   recent_messages: DashboardIndex200RecentMessagesItem[];
   recent_chats: DashboardIndex200RecentChatsItem[];
   secondary: DashboardIndex200Secondary;
+  analytics_highlight: DashboardIndex200AnalyticsHighlight;
 };
 
 export type FineTuningStatus200TrainingDataSize = { [key: string]: unknown } | number;

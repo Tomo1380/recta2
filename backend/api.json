@@ -3154,6 +3154,10 @@
                                                     "type": "integer",
                                                     "minimum": 0
                                                 },
+                                                "new_users_7d": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                },
                                                 "published_articles": {
                                                     "type": "integer",
                                                     "minimum": 0
@@ -3166,8 +3170,32 @@
                                             "required": [
                                                 "unread_messages",
                                                 "pending_reviews",
+                                                "new_users_7d",
                                                 "published_articles",
                                                 "fine_tuning_qa_active"
+                                            ]
+                                        },
+                                        "analytics_highlight": {
+                                            "type": "object",
+                                            "properties": {
+                                                "stores": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {}
+                                                    }
+                                                },
+                                                "columns": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {}
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "stores",
+                                                "columns"
                                             ]
                                         }
                                     },
@@ -3179,7 +3207,8 @@
                                         "recent_reviews",
                                         "recent_messages",
                                         "recent_chats",
-                                        "secondary"
+                                        "secondary",
+                                        "analytics_highlight"
                                     ]
                                 }
                             }
