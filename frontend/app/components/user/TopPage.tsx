@@ -551,114 +551,6 @@ export default function TopPage({
         </div>
         )}
 
-        {/* ══ RECENTLY VIEWED (あなたが見た店舗) ══ */}
-        <RecentlyViewedStores variant="flush" />
-
-        {/* ══ REVIEWS ══ */}
-        <div className="mt-6 px-5 pb-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-1 h-5 rounded-full" style={{ background: `linear-gradient(180deg,${GOLD},#c8960c)` }} />
-              <h2 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "17px", letterSpacing: "-0.02em", color: DARK, margin: 0 }}>新着クチコミ</h2>
-              <span className="px-2 py-0.5 rounded" style={{ background: "rgba(200,96,128,.1)", fontFamily: J, fontWeight: 600, fontSize: "9px", color: "rgba(200,96,128,.8)" }}>{recentReviews.length}件</span>
-            </div>
-          </div>
-          {recentReviews.length === 0 ? (
-            <div className="px-5 py-8 text-center" style={{ fontFamily: J, fontSize: "12px", color: "rgba(27,37,40,.45)" }}>
-              まだ口コミは投稿されていません。
-            </div>
-          ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
-            {recentReviews.map((review, idx) => {
-              const requireLogin = !isAuthenticated && idx >= 3;
-              // 口コミ表示は本人のニックネームのみ。LINE 実名はプライバシー保護のため使わない。
-              const userName = review.user?.nickname || "匿名";
-              const initial = (userName.charAt(0) || "?");
-              const dateText = review.created_at ? formatRelative(review.created_at) : "";
-              return (
-              <Link
-                key={review.id}
-                to={requireLogin ? "/login" : `/stores/${review.store?.id}#reviews`}
-                onClick={() => {
-                  if (requireLogin) {
-                    sessionStorage.setItem("recta:login-return-to", "/");
-                  }
-                }}
-                className="shrink-0 rounded-2xl overflow-hidden block active:scale-[0.99] transition-transform"
-                style={{ width: "270px", background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 20px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)", textDecoration: "none", color: "inherit" }}
-              >
-                <div className="flex items-center px-4 pt-3.5 pb-2.5 gap-3">
-                  {/* 店舗サムネ: 画像 URL があれば 36x36 で表示、無ければ
-                      従来の棚アイコンを fallback として残す。 */}
-                  {review.store?.image_url ? (
-                    <img
-                      src={review.store.image_url}
-                      alt={review.store.name}
-                      className="w-9 h-9 rounded-xl object-cover shrink-0"
-                      style={{ border: "1px solid rgba(27,37,40,.08)" }}
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.1),rgba(200,96,128,.04))", border: "1px solid rgba(200,96,128,.15)" }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 21V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14M3 21h10M13 21V3a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v18M13 21h8" stroke="rgba(200,96,128,.55)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <p style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: DARK, margin: 0 }}>{review.store?.name ?? ""}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.4)" }}>{review.store?.area ?? ""}</span>
-                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.2)" }}>·</span>
-                      <span className="px-1.5 py-0 rounded" style={{ fontFamily: J, fontWeight: 500, fontSize: "9px", color: "rgba(200,96,128,.7)", background: "rgba(200,96,128,.07)" }}>{review.store?.category ?? ""}</span>
-                    </div>
-                  </div>
-                  <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9px", color: "rgba(27,37,40,.25)" }}>{dateText}</span>
-                </div>
-                <div style={{ height: "1px", background: "linear-gradient(90deg,transparent,rgba(27,37,40,.06) 16px,rgba(27,37,40,.06) calc(100% - 16px),transparent)" }} />
-                <div className="relative" style={{ padding: "12px 16px 14px", minHeight: "115px" }}>
-                  <div style={{ filter: requireLogin ? "blur(7px)" : "none", transition: "filter .4s ease", userSelect: requireLogin ? "none" : "auto" }}>
-                    <div className="flex items-center gap-3 mb-2.5">
-                      <div className="flex items-center gap-0.5">
-                        {[1,2,3,4,5].map(s => (
-                          <svg key={s} width="13" height="13" viewBox="0 0 24 24" fill={s <= review.rating ? GOLD : "rgba(27,37,40,.08)"}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.12),rgba(200,96,128,.06))", border: "1px solid rgba(200,96,128,.15)" }}>
-                          <span style={{ fontFamily: J, fontWeight: 600, fontSize: "8px", color: "rgba(200,96,128,.7)" }}>{initial}</span>
-                        </div>
-                        <span style={{ fontFamily: J, fontWeight: 500, fontSize: "10.5px", color: "rgba(27,37,40,.5)" }}>{userName}</span>
-                      </div>
-                    </div>
-                    <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: DARK, margin: 0, lineHeight: 1.75, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{review.body}</p>
-                  </div>
-                  {requireLogin && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" style={{ background: "rgba(255,255,255,.08)" }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="mb-1">
-                        <rect x="3" y="11" width="18" height="11" rx="2" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "10px", color: "rgba(27,37,40,.45)", marginBottom: "6px" }}>クチコミを見るにはログインが必要です</span>
-                      {/* 親要素がもう <Link to="/login"> なので、ここは
-                          presentational なボタン外見だけ。<a> をネストすると
-                          React Router の hydrate が壊れて Invalid HTML 警告
-                          になるため、敢えてただの <span> にする。クリックは
-                          外側カードの Link が拾う。 */}
-                      <span
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl"
-                        style={{ background: "#06C755", boxShadow: "0 4px 14px rgba(6,199,85,.3), 0 1px 3px rgba(6,199,85,.2)" }}
-                      >
-                        <LineIcon size={16} />
-                        <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12px", color: "white", letterSpacing: "0.02em" }}>LINEでログイン</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </Link>
-              );
-            })}
-          </div>
-          )}
-        </div>
-
         {/* ══ COLUMNS (Recta コラム) ══
             記事 0 件ならセクションごと非表示 (空棚は逆効果)。            */}
         {columns.length > 0 && (
@@ -795,6 +687,114 @@ export default function TopPage({
             </div>
           </div>
         )}
+
+        {/* ══ RECENTLY VIEWED (あなたが見た店舗) ══ */}
+        <RecentlyViewedStores variant="flush" />
+
+        {/* ══ REVIEWS ══ */}
+        <div className="mt-6 px-5 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-5 rounded-full" style={{ background: `linear-gradient(180deg,${GOLD},#c8960c)` }} />
+              <h2 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "17px", letterSpacing: "-0.02em", color: DARK, margin: 0 }}>新着クチコミ</h2>
+              <span className="px-2 py-0.5 rounded" style={{ background: "rgba(200,96,128,.1)", fontFamily: J, fontWeight: 600, fontSize: "9px", color: "rgba(200,96,128,.8)" }}>{recentReviews.length}件</span>
+            </div>
+          </div>
+          {recentReviews.length === 0 ? (
+            <div className="px-5 py-8 text-center" style={{ fontFamily: J, fontSize: "12px", color: "rgba(27,37,40,.45)" }}>
+              まだ口コミは投稿されていません。
+            </div>
+          ) : (
+          <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
+            {recentReviews.map((review, idx) => {
+              const requireLogin = !isAuthenticated && idx >= 3;
+              // 口コミ表示は本人のニックネームのみ。LINE 実名はプライバシー保護のため使わない。
+              const userName = review.user?.nickname || "匿名";
+              const initial = (userName.charAt(0) || "?");
+              const dateText = review.created_at ? formatRelative(review.created_at) : "";
+              return (
+              <Link
+                key={review.id}
+                to={requireLogin ? "/login" : `/stores/${review.store?.id}#reviews`}
+                onClick={() => {
+                  if (requireLogin) {
+                    sessionStorage.setItem("recta:login-return-to", "/");
+                  }
+                }}
+                className="shrink-0 rounded-2xl overflow-hidden block active:scale-[0.99] transition-transform"
+                style={{ width: "270px", background: "white", border: "1px solid rgba(27,37,40,.06)", boxShadow: "0 4px 20px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)", textDecoration: "none", color: "inherit" }}
+              >
+                <div className="flex items-center px-4 pt-3.5 pb-2.5 gap-3">
+                  {/* 店舗サムネ: 画像 URL があれば 36x36 で表示、無ければ
+                      従来の棚アイコンを fallback として残す。 */}
+                  {review.store?.image_url ? (
+                    <img
+                      src={review.store.image_url}
+                      alt={review.store.name}
+                      className="w-9 h-9 rounded-xl object-cover shrink-0"
+                      style={{ border: "1px solid rgba(27,37,40,.08)" }}
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.1),rgba(200,96,128,.04))", border: "1px solid rgba(200,96,128,.15)" }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 21V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14M3 21h10M13 21V3a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v18M13 21h8" stroke="rgba(200,96,128,.55)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: DARK, margin: 0 }}>{review.store?.name ?? ""}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.4)" }}>{review.store?.area ?? ""}</span>
+                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9.5px", color: "rgba(27,37,40,.2)" }}>·</span>
+                      <span className="px-1.5 py-0 rounded" style={{ fontFamily: J, fontWeight: 500, fontSize: "9px", color: "rgba(200,96,128,.7)", background: "rgba(200,96,128,.07)" }}>{review.store?.category ?? ""}</span>
+                    </div>
+                  </div>
+                  <span style={{ fontFamily: J, fontWeight: 400, fontSize: "9px", color: "rgba(27,37,40,.25)" }}>{dateText}</span>
+                </div>
+                <div style={{ height: "1px", background: "linear-gradient(90deg,transparent,rgba(27,37,40,.06) 16px,rgba(27,37,40,.06) calc(100% - 16px),transparent)" }} />
+                <div className="relative" style={{ padding: "12px 16px 14px", minHeight: "115px" }}>
+                  <div style={{ filter: requireLogin ? "blur(7px)" : "none", transition: "filter .4s ease", userSelect: requireLogin ? "none" : "auto" }}>
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <div className="flex items-center gap-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <svg key={s} width="13" height="13" viewBox="0 0 24 24" fill={s <= review.rating ? GOLD : "rgba(27,37,40,.08)"}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,rgba(200,96,128,.12),rgba(200,96,128,.06))", border: "1px solid rgba(200,96,128,.15)" }}>
+                          <span style={{ fontFamily: J, fontWeight: 600, fontSize: "8px", color: "rgba(200,96,128,.7)" }}>{initial}</span>
+                        </div>
+                        <span style={{ fontFamily: J, fontWeight: 500, fontSize: "10.5px", color: "rgba(27,37,40,.5)" }}>{userName}</span>
+                      </div>
+                    </div>
+                    <p style={{ fontFamily: J, fontWeight: 400, fontSize: "12px", color: DARK, margin: 0, lineHeight: 1.75, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{review.body}</p>
+                  </div>
+                  {requireLogin && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" style={{ background: "rgba(255,255,255,.08)" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="mb-1">
+                        <rect x="3" y="11" width="18" height="11" rx="2" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="rgba(27,37,40,.25)" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                      <span style={{ fontFamily: J, fontWeight: 400, fontSize: "10px", color: "rgba(27,37,40,.45)", marginBottom: "6px" }}>クチコミを見るにはログインが必要です</span>
+                      {/* 親要素がもう <Link to="/login"> なので、ここは
+                          presentational なボタン外見だけ。<a> をネストすると
+                          React Router の hydrate が壊れて Invalid HTML 警告
+                          になるため、敢えてただの <span> にする。クリックは
+                          外側カードの Link が拾う。 */}
+                      <span
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl"
+                        style={{ background: "#06C755", boxShadow: "0 4px 14px rgba(6,199,85,.3), 0 1px 3px rgba(6,199,85,.2)" }}
+                      >
+                        <LineIcon size={16} />
+                        <span style={{ fontFamily: J, fontWeight: 600, fontSize: "12px", color: "white", letterSpacing: "0.02em" }}>LINEでログイン</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Link>
+              );
+            })}
+          </div>
+          )}
+        </div>
 
         {/* ══ 上京サポート BANNER ══ */}
         <div className="mt-6 px-5">
