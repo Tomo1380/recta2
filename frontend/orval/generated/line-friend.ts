@@ -5,8 +5,15 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
-  LineFriendBroadcast200,
-  SendLineBroadcastRequest
+  LineFriendMessages200,
+  LineFriendMessagesParams,
+  LineFriendPush200,
+  LineFriendShow200,
+  LineFriendUpdateName200,
+  LineFriendUpdateNameBody,
+  LineFriendUpdateNotes200,
+  LineFriendUpdateNotesBody,
+  SendLinePushRequest
 } from './api.schemas';
 
 import { rectaMutator } from '../mutators/auth';
@@ -15,16 +22,75 @@ import { rectaMutator } from '../mutators/auth';
 
 
   /**
- * @summary Broadcast message to all friends
+ * @summary Paginated message history for a specific LINE user, with the friend record
  */
-export const lineFriendBroadcast = (
-    sendLineBroadcastRequest: SendLineBroadcastRequest,
+export const lineFriendMessages = (
+    lineUserId: string,
+    params?: LineFriendMessagesParams,
  ) => {
-      return rectaMutator<LineFriendBroadcast200>(
-      {url: `/admin/users/broadcast`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: sendLineBroadcastRequest
+      return rectaMutator<LineFriendMessages200>(
+      {url: `/admin/line-friends/${lineUserId}/messages`, method: 'GET',
+        params
     },
       );
     }
-  export type LineFriendBroadcastResult = NonNullable<Awaited<ReturnType<typeof lineFriendBroadcast>>>
+  /**
+ * @summary 人物詳細 (line_user_id 基準)。トーク相手 (LineFriend) を主に、LINEログイン
+(User) があれば口コミ等を添える。友だちのみの相手でも詳細が見られる
+(2026-06-06 FB)。
+ */
+export const lineFriendShow = (
+    lineUserId: string,
+ ) => {
+      return rectaMutator<LineFriendShow200>(
+      {url: `/admin/line-friends/${lineUserId}`, method: 'GET'
+    },
+      );
+    }
+  /**
+ * @summary Send a push message to a specific user
+ */
+export const lineFriendPush = (
+    sendLinePushRequest: SendLinePushRequest,
+ ) => {
+      return rectaMutator<LineFriendPush200>(
+      {url: `/admin/line-friends/push`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: sendLinePushRequest
+    },
+      );
+    }
+  /**
+ * @summary 管理用の表示名 (admin_name) を更新。LINE 本来の名前 (display_name) は触らない。
+トーク相手は LineFriend に、ログインのみの相手は User.nickname に書く。
+ */
+export const lineFriendUpdateName = (
+    lineUserId: string,
+    lineFriendUpdateNameBody?: LineFriendUpdateNameBody,
+ ) => {
+      return rectaMutator<LineFriendUpdateName200>(
+      {url: `/admin/line-friends/${lineUserId}/name`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: lineFriendUpdateNameBody
+    },
+      );
+    }
+  /**
+ * @summary 管理メモ (admin_notes) を更新。トーク相手は LineFriend に、ログインのみは User に書く。
+ */
+export const lineFriendUpdateNotes = (
+    lineUserId: string,
+    lineFriendUpdateNotesBody?: LineFriendUpdateNotesBody,
+ ) => {
+      return rectaMutator<LineFriendUpdateNotes200>(
+      {url: `/admin/line-friends/${lineUserId}/notes`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: lineFriendUpdateNotesBody
+    },
+      );
+    }
+  export type LineFriendMessagesResult = NonNullable<Awaited<ReturnType<typeof lineFriendMessages>>>
+export type LineFriendShowResult = NonNullable<Awaited<ReturnType<typeof lineFriendShow>>>
+export type LineFriendPushResult = NonNullable<Awaited<ReturnType<typeof lineFriendPush>>>
+export type LineFriendUpdateNameResult = NonNullable<Awaited<ReturnType<typeof lineFriendUpdateName>>>
+export type LineFriendUpdateNotesResult = NonNullable<Awaited<ReturnType<typeof lineFriendUpdateNotes>>>

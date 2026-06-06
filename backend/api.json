@@ -1268,6 +1268,65 @@
                 }
             }
         },
+        "/admin/ai-chat/logs": {
+            "get": {
+                "operationId": "aiChatSetting.logs",
+                "summary": "AI\u30c1\u30e3\u30c3\u30c8\u5c65\u6b74 (\u500b\u5225\u306e\u8cea\u554f/\u56de\u7b54\u30ed\u30b0)\u3002mode / page_type / \u672c\u6587\u691c\u7d22\u3067\u7d5e\u308a\u8fbc\u307f\u3002",
+                "tags": [
+                    "AiChatSetting"
+                ],
+                "parameters": [
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "current_page": {
+                                            "type": "integer"
+                                        },
+                                        "last_page": {
+                                            "type": "integer"
+                                        },
+                                        "per_page": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "current_page",
+                                        "last_page",
+                                        "per_page",
+                                        "total"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/admin/ai-chat/limits": {
             "get": {
                 "operationId": "aiChatSetting.limits",
@@ -2998,7 +3057,19 @@
                                                             "null"
                                                         ]
                                                     },
-                                                    "name": {},
+                                                    "line_user_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "name": {
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ]
+                                                    },
                                                     "avatar": {
                                                         "type": "string"
                                                     },
@@ -3015,6 +3086,7 @@
                                                 "required": [
                                                     "id",
                                                     "user_id",
+                                                    "line_user_id",
                                                     "name",
                                                     "avatar",
                                                     "message",
@@ -4679,10 +4751,134 @@
                 }
             }
         },
-        "/admin/users/broadcast": {
+        "/admin/line-friends/{lineUserId}/messages": {
+            "get": {
+                "operationId": "lineFriend.messages",
+                "summary": "Paginated message history for a specific LINE user, with the friend record",
+                "tags": [
+                    "LineFriend"
+                ],
+                "parameters": [
+                    {
+                        "name": "lineUserId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "friend": {
+                                            "type": "string"
+                                        },
+                                        "messages": {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/LineMessageResource"
+                                                    }
+                                                },
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "data",
+                                                "current_page",
+                                                "last_page",
+                                                "per_page",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "friend",
+                                        "messages"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/line-friends/{lineUserId}": {
+            "get": {
+                "operationId": "lineFriend.show",
+                "summary": "\u4eba\u7269\u8a73\u7d30 (line_user_id \u57fa\u6e96)\u3002\u30c8\u30fc\u30af\u76f8\u624b (LineFriend) \u3092\u4e3b\u306b\u3001LINE\u30ed\u30b0\u30a4\u30f3\n(User) \u304c\u3042\u308c\u3070\u53e3\u30b3\u30df\u7b49\u3092\u6dfb\u3048\u308b\u3002\u53cb\u3060\u3061\u306e\u307f\u306e\u76f8\u624b\u3067\u3082\u8a73\u7d30\u304c\u898b\u3089\u308c\u308b\n(2026-06-06 FB)\u3002",
+                "tags": [
+                    "LineFriend"
+                ],
+                "parameters": [
+                    {
+                        "name": "lineUserId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "person": {}
+                                    },
+                                    "required": [
+                                        "person"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/line-friends/push": {
             "post": {
-                "operationId": "lineFriend.broadcast",
-                "summary": "Broadcast message to all friends",
+                "operationId": "lineFriend.push",
+                "summary": "Send a push message to a specific user",
                 "tags": [
                     "LineFriend"
                 ],
@@ -4691,7 +4887,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SendLineBroadcastRequest"
+                                "$ref": "#/components/schemas/SendLinePushRequest"
                             }
                         }
                     }
@@ -4720,6 +4916,468 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/admin/line-friends/{lineUserId}/name": {
+            "put": {
+                "operationId": "lineFriend.updateName",
+                "summary": "\u7ba1\u7406\u7528\u306e\u8868\u793a\u540d (admin_name) \u3092\u66f4\u65b0\u3002LINE \u672c\u6765\u306e\u540d\u524d (display_name) \u306f\u89e6\u3089\u306a\u3044\u3002\n\u30c8\u30fc\u30af\u76f8\u624b\u306f LineFriend \u306b\u3001\u30ed\u30b0\u30a4\u30f3\u306e\u307f\u306e\u76f8\u624b\u306f User.nickname \u306b\u66f8\u304f\u3002",
+                "tags": [
+                    "LineFriend"
+                ],
+                "parameters": [
+                    {
+                        "name": "lineUserId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "admin_name": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 100
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "person": {
+                                            "type": "object",
+                                            "properties": {
+                                                "line_user_id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "admin_name": {
+                                                    "type": "string"
+                                                },
+                                                "display_name": {
+                                                    "type": "string"
+                                                },
+                                                "picture_url": {
+                                                    "type": "string"
+                                                },
+                                                "is_following": {
+                                                    "type": "boolean"
+                                                },
+                                                "is_talk": {
+                                                    "type": "boolean"
+                                                },
+                                                "has_account": {
+                                                    "type": "boolean"
+                                                },
+                                                "admin_notes": {
+                                                    "type": "string"
+                                                },
+                                                "user": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "integer"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "status": {
+                                                            "type": "string"
+                                                        },
+                                                        "line_display_name": {
+                                                            "type": "string"
+                                                        },
+                                                        "nickname": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "null"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "reviews_count": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                }
+                                                            ]
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "status",
+                                                        "line_display_name",
+                                                        "nickname",
+                                                        "reviews_count",
+                                                        "created_at"
+                                                    ]
+                                                },
+                                                "reviews": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/components/schemas/Review"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                "ai_chats": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "user_message": {
+                                                                "type": "string"
+                                                            },
+                                                            "ai_response": {
+                                                                "type": "string"
+                                                            },
+                                                            "mode": {
+                                                                "type": "string"
+                                                            },
+                                                            "page_type": {
+                                                                "type": "string"
+                                                            },
+                                                            "total_tokens": {
+                                                                "type": "string"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "user_message",
+                                                            "ai_response",
+                                                            "mode",
+                                                            "page_type",
+                                                            "total_tokens",
+                                                            "created_at"
+                                                        ]
+                                                    }
+                                                },
+                                                "ai_chats_total": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                },
+                                                "messages": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "messages_total": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "line_user_id",
+                                                "name",
+                                                "admin_name",
+                                                "display_name",
+                                                "picture_url",
+                                                "is_following",
+                                                "is_talk",
+                                                "has_account",
+                                                "admin_notes",
+                                                "user",
+                                                "reviews",
+                                                "ai_chats",
+                                                "ai_chats_total",
+                                                "messages",
+                                                "messages_total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "person"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/line-friends/{lineUserId}/notes": {
+            "put": {
+                "operationId": "lineFriend.updateNotes",
+                "summary": "\u7ba1\u7406\u30e1\u30e2 (admin_notes) \u3092\u66f4\u65b0\u3002\u30c8\u30fc\u30af\u76f8\u624b\u306f LineFriend \u306b\u3001\u30ed\u30b0\u30a4\u30f3\u306e\u307f\u306f User \u306b\u66f8\u304f\u3002",
+                "tags": [
+                    "LineFriend"
+                ],
+                "parameters": [
+                    {
+                        "name": "lineUserId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "admin_notes": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 2000
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "person": {
+                                            "type": "object",
+                                            "properties": {
+                                                "line_user_id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "admin_name": {
+                                                    "type": "string"
+                                                },
+                                                "display_name": {
+                                                    "type": "string"
+                                                },
+                                                "picture_url": {
+                                                    "type": "string"
+                                                },
+                                                "is_following": {
+                                                    "type": "boolean"
+                                                },
+                                                "is_talk": {
+                                                    "type": "boolean"
+                                                },
+                                                "has_account": {
+                                                    "type": "boolean"
+                                                },
+                                                "admin_notes": {
+                                                    "type": "string"
+                                                },
+                                                "user": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "integer"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "status": {
+                                                            "type": "string"
+                                                        },
+                                                        "line_display_name": {
+                                                            "type": "string"
+                                                        },
+                                                        "nickname": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "null"
+                                                                }
+                                                            ]
+                                                        },
+                                                        "reviews_count": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                }
+                                                            ]
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "status",
+                                                        "line_display_name",
+                                                        "nickname",
+                                                        "reviews_count",
+                                                        "created_at"
+                                                    ]
+                                                },
+                                                "reviews": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/components/schemas/Review"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                "ai_chats": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "user_message": {
+                                                                "type": "string"
+                                                            },
+                                                            "ai_response": {
+                                                                "type": "string"
+                                                            },
+                                                            "mode": {
+                                                                "type": "string"
+                                                            },
+                                                            "page_type": {
+                                                                "type": "string"
+                                                            },
+                                                            "total_tokens": {
+                                                                "type": "string"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "user_message",
+                                                            "ai_response",
+                                                            "mode",
+                                                            "page_type",
+                                                            "total_tokens",
+                                                            "created_at"
+                                                        ]
+                                                    }
+                                                },
+                                                "ai_chats_total": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                },
+                                                "messages": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "messages_total": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "line_user_id",
+                                                "name",
+                                                "admin_name",
+                                                "display_name",
+                                                "picture_url",
+                                                "is_following",
+                                                "is_talk",
+                                                "has_account",
+                                                "admin_notes",
+                                                "user",
+                                                "reviews",
+                                                "ai_chats",
+                                                "ai_chats_total",
+                                                "messages",
+                                                "messages_total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "person"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 }
             }
@@ -5387,9 +6045,6 @@
                                                         ],
                                                         "items": {}
                                                     },
-                                                    "is_pr": {
-                                                        "type": "boolean"
-                                                    },
                                                     "reviews_count": {
                                                         "type": "integer"
                                                     },
@@ -5406,7 +6061,6 @@
                                                     "trial_hourly_max",
                                                     "feature_tags",
                                                     "images",
-                                                    "is_pr",
                                                     "reviews_count",
                                                     "average_rating"
                                                 ]
@@ -5630,11 +6284,18 @@
                                         "related": {
                                             "type": "array",
                                             "items": {}
+                                        },
+                                        "related_columns": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Article"
+                                            }
                                         }
                                     },
                                     "required": [
                                         "store",
-                                        "related"
+                                        "related",
+                                        "related_columns"
                                     ]
                                 }
                             }
@@ -6402,8 +7063,9 @@
                                             "integer",
                                             "null"
                                         ],
-                                        "minimum": -1000,
-                                        "maximum": 1000
+                                        "description": "\u8868\u793a\u512a\u5148\u5ea6\u306f UI \u540c\u69d8 1\u301c10 (0 \u306f\u672a\u8a2d\u5b9a\u6271\u3044)\u3002\u7bc4\u56f2\u5916\u5024\u3092 API \u3067\u3082\u5f3e\u304f\u3002",
+                                        "minimum": 0,
+                                        "maximum": 10
                                     },
                                     "slug": {
                                         "type": [
@@ -7061,8 +7723,8 @@
                                             "integer",
                                             "null"
                                         ],
-                                        "minimum": -1000,
-                                        "maximum": 1000
+                                        "minimum": 0,
+                                        "maximum": 10
                                     },
                                     "slug": {
                                         "type": [
@@ -8171,23 +8833,18 @@
         "/admin/users": {
             "get": {
                 "operationId": "user.index",
+                "description": "mode: 'talk' (\u65e2\u5b9a: \u30c8\u30fc\u30af\u76f8\u624b\u306e\u307f) | 'login_only' (\u30ed\u30b0\u30a4\u30f3\u306e\u307f\u30fb\u672a\u30c8\u30fc\u30af)\n      | 'all' (\u4e21\u65b9)",
+                "summary": "\u300cLINE \u5229\u7528\u8005\u300d\u4e00\u89a7\u3002\u5927\u4e8b\u306a\u306e\u306f LINE \u30c8\u30fc\u30af (\u516c\u5f0f\u30a2\u30ab\u30a6\u30f3\u30c8) \u5074\u306a\u306e\u3067\u3001\nline_user_id \u3092\u8ef8\u306b\u3057\u305f\u30c8\u30fc\u30af\u76f8\u624b (LineFriend) \u3092\u4e3b\u5f79\u306b\u3059\u308b (2026-06-06 FB)\u3002\nLINE \u30ed\u30b0\u30a4\u30f3 (User) \u306f\u4ed8\u968f\u5c5e\u6027\u3068\u3057\u3066\u6dfb\u3048\u308b\u3002",
                 "tags": [
                     "User"
                 ],
                 "parameters": [
                     {
-                        "name": "line_status",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "per_page",
+                        "name": "mode",
                         "in": "query",
                         "schema": {
                             "type": "string",
-                            "default": 20
+                            "default": "talk"
                         }
                     }
                 ],
@@ -8199,14 +8856,12 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "users": {
+                                        "people": {
                                             "type": "object",
                                             "properties": {
                                                 "data": {
                                                     "type": "array",
-                                                    "items": {
-                                                        "$ref": "#/components/schemas/UserResource"
-                                                    }
+                                                    "items": {}
                                                 },
                                                 "current_page": {
                                                     "type": "integer"
@@ -8229,25 +8884,29 @@
                                                 "total"
                                             ]
                                         },
-                                        "line_stats": {
+                                        "stats": {
                                             "type": "object",
                                             "properties": {
-                                                "total_users": {
+                                                "talk_count": {
                                                     "type": "integer"
                                                 },
-                                                "line_friend_count": {
+                                                "login_only_count": {
+                                                    "type": "integer"
+                                                },
+                                                "total_users": {
                                                     "type": "integer"
                                                 }
                                             },
                                             "required": [
-                                                "total_users",
-                                                "line_friend_count"
+                                                "talk_count",
+                                                "login_only_count",
+                                                "total_users"
                                             ]
                                         }
                                     },
                                     "required": [
-                                        "users",
-                                        "line_stats"
+                                        "people",
+                                        "stats"
                                     ]
                                 }
                             }
@@ -8875,6 +9534,12 @@
                             "null"
                         ],
                         "format": "date-time"
+                    },
+                    "line_user_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 },
                 "required": [
@@ -8888,7 +9553,8 @@
                     "output_tokens",
                     "mode",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "line_user_id"
                 ],
                 "title": "AiChatLog"
             },
@@ -9092,6 +9758,120 @@
                     "shop_count"
                 ],
                 "title": "AreaResource"
+            },
+            "Article": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "excerpt": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "body": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    },
+                    "body_html": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "thumbnail_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tags": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "author_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "section": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "related_store_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "excerpt",
+                    "body",
+                    "body_html",
+                    "thumbnail_url",
+                    "category",
+                    "tags",
+                    "status",
+                    "published_at",
+                    "created_at",
+                    "updated_at",
+                    "author_id",
+                    "section",
+                    "related_store_ids"
+                ],
+                "title": "Article"
             },
             "ArticleResource": {
                 "type": "object",
@@ -9753,9 +10533,6 @@
                     "sort_order": {
                         "type": "integer"
                     },
-                    "is_pr": {
-                        "type": "boolean"
-                    },
                     "visible": {
                         "type": "boolean"
                     },
@@ -9780,6 +10557,25 @@
                                     "null"
                                 ],
                                 "description": "controller \u5074\u3067 append \u3055\u308c\u308b\u52d5\u7684\u30d5\u30a3\u30fc\u30eb\u30c9\u3002\u4e00\u89a7 endpoint \u3067\u3060\u3051\u4ed8\u304f\u3002"
+                            },
+                            "pv": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "description": "\u76f4\u8fd130\u65e5\u306e\u6307\u6a19 (P1)\u3002pickupShops \u4e00\u89a7\u3067\u3060\u3051\u4ed8\u304f\u3002"
+                            },
+                            "line_clicks": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "cv_rate": {
+                                "type": [
+                                    "number",
+                                    "null"
+                                ]
                             }
                         },
                         "required": [
@@ -9787,7 +10583,10 @@
                             "name",
                             "area",
                             "category",
-                            "average_rating"
+                            "average_rating",
+                            "pv",
+                            "line_clicks",
+                            "cv_rate"
                         ]
                     }
                 },
@@ -9795,7 +10594,6 @@
                     "id",
                     "store_id",
                     "sort_order",
-                    "is_pr",
                     "visible"
                 ],
                 "title": "PickupShopResource"
@@ -9894,6 +10692,97 @@
                     "password"
                 ],
                 "title": "ResetAdminPasswordRequest"
+            },
+            "Review": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "user_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "store_id": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer"
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "tweet_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tweet_author_screen_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "author_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_featured": {
+                        "type": "boolean"
+                    },
+                    "store_reply": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "store_reply_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "user_id",
+                    "store_id",
+                    "rating",
+                    "body",
+                    "tweet_id",
+                    "tweet_author_screen_name",
+                    "status",
+                    "created_at",
+                    "updated_at",
+                    "author_name",
+                    "is_featured",
+                    "store_reply",
+                    "store_reply_at"
+                ],
+                "title": "Review"
             },
             "ReviewResource": {
                 "type": "object",
@@ -10036,18 +10925,22 @@
                 ],
                 "title": "ReviewResource"
             },
-            "SendLineBroadcastRequest": {
+            "SendLinePushRequest": {
                 "type": "object",
                 "properties": {
+                    "line_user_id": {
+                        "type": "string"
+                    },
                     "message": {
                         "type": "string",
                         "maxLength": 5000
                     }
                 },
                 "required": [
+                    "line_user_id",
                     "message"
                 ],
-                "title": "SendLineBroadcastRequest"
+                "title": "SendLinePushRequest"
             },
             "SendUserLineMessageRequest": {
                 "type": "object",
@@ -10379,9 +11272,6 @@
                     },
                     "sort_order": {
                         "type": "integer"
-                    },
-                    "is_pr": {
-                        "type": "boolean"
                     },
                     "visible": {
                         "type": "boolean"
@@ -11098,9 +11988,6 @@
                     },
                     "sort_order": {
                         "type": "integer"
-                    },
-                    "is_pr": {
-                        "type": "boolean"
                     },
                     "visible": {
                         "type": "boolean"

@@ -15,21 +15,31 @@ use App\Http\Resources\PickupShopResource;
 use App\Models\Consultation;
 use App\Models\PickupShop;
 use App\Models\SiteSetting;
+use App\Services\Analytics\RankingService;
 use App\Services\Content\OgImageRenderer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ContentController extends Controller
 {
-    public function pickupShops(): AnonymousResourceCollection
+    public function pickupShops(RankingService $ranking): AnonymousResourceCollection
     {
         $pickupShops = PickupShop::with(['store' => function ($query) {
             $query->select('id', 'name', 'area', 'category');
         }])->orderBy('sort_order')->get();
 
-        $pickupShops->each(function ($pickupShop) {
+        // ピックアップ各店の直近30日の指標 (PV / LINE導線クリック / CV率) を付与。
+        // どの店が伸びてるかを見て差し替え判断できるようにする (P1)。
+        $storeIds = $pickupShops->pluck('store_id')->filter()->unique()->values()->all();
+        $metrics = $ranking->storeMetrics($storeIds, now()->subDays(30), now());
+
+        $pickupShops->each(function ($pickupShop) use ($metrics) {
             if ($pickupShop->store) {
                 $pickupShop->store->average_rating = $pickupShop->store->averageRating();
+                $m = $metrics[$pickupShop->store_id] ?? ['pv' => 0, 'line_clicks' => 0, 'cv_rate' => 0.0];
+                $pickupShop->store->pv = $m['pv'];
+                $pickupShop->store->line_clicks = $m['line_clicks'];
+                $pickupShop->store->cv_rate = $m['cv_rate'];
             }
         });
 

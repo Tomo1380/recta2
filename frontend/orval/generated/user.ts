@@ -22,7 +22,14 @@ import { rectaMutator } from '../mutators/auth';
 
 
 
-  export const userIndex = (
+  /**
+ * mode: 'talk' (既定: トーク相手のみ) | 'login_only' (ログインのみ・未トーク)
+ *       | 'all' (両方)
+ * @summary 「LINE 利用者」一覧。大事なのは LINE トーク (公式アカウント) 側なので、
+line_user_id を軸にしたトーク相手 (LineFriend) を主役にする (2026-06-06 FB)。
+LINE ログイン (User) は付随属性として添える。
+ */
+export const userIndex = (
     params?: UserIndexParams,
  ) => {
       return rectaMutator<UserIndex200>(

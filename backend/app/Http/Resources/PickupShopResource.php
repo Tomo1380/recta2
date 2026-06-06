@@ -31,6 +31,10 @@ class PickupShopResource extends JsonResource
                     'average_rating' => isset($this->store->average_rating)
                         ? (float) $this->store->average_rating
                         : null,
+                    // 直近30日の指標 (P1)。pickupShops 一覧でだけ付く。
+                    'pv' => isset($this->store->pv) ? (int) $this->store->pv : null,
+                    'line_clicks' => isset($this->store->line_clicks) ? (int) $this->store->line_clicks : null,
+                    'cv_rate' => isset($this->store->cv_rate) ? (float) $this->store->cv_rate : null,
                 ];
             }),
         ];

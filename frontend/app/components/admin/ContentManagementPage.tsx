@@ -369,7 +369,7 @@ export function ContentManagementPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-[13px] text-muted-foreground">
-                トップページの「ピックアップ店舗」セクションに表示する店舗とその順番を管理します。PRバッジ付きの店舗はゴールドのPRタグが表示されます。
+                トップページの「ピックアップ店舗」セクションに表示する店舗とその順番を管理します。並び順はそのまま全ユーザーのトップに反映されます。PV/LINE/CV率は直近30日の実績です。
               </p>
               <button
                 onClick={() => setShowAddPickupModal(true)}
@@ -390,6 +390,9 @@ export function ContentManagementPage() {
                       <th className="px-4 py-3 text-left text-[11px] text-muted-foreground uppercase tracking-wider">エリア</th>
                       <th className="px-4 py-3 text-left text-[11px] text-muted-foreground uppercase tracking-wider">カテゴリ</th>
                       <th className="px-4 py-3 text-left text-[11px] text-muted-foreground uppercase tracking-wider">評価</th>
+                      <th className="px-4 py-3 text-right text-[11px] text-muted-foreground uppercase tracking-wider">PV<span className="text-[9px] normal-case text-muted-foreground/60">/30日</span></th>
+                      <th className="px-4 py-3 text-right text-[11px] text-muted-foreground uppercase tracking-wider">LINE<span className="text-[9px] normal-case text-muted-foreground/60">/30日</span></th>
+                      <th className="px-4 py-3 text-right text-[11px] text-muted-foreground uppercase tracking-wider">CV率</th>
                       <th className="px-4 py-3 text-center text-[11px] text-muted-foreground uppercase tracking-wider">表示</th>
                       <th className="px-4 py-3 text-right text-[11px] text-muted-foreground uppercase tracking-wider">操作</th>
                     </tr>
@@ -415,8 +418,17 @@ export function ContentManagementPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                            <span className="text-[13px] text-foreground">{shop.store?.average_rating ?? "-"}</span>
+                            <span className="text-[13px] text-foreground">{shop.store?.average_rating != null ? Number(shop.store.average_rating).toFixed(1) : "-"}</span>
                           </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-[13px] text-foreground tabular-nums">{shop.store?.pv != null ? shop.store.pv.toLocaleString() : "-"}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-[13px] text-foreground tabular-nums">{shop.store?.line_clicks != null ? shop.store.line_clicks.toLocaleString() : "-"}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-[13px] text-foreground tabular-nums">{shop.store?.cv_rate != null ? `${shop.store.cv_rate}%` : "-"}</span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
