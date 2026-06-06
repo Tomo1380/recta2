@@ -9,23 +9,10 @@ import {
   MessageSquare,
   Minus,
   Star,
-  TrendingUp,
   Users,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
@@ -51,12 +38,6 @@ function formatRelativeTime(iso: string | null): string {
   const diffDay = Math.round(diffHr / 24);
   if (diffDay < 30) return `${diffDay}日前`;
   return d.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
-}
-
-function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function getDelta(kpi: DashboardKpiWithDelta): number | null {
@@ -218,8 +199,6 @@ function LoadingSkeleton() {
 // ----------------------------------------------------------------
 
 export function DashboardPage() {
-  const rawId = useId();
-  const chartId = rawId.replace(/:/g, "");
   const navigate = useNavigate();
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -254,23 +233,6 @@ export function DashboardPage() {
       cancelled = true;
     };
   }, []);
-
-  const chatTrendData = useMemo(() => {
-    if (!data) return [];
-    return data.chat_trend.map((p) => ({
-      date: formatShortDate(p.date),
-      Agent: p.agent,
-      "Fine-tuned": p.finetuned,
-    }));
-  }, [data]);
-
-  const lineFriendTrendData = useMemo(() => {
-    if (!data) return [];
-    return data.line_friend_trend.map((p) => ({
-      date: formatShortDate(p.date),
-      count: p.count,
-    }));
-  }, [data]);
 
   if (loading || !data) {
     return (
@@ -358,129 +320,6 @@ export function DashboardPage() {
           unit="件"
           hint={`平均 ${numberFmt.format(k.chat_today.avg_tokens ?? 0)} tok`}
         />
-      </div>
-
-      {/* Time-series charts */}
-      <div className="order-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* AI Chat trend by mode */}
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm">AIチャット利用数（モード別）</h3>
-            </div>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              30日
-            </span>
-          </div>
-          <div className="min-h-[260px] h-[260px] sm:h-[280px]">
-            {chatTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chatTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                    minTickGap={20}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="Agent" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="Fine-tuned" stackId="a" fill="#a78bfa" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="チャット利用ログがまだありません" />
-            )}
-          </div>
-        </div>
-
-        {/* LINE friends trend */}
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm">LINE友だち追加（日別）</h3>
-            </div>
-            <span className="text-[11px] text-muted-foreground bg-muted px-2 py-1 rounded-md">
-              30日
-            </span>
-          </div>
-          <div className="min-h-[260px] h-[260px] sm:h-[280px]">
-            {lineFriendTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={lineFriendTrendData}>
-                  <defs>
-                    <linearGradient
-                      id={`lineGrad-${chartId}`}
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#06c755" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#06c755" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                    minTickGap={20}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10 }}
-                    stroke="#9ca3af"
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid #e7e5e4",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    name="新規追加"
-                    stroke="#06c755"
-                    strokeWidth={2}
-                    fill={`url(#lineGrad-${chartId})`}
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState message="LINE友だちのデータがまだありません" />
-            )}
-          </div>
-        </div>
       </div>
 
       {/* アクセス解析: 店舗/エリア/コラム ランキング + LINE経路 + 計測リンク発行 (FB A2-A4) */}
