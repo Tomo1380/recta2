@@ -223,8 +223,8 @@ export function PersonDetailPage() {
             )}
           </section>
 
-          {/* AIチャット履歴 (この人の会話。チャットは user_id 紐づきなのでログイン済のみ) */}
-          {person.has_account && (
+          {/* AIチャット履歴 (この人=line_user_id の会話。LINEログイン時に紐づく) */}
+          {(person.has_account || person.ai_chats.length > 0) && (
             <section className="bg-card border border-border rounded-xl p-4">
               <h3 className="text-[13px] font-bold flex items-center gap-1.5 mb-2">
                 <Bot className="w-4 h-4 text-emerald-500" />

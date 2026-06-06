@@ -159,12 +159,11 @@ class LineFriendController extends Controller
         $messages = LineMessage::where('line_user_id', $lineUserId)
             ->orderByDesc('created_at')->limit(5)->get();
 
-        // この人 (ログイン済 User) の AIチャット履歴。チャットは user_id に紐づくので
-        // ログインしている人だけ取れる (2026-06-07 FB)。
-        $aiChats = [];
-        if ($user) {
-            $aiChats = \App\Models\AiChatLog::where('user_id', $user->id)
-                ->orderByDesc('created_at')
+        // この人 (line_user_id) の AIチャット履歴。チャットは LINEログイン時に
+        // line_user_id が写されるので、LINEトーク基準で本人のチャットを引ける
+        // (2026-06-07 FB)。匿名チャットは紐づかない (IPのみ)。
+        $aiChats = \App\Models\AiChatLog::where('line_user_id', $lineUserId)
+            ->orderByDesc('created_at')
                 ->limit(20)
                 ->get(['id', 'user_message', 'ai_response', 'mode', 'page_type', 'input_tokens', 'output_tokens', 'created_at'])
                 ->map(fn ($l) => [
@@ -177,7 +176,6 @@ class LineFriendController extends Controller
                     'created_at' => $l->created_at?->toIso8601String(),
                 ])
                 ->all();
-        }
 
         $adminName = $friend?->admin_name;
         $displayName = $friend?->display_name ?: $user?->line_display_name;
