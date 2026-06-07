@@ -11,6 +11,7 @@ import {
   EyeOff,
   Loader2,
   Plane,
+  GripVertical,
 } from "lucide-react";
 // orval-generated client (Laravel scramble → OpenAPI → axios-functions).
 // 既存 ~/lib/api と ~/lib/types の手書きは段階的にこちら側へ寄せていく。
@@ -23,6 +24,7 @@ import {
   relocateVoiceReorder,
 } from "../../../orval/generated/relocate-voice";
 import type { RelocateVoice } from "../../../orval/generated/api.schemas";
+import { useDragReorder, arrayMove } from "~/hooks/useDragReorder";
 
 interface Toast {
   message: string;
@@ -145,20 +147,27 @@ export function RelocateVoicesPage() {
     }
   };
 
-  const move = async (index: number, direction: -1 | 1) => {
-    const next = index + direction;
-    if (next < 0 || next >= voices.length) return;
-    const reordered = [...voices];
-    [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
+  // 並び順を楽観的に反映 → 永続化。失敗したら元に戻す。
+  const persistOrder = async (reordered: RelocateVoice[]) => {
+    const prev = voices;
     setVoices(reordered);
     try {
       await relocateVoiceReorder({ ids: reordered.map((v) => v.id) });
     } catch (e) {
       console.error(e);
       showToast("並び替えに失敗しました", "error");
-      fetchVoices();
+      setVoices(prev);
     }
   };
+
+  // 矢印ボタンでの 1 つ移動（D&D のフォールバック / アクセシビリティ）。
+  const move = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= voices.length) return;
+    void persistOrder(arrayMove(voices, index, target));
+  };
+
+  const dnd = useDragReorder((from, to) => void persistOrder(arrayMove(voices, from, to)));
 
   if (loading) {
     return (
@@ -200,9 +209,20 @@ export function RelocateVoicesPage() {
           voices.map((voice, index) => {
             const isEditing = editingId === voice.id;
             return (
-              <div key={voice.id} className="p-5">
+              <div
+                key={voice.id}
+                {...(isEditing ? {} : dnd.rowProps(index))}
+                className={`p-5 transition ${
+                  dnd.dragIndex === index ? "opacity-40" : ""
+                } ${
+                  dnd.overIndex === index && dnd.dragIndex !== null && dnd.dragIndex !== index
+                    ? "bg-indigo-50/70 shadow-[inset_0_2px_0_0_#818cf8]"
+                    : ""
+                }`}
+              >
                 <div className="flex items-start gap-3">
-                  <div className="flex flex-col items-center gap-1 pt-1">
+                  <div className="flex flex-col items-center gap-1 pt-1 select-none">
+                    <GripVertical className={`w-4 h-4 text-slate-300 ${isEditing ? "opacity-30" : "cursor-grab active:cursor-grabbing"}`} />
                     <button
                       onClick={() => move(index, -1)}
                       disabled={index === 0}

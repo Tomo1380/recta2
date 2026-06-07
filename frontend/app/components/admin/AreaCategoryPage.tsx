@@ -35,6 +35,7 @@ import {
 } from "../../../orval/generated/area-category";
 import type { AreaResource, CategoryResource } from "../../../orval/generated/api.schemas";
 import { ImageCropDialog } from "./ImageCropDialog";
+import { useDragReorder, arrayMove } from "~/hooks/useDragReorder";
 
 // 既存コードが Area/Category 名で書かれているので、生成型に local alias する。
 type Area = AreaResource;
@@ -148,34 +149,29 @@ export function AreaCategoryPage() {
     }
   };
 
-  const handleMoveArea = async (id: number, direction: "up" | "down") => {
-    const idx = areas.findIndex(a => a.id === id);
-    if (direction === "up" && idx > 0) {
-      const next = [...areas];
-      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      setAreas(next);
-      try {
-        await areaCategoryReorderAreas({ ids: next.map(a => a.id) });
-        showToast("並び順を更新しました");
-      } catch (e) {
-        console.error(e);
-        showToast("並び順の更新に失敗しました", "error");
-        await fetchAreas();
-      }
-    } else if (direction === "down" && idx < areas.length - 1) {
-      const next = [...areas];
-      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      setAreas(next);
-      try {
-        await areaCategoryReorderAreas({ ids: next.map(a => a.id) });
-        showToast("並び順を更新しました");
-      } catch (e) {
-        console.error(e);
-        showToast("並び順の更新に失敗しました", "error");
-        await fetchAreas();
-      }
+  // 並び順を楽観的に反映 → 永続化。失敗したら元に戻す。
+  const persistAreaOrder = async (next: Area[]) => {
+    const prev = areas;
+    setAreas(next);
+    try {
+      await areaCategoryReorderAreas({ ids: next.map(a => a.id) });
+      showToast("並び順を更新しました");
+    } catch (e) {
+      console.error(e);
+      showToast("並び順の更新に失敗しました", "error");
+      setAreas(prev);
     }
   };
+
+  // 矢印ボタンでの 1 つ移動（D&D のフォールバック / アクセシビリティ）。
+  const handleMoveArea = (id: number, direction: "up" | "down") => {
+    const idx = areas.findIndex(a => a.id === id);
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || target < 0 || target >= areas.length) return;
+    void persistAreaOrder(arrayMove(areas, idx, target));
+  };
+
+  const areaDnd = useDragReorder((from, to) => void persistAreaOrder(arrayMove(areas, from, to)));
 
   const handleSaveCategory = async (cat: Category) => {
     setSaving(true);
@@ -219,34 +215,29 @@ export function AreaCategoryPage() {
     }
   };
 
-  const handleMoveCategory = async (id: number, direction: "up" | "down") => {
-    const idx = categories.findIndex(c => c.id === id);
-    if (direction === "up" && idx > 0) {
-      const next = [...categories];
-      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      setCategories(next);
-      try {
-        await areaCategoryReorderCategories({ ids: next.map(c => c.id) });
-        showToast("並び順を更新しました");
-      } catch (e) {
-        console.error(e);
-        showToast("並び順の更新に失敗しました", "error");
-        await fetchCategories();
-      }
-    } else if (direction === "down" && idx < categories.length - 1) {
-      const next = [...categories];
-      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      setCategories(next);
-      try {
-        await areaCategoryReorderCategories({ ids: next.map(c => c.id) });
-        showToast("並び順を更新しました");
-      } catch (e) {
-        console.error(e);
-        showToast("並び順の更新に失敗しました", "error");
-        await fetchCategories();
-      }
+  // 並び順を楽観的に反映 → 永続化。失敗したら元に戻す。
+  const persistCategoryOrder = async (next: Category[]) => {
+    const prev = categories;
+    setCategories(next);
+    try {
+      await areaCategoryReorderCategories({ ids: next.map(c => c.id) });
+      showToast("並び順を更新しました");
+    } catch (e) {
+      console.error(e);
+      showToast("並び順の更新に失敗しました", "error");
+      setCategories(prev);
     }
   };
+
+  // 矢印ボタンでの 1 つ移動（D&D のフォールバック / アクセシビリティ）。
+  const handleMoveCategory = (id: number, direction: "up" | "down") => {
+    const idx = categories.findIndex(c => c.id === id);
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || target < 0 || target >= categories.length) return;
+    void persistCategoryOrder(arrayMove(categories, idx, target));
+  };
+
+  const categoryDnd = useDragReorder((from, to) => void persistCategoryOrder(arrayMove(categories, from, to)));
 
   const handleUploadCategoryImage = async (cat: Category, file: File) => {
     if (file.size > 5 * 1024 * 1024) {
@@ -473,10 +464,20 @@ export function AreaCategoryPage() {
                 </thead>
                 <tbody>
                   {filteredAreas.map((area, idx) => (
-                    <tr key={area.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition">
+                    <tr
+                      key={area.id}
+                      {...(searchQuery ? {} : areaDnd.rowProps(idx))}
+                      className={`border-b border-border last:border-0 transition ${
+                        areaDnd.dragIndex === idx ? "opacity-40" : "hover:bg-muted/20"
+                      } ${
+                        areaDnd.overIndex === idx && areaDnd.dragIndex !== null && areaDnd.dragIndex !== idx
+                          ? "bg-indigo-50/70 shadow-[inset_0_2px_0_0_#818cf8]"
+                          : ""
+                      }`}
+                    >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <GripVertical className="w-3.5 h-3.5 text-gray-300 cursor-grab" />
+                        <div className="flex items-center gap-1 select-none">
+                          <GripVertical className={`w-3.5 h-3.5 text-gray-400 ${searchQuery ? "opacity-30" : "cursor-grab active:cursor-grabbing"}`} />
                           <span className="text-[13px] text-muted-foreground">{idx + 1}</span>
                         </div>
                       </td>
@@ -590,10 +591,20 @@ export function AreaCategoryPage() {
                     const isEditing = editingCategory === cat.id;
                     const isUploading = uploadingCategoryId === cat.id;
                     return (
-                      <tr key={cat.id} className={`border-b border-border last:border-0 hover:bg-muted/20 transition ${!cat.visible ? "opacity-60" : ""}`}>
+                      <tr
+                        key={cat.id}
+                        {...(searchQuery ? {} : categoryDnd.rowProps(idx))}
+                        className={`border-b border-border last:border-0 transition ${
+                          categoryDnd.dragIndex === idx ? "opacity-40" : "hover:bg-muted/20"
+                        } ${
+                          categoryDnd.overIndex === idx && categoryDnd.dragIndex !== null && categoryDnd.dragIndex !== idx
+                            ? "bg-indigo-50/70 shadow-[inset_0_2px_0_0_#818cf8]"
+                            : ""
+                        } ${!cat.visible ? "opacity-60" : ""}`}
+                      >
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <GripVertical className="w-3.5 h-3.5 text-gray-300 cursor-grab" />
+                          <div className="flex items-center gap-1 select-none">
+                            <GripVertical className={`w-3.5 h-3.5 text-gray-400 ${searchQuery ? "opacity-30" : "cursor-grab active:cursor-grabbing"}`} />
                             <span className="text-[13px] text-muted-foreground">{idx + 1}</span>
                           </div>
                         </td>
