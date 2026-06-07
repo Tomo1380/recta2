@@ -11,9 +11,13 @@ class Area extends Model
         'slug',
         'visible',
         'sort_order',
+        'lat',
+        'lng',
     ];
 
     protected $casts = [
         'visible' => 'boolean',
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 }

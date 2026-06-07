@@ -50,6 +50,35 @@ class ArticleSeeder extends Seeder
                 ],
             );
         }
+
+        $this->linkRelatedStores();
+    }
+
+    /**
+     * デモ用: 各コラムに、タグ(エリア/業種)が一致する公開店舗を「紹介した店舗」として
+     * 最大2件紐付ける。店舗詳細の「関連コラム」で“この店を紹介したコラム”が
+     * 優先表示されるのを確認できるようにする (実運用では admin が手動で紐付ける)。
+     */
+    private function linkRelatedStores(): void
+    {
+        $stores = \App\Models\Store::where('publish_status', 'published')->get(['id', 'area', 'category']);
+        if ($stores->isEmpty()) {
+            return;
+        }
+
+        foreach (Article::all() as $article) {
+            $tags = $article->tags ?? [];
+            $matchIds = $stores
+                ->filter(fn ($s) => in_array($s->area, $tags, true) || in_array($s->category, $tags, true))
+                ->take(2)
+                ->pluck('id')
+                ->all();
+
+            if (!empty($matchIds)) {
+                $article->related_store_ids = $matchIds;
+                $article->save();
+            }
+        }
     }
 
     /** @return array<int, array<string, mixed>> */

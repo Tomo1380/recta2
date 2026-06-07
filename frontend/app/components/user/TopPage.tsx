@@ -8,7 +8,7 @@ import SectionHeader from "~/components/user/shared/SectionHeader";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import { useUserAuthSafe } from "~/lib/user-auth";
 import { LUXE } from "~/lib/luxe-tokens";
-import { setPreferredArea } from "~/lib/preferred-area";
+import { getPreferredArea, setPreferredArea } from "~/lib/preferred-area";
 import type { ArticleSummary, PublicArticleIndexResponse } from "~/lib/types";
 
 // ─── Constants ─────────────────────────────────────
@@ -157,7 +157,7 @@ function AreaCategoryBand({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
-            {areas.slice(0, areasVisible).map((area, i) => {
+            {areas.slice(0, areasVisible).map((area) => {
               const count = area.store_count ?? 0;
               return (
                 <Link
@@ -165,13 +165,13 @@ function AreaCategoryBand({
                   to={`/stores?area=${encodeURIComponent(area.slug)}`}
                   onClick={() => onAreaSelect(area.slug)}
                   className="rounded-xl flex items-center gap-2.5 px-3 active:scale-[0.98] transition-transform"
-                  style={{ background: "rgba(255,255,255,.06)", border: i < 3 ? "1px solid rgba(212,175,55,.2)" : "1px solid rgba(255,255,255,.08)", height: "50px", textDecoration: "none" }}
+                  style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(212,175,55,.2)", height: "50px", textDecoration: "none" }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={i < 3 ? GOLD : "rgba(255,255,255,.3)"} strokeWidth="1.5" fill={i < 3 ? "rgba(212,175,55,.15)" : "rgba(255,255,255,.05)"} />
-                    <circle cx="12" cy="9" r="2.5" fill={i < 3 ? GOLD : "rgba(255,255,255,.25)"} />
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={GOLD} strokeWidth="1.5" fill="rgba(212,175,55,.15)" />
+                    <circle cx="12" cy="9" r="2.5" fill={GOLD} />
                   </svg>
-                  <span className="flex-1 text-left" style={{ fontFamily: J, fontWeight: i < 3 ? 600 : 400, fontSize: "12.5px", color: i < 3 ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.6)" }}>{area.name}</span>
+                  <span className="flex-1 text-left" style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: "rgba(255,255,255,.95)" }}>{area.name}</span>
                   <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: "10px", color: "rgba(255,255,255,.25)" }}>{count}</span>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0"><path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,.15)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </Link>
@@ -337,7 +337,13 @@ export default function TopPage({
   const [columns, setColumns] = useState<ArticleSummary[]>([]);
 
   useEffect(() => {
-    fetch("/api/home")
+    // 最後に選んだエリア (localStorage) を渡すと、ピックアップが近隣エリア順に
+    // 並び替わる (絞り込みではなく並べ替えなので運営の推しは消えない)。
+    const preferred = getPreferredArea();
+    const homeUrl = preferred
+      ? `/api/home?area=${encodeURIComponent(preferred)}`
+      : "/api/home";
+    fetch(homeUrl)
       .then((res) => res.json())
       .then((json: HomeData) => { setData(json); setLoading(false); })
       .catch(() => { setLoading(false); });
@@ -385,10 +391,10 @@ export default function TopPage({
   const heroBadge = pick(heroBanner.hero_badge, "ナイトワーク求人");
   const heroAiLabel = pick(heroBanner.hero_ai_label, "AI MATCHING");
 
-  // ピックアップは「運営のおすすめ枠」。エリアでの絞り込みはしない
-  // (管理画面の並び順=キュレーションをそのまま全ユーザーに見せる)。
-  // 旧実装は preferred area で他エリアを除外していたが、運営の推しが
-  // 埋もれる/消える問題があったため撤去 (2026-06-07 FB)。
+  // ピックアップは「運営のおすすめ枠」。エリアでの“絞り込み”はしない
+  // (完全一致絞りは運営の推しが消えるため撤去済み 2026-06-07 FB)。
+  // 代わりに、ユーザーが選んだエリアの近隣順に“並べ替え”だけ行う。並べ替えは
+  // backend (/api/home?area=) 側で実施済みなので、ここはそのまま受ける。
   const pickupShops = allPickupShops;
 
   return (
@@ -445,8 +451,8 @@ export default function TopPage({
           areasVisible={areasVisible}
           setAreasVisible={setAreasVisible}
           onAreaSelect={(slug) => {
-            // 選んだエリアを記録だけしておく (将来の行動ベース・エリアサジェスト P2 の土台)。
-            // 現状ピックアップの絞り込みには使わない。
+            // 選んだエリアを記録。次回トップ訪問時に /api/home?area= へ渡し、
+            // ピックアップをこのエリアの近隣順に並べ替える。
             setPreferredArea(slug);
           }}
         />
@@ -465,7 +471,7 @@ export default function TopPage({
             />
           </div>
           <div className="flex gap-3 px-5 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
-            {pickupShops.map((store, idx) => {
+            {pickupShops.map((store) => {
               const imageUrl = store.images && store.images.length > 0 ? getImageUrl(store.images[0]) : undefined;
               return (
                 <Link key={store.id} to={`/stores/${store.id}`} className="shrink-0 rounded-2xl overflow-hidden" style={{ width: "200px", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06)", border: "1px solid rgba(27,37,40,.06)", textDecoration: "none" }}>
@@ -499,11 +505,6 @@ export default function TopPage({
                         >
                           {store.category}
                         </span>
-                      </div>
-                    )}
-                    {idx === 0 && (
-                      <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg,${GOLD},#c8960c)`, boxShadow: "0 2px 8px rgba(212,175,55,.4)" }}>
-                        <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "10px", color: "white" }}>1</span>
                       </div>
                     )}
                     {(store.trial_hourly_min || store.trial_hourly_max) && (

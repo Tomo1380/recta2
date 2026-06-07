@@ -14,17 +14,20 @@ class AreaCategorySeeder extends Seeder
         Area::query()->delete();
         Category::query()->delete();
 
+        // lat/lng は各エリアの中心座標。トップのピックアップ近隣ソート用。
+        // 本番では管理画面のエリア作成時に geocode 自動セットされるが、Google key
+        // 無しのローカル/fresh でも動くよう既知エリアは座標を持たせておく。
         $areas = [
-            ['name' => '渋谷', 'slug' => 'shibuya', 'visible' => true, 'sort_order' => 1],
-            ['name' => '新宿', 'slug' => 'shinjuku', 'visible' => true, 'sort_order' => 2],
-            ['name' => '六本木', 'slug' => 'roppongi', 'visible' => true, 'sort_order' => 3],
-            ['name' => '銀座', 'slug' => 'ginza', 'visible' => true, 'sort_order' => 4],
-            ['name' => '池袋', 'slug' => 'ikebukuro', 'visible' => true, 'sort_order' => 5],
-            ['name' => '恵比寿', 'slug' => 'ebisu', 'visible' => true, 'sort_order' => 6],
-            ['name' => '麻布十番', 'slug' => 'azabujuban', 'visible' => true, 'sort_order' => 7],
-            ['name' => '表参道', 'slug' => 'omotesando', 'visible' => true, 'sort_order' => 8],
-            ['name' => '中洲', 'slug' => 'nakasu', 'visible' => false, 'sort_order' => 9],
-            ['name' => 'すすきの', 'slug' => 'susukino', 'visible' => false, 'sort_order' => 10],
+            ['name' => '渋谷', 'slug' => 'shibuya', 'visible' => true, 'sort_order' => 1, 'lat' => 35.6580, 'lng' => 139.6994],
+            ['name' => '新宿', 'slug' => 'shinjuku', 'visible' => true, 'sort_order' => 2, 'lat' => 35.6938, 'lng' => 139.7034],
+            ['name' => '六本木', 'slug' => 'roppongi', 'visible' => true, 'sort_order' => 3, 'lat' => 35.6628, 'lng' => 139.7315],
+            ['name' => '銀座', 'slug' => 'ginza', 'visible' => true, 'sort_order' => 4, 'lat' => 35.6717, 'lng' => 139.7650],
+            ['name' => '池袋', 'slug' => 'ikebukuro', 'visible' => true, 'sort_order' => 5, 'lat' => 35.7295, 'lng' => 139.7109],
+            ['name' => '恵比寿', 'slug' => 'ebisu', 'visible' => true, 'sort_order' => 6, 'lat' => 35.6467, 'lng' => 139.7100],
+            ['name' => '麻布十番', 'slug' => 'azabujuban', 'visible' => true, 'sort_order' => 7, 'lat' => 35.6556, 'lng' => 139.7363],
+            ['name' => '表参道', 'slug' => 'omotesando', 'visible' => true, 'sort_order' => 8, 'lat' => 35.6655, 'lng' => 139.7126],
+            ['name' => '中洲', 'slug' => 'nakasu', 'visible' => false, 'sort_order' => 9, 'lat' => 33.5939, 'lng' => 130.4017],
+            ['name' => 'すすきの', 'slug' => 'susukino', 'visible' => false, 'sort_order' => 10, 'lat' => 43.0556, 'lng' => 141.3534],
         ];
 
         foreach ($areas as $area) {

@@ -77,6 +77,35 @@ class AdminReviewManageTest extends TestCase
         $this->assertNotNull($res->json('store_reply_at'));
     }
 
+    public function test_index_filters_by_reply_state(): void
+    {
+        $store = $this->store();
+        $replied = Review::create([
+            'store_id' => $store->id, 'rating' => 5, 'body' => 'replied', 'status' => 'published',
+            'store_reply' => 'ありがとうございます', 'store_reply_at' => now(),
+        ]);
+        $unreplied = Review::create([
+            'store_id' => $store->id, 'rating' => 2, 'body' => 'unreplied', 'status' => 'published',
+        ]);
+        // 空文字は未返答扱い。
+        $blank = Review::create([
+            'store_id' => $store->id, 'rating' => 1, 'body' => 'blank', 'status' => 'published',
+            'store_reply' => '',
+        ]);
+
+        $admin = $this->admin();
+
+        $unrepliedRes = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/admin/reviews?reply=unreplied');
+        $unrepliedRes->assertStatus(200)->assertJsonPath('total', 2);
+
+        $repliedRes = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/admin/reviews?reply=replied');
+        $repliedRes->assertStatus(200)
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $replied->id);
+    }
+
     public function test_index_filters_by_user_id(): void
     {
         $store = $this->store();

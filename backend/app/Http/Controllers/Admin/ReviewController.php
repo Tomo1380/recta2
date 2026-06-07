@@ -46,6 +46,13 @@ class ReviewController extends Controller
         if ($userId = $request->input('user_id')) {
             $query->where('user_id', $userId);
         }
+        // 返答状態で絞り込み (B4: 未返答 / 返答済み)。空文字も未返答扱い。
+        $reply = $request->input('reply');
+        if ($reply === 'unreplied') {
+            $query->where(fn ($q) => $q->whereNull('store_reply')->orWhere('store_reply', ''));
+        } elseif ($reply === 'replied') {
+            $query->whereNotNull('store_reply')->where('store_reply', '!=', '');
+        }
         // フリーワード検索: ユーザー名 (LINE表示名 / ニックネーム) / 表示名 / 店舗名。
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { api } from "~/lib/api"; // admin store 検索のみ (Wave 7 まで残る)
 import { useFileUpload } from "~/hooks/useFileUpload";
+import { useDragReorder, arrayMove } from "~/hooks/useDragReorder";
 import { FloatingPreview } from "./shared/FloatingPreview";
 import TopPage from "~/components/user/TopPage";
 import type { Store } from "~/lib/types";
@@ -130,34 +131,34 @@ export function ContentManagementPage() {
     { key: "banner", label: "バナー・ヒーロー", icon: Image },
   ];
 
-  const movePickupShop = async (id: number, direction: "up" | "down") => {
-    const idx = pickupShops.findIndex(s => s.id === id);
-    if (direction === "up" && idx > 0) {
-      const next = [...pickupShops];
-      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      setPickupShops(next);
-      try {
-        await contentReorderPickupShops({ ids: next.map(s => s.id) });
-        showToast("並び順を更新しました");
-      } catch (e) {
-        console.error(e);
-        showToast("並び順の更新に失敗しました", "error");
-        await fetchPickupShops();
-      }
-    } else if (direction === "down" && idx < pickupShops.length - 1) {
-      const next = [...pickupShops];
-      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      setPickupShops(next);
-      try {
-        await contentReorderPickupShops({ ids: next.map(s => s.id) });
-        showToast("並び順を更新しました");
-      } catch (e) {
-        console.error(e);
-        showToast("並び順の更新に失敗しました", "error");
-        await fetchPickupShops();
-      }
+  // 並び順を楽観的に反映 → 永続化。失敗したら元に戻す。
+  const persistPickupOrder = async (next: PickupShop[]) => {
+    const prev = pickupShops;
+    setPickupShops(next);
+    try {
+      await contentReorderPickupShops({ ids: next.map(s => s.id) });
+      showToast("並び順を更新しました");
+    } catch (e) {
+      console.error(e);
+      showToast("並び順の更新に失敗しました", "error");
+      setPickupShops(prev);
     }
   };
+
+  // 矢印ボタンでの 1 つ移動（D&D のフォールバック / アクセシビリティ）。
+  const movePickupShop = (id: number, direction: "up" | "down") => {
+    const idx = pickupShops.findIndex(s => s.id === id);
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || target < 0 || target >= pickupShops.length) return;
+    const next = [...pickupShops];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    void persistPickupOrder(next);
+  };
+
+  // ドラッグ&ドロップ並び替え（ネイティブ HTML5 DnD）。
+  const pickupDnd = useDragReorder((from, to) =>
+    void persistPickupOrder(arrayMove(pickupShops, from, to)),
+  );
 
   const handleTogglePickupVisible = async (shop: PickupShop) => {
     try {
@@ -399,10 +400,20 @@ export function ContentManagementPage() {
                   </thead>
                   <tbody>
                     {pickupShops.map((shop, idx) => (
-                      <tr key={shop.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition">
+                      <tr
+                        key={shop.id}
+                        {...pickupDnd.rowProps(idx)}
+                        className={`border-b border-border last:border-0 transition ${
+                          pickupDnd.dragIndex === idx ? "opacity-40" : "hover:bg-muted/20"
+                        } ${
+                          pickupDnd.overIndex === idx && pickupDnd.dragIndex !== null && pickupDnd.dragIndex !== idx
+                            ? "bg-indigo-50/70 shadow-[inset_0_2px_0_0_#818cf8]"
+                            : ""
+                        }`}
+                      >
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <GripVertical className="w-3.5 h-3.5 text-gray-300 cursor-grab" />
+                          <div className="flex items-center gap-1 select-none">
+                            <GripVertical className="w-3.5 h-3.5 text-gray-400 cursor-grab active:cursor-grabbing" />
                             <span className="text-[13px] text-muted-foreground">{idx + 1}</span>
                           </div>
                         </td>

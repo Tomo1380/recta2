@@ -128,24 +128,20 @@ export interface AppHttpRequestsAdminStoreReviewRequest {
   store_reply?: string | null;
 }
 
-export interface Area {
-  id: number;
-  name: string;
-  slug: string;
-  visible: boolean;
-  sort_order: number;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
-}
-
 export interface AreaResource {
   id: number;
   name: string;
   slug: string;
   visible: boolean;
   sort_order: number;
+  /**
+     * 中心座標。トップのピックアップ近隣ソートに使う。管理画面で
+   * エリア作成/改名時に geocode 自動セット (未取得なら null)。
+     * @nullable
+     */
+  lat: number | null;
+  /** @nullable */
+  lng: number | null;
   /**
      * 管理画面の一覧で「このエリアに紐づく店舗数」を出すために
    * controller 側で append される動的フィールド。set されていない
@@ -154,37 +150,6 @@ export interface AreaResource {
      * @nullable
      */
   shop_count: number | null;
-}
-
-export interface Article {
-  id: number;
-  slug: string;
-  title: string;
-  /** @nullable */
-  excerpt: string | null;
-  /** @nullable */
-  body: unknown[] | null;
-  /** @nullable */
-  body_html: string | null;
-  /** @nullable */
-  thumbnail_url: string | null;
-  /** @nullable */
-  category: string | null;
-  /** @nullable */
-  tags: unknown[] | null;
-  status: string;
-  /** @nullable */
-  published_at: string | null;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  updated_at: string | null;
-  /** @nullable */
-  author_id: number | null;
-  /** @nullable */
-  section: string | null;
-  /** @nullable */
-  related_store_ids: unknown[] | null;
 }
 
 export interface ArticleResource {
@@ -585,6 +550,19 @@ export interface StoreAreaRequest {
   slug: string;
   visible?: boolean;
   sort_order?: number;
+  /**
+     * 通常は作成後に geocode 自動セット。明示指定があれば手動上書きを許す。
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  lat?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  lng?: number | null;
 }
 
 /**
@@ -957,6 +935,19 @@ export interface UpdateAreaRequest {
   slug?: string;
   visible?: boolean;
   sort_order?: number;
+  /**
+     * 通常は geocode 自動セット。明示指定があれば手動上書きを許す。
+     * @minimum -90
+     * @maximum 90
+     * @nullable
+     */
+  lat?: number | null;
+  /**
+     * @minimum -180
+     * @maximum 180
+     * @nullable
+     */
+  lng?: number | null;
 }
 
 /**
@@ -1652,19 +1643,13 @@ export type AnalyticsOverview200Summary = {
   line_friends_in_range: number;
 };
 
-export type AnalyticsOverview200LineRoutesItem = {
-  route: string;
-  kind: string;
-  clicks: number;
-};
-
 export type AnalyticsOverview200 = {
   range: AnalyticsOverview200Range;
   summary: AnalyticsOverview200Summary;
   stores: unknown[][];
   areas: unknown[][];
   columns: unknown[][];
-  line_routes: AnalyticsOverview200LineRoutesItem[];
+  line_routes: string[];
 };
 
 export type AnalyticsBreakdownParams = {
@@ -1698,16 +1683,10 @@ export const AnalyticsBreakdownDays = {
   NUMBER_365: '365',
 } as const;
 
-export type AnalyticsBreakdown200RowsItem = {
-  /** @nullable */
-  source: string | null;
-  clicks: number;
-};
-
 export type AnalyticsBreakdown200 = {
   type: string;
   key: string;
-  rows: AnalyticsBreakdown200RowsItem[];
+  rows: (string | number)[];
 };
 
 export type AreaCategoryReorderAreas200 = {
@@ -1810,39 +1789,6 @@ export type DashboardIndex200Kpis = {
   chat_today: DashboardIndex200KpisChatToday;
 };
 
-export type DashboardIndex200RecentReviewsItem = {
-  id: number;
-  rating: number;
-  body: string;
-  status: string;
-  created_at: string;
-  user_name: string | '匿名ユーザー';
-  store_id: number;
-  store_name: string;
-};
-
-export type DashboardIndex200RecentMessagesItem = {
-  id: number;
-  /** @nullable */
-  user_id: number | null;
-  line_user_id: string;
-  name: string | null;
-  avatar: string;
-  message: string;
-  created_at: string;
-  unread: boolean;
-};
-
-export type DashboardIndex200RecentChatsItem = {
-  id: number;
-  mode: string;
-  page_type: string;
-  user_message: string;
-  total_tokens: number;
-  created_at: string;
-  user_name: string | '匿名';
-};
-
 export type DashboardIndex200Secondary = {
   /** @minimum 0 */
   new_inbound_threads_7d: number;
@@ -1870,9 +1816,9 @@ export type DashboardIndex200 = {
   kpis: DashboardIndex200Kpis;
   chat_trend: string[];
   line_friend_trend: string[];
-  recent_reviews: DashboardIndex200RecentReviewsItem[];
-  recent_messages: DashboardIndex200RecentMessagesItem[];
-  recent_chats: DashboardIndex200RecentChatsItem[];
+  recent_reviews: string[];
+  recent_messages: string[];
+  recent_chats: string[];
   secondary: DashboardIndex200Secondary;
   analytics_highlight: DashboardIndex200AnalyticsHighlight;
 };
@@ -2352,68 +2298,19 @@ export type PublicReviewDestroy403 = {
   message: '他のユーザーの口コミは削除できません';
 };
 
-export type PublicStoreHome200PickupShopsItem = {
-  id: number;
-  name: string;
-  area: string;
-  category: string;
-  trial_hourly_min: unknown;
-  trial_hourly_max: unknown;
-  /** @nullable */
-  feature_tags: unknown[] | null;
-  /** @nullable */
-  images: unknown[] | null;
-  reviews_count: number;
-  average_rating: number;
+export type PublicStoreHomeParams = {
+area?: string;
 };
 
-/**
- * @nullable
- */
-export type PublicStoreHome200RecentReviewsItemStore = {
-  id: number;
-  name: string;
-  area: string;
-  category: string;
-  /** @nullable */
-  image_url: string | null;
-} | null;
-
-/**
- * @nullable
- */
-export type PublicStoreHome200RecentReviewsItemUser = {
-  line_display_name: string;
-  /** @nullable */
-  line_picture_url: string | null;
-  use_line_avatar: boolean;
-  /** @nullable */
-  nickname: string | null;
-} | null;
-
-export type PublicStoreHome200RecentReviewsItem = {
-  id: number;
-  rating: number;
-  body: string;
-  /** @nullable */
-  tweet_id: string | null;
-  /** @nullable */
-  tweet_author_screen_name: string | null;
-  /** @nullable */
-  created_at: string | null;
-  /** @nullable */
-  store: PublicStoreHome200RecentReviewsItemStore;
-  /** @nullable */
-  user: PublicStoreHome200RecentReviewsItemUser;
-};
+export type PublicStoreHome200PickupShopsItem = {[key: string]: unknown};
 
 export type PublicStoreHome200 = {
   banner: string;
   pickup_shops: PublicStoreHome200PickupShopsItem[];
   consultations: Consultation[];
-  areas: Area[];
+  areas: string[];
   categories: Category[];
-  recent_reviews: PublicStoreHome200RecentReviewsItem[];
+  recent_reviews: string[];
 };
 
 export type PublicStoreIndexParams = {
@@ -2432,7 +2329,7 @@ export type PublicStoreIndex200 = { [key: string]: unknown };
 export type PublicStoreShow200 = {
   store: unknown[];
   related: unknown[];
-  related_columns: Article[];
+  related_columns: string[];
 };
 
 export type RelocateVoiceReorder200 = {
@@ -2440,6 +2337,10 @@ export type RelocateVoiceReorder200 = {
 };
 
 export type ReviewIndexParams = {
+/**
+ * 返答状態で絞り込み (B4: 未返答 / 返答済み)。空文字も未返答扱い。
+ */
+reply?: string;
 per_page?: string;
 };
 
