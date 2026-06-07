@@ -2288,7 +2288,7 @@ export function ShopEditPage() {
             />
           </Field>
           <Field
-            label="上京ロゴ・バナー (D3)"
+            label="上京ロゴ・バナー"
             hint="ONにすると店舗詳細に「地方から上京」訴求バナーを表示します。東京・新地・ミナミ等の上京需要があるエリアのみ推奨。"
           >
             <label className="inline-flex items-center gap-2 cursor-pointer text-sm">

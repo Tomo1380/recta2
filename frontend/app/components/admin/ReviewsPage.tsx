@@ -14,6 +14,17 @@ function authorLabel(review: Review): string {
   );
 }
 
+/** B4: 店側返答が入っているか（空文字は未返答扱い）。 */
+function isReplied(review: Review): boolean {
+  return !!review.store_reply && review.store_reply.trim() !== "";
+}
+
+const REPLY_FILTER_MAP: Record<string, string | undefined> = {
+  "返答全て": undefined,
+  "未返答": "unreplied",
+  "返答済み": "replied",
+};
+
 const STATUS_FILTER_MAP: Record<string, string | undefined> = {
   "全て": undefined,
   "公開": "published",
@@ -36,6 +47,7 @@ function formatDate(iso: string): string {
 export function ReviewsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("全て");
+  const [replyFilter, setReplyFilter] = useState("返答全て");
   const [sortState, setSortState] = useState<SortState>({ sort: "created_at", order: "desc" });
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -48,6 +60,7 @@ export function ReviewsPage() {
   const [authorFilter, setAuthorFilter] = useState<{ userId: number | null; label: string } | null>(null);
 
   const statuses = ["全て", "公開", "非公開", "削除済み"];
+  const replyFilters = ["返答全て", "未返答", "返答済み"];
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
@@ -57,6 +70,8 @@ export function ReviewsPage() {
       if (search) params.set("search", search);
       const apiStatus = STATUS_FILTER_MAP[statusFilter];
       if (apiStatus) params.set("status", apiStatus);
+      const apiReply = REPLY_FILTER_MAP[replyFilter];
+      if (apiReply) params.set("reply", apiReply);
       if (authorFilter?.userId) params.set("user_id", String(authorFilter.userId));
       else if (authorFilter && !authorFilter.userId) params.set("search", authorFilter.label);
       params.set("sort", sortState.sort);
@@ -71,7 +86,7 @@ export function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, sortState, authorFilter]);
+  }, [page, search, statusFilter, replyFilter, sortState, authorFilter]);
 
   useEffect(() => {
     fetchReviews();
@@ -80,7 +95,7 @@ export function ReviewsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, sortState, authorFilter]);
+  }, [search, statusFilter, replyFilter, sortState, authorFilter]);
 
   // B1: 投稿者タップ → その投稿者の過去口コミ一覧に絞り込む。
   const filterByAuthor = (review: Review) => {
@@ -190,6 +205,21 @@ export function ReviewsPage() {
             </button>
           ))}
         </div>
+        <div className="flex gap-0.5 bg-muted p-0.5 rounded-lg">
+          {replyFilters.map((s) => (
+            <button
+              key={s}
+              onClick={() => setReplyFilter(s)}
+              className={`px-3 py-1.5 rounded-md text-[13px] transition-all ${
+                replyFilter === s
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
         <SortControl value={sortState} onChange={setSortState} />
       </div>
 
@@ -211,6 +241,7 @@ export function ReviewsPage() {
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">本文</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">日時</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">ステータス</th>
+                    <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">返答</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider"></th>
                   </tr>
                 </thead>
@@ -267,6 +298,13 @@ export function ReviewsPage() {
                           </div>
                         </td>
                         <td className="py-2.5 px-4">
+                          {isReplied(review) ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">返答済み</span>
+                          ) : (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">未返答</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4">
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             {review.status !== "deleted" && (
                               <button
@@ -293,7 +331,7 @@ export function ReviewsPage() {
                       </tr>
                       {expandedId === review.id && (
                         <tr className="border-b border-border bg-muted/20">
-                          <td colSpan={7} className="px-6 py-4 space-y-3">
+                          <td colSpan={8} className="px-6 py-4 space-y-3">
                             <p className="text-[13px] whitespace-pre-wrap leading-relaxed text-muted-foreground">{review.body}</p>
                             <ReplyEditor review={review} onSave={handleSaveReply} />
                           </td>
@@ -323,6 +361,9 @@ export function ReviewsPage() {
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">★</span>
                       )}
                       <div className={`w-1.5 h-1.5 rounded-full ${statusDot(label)}`} />
+                      {!isReplied(review) && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">未返答</span>
+                      )}
                     </div>
                     <span className="text-[11px] text-muted-foreground">{formatDate(review.created_at).split(" ")[0]}</span>
                   </div>
@@ -622,12 +663,12 @@ function ReplyEditor({
 
   return (
     <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 space-y-2">
-      <label className="text-[12px] font-medium text-emerald-700">店側からの返答（B4）</label>
+      <label className="text-[12px] font-medium text-emerald-700">店側からの返答</label>
       <textarea
         value={reply}
         onChange={(e) => setReply(e.target.value)}
-        rows={2}
-        placeholder="店舗から聞いた返答を入力（公開ページの口コミに表示されます）"
+        rows={3}
+        placeholder="店舗から聞いた返答を入力（公開ページの口コミに表示されます）。URL（回答動画・コラム等）を貼ると自動でリンクになります。改行も反映されます。"
         className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
         onClick={(e) => e.stopPropagation()}
       />

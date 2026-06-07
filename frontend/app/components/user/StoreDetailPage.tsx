@@ -55,6 +55,7 @@ import StoreMap from "~/components/shared/StoreMap";
 import LuxeCard from "~/components/user/shared/LuxeCard";
 import { pushViewedStore } from "~/lib/viewed-stores";
 import { formatDateJa } from "~/lib/date";
+import { linkify } from "~/lib/autolink";
 import { useUserAuthSafe } from "~/lib/user-auth";
 
 // ---------------------------------------------------------------------------
@@ -4597,8 +4598,8 @@ function ReviewItem({ review }: { review: Review }) {
           <p className="text-[11px] font-bold mb-0.5" style={{ color: "#04a447" }}>
             店舗からの返信
           </p>
-          <p className="text-[12.5px] leading-relaxed" style={{ color: "rgba(27,37,40,0.72)" }}>
-            {review.store_reply}
+          <p className="text-[12.5px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "rgba(27,37,40,0.72)" }}>
+            {linkify(review.store_reply, "underline break-all font-medium text-emerald-600 hover:opacity-80")}
           </p>
         </div>
       )}
