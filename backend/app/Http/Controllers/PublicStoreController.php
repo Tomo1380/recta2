@@ -268,8 +268,13 @@ class PublicStoreController extends Controller
 
     /**
      * Homepage data: banner, pickup shops, consultations.
+     *
+     * `?area=slug` を渡すと、ピックアップ店舗を「その店のエリア ↔ 指定エリア」の
+     * 距離が近い順に並べ替える (キュレーション順は同距離内で維持)。フロントは
+     * ユーザーが最後に選んだエリア (localStorage の preferred-area) を渡す。
+     * area 未指定 or 座標未取得なら従来どおり sort_order のまま。
      */
-    public function home(): JsonResponse
+    public function home(Request $request): JsonResponse
     {
         // Banner settings
         $bannerKeys = ['hero_tagline', 'hero_subtitle', 'hero_badge', 'hero_ai_label', 'hero_image_url'];
@@ -306,6 +311,9 @@ class PublicStoreController extends Controller
                 ];
             })
             ->values();
+
+        // ユーザーが選んだエリア (?area=slug) に近い順へ並べ替え。
+        $pickups = $this->sortPickupsByArea($pickups, $request->query('area'));
 
         // Consultations
         $consultations = Consultation::where('visible', true)
@@ -404,5 +412,63 @@ class PublicStoreController extends Controller
             'categories' => $categories,
             'recent_reviews' => $recentReviews,
         ]);
+    }
+
+    /**
+     * ピックアップ配列を、指定エリア (slug) の中心座標に近い順へ安定ソートする。
+     * 各店の `area` 名をエリア座標表に引き当て、指定エリアとの距離をキーにする。
+     * 座標不明のエリア (geocode 未取得 / 該当なし) は距離無限大として末尾へ。
+     *
+     * PHP 8 の sort は安定なので、同距離の店は元の sort_order (キュレーション順)
+     * を保つ。指定エリア無し or 指定エリアの座標が無ければ元の並びをそのまま返す。
+     *
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $pickups
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function sortPickupsByArea(\Illuminate\Support\Collection $pickups, ?string $areaSlug)
+    {
+        if (!$areaSlug || $pickups->isEmpty()) {
+            return $pickups;
+        }
+
+        $origin = Area::where('slug', $areaSlug)
+            ->whereNotNull('lat')
+            ->whereNotNull('lng')
+            ->first(['lat', 'lng']);
+        if (!$origin) {
+            return $pickups;
+        }
+
+        // エリア名 => [lat, lng] の対応表。店の area 名から座標を引くのに使う。
+        $coords = Area::whereNotNull('lat')->whereNotNull('lng')
+            ->get(['name', 'lat', 'lng'])
+            ->keyBy('name');
+
+        return $pickups
+            ->sortBy(function ($p) use ($origin, $coords) {
+                $area = $coords->get($p['area'] ?? null);
+                if (!$area) {
+                    return INF; // 座標不明は末尾へ
+                }
+                return $this->haversineKm(
+                    (float) $origin->lat, (float) $origin->lng,
+                    (float) $area->lat, (float) $area->lng,
+                );
+            })
+            ->values();
+    }
+
+    /**
+     * 2 地点間の距離 (km) を Haversine 公式で求める。並べ替えのキー用途なので
+     * 厳密さより単調性が目的。
+     */
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthKm = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return $earthKm * 2 * asin(min(1.0, sqrt($a)));
     }
 }

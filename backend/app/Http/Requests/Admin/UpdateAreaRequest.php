@@ -23,6 +23,9 @@ class UpdateAreaRequest extends FormRequest
             'slug' => ['sometimes', 'string', 'max:255', Rule::unique('areas', 'slug')->ignore($areaId)],
             'visible' => 'sometimes|boolean',
             'sort_order' => 'sometimes|integer',
+            // 通常は geocode 自動セット。明示指定があれば手動上書きを許す。
+            'lat' => 'sometimes|nullable|numeric|between:-90,90',
+            'lng' => 'sometimes|nullable|numeric|between:-180,180',
         ];
     }
 }

@@ -8,6 +8,7 @@ import type {
   AreaResource,
   CategoryResource,
   PublicStoreHome200,
+  PublicStoreHomeParams,
   PublicStoreIndex200,
   PublicStoreIndexParams,
   PublicStoreShow200
@@ -19,13 +20,18 @@ import { rectaMutator } from '../mutators/auth';
 
 
   /**
+ * `?area=slug` を渡すと、ピックアップ店舗を「その店のエリア ↔ 指定エリア」の
+ * 距離が近い順に並べ替える (キュレーション順は同距離内で維持)。フロントは
+ * ユーザーが最後に選んだエリア (localStorage の preferred-area) を渡す。
+ * area 未指定 or 座標未取得なら従来どおり sort_order のまま。
  * @summary Homepage data: banner, pickup shops, consultations
  */
 export const publicStoreHome = (
-
+    params?: PublicStoreHomeParams,
  ) => {
       return rectaMutator<PublicStoreHome200>(
-      {url: `/home`, method: 'GET'
+      {url: `/home`, method: 'GET',
+        params
     },
       );
     }

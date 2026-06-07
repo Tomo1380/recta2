@@ -23,6 +23,9 @@ class StoreAreaRequest extends FormRequest
             'slug' => 'required|string|max:255|unique:areas,slug',
             'visible' => 'boolean',
             'sort_order' => 'integer',
+            // 通常は作成後に geocode 自動セット。明示指定があれば手動上書きを許す。
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
         ];
     }
 }

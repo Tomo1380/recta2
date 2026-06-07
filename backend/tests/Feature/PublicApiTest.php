@@ -141,6 +141,44 @@ class PublicApiTest extends TestCase
         $this->assertCount(1, $pickups);
     }
 
+    public function test_home_orders_pickups_by_area_proximity(): void
+    {
+        // 3 エリア: 渋谷(原点) / 恵比寿(近い) / 中洲=福岡(遠い)。
+        Area::create(['name' => '渋谷', 'slug' => 'shibuya', 'visible' => true, 'sort_order' => 0, 'lat' => 35.6580, 'lng' => 139.6994]);
+        Area::create(['name' => '恵比寿', 'slug' => 'ebisu', 'visible' => true, 'sort_order' => 1, 'lat' => 35.6467, 'lng' => 139.7100]);
+        Area::create(['name' => '中洲', 'slug' => 'nakasu', 'visible' => true, 'sort_order' => 2, 'lat' => 33.5939, 'lng' => 130.4017]);
+
+        $fukuoka = $this->createPublishedStore(['name' => 'Fukuoka Store', 'area' => '中洲']);
+        $ebisu = $this->createPublishedStore(['name' => 'Ebisu Store', 'area' => '恵比寿']);
+        $shibuya = $this->createPublishedStore(['name' => 'Shibuya Store', 'area' => '渋谷']);
+
+        // キュレーション順はあえて「福岡→恵比寿→渋谷」(原点の逆順) で登録。
+        PickupShop::create(['store_id' => $fukuoka->id, 'visible' => true, 'sort_order' => 0]);
+        PickupShop::create(['store_id' => $ebisu->id, 'visible' => true, 'sort_order' => 1]);
+        PickupShop::create(['store_id' => $shibuya->id, 'visible' => true, 'sort_order' => 2]);
+
+        // area 指定なし: キュレーション順 (sort_order) のまま。
+        $plain = $this->getJson('/api/home')->json('pickup_shops');
+        $this->assertSame(['Fukuoka Store', 'Ebisu Store', 'Shibuya Store'], array_column($plain, 'name'));
+
+        // ?area=shibuya: 渋谷に近い順 (渋谷 → 恵比寿 → 福岡) に並び替わる。
+        $sorted = $this->getJson('/api/home?area=shibuya')->json('pickup_shops');
+        $this->assertSame(['Shibuya Store', 'Ebisu Store', 'Fukuoka Store'], array_column($sorted, 'name'));
+    }
+
+    public function test_home_ignores_unknown_area_slug(): void
+    {
+        Area::create(['name' => '渋谷', 'slug' => 'shibuya', 'visible' => true, 'sort_order' => 0, 'lat' => 35.6580, 'lng' => 139.6994]);
+        $a = $this->createPublishedStore(['name' => 'A', 'area' => '渋谷']);
+        $b = $this->createPublishedStore(['name' => 'B', 'area' => '渋谷']);
+        PickupShop::create(['store_id' => $a->id, 'visible' => true, 'sort_order' => 0]);
+        PickupShop::create(['store_id' => $b->id, 'visible' => true, 'sort_order' => 1]);
+
+        // 未知の slug は無視して元の並びを返す。
+        $pickups = $this->getJson('/api/home?area=does-not-exist')->json('pickup_shops');
+        $this->assertSame(['A', 'B'], array_column($pickups, 'name'));
+    }
+
     // ========== Store Listing ==========
 
     public function test_can_list_stores(): void

@@ -8,7 +8,7 @@ import SectionHeader from "~/components/user/shared/SectionHeader";
 import { LineIcon } from "~/components/user/shared/LineIcon";
 import { useUserAuthSafe } from "~/lib/user-auth";
 import { LUXE } from "~/lib/luxe-tokens";
-import { setPreferredArea } from "~/lib/preferred-area";
+import { getPreferredArea, setPreferredArea } from "~/lib/preferred-area";
 import type { ArticleSummary, PublicArticleIndexResponse } from "~/lib/types";
 
 // ─── Constants ─────────────────────────────────────
@@ -337,7 +337,13 @@ export default function TopPage({
   const [columns, setColumns] = useState<ArticleSummary[]>([]);
 
   useEffect(() => {
-    fetch("/api/home")
+    // 最後に選んだエリア (localStorage) を渡すと、ピックアップが近隣エリア順に
+    // 並び替わる (絞り込みではなく並べ替えなので運営の推しは消えない)。
+    const preferred = getPreferredArea();
+    const homeUrl = preferred
+      ? `/api/home?area=${encodeURIComponent(preferred)}`
+      : "/api/home";
+    fetch(homeUrl)
       .then((res) => res.json())
       .then((json: HomeData) => { setData(json); setLoading(false); })
       .catch(() => { setLoading(false); });
@@ -385,10 +391,10 @@ export default function TopPage({
   const heroBadge = pick(heroBanner.hero_badge, "ナイトワーク求人");
   const heroAiLabel = pick(heroBanner.hero_ai_label, "AI MATCHING");
 
-  // ピックアップは「運営のおすすめ枠」。エリアでの絞り込みはしない
-  // (管理画面の並び順=キュレーションをそのまま全ユーザーに見せる)。
-  // 旧実装は preferred area で他エリアを除外していたが、運営の推しが
-  // 埋もれる/消える問題があったため撤去 (2026-06-07 FB)。
+  // ピックアップは「運営のおすすめ枠」。エリアでの“絞り込み”はしない
+  // (完全一致絞りは運営の推しが消えるため撤去済み 2026-06-07 FB)。
+  // 代わりに、ユーザーが選んだエリアの近隣順に“並べ替え”だけ行う。並べ替えは
+  // backend (/api/home?area=) 側で実施済みなので、ここはそのまま受ける。
   const pickupShops = allPickupShops;
 
   return (
@@ -445,8 +451,8 @@ export default function TopPage({
           areasVisible={areasVisible}
           setAreasVisible={setAreasVisible}
           onAreaSelect={(slug) => {
-            // 選んだエリアを記録だけしておく (将来の行動ベース・エリアサジェスト P2 の土台)。
-            // 現状ピックアップの絞り込みには使わない。
+            // 選んだエリアを記録。次回トップ訪問時に /api/home?area= へ渡し、
+            // ピックアップをこのエリアの近隣順に並べ替える。
             setPreferredArea(slug);
           }}
         />

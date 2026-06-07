@@ -14,12 +14,17 @@ use App\Http\Resources\CategoryResource;
 use App\Models\Area;
 use App\Models\Category;
 use App\Models\Store;
+use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AreaCategoryController extends Controller
 {
+    public function __construct(private GeocodingService $geocoding)
+    {
+    }
+
     public function areas(): AnonymousResourceCollection
     {
         $areas = Area::orderBy('sort_order')->get();
@@ -36,13 +41,40 @@ class AreaCategoryController extends Controller
     public function storeArea(StoreAreaRequest $request): AreaResource
     {
         $area = Area::create($request->validated());
+        // 座標が明示指定されていなければ、エリア名から裏で geocode して中心座標を
+        // 自動セットする (トップのピックアップ近隣ソート用)。失敗しても作成は通す。
+        if ($area->lat === null && $area->lng === null) {
+            $this->geocodeArea($area);
+        }
         return new AreaResource($area);
     }
 
     public function updateArea(UpdateAreaRequest $request, Area $area): AreaResource
     {
-        $area->update($request->validated());
+        $data = $request->validated();
+        $nameChanged = array_key_exists('name', $data) && $data['name'] !== $area->name;
+        $coordsGiven = array_key_exists('lat', $data) || array_key_exists('lng', $data);
+
+        $area->update($data);
+
+        // 改名されて座標の手動指定が無い場合は geocode し直す (旧座標がズレるため)。
+        if ($nameChanged && !$coordsGiven) {
+            $this->geocodeArea($area);
+        }
         return new AreaResource($area);
+    }
+
+    /**
+     * エリア名を geocode して lat/lng を保存する。Google key 未設定や geocode
+     * 失敗時は GeocodingService が null を返すので、その場合は座標を触らない
+     * (= 距離不明として近隣ソートで末尾に回る)。
+     */
+    private function geocodeArea(Area $area): void
+    {
+        $result = $this->geocoding->geocode($area->name);
+        if ($result !== null) {
+            $area->update(['lat' => $result['lat'], 'lng' => $result['lng']]);
+        }
     }
 
     public function destroyArea(Area $area): JsonResponse

@@ -1473,23 +1473,7 @@
                                         "line_routes": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "route": {
-                                                        "type": "string"
-                                                    },
-                                                    "kind": {
-                                                        "type": "string"
-                                                    },
-                                                    "clicks": {
-                                                        "type": "integer"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "route",
-                                                    "kind",
-                                                    "clicks"
-                                                ]
+                                                "type": "string"
                                             }
                                         }
                                     },
@@ -1575,21 +1559,13 @@
                                         "rows": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "source": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
                                                     },
-                                                    "clicks": {
+                                                    {
                                                         "type": "integer"
                                                     }
-                                                },
-                                                "required": [
-                                                    "source",
-                                                    "clicks"
                                                 ]
                                             }
                                         }
@@ -2994,153 +2970,19 @@
                                         "recent_reviews": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "rating": {
-                                                        "type": "integer"
-                                                    },
-                                                    "body": {
-                                                        "type": "string"
-                                                    },
-                                                    "status": {
-                                                        "type": "string"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    },
-                                                    "user_name": {
-                                                        "anyOf": [
-                                                            {
-                                                                "type": "string"
-                                                            },
-                                                            {
-                                                                "type": "string",
-                                                                "enum": [
-                                                                    "\u533f\u540d\u30e6\u30fc\u30b6\u30fc"
-                                                                ]
-                                                            }
-                                                        ]
-                                                    },
-                                                    "store_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "store_name": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "rating",
-                                                    "body",
-                                                    "status",
-                                                    "created_at",
-                                                    "user_name",
-                                                    "store_id",
-                                                    "store_name"
-                                                ]
+                                                "type": "string"
                                             }
                                         },
                                         "recent_messages": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "user_id": {
-                                                        "type": [
-                                                            "integer",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "line_user_id": {
-                                                        "type": "string"
-                                                    },
-                                                    "name": {
-                                                        "anyOf": [
-                                                            {
-                                                                "type": "string"
-                                                            },
-                                                            {
-                                                                "type": "null"
-                                                            }
-                                                        ]
-                                                    },
-                                                    "avatar": {
-                                                        "type": "string"
-                                                    },
-                                                    "message": {
-                                                        "type": "string"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    },
-                                                    "unread": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "user_id",
-                                                    "line_user_id",
-                                                    "name",
-                                                    "avatar",
-                                                    "message",
-                                                    "created_at",
-                                                    "unread"
-                                                ]
+                                                "type": "string"
                                             }
                                         },
                                         "recent_chats": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "mode": {
-                                                        "type": "string"
-                                                    },
-                                                    "page_type": {
-                                                        "type": "string"
-                                                    },
-                                                    "user_message": {
-                                                        "type": "string"
-                                                    },
-                                                    "total_tokens": {
-                                                        "type": "integer"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    },
-                                                    "user_name": {
-                                                        "anyOf": [
-                                                            {
-                                                                "type": "string"
-                                                            },
-                                                            {
-                                                                "type": "string",
-                                                                "enum": [
-                                                                    "\u533f\u540d"
-                                                                ]
-                                                            }
-                                                        ]
-                                                    }
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "mode",
-                                                    "page_type",
-                                                    "user_message",
-                                                    "total_tokens",
-                                                    "created_at",
-                                                    "user_name"
-                                                ]
+                                                "type": "string"
                                             }
                                         },
                                         "secondary": {
@@ -6043,9 +5885,19 @@
         "/home": {
             "get": {
                 "operationId": "publicStore.home",
+                "description": "`?area=slug` \u3092\u6e21\u3059\u3068\u3001\u30d4\u30c3\u30af\u30a2\u30c3\u30d7\u5e97\u8217\u3092\u300c\u305d\u306e\u5e97\u306e\u30a8\u30ea\u30a2 \u2194 \u6307\u5b9a\u30a8\u30ea\u30a2\u300d\u306e\n\u8ddd\u96e2\u304c\u8fd1\u3044\u9806\u306b\u4e26\u3079\u66ff\u3048\u308b (\u30ad\u30e5\u30ec\u30fc\u30b7\u30e7\u30f3\u9806\u306f\u540c\u8ddd\u96e2\u5185\u3067\u7dad\u6301)\u3002\u30d5\u30ed\u30f3\u30c8\u306f\n\u30e6\u30fc\u30b6\u30fc\u304c\u6700\u5f8c\u306b\u9078\u3093\u3060\u30a8\u30ea\u30a2 (localStorage \u306e preferred-area) \u3092\u6e21\u3059\u3002\narea \u672a\u6307\u5b9a or \u5ea7\u6a19\u672a\u53d6\u5f97\u306a\u3089\u5f93\u6765\u3069\u304a\u308a sort_order \u306e\u307e\u307e\u3002",
                 "summary": "Homepage data: banner, pickup shops, consultations",
                 "tags": [
                     "PublicStore"
+                ],
+                "parameters": [
+                    {
+                        "name": "area",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
                 ],
                 "responses": {
                     "200": {
@@ -6062,54 +5914,7 @@
                                             "type": "array",
                                             "items": {
                                                 "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "area": {
-                                                        "type": "string"
-                                                    },
-                                                    "category": {
-                                                        "type": "string"
-                                                    },
-                                                    "trial_hourly_min": {},
-                                                    "trial_hourly_max": {},
-                                                    "feature_tags": {
-                                                        "type": [
-                                                            "array",
-                                                            "null"
-                                                        ],
-                                                        "items": {}
-                                                    },
-                                                    "images": {
-                                                        "type": [
-                                                            "array",
-                                                            "null"
-                                                        ],
-                                                        "items": {}
-                                                    },
-                                                    "reviews_count": {
-                                                        "type": "integer"
-                                                    },
-                                                    "average_rating": {
-                                                        "type": "number"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "name",
-                                                    "area",
-                                                    "category",
-                                                    "trial_hourly_min",
-                                                    "trial_hourly_max",
-                                                    "feature_tags",
-                                                    "images",
-                                                    "reviews_count",
-                                                    "average_rating"
-                                                ]
+                                                "additionalProperties": {}
                                             }
                                         },
                                         "consultations": {
@@ -6121,7 +5926,7 @@
                                         "areas": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Area"
+                                                "type": "string"
                                             }
                                         },
                                         "categories": {
@@ -6133,112 +5938,7 @@
                                         "recent_reviews": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "rating": {
-                                                        "type": "integer"
-                                                    },
-                                                    "body": {
-                                                        "type": "string"
-                                                    },
-                                                    "tweet_id": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "tweet_author_screen_name": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "created_at": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ],
-                                                        "format": "date-time"
-                                                    },
-                                                    "store": {
-                                                        "type": [
-                                                            "object",
-                                                            "null"
-                                                        ],
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer"
-                                                            },
-                                                            "name": {
-                                                                "type": "string"
-                                                            },
-                                                            "area": {
-                                                                "type": "string"
-                                                            },
-                                                            "category": {
-                                                                "type": "string"
-                                                            },
-                                                            "image_url": {
-                                                                "type": [
-                                                                    "string",
-                                                                    "null"
-                                                                ]
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "id",
-                                                            "name",
-                                                            "area",
-                                                            "category",
-                                                            "image_url"
-                                                        ]
-                                                    },
-                                                    "user": {
-                                                        "type": [
-                                                            "object",
-                                                            "null"
-                                                        ],
-                                                        "properties": {
-                                                            "line_display_name": {
-                                                                "type": "string"
-                                                            },
-                                                            "line_picture_url": {
-                                                                "type": [
-                                                                    "string",
-                                                                    "null"
-                                                                ]
-                                                            },
-                                                            "use_line_avatar": {
-                                                                "type": "boolean"
-                                                            },
-                                                            "nickname": {
-                                                                "type": [
-                                                                    "string",
-                                                                    "null"
-                                                                ]
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "line_display_name",
-                                                            "line_picture_url",
-                                                            "use_line_avatar",
-                                                            "nickname"
-                                                        ]
-                                                    }
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "rating",
-                                                    "body",
-                                                    "tweet_id",
-                                                    "tweet_author_screen_name",
-                                                    "created_at",
-                                                    "store",
-                                                    "user"
-                                                ]
+                                                "type": "string"
                                             }
                                         }
                                     },
@@ -6334,7 +6034,7 @@
                                         "related_columns": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Article"
+                                                "type": "string"
                                             }
                                         }
                                     },
@@ -6590,6 +6290,14 @@
                     "Review"
                 ],
                 "parameters": [
+                    {
+                        "name": "reply",
+                        "in": "query",
+                        "description": "\u8fd4\u7b54\u72b6\u614b\u3067\u7d5e\u308a\u8fbc\u307f (B4: \u672a\u8fd4\u7b54 / \u8fd4\u7b54\u6e08\u307f)\u3002\u7a7a\u6587\u5b57\u3082\u672a\u8fd4\u7b54\u6271\u3044\u3002",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "per_page",
                         "in": "query",
@@ -9717,50 +9425,6 @@
                 ],
                 "title": "App.Http.Requests.Admin.StoreReviewRequest"
             },
-            "Area": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "slug": {
-                        "type": "string"
-                    },
-                    "visible": {
-                        "type": "boolean"
-                    },
-                    "sort_order": {
-                        "type": "integer"
-                    },
-                    "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    }
-                },
-                "required": [
-                    "id",
-                    "name",
-                    "slug",
-                    "visible",
-                    "sort_order",
-                    "created_at",
-                    "updated_at"
-                ],
-                "title": "Area"
-            },
             "AreaResource": {
                 "type": "object",
                 "properties": {
@@ -9779,6 +9443,19 @@
                     "sort_order": {
                         "type": "integer"
                     },
+                    "lat": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "description": "\u4e2d\u5fc3\u5ea7\u6a19\u3002\u30c8\u30c3\u30d7\u306e\u30d4\u30c3\u30af\u30a2\u30c3\u30d7\u8fd1\u96a3\u30bd\u30fc\u30c8\u306b\u4f7f\u3046\u3002\u7ba1\u7406\u753b\u9762\u3067\n\u30a8\u30ea\u30a2\u4f5c\u6210/\u6539\u540d\u6642\u306b geocode \u81ea\u52d5\u30bb\u30c3\u30c8 (\u672a\u53d6\u5f97\u306a\u3089 null)\u3002"
+                    },
+                    "lng": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
                     "shop_count": {
                         "type": [
                             "integer",
@@ -9793,123 +9470,11 @@
                     "slug",
                     "visible",
                     "sort_order",
+                    "lat",
+                    "lng",
                     "shop_count"
                 ],
                 "title": "AreaResource"
-            },
-            "Article": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "slug": {
-                        "type": "string"
-                    },
-                    "title": {
-                        "type": "string"
-                    },
-                    "excerpt": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "body": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "body_html": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "thumbnail_url": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "category": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "tags": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "status": {
-                        "type": "string"
-                    },
-                    "published_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "author_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "section": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "related_store_ids": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    }
-                },
-                "required": [
-                    "id",
-                    "slug",
-                    "title",
-                    "excerpt",
-                    "body",
-                    "body_html",
-                    "thumbnail_url",
-                    "category",
-                    "tags",
-                    "status",
-                    "published_at",
-                    "created_at",
-                    "updated_at",
-                    "author_id",
-                    "section",
-                    "related_store_ids"
-                ],
-                "title": "Article"
             },
             "ArticleResource": {
                 "type": "object",
@@ -11039,6 +10604,23 @@
                     },
                     "sort_order": {
                         "type": "integer"
+                    },
+                    "lat": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "description": "\u901a\u5e38\u306f\u4f5c\u6210\u5f8c\u306b geocode \u81ea\u52d5\u30bb\u30c3\u30c8\u3002\u660e\u793a\u6307\u5b9a\u304c\u3042\u308c\u3070\u624b\u52d5\u4e0a\u66f8\u304d\u3092\u8a31\u3059\u3002",
+                        "minimum": -90,
+                        "maximum": 90
+                    },
+                    "lng": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "minimum": -180,
+                        "maximum": 180
                     }
                 },
                 "required": [
@@ -11680,6 +11262,23 @@
                     },
                     "sort_order": {
                         "type": "integer"
+                    },
+                    "lat": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "description": "\u901a\u5e38\u306f geocode \u81ea\u52d5\u30bb\u30c3\u30c8\u3002\u660e\u793a\u6307\u5b9a\u304c\u3042\u308c\u3070\u624b\u52d5\u4e0a\u66f8\u304d\u3092\u8a31\u3059\u3002",
+                        "minimum": -90,
+                        "maximum": 90
+                    },
+                    "lng": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "minimum": -180,
+                        "maximum": 180
                     }
                 },
                 "title": "UpdateAreaRequest"
