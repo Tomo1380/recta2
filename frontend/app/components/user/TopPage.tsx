@@ -465,7 +465,7 @@ export default function TopPage({
             />
           </div>
           <div className="flex gap-3 px-5 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" as const }}>
-            {pickupShops.map((store, idx) => {
+            {pickupShops.map((store) => {
               const imageUrl = store.images && store.images.length > 0 ? getImageUrl(store.images[0]) : undefined;
               return (
                 <Link key={store.id} to={`/stores/${store.id}`} className="shrink-0 rounded-2xl overflow-hidden" style={{ width: "200px", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06)", border: "1px solid rgba(27,37,40,.06)", textDecoration: "none" }}>
@@ -499,11 +499,6 @@ export default function TopPage({
                         >
                           {store.category}
                         </span>
-                      </div>
-                    )}
-                    {idx === 0 && (
-                      <div className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg,${GOLD},#c8960c)`, boxShadow: "0 2px 8px rgba(212,175,55,.4)" }}>
-                        <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "10px", color: "white" }}>1</span>
                       </div>
                     )}
                     {(store.trial_hourly_min || store.trial_hourly_max) && (
