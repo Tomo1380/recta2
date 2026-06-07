@@ -387,6 +387,110 @@ export function ReviewsPage() {
 }
 
 /** B2/B3: 管理者が桜口コミ / 有名嬢口コミを作成するフォーム。 */
+interface StoreLite {
+  id: number;
+  name: string;
+  area?: string | null;
+}
+
+/** 店舗名で検索して 1 店舗だけ選ぶピッカー。口コミ作成の店舗指定に使う。 */
+function StoreSearchSelect({
+  value,
+  onChange,
+}: {
+  value: StoreLite | null;
+  onChange: (s: StoreLite | null) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<StoreLite[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (q.trim().length < 1) {
+      setResults([]);
+      return;
+    }
+    let active = true;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get<Paginated<StoreLite>>(
+          `/admin/stores?search=${encodeURIComponent(q.trim())}&per_page=8`,
+        );
+        if (active) setResults(res.data.map((s) => ({ id: s.id, name: s.name, area: s.area })));
+      } catch {
+        if (active) setResults([]);
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [q]);
+
+  if (value) {
+    return (
+      <div className="mt-0.5 flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-[13px]">
+          {value.name}
+          {value.area ? `（${value.area}）` : ""}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="text-[12px] text-muted-foreground hover:text-foreground"
+        >
+          変更
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mt-0.5">
+      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+      <input
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        placeholder="店舗名で検索して選択"
+        className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+      />
+      {open && q.trim() && (
+        <div className="absolute z-10 mt-1 w-full bg-white border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
+          {searching ? (
+            <div className="px-3 py-2 text-[12px] text-muted-foreground">検索中…</div>
+          ) : results.length === 0 ? (
+            <div className="px-3 py-2 text-[12px] text-muted-foreground">該当なし</div>
+          ) : (
+            results.map((s) => (
+              <button
+                type="button"
+                key={s.id}
+                onClick={() => {
+                  onChange(s);
+                  setQ("");
+                  setResults([]);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-[13px] hover:bg-muted/60 flex items-center justify-between"
+              >
+                <span>{s.name}</span>
+                {s.area && <span className="text-[11px] text-muted-foreground">{s.area}</span>}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CreateReviewForm({
   onClose,
   onCreated,
@@ -394,7 +498,7 @@ function CreateReviewForm({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [storeId, setStoreId] = useState("");
+  const [store, setStore] = useState<StoreLite | null>(null);
   const [rating, setRating] = useState(5);
   const [authorName, setAuthorName] = useState("");
   const [body, setBody] = useState("");
@@ -402,14 +506,15 @@ function CreateReviewForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = storeId.trim() !== "" && body.trim() !== "" && authorName.trim() !== "";
+  const canSubmit = store !== null && body.trim() !== "" && authorName.trim() !== "";
 
   const submit = async () => {
+    if (!store) return;
     setSubmitting(true);
     setError(null);
     try {
       await api.post("/admin/reviews", {
-        store_id: Number(storeId),
+        store_id: store.id,
         rating,
         body: body.trim(),
         author_name: authorName.trim(),
@@ -433,14 +538,8 @@ function CreateReviewForm({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-[11px] text-muted-foreground">店舗ID</label>
-          <input
-            value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-            inputMode="numeric"
-            placeholder="例: 12"
-            className="mt-0.5 w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-          />
+          <label className="text-[11px] text-muted-foreground">店舗</label>
+          <StoreSearchSelect value={store} onChange={setStore} />
         </div>
         <div>
           <label className="text-[11px] text-muted-foreground">表示名（投稿者名）</label>
