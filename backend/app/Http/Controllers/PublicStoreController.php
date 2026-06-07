@@ -191,9 +191,32 @@ class PublicStoreController extends Controller
             ->limit(6)
             ->get();
 
-        // 関連コラム (回遊動線): この店のエリア / 業種を tags に持つ公開記事。
-        // 「渋谷のキャバを見た → 渋谷 / キャバクラの読み物」へ送客する。
-        $relatedColumns = \App\Models\Article::published()
+        // 関連コラム (回遊動線): この店舗を実際に紹介しているコラムを優先で出す。
+        // 優先順: ①コラム側で「紹介した店舗」にこの店を指定 → ②本文にこの店への
+        // リンク(/stores/{id|slug})がある → ③この店のエリア/業種を tags に持つ
+        // (フォールバック)。①②で埋まらない分だけ③で補完する。
+        $colFields = ['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'section', 'published_at'];
+
+        // ① 「この記事で紹介した店舗」に指定されているコラム。
+        $byStore = \App\Models\Article::published()
+            ->whereJsonContains('related_store_ids', $store->id)
+            ->orderByDesc('published_at')
+            ->get($colFields);
+
+        // ② 本文 (body_html) にこの店舗へのリンクが入っているコラム。
+        //    id は /stores/5 が /stores/50 に誤マッチしないよう境界付き正規表現で照合。
+        $byLink = \App\Models\Article::published()
+            ->where(function ($q) use ($store) {
+                $q->where('body_html', '~', '/stores/' . $store->id . '([^0-9]|$)');
+                if ($store->slug) {
+                    $q->orWhere('body_html', 'like', '%/stores/' . $store->slug . '%');
+                }
+            })
+            ->orderByDesc('published_at')
+            ->get($colFields);
+
+        // ③ エリア / 業種タグ (フォールバック)。
+        $byTag = \App\Models\Article::published()
             ->where(function ($q) use ($store) {
                 if ($store->area) {
                     $q->orWhereJsonContains('tags', $store->area);
@@ -203,8 +226,14 @@ class PublicStoreController extends Controller
                 }
             })
             ->orderByDesc('published_at')
-            ->limit(3)
-            ->get(['id', 'slug', 'title', 'excerpt', 'thumbnail_url', 'category', 'section', 'published_at']);
+            ->get($colFields);
+
+        $relatedColumns = $byStore
+            ->concat($byLink)
+            ->concat($byTag)
+            ->unique('id')
+            ->take(3)
+            ->values();
 
         return response()->json([
             'store' => $storePayload,
