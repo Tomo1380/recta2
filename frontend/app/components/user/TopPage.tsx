@@ -157,7 +157,7 @@ function AreaCategoryBand({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
-            {areas.slice(0, areasVisible).map((area, i) => {
+            {areas.slice(0, areasVisible).map((area) => {
               const count = area.store_count ?? 0;
               return (
                 <Link
@@ -165,13 +165,13 @@ function AreaCategoryBand({
                   to={`/stores?area=${encodeURIComponent(area.slug)}`}
                   onClick={() => onAreaSelect(area.slug)}
                   className="rounded-xl flex items-center gap-2.5 px-3 active:scale-[0.98] transition-transform"
-                  style={{ background: "rgba(255,255,255,.06)", border: i < 3 ? "1px solid rgba(212,175,55,.2)" : "1px solid rgba(255,255,255,.08)", height: "50px", textDecoration: "none" }}
+                  style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(212,175,55,.2)", height: "50px", textDecoration: "none" }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={i < 3 ? GOLD : "rgba(255,255,255,.3)"} strokeWidth="1.5" fill={i < 3 ? "rgba(212,175,55,.15)" : "rgba(255,255,255,.05)"} />
-                    <circle cx="12" cy="9" r="2.5" fill={i < 3 ? GOLD : "rgba(255,255,255,.25)"} />
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke={GOLD} strokeWidth="1.5" fill="rgba(212,175,55,.15)" />
+                    <circle cx="12" cy="9" r="2.5" fill={GOLD} />
                   </svg>
-                  <span className="flex-1 text-left" style={{ fontFamily: J, fontWeight: i < 3 ? 600 : 400, fontSize: "12.5px", color: i < 3 ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.6)" }}>{area.name}</span>
+                  <span className="flex-1 text-left" style={{ fontFamily: J, fontWeight: 600, fontSize: "12.5px", color: "rgba(255,255,255,.95)" }}>{area.name}</span>
                   <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 500, fontSize: "10px", color: "rgba(255,255,255,.25)" }}>{count}</span>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" className="shrink-0"><path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,.15)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </Link>
