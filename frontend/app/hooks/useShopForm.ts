@@ -151,6 +151,8 @@ export interface ShopForm {
   transferKm: string;
   transferZones: TransferZoneDraft[];
   relatedStoreIds: number[];
+  /** 採用基準が近い店舗 (回遊動線・系列とは別軸)。store.id の配列。 */
+  recruitmentSimilarStoreIds: number[];
   /** 上京ロゴ/バナーの表示 (D3)。東京・新地・ミナミ等のみ ON にする想定。 */
   showRelocateBadge: boolean;
   champagneDescription: string;
@@ -213,7 +215,7 @@ export const INITIAL_FORM: ShopForm = {
   interviewDialog: [], interviewQuestions: [],
   documents: [...DEFAULT_DOCUMENTS], docNote: "", shiftInfo: "",
   hiringEntries: [], hiringTotal: "", hiringExamples: [],
-  transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
+  transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [], recruitmentSimilarStoreIds: [],
   showRelocateBadge: false,
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
   dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [], dressPhotos: [],
@@ -380,6 +382,11 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
   const rs = store.related_store_ids ?? [];
   const relatedStoreIds: number[] = Array.isArray(rs)
     ? rs.filter((n: unknown) => Number.isFinite(Number(n))).map((n: unknown) => Number(n))
+    : [];
+
+  const rss = store.recruitment_similar_store_ids ?? [];
+  const recruitmentSimilarStoreIds: number[] = Array.isArray(rss)
+    ? rss.filter((n: unknown) => Number.isFinite(Number(n))).map((n: unknown) => Number(n))
     : [];
 
   const cp = store.champagne_prices ?? {};
@@ -550,6 +557,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     transferKm: store.transfer_km ?? "",
     transferZones,
     relatedStoreIds,
+    recruitmentSimilarStoreIds,
     showRelocateBadge: Boolean((store as AnyStore).show_relocate_badge ?? false),
     payrollSystemType: store.payroll_system_type ?? "",
     champagneDescription: store.champagne_description ?? "",
@@ -737,6 +745,8 @@ export function formToPayload(
       })),
     related_store_ids:
       form.relatedStoreIds.length > 0 ? form.relatedStoreIds : null,
+    recruitment_similar_store_ids:
+      form.recruitmentSimilarStoreIds.length > 0 ? form.recruitmentSimilarStoreIds : null,
     payroll_system_type: form.payrollSystemType || null,
     payroll_cycle: form.payrollCycle || null,
     payroll_pay_day: form.payrollPayDay.trim() || null,

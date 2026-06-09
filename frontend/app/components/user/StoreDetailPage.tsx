@@ -352,6 +352,8 @@ export interface StoreDetailStore {
   related_store_ids?: number[] | null;
   /** Optional pre-resolved related stores (preferred over related_store_ids) */
   related_stores?: RelatedStoreLite[] | null;
+  /** 採用基準が近い店舗 (系列とは別軸の回遊動線)。 */
+  recruitment_similar_store_ids?: number[] | null;
   transfer_zones?: TransferZone[] | null;
   experience_guaranteed?: boolean | null;
   /** 上京ロゴ・バナーの表示 (D3)。東京・新地・ミナミ等のみ ON。 */
@@ -1791,6 +1793,16 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               icon={<Building size={20} style={{ color: "#D4AF37" }} />}
               stores={store.related_stores}
               ids={store.related_store_ids}
+              currentId={store.id}
+            />
+          </div>
+
+          {/* 採用基準が近いお店 (系列とは別軸の回遊動線・比較動線) */}
+          <div data-preview-anchor="recruitment-similar">
+            <RelatedStoresSection
+              title="採用基準が近いお店"
+              icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+              ids={store.recruitment_similar_store_ids}
               currentId={store.id}
             />
           </div>

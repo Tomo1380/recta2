@@ -176,6 +176,8 @@ class StoreController extends Controller
             'recta_episodes' => 'nullable|array',
             'related_store_ids' => 'nullable|array',
             'related_store_ids.*' => 'integer',
+            'recruitment_similar_store_ids' => 'nullable|array',
+            'recruitment_similar_store_ids.*' => 'integer',
 
             // store_videos の同期に使うペイロード。配列で受け取り、
             // controller 側で順序・差分を解決して store_videos テーブルに反映する。
@@ -215,7 +217,7 @@ class StoreController extends Controller
             'champagne_prices', 'champagne_description',
             'transfer_description', 'transfer_km', 'transfer_zones',
             'dress_code', 'set_fee',
-            'recta_episodes', 'related_store_ids',
+            'recta_episodes', 'related_store_ids', 'recruitment_similar_store_ids',
             'experience_guaranteed', 'show_relocate_badge', 'publish_status',
             'priority',
             'slug',
