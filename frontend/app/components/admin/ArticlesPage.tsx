@@ -93,7 +93,7 @@ export function ArticlesPage() {
             className="flex items-center gap-1.5 px-3.5 py-2 border border-border rounded-lg text-[13px] hover:bg-muted transition-all"
           >
             <Tags className="w-4 h-4" />
-            大テーマを管理
+            分類を管理
           </button>
           <button
             onClick={() => navigate("/admin/articles/new")}
@@ -104,7 +104,7 @@ export function ArticlesPage() {
           </button>
         </div>
       </div>
-      {showSections && <SectionManager onClose={() => setShowSections(false)} />}
+      {showSections && <TaxonomyManager onClose={() => setShowSections(false)} />}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -317,39 +317,34 @@ export function ArticlesPage() {
   );
 }
 
-type SectionItem = { name: string; article_count: number };
+type TaxonomyItem = { name: string; article_count: number };
 
-/**
- * 大テーマ（コラムTOP上段ナビ）の管理。追加・削除・並べ替え。
- * 削除は「選択肢から外す」だけで既存記事の値は保持する（非破壊）。使用件数を表示し、
- * 使用中のテーマを外すときは確認する。
- */
-function SectionManager({ onClose }: { onClose: () => void }) {
-  const [items, setItems] = useState<SectionItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+/** 1 つの分類リスト（大テーマ or カテゴリ）の編集 UI。追加・削除・並べ替え。 */
+function TaxonomyGroup({
+  title,
+  hint,
+  unusedNoun,
+  items,
+  setItems,
+}: {
+  title: string;
+  hint: string;
+  unusedNoun: string;
+  items: TaxonomyItem[];
+  setItems: (next: TaxonomyItem[]) => void;
+}) {
   const [newName, setNewName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .get<{ sections: SectionItem[] }>("/admin/columns/sections")
-      .then((r) => setItems(r.sections))
-      .catch(() => setError("読み込みに失敗しました"))
-      .finally(() => setLoading(false));
-  }, []);
-
   const add = () => {
     const n = newName.trim();
     if (!n || items.some((i) => i.name === n)) return;
     setItems([...items, { name: n, article_count: 0 }]);
     setNewName("");
   };
-  const remove = (it: SectionItem) => {
+  const remove = (it: TaxonomyItem) => {
     if (
       it.article_count > 0 &&
       !confirm(
-        `「${it.name}」は${it.article_count}件の記事で使われています。\n選択肢から外しても記事自体は消えませんが、コラムTOPのナビには出なくなります。外しますか？`,
+        `「${it.name}」は${it.article_count}件の記事で使われています。\n選択肢から外しても記事自体は消えませんが、${unusedNoun}には出なくなります。外しますか？`,
       )
     ) {
       return;
@@ -363,14 +358,80 @@ function SectionManager({ onClose }: { onClose: () => void }) {
     [next[idx], next[j]] = [next[j], next[idx]];
     setItems(next);
   };
+
+  return (
+    <div>
+      <h4 className="text-[13px] font-bold">{title}</h4>
+      <p className="text-[11px] text-muted-foreground mb-2">{hint}</p>
+      <ul className="space-y-1.5 mb-2">
+        {items.map((it, idx) => (
+          <li key={it.name} className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
+            <div className="flex flex-col">
+              <button onClick={() => move(idx, -1)} disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
+                <ArrowUp className="w-3 h-3" />
+              </button>
+              <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
+                <ArrowDown className="w-3 h-3" />
+              </button>
+            </div>
+            <span className="flex-1 text-[13px]">{it.name}</span>
+            <span className="text-[11px] text-muted-foreground">{it.article_count}件</span>
+            <button onClick={() => remove(it)} className="p-1 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition" aria-label="削除">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </li>
+        ))}
+        {items.length === 0 && <li className="text-[12px] text-muted-foreground py-2 text-center">項目がありません</li>}
+      </ul>
+      <div className="flex gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder="新しい項目名"
+          className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        />
+        <button onClick={add} disabled={!newName.trim()} className="px-3 py-2 rounded-lg text-[13px] border border-border hover:bg-muted transition disabled:opacity-40">
+          追加
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * コラムの分類（大テーマ section / カテゴリ category）の管理。追加・削除・並べ替え。
+ * 削除は「候補/ナビから外す」だけで既存記事の値は保持する（非破壊）。使用件数を表示し、
+ * 使用中の項目を外すときは確認する。
+ */
+function TaxonomyManager({ onClose }: { onClose: () => void }) {
+  const [sections, setSections] = useState<TaxonomyItem[]>([]);
+  const [categories, setCategories] = useState<TaxonomyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ sections: TaxonomyItem[]; categories: TaxonomyItem[] }>("/admin/columns/taxonomies")
+      .then((r) => {
+        setSections(r.sections);
+        setCategories(r.categories);
+      })
+      .catch(() => setError("読み込みに失敗しました"))
+      .finally(() => setLoading(false));
+  }, []);
+
   const save = async () => {
     try {
       setSaving(true);
       setError(null);
-      const res = await api.put<{ sections: SectionItem[] }>("/admin/columns/sections", {
-        sections: items.map((i) => i.name),
-      });
-      setItems(res.sections);
+      const res = await api.put<{ sections: TaxonomyItem[]; categories: TaxonomyItem[] }>(
+        "/admin/columns/taxonomies",
+        { sections: sections.map((i) => i.name), categories: categories.map((i) => i.name) },
+      );
+      setSections(res.sections);
+      setCategories(res.categories);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存に失敗しました");
@@ -380,13 +441,13 @@ function SectionManager({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl border border-border w-full max-w-md p-6">
+      <div className="relative bg-white rounded-xl shadow-2xl border border-border w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-foreground font-bold">大テーマの管理</h3>
-            <p className="text-[12px] text-muted-foreground mt-0.5">コラムTOP上段ナビの大テーマ。並べ替え・追加・削除できます。</p>
+            <h3 className="text-foreground font-bold">コラムの分類を管理</h3>
+            <p className="text-[12px] text-muted-foreground mt-0.5">大テーマ・カテゴリの追加・削除・並べ替え。</p>
           </div>
           <button onClick={onClose} className="p-1 rounded-md hover:bg-muted transition">
             <X className="w-4 h-4" />
@@ -399,43 +460,24 @@ function SectionManager({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <>
-            <ul className="space-y-1.5 mb-3">
-              {items.map((it, idx) => (
-                <li key={it.name} className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
-                  <div className="flex flex-col">
-                    <button onClick={() => move(idx, -1)} disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
-                      <ArrowUp className="w-3 h-3" />
-                    </button>
-                    <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
-                      <ArrowDown className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <span className="flex-1 text-[13px]">{it.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{it.article_count}件</span>
-                  <button onClick={() => remove(it)} className="p-1 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition" aria-label="削除">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </li>
-              ))}
-              {items.length === 0 && (
-                <li className="text-[12px] text-muted-foreground py-2 text-center">大テーマがありません</li>
-              )}
-            </ul>
-
-            <div className="flex gap-2">
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-                placeholder="新しい大テーマ名"
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            <div className="space-y-5">
+              <TaxonomyGroup
+                title="大テーマ"
+                hint="コラムTOP上段ナビ。"
+                unusedNoun="コラムTOPのナビ"
+                items={sections}
+                setItems={setSections}
               />
-              <button onClick={add} disabled={!newName.trim()} className="px-3 py-2 rounded-lg text-[13px] border border-border hover:bg-muted transition disabled:opacity-40">
-                追加
-              </button>
+              <TaxonomyGroup
+                title="カテゴリ"
+                hint="記事のカテゴリ候補。記事作成時は自由入力もできます。"
+                unusedNoun="候補リスト"
+                items={categories}
+                setItems={setCategories}
+              />
             </div>
 
-            {error && <p className="text-[12px] text-red-500 mt-2">{error}</p>}
+            {error && <p className="text-[12px] text-red-500 mt-3">{error}</p>}
 
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] border border-border hover:bg-muted transition">

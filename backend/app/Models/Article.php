@@ -34,15 +34,29 @@ class Article extends Model
     /** 大テーマの初期値（SiteSetting 未設定時のフォールバック）。 */
     public const SECTIONS = ['夜の始め方', 'エリア別比較', '地方から上京', 'Q&A'];
 
+    /** カテゴリの初期値（SiteSetting 未設定時のフォールバック）。 */
+    public const CATEGORIES = ['業界解説', '店舗特集', '上京サポート', 'ノルマ・お給料', '面接対策', 'その他'];
+
     /**
-     * 公開コラムの大テーマ（上段ナビ）。SiteSetting('column_sections') で管理し、
-     * 未設定なら固定値 SECTIONS にフォールバックする（後方互換）。
+     * カテゴリ候補。SiteSetting('column_categories') で管理し、未設定なら固定値に
+     * フォールバック。category は自由入力なので、これは「候補/管理リスト」として使う。
      *
      * @return array<int, string>
      */
-    public static function sectionList(): array
+    public static function categoryList(): array
     {
-        $raw = SiteSetting::where('key', 'column_sections')->value('value');
+        return self::taxonomyFromSetting('column_categories', self::CATEGORIES);
+    }
+
+    /**
+     * SiteSetting に JSON 配列で保存された分類リストを読む。空・未設定なら fallback。
+     *
+     * @param  array<int, string>  $fallback
+     * @return array<int, string>
+     */
+    protected static function taxonomyFromSetting(string $key, array $fallback): array
+    {
+        $raw = SiteSetting::where('key', $key)->value('value');
         if ($raw) {
             $decoded = json_decode($raw, true);
             if (is_array($decoded)) {
@@ -55,7 +69,18 @@ class Article extends Model
                 }
             }
         }
-        return self::SECTIONS;
+        return $fallback;
+    }
+
+    /**
+     * 公開コラムの大テーマ（上段ナビ）。SiteSetting('column_sections') で管理し、
+     * 未設定なら固定値 SECTIONS にフォールバックする（後方互換）。
+     *
+     * @return array<int, string>
+     */
+    public static function sectionList(): array
+    {
+        return self::taxonomyFromSetting('column_sections', self::SECTIONS);
     }
 
     protected $fillable = [

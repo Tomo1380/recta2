@@ -138,55 +138,80 @@ class ArticleController extends Controller
     }
 
     /**
-     * 大テーマ (section) 一覧 + 各テーマの記事使用数。管理 UI の編集用。
+     * コラムの分類（大テーマ section / カテゴリ category）一覧 + 各値の記事使用数。
+     * 管理 UI と編集画面の候補に使う。
      *
-     * @response array{sections: array<int, array{name: string, article_count: int}>}
+     * @response array{
+     *   sections: array<int, array{name: string, article_count: int}>,
+     *   categories: array<int, array{name: string, article_count: int}>
+     * }
      */
-    public function sections(): JsonResponse
+    public function taxonomies(): JsonResponse
     {
-        $sections = Article::sectionList();
-        $counts = Article::whereIn('section', $sections)
-            ->selectRaw('section, count(*) as c')
-            ->groupBy('section')
-            ->pluck('c', 'section');
-
         return response()->json([
-            'sections' => collect($sections)->map(fn ($s) => [
-                'name' => $s,
-                'article_count' => (int) ($counts[$s] ?? 0),
-            ])->values(),
+            'sections' => $this->taxonomyWithCounts('section', Article::sectionList()),
+            'categories' => $this->taxonomyWithCounts('category', Article::categoryList()),
         ]);
     }
 
     /**
-     * 大テーマ (section) の一覧を保存（並び順そのまま）。
+     * 分類リストを保存（並び順そのまま）。sections / categories のうち送られた方だけ更新。
      *
-     * 削除は「選択肢から外す」だけで既存記事の section 値は保持する（非破壊）。
-     * 外したテーマを使う記事はナビに出なくなるだけで、記事自体は壊れない。
+     * 削除は「選択肢から外す」だけで既存記事の値は保持する（非破壊）。外した値を使う
+     * 記事はナビ/候補に出なくなるだけで、記事自体は壊れない。
      */
-    public function updateSections(Request $request): JsonResponse
+    public function updateTaxonomies(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'sections' => 'present|array|max:20',
+            'sections' => 'sometimes|array|max:30',
             'sections.*' => 'required|string|max:50',
+            'categories' => 'sometimes|array|max:30',
+            'categories.*' => 'required|string|max:50',
         ]);
 
-        // trim + 重複・空除去（順序は維持）
-        $list = [];
-        foreach ($data['sections'] as $s) {
-            $s = trim($s);
-            if ($s !== '' && !in_array($s, $list, true)) {
-                $list[] = $s;
-            }
+        if (array_key_exists('sections', $data)) {
+            $this->saveTaxonomy('column_sections', $data['sections']);
         }
-
-        SiteSetting::updateOrCreate(
-            ['key' => 'column_sections'],
-            ['value' => json_encode($list, JSON_UNESCAPED_UNICODE)],
-        );
+        if (array_key_exists('categories', $data)) {
+            $this->saveTaxonomy('column_categories', $data['categories']);
+        }
         Cache::forget('public_articles_index');
 
-        return $this->sections();
+        return $this->taxonomies();
+    }
+
+    /**
+     * @param  array<int, string>  $names
+     * @return array<int, array{name: string, article_count: int}>
+     */
+    private function taxonomyWithCounts(string $column, array $names): array
+    {
+        $counts = Article::whereIn($column, $names)
+            ->selectRaw("{$column} as v, count(*) as c")
+            ->groupBy($column)
+            ->pluck('c', 'v');
+
+        return collect($names)->map(fn ($n) => [
+            'name' => $n,
+            'article_count' => (int) ($counts[$n] ?? 0),
+        ])->values()->all();
+    }
+
+    /**
+     * trim + 重複・空除去して SiteSetting に JSON 保存（順序維持）。
+     *
+     * @param  array<int, string>  $names
+     */
+    private function saveTaxonomy(string $key, array $names): void
+    {
+        $list = [];
+        foreach ($names as $n) {
+            $n = trim($n);
+            if ($n !== '' && !in_array($n, $list, true)) {
+                $list[] = $n;
+            }
+        }
+        SiteSetting::updateOrCreate(['key' => $key], ['value' => json_encode($list, JSON_UNESCAPED_UNICODE)]);
     }
 
     public function uploadThumbnail(UploadArticleThumbnailRequest $request, Article $article): JsonResponse

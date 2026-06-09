@@ -78,14 +78,17 @@ export function ArticleEditPage() {
   const [bodyHtml, setBodyHtml] = useState<string>("");
   // C4: この記事で紹介した店舗（手動紐付け）。
   const [relatedStores, setRelatedStores] = useState<RelatedStoreLite[]>([]);
-  // 大テーマ候補は管理画面で編集可能（SiteSetting）。初期は固定値、マウント時に最新を取得。
+  // 大テーマ/カテゴリ候補は管理画面で編集可能（SiteSetting）。初期は固定値、マウント時に最新取得。
   const [sectionOptions, setSectionOptions] = useState<string[]>(SECTIONS);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(COMMON_CATEGORIES);
   useEffect(() => {
     let active = true;
     api
-      .get<{ sections: { name: string }[] }>("/admin/columns/sections")
+      .get<{ sections: { name: string }[]; categories: { name: string }[] }>("/admin/columns/taxonomies")
       .then((r) => {
-        if (active) setSectionOptions(r.sections.map((s) => s.name));
+        if (!active) return;
+        setSectionOptions(r.sections.map((s) => s.name));
+        setCategoryOptions(r.categories.map((c) => c.name));
       })
       .catch(() => {});
     return () => {
@@ -418,10 +421,13 @@ export function ArticleEditPage() {
               className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
             <datalist id="article-categories">
-              {COMMON_CATEGORIES.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c} value={c} />
               ))}
             </datalist>
+            <p className="text-[11px] text-muted-foreground">
+              候補の追加・削除は「コラム管理」画面の「分類を管理」から行えます（自由入力も可）。
+            </p>
           </div>
 
           {/* Section (C2): コラムTOP 上段ナビの大テーマ */}
