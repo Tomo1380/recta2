@@ -1558,13 +1558,21 @@ export default function AiChatPanel({
                 )}
 
                 {/* 店舗カードの「後ろ」に出すテキスト（絞り込みを促す締めの一文など）。
-                    AI 本文を「カード前 / カード後」に分割した後半部分。 */}
+                    AI 本文を「カード前 / カード後」に分割した後半部分。
+                    導入の吹き出しと同じスタイルで、チャットの続きとして見せる。 */}
                 {msg.role === "ai" && msg.contentAfter && (
-                  <div
-                    className="mt-2 ml-8 text-[13px] leading-relaxed whitespace-pre-wrap"
-                    style={{ color: "#1b2528" }}
-                  >
-                    {msg.contentAfter}
+                  <div className="mt-2 ml-8">
+                    <div
+                      className="inline-block max-w-[80%] px-3.5 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed rounded-[18px]"
+                      style={{
+                        backgroundColor: "white",
+                        color: "#1b2528",
+                        border: "0.5px solid rgba(212,175,55,0.25)",
+                        boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
+                      }}
+                    >
+                      {msg.contentAfter}
+                    </div>
                   </div>
                 )}
 
