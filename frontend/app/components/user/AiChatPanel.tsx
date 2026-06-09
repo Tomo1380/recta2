@@ -365,12 +365,24 @@ async function streamMessage(
   }
 }
 
-function formatWage(min?: number, max?: number): string {
-  if (min == null && max == null) return "";
+function formatWage(min?: number | string | null, max?: number | string | null): string {
+  // "6,000円" のような文字列で来ても数値化する（円・カンマ等を除去）。
+  const toNum = (v: number | string | null | undefined): number | null => {
+    if (v == null || v === "") return null;
+    const d = String(v).replace(/[^\d]/g, "");
+    return d === "" ? null : Number(d);
+  };
+  let lo = toNum(min);
+  let hi = toNum(max);
+  if (lo != null && hi != null && lo > hi) [lo, hi] = [hi, lo];
+
+  if (lo == null && hi == null) return "";
   const fmt = (n: number) => n.toLocaleString();
-  if (min != null && max != null) return `${fmt(min)}~${fmt(max)}円/h`;
-  if (min != null) return `${fmt(min)}円~/h`;
-  return `~${fmt(max!)}円/h`;
+  if (lo != null && hi != null) {
+    return lo === hi ? `${fmt(lo)}円/h` : `${fmt(lo)}~${fmt(hi)}円/h`;
+  }
+  if (lo != null) return `${fmt(lo)}円~/h`;
+  return `~${fmt(hi!)}円/h`;
 }
 
 // ---------------------------------------------------------------------------

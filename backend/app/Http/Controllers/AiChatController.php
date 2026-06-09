@@ -372,14 +372,22 @@ class AiChatController extends Controller
      */
     private function toStoreCard(array $s, string $comment): array
     {
+        // 体入時給は「6,000円」のような文字列で入っていることがあるため数値化し、
+        // min > max の逆転データは昇順に並べ替える（カードの「6,000~5,500」表示防止）。
+        $min = $this->parseWage($s['trial_hourly_min'] ?? null);
+        $max = $this->parseWage($s['trial_hourly_max'] ?? null);
+        if ($min !== null && $max !== null && $min > $max) {
+            [$min, $max] = [$max, $min];
+        }
+
         return [
             'id' => $s['id'],
             'name' => $s['name'],
             'area' => $s['area'] ?? null,
             'category' => $s['category'] ?? null,
             'nearest_station' => $s['nearest_station'] ?? null,
-            'trial_hourly_min' => $s['trial_hourly_min'] ?? null,
-            'trial_hourly_max' => $s['trial_hourly_max'] ?? null,
+            'trial_hourly_min' => $min,
+            'trial_hourly_max' => $max,
             'feature_tags' => $s['feature_tags'] ?? [],
             'average_rating' => $s['average_rating'] ?? null,
             'reviews_count' => $s['reviews_count'] ?? null,
@@ -388,6 +396,22 @@ class AiChatController extends Controller
             // AI が生成した、その人向けの一言要約（カードに表示）
             'comment' => $comment,
         ];
+    }
+
+    /**
+     * 時給値を数値に正規化する。"6,000円" や "6000" などの文字列も受け付け、
+     * 数字以外を除去して int を返す。空・数字なしは null。
+     */
+    private function parseWage($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_int($value)) {
+            return $value;
+        }
+        $digits = preg_replace('/[^\d]/', '', (string) $value);
+        return $digits === '' ? null : (int) $digits;
     }
 
     /**
