@@ -216,11 +216,15 @@ class AiChatController extends Controller
                 ]);
 
                 $recommendedStores = $this->buildStoreCards($toolCalls, $aiText);
-                // Strip [STORE:ID] markers + guard against fabricated store lines
-                $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
+                // マーカー除去 + 架空店ガード。さらにカード位置で pre / post に分割
+                // （pre テキスト → 店舗カード → post テキスト の順で表示させる）。
+                $parts = AgentTextSanitizer::splitParts(
+                    AgentTextSanitizer::strip($aiText, !empty($recommendedStores))
+                );
 
                 return response()->json([
-                    'message' => $displayText,
+                    'message' => $parts['pre'],
+                    'after_text' => $parts['post'],
                     'stores' => $recommendedStores,
                     'follow_ups' => [],
                     'meta' => [
@@ -735,7 +739,11 @@ class AiChatController extends Controller
                 // Final text reply — stream it as typewriter chunks.
                 $aiText = collect($parts)->filter(fn($p) => isset($p['text']))->pluck('text')->implode('');
                 $recommendedStores = $this->buildStoreCards($toolCalls, $aiText);
-                $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
+                // カード位置で pre / post に分割。pre をタイプライター配信し、
+                // post は done イベントで送る（フロントは pre → カード → post で表示）。
+                $textParts = AgentTextSanitizer::splitParts(
+                    AgentTextSanitizer::strip($aiText, !empty($recommendedStores))
+                );
 
                 $elapsed = round((microtime(true) - $startTime) * 1000);
 
@@ -750,10 +758,11 @@ class AiChatController extends Controller
                     'mode' => 'agent',
                 ]);
 
-                $this->streamTextAsTypewriter($send, $displayText);
+                $this->streamTextAsTypewriter($send, $textParts['pre']);
 
                 $send('done', [
                     'stores' => $recommendedStores,
+                    'after_text' => $textParts['post'],
                     'follow_ups' => [],
                     'meta' => [
                         'mode' => 'agent',

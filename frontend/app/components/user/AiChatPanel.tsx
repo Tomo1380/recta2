@@ -176,6 +176,8 @@ interface MessageMeta {
 interface ChatMessage {
   role: "user" | "ai";
   content: string;
+  /** 店舗カードの「後ろ」に表示するテキスト（絞り込みを促す締めの一文など） */
+  contentAfter?: string;
   stores?: StoreCard[];
   follow_ups?: string[];
   meta?: MessageMeta;
@@ -194,6 +196,8 @@ interface ChatConfigResponse {
 
 interface ChatApiResponse {
   message: string;
+  /** 店舗カードの「後ろ」に表示するテキスト（絞り込みを促す締めの一文など） */
+  after_text?: string;
   stores?: StoreCard[];
   follow_ups?: string[];
   meta?: MessageMeta;
@@ -219,7 +223,7 @@ interface LimitError {
 interface StreamHandlers {
   onStatus?: (label: string) => void;
   onDelta: (delta: string) => void;
-  onDone: (payload: Pick<ChatApiResponse, "stores" | "follow_ups" | "meta">) => void;
+  onDone: (payload: Pick<ChatApiResponse, "stores" | "follow_ups" | "meta" | "after_text">) => void;
 }
 
 /**
@@ -314,6 +318,7 @@ async function streamMessage(
         terminated = true;
         handlers.onDone({
           stores: (payload.stores ?? []) as ChatApiResponse["stores"],
+          after_text: typeof payload.after_text === "string" ? payload.after_text : "",
           follow_ups: (payload.follow_ups ?? []) as ChatApiResponse["follow_ups"],
           meta: payload.meta as ChatApiResponse["meta"],
         });
@@ -1066,8 +1071,9 @@ export default function AiChatPanel({
                 return next;
               });
             },
-            onDone: ({ stores, follow_ups, meta }) => {
+            onDone: ({ stores, follow_ups, meta, after_text }) => {
               const finalText = cleanText(accumulated).trim();
+              const afterText = (after_text ?? "").trim();
               // LINE CTA は「店舗を提案したタイミング」だけ・連続では出さない。
               // 情報質問だけの返信では出さない（毎回出てしつこいのを防ぐ）。
               const hasStores = (stores ?? []).length > 0;
@@ -1087,6 +1093,7 @@ export default function AiChatPanel({
                   next[next.length - 1] = {
                     ...last,
                     content: finalText,
+                    contentAfter: afterText || undefined,
                     stores,
                     follow_ups,
                     meta,
@@ -1547,6 +1554,17 @@ export default function AiChatPanel({
                         </Link>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* 店舗カードの「後ろ」に出すテキスト（絞り込みを促す締めの一文など）。
+                    AI 本文を「カード前 / カード後」に分割した後半部分。 */}
+                {msg.role === "ai" && msg.contentAfter && (
+                  <div
+                    className="mt-2 ml-8 text-[13px] leading-relaxed whitespace-pre-wrap"
+                    style={{ color: "#1b2528" }}
+                  >
+                    {msg.contentAfter}
                   </div>
                 )}
 
