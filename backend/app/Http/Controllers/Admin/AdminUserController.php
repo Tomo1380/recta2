@@ -58,7 +58,12 @@ class AdminUserController extends Controller
     public function update(UpdateAdminUserRequest $request, AdminUser $adminUser): AdminUserResource
     {
         $this->ensureSuperAdmin($request);
-        $adminUser->update($request->validated());
+        $data = $request->validated();
+        // パスワード未入力 (null/空) のときは既存パスワードを維持する。
+        if (empty($data['password'] ?? null)) {
+            unset($data['password']);
+        }
+        $adminUser->update($data);
         return new AdminUserResource($adminUser);
     }
 

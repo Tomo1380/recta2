@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X, RotateCcw, Shield, Loader2 } from "lucide-react";
+import { Plus, X, Shield, Loader2 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AdminUser, Paginated } from "~/lib/types";
 
@@ -26,8 +26,23 @@ export function AdminUsersPage() {
   const [invitePassword, setInvitePassword] = useState("password123");
   const [inviteRole, setInviteRole] = useState("一般管理者");
   const [submitting, setSubmitting] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState<AdminUser | null>(null);
-  const [newPassword, setNewPassword] = useState("");
+  // 編集モーダル
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRole, setEditRole] = useState<AdminUser["role"]>("admin");
+  const [editStatus, setEditStatus] = useState<AdminUser["status"]>("active");
+  const [editPassword, setEditPassword] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const openEdit = (admin: AdminUser) => {
+    setEditTarget(admin);
+    setEditName(admin.name);
+    setEditEmail(admin.email);
+    setEditRole(admin.role);
+    setEditStatus(admin.status);
+    setEditPassword("");
+  };
 
   const fetchAdmins = useCallback(async () => {
     try {
@@ -79,17 +94,26 @@ export function AdminUsersPage() {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!showPasswordModal || !newPassword) return;
+  const handleSaveEdit = async () => {
+    if (!editTarget || !editName || !editEmail) return;
     try {
-      await api.put(`/admin/admin-users/${showPasswordModal.id}/reset-password`, {
-        password: newPassword,
-      });
-      setShowPasswordModal(null);
-      setNewPassword("");
-      alert("パスワードをリセットしました");
+      setEditSubmitting(true);
+      const payload: Record<string, string> = {
+        name: editName,
+        email: editEmail,
+        role: editRole,
+        status: editStatus,
+      };
+      // パスワードは入力があったときだけ送る (空なら現状維持)
+      if (editPassword) payload.password = editPassword;
+      await api.put(`/admin/admin-users/${editTarget.id}`, payload);
+      setEditTarget(null);
+      setEditPassword("");
+      await fetchAdmins();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "パスワードリセットに失敗しました");
+      alert(e instanceof Error ? e.message : "更新に失敗しました");
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -172,7 +196,10 @@ export function AdminUsersPage() {
                   </td>
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-1">
-                      <button className="text-[12px] text-muted-foreground hover:text-foreground transition px-2 py-1 rounded-md hover:bg-muted">
+                      <button
+                        onClick={() => openEdit(admin)}
+                        className="text-[12px] text-muted-foreground hover:text-foreground transition px-2 py-1 rounded-md hover:bg-muted"
+                      >
                         編集
                       </button>
                       <button
@@ -184,13 +211,6 @@ export function AdminUsersPage() {
                         }`}
                       >
                         {admin.status === "active" ? "無効化" : "有効化"}
-                      </button>
-                      <button
-                        onClick={() => { setShowPasswordModal(admin); setNewPassword(""); }}
-                        className="p-1 rounded-md hover:bg-muted transition"
-                        title="パスワードリセット"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
                     </div>
                   </td>
@@ -219,13 +239,21 @@ export function AdminUsersPage() {
                 <div className={`w-1.5 h-1.5 rounded-full ${admin.status === "active" ? "bg-emerald-500" : "bg-stone-400"}`} />
               </div>
             </div>
-            <div className="flex items-center gap-3 mt-3 text-[12px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                {admin.role === "super_admin" && <Shield className="w-3 h-3" />}
-                {roleLabel(admin.role)}
-              </span>
-              <span>·</span>
-              <span>{formatDate(admin.last_login_at)}</span>
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  {admin.role === "super_admin" && <Shield className="w-3 h-3" />}
+                  {roleLabel(admin.role)}
+                </span>
+                <span>·</span>
+                <span>{formatDate(admin.last_login_at)}</span>
+              </div>
+              <button
+                onClick={() => openEdit(admin)}
+                className="text-[12px] text-indigo-600 hover:text-indigo-700 transition px-2 py-1 rounded-md hover:bg-muted"
+              >
+                編集
+              </button>
             </div>
           </div>
         ))}
@@ -312,45 +340,96 @@ export function AdminUsersPage() {
         </div>
       )}
 
-      {/* Password Reset Modal */}
-      {showPasswordModal && (
+      {/* Edit Modal */}
+      {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowPasswordModal(null)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setEditTarget(null)} />
           <div className="relative bg-white rounded-xl shadow-2xl border border-border w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-foreground">パスワードリセット</h3>
-                <p className="text-[13px] text-muted-foreground mt-0.5">{showPasswordModal.name} のパスワードを変更</p>
+                <h3 className="text-foreground">管理ユーザーを編集</h3>
+                <p className="text-[13px] text-muted-foreground mt-0.5">{editTarget.name} の情報を変更</p>
               </div>
-              <button onClick={() => setShowPasswordModal(null)} className="p-1 rounded-md hover:bg-muted transition">
+              <button onClick={() => setEditTarget(null)} className="p-1 rounded-md hover:bg-muted transition">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div>
-              <label className="block text-[13px] mb-1.5">新しいパスワード</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="新しいパスワードを入力"
-                className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[13px] mb-1.5">名前</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="氏名"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] mb-1.5">メールアドレス</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="email@recta2.jp"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[13px] mb-1.5">ロール</label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as AdminUser["role"])}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  >
+                    <option value="super_admin">スーパー管理者</option>
+                    <option value="admin">一般管理者</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[13px] mb-1.5">ステータス</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as AdminUser["status"])}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  >
+                    <option value="active">有効</option>
+                    <option value="inactive">無効</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[13px] mb-1.5">
+                  新しいパスワード
+                  <span className="text-muted-foreground ml-1">（変更する場合のみ入力 / 8文字以上）</span>
+                </label>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="変更しない場合は空欄"
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 mt-6">
               <button
-                onClick={() => setShowPasswordModal(null)}
+                onClick={() => setEditTarget(null)}
                 className="px-4 py-2 rounded-lg text-[13px] border border-border hover:bg-muted transition"
               >
                 キャンセル
               </button>
               <button
-                onClick={handleResetPassword}
-                disabled={!newPassword}
+                onClick={handleSaveEdit}
+                disabled={editSubmitting || !editName || !editEmail || (!!editPassword && editPassword.length < 8)}
                 className="px-4 py-2 rounded-lg text-[13px] bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
               >
-                リセット
+                {editSubmitting ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : null}
+                保存
               </button>
             </div>
           </div>

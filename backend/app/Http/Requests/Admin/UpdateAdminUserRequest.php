@@ -23,6 +23,8 @@ class UpdateAdminUserRequest extends FormRequest
             'email' => ['sometimes', 'required', 'email', Rule::unique('admin_users', 'email')->ignore($id)],
             'role' => 'sometimes|in:super_admin,admin',
             'status' => 'sometimes|in:active,inactive',
+            // 編集画面からのパスワード変更 (任意)。空のときは update() 側で除外する。
+            'password' => 'sometimes|nullable|string|min:8',
         ];
     }
 }
