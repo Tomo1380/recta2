@@ -127,6 +127,11 @@ class StoreResource extends JsonResource
         if (isset($this->resource->reviews_count)) {
             $merged['reviews_count'] = (int) $this->resource->reviews_count;
         }
+        // access_count（PageView 数）はアクセス順ソート時のみ controller が
+        // addSelect('pv_count') する。存在するときだけ出す。
+        if (array_key_exists('pv_count', $this->resource->getAttributes())) {
+            $merged['access_count'] = (int) $this->resource->pv_count;
+        }
         // average_rating は controller 側で withAvg('reviews_avg_rating') を
         // 事前ロードしていればそれを使い (N+1 回避)、無ければ method で都度計算。
         if (array_key_exists('reviews_avg_rating', $this->resource->getAttributes())) {

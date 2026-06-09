@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\Concerns\SortsListByDate;
 use App\Http\Requests\Admin\ReorderStoreImagesRequest;
 use App\Http\Requests\Admin\UploadStoreImageRequest;
 use App\Http\Resources\StoreResource;
+use App\Models\PageView;
 use App\Models\Store;
 use App\Services\GeocodingService;
 use App\Services\Store\StoreImageService;
@@ -49,9 +50,29 @@ class StoreController extends Controller
             $query->where('publish_status', $status);
         }
 
+        // 「Nヶ月以上更新なし」絞り込み。口コミ投稿も「更新」とみなすため、
+        // updated_at が閾値より古く、かつ閾値以降に公開口コミが付いていない店だけ残す。
+        if ($months = (int) $request->input('not_updated_months')) {
+            $threshold = now()->subMonths($months);
+            $query->where('updated_at', '<', $threshold)
+                ->whereDoesntHave('reviews', fn ($r) => $r
+                    ->where('status', 'published')
+                    ->where('created_at', '>=', $threshold));
+        }
+
         $query->withCount(['reviews' => fn ($q) => $q->where('status', 'published')]);
-        $stores = $this->applyListSort($query, $request, ['created_at', 'updated_at'], 'updated_at')
-            ->paginate($request->input('per_page', 20));
+
+        if ($request->input('sort') === 'access_rank') {
+            // アクセス数（PageView）ランキング順。全期間のPV数で並べる。
+            $order = strtolower((string) $request->input('order', 'desc')) === 'asc' ? 'asc' : 'desc';
+            $query->addSelect(['pv_count' => PageView::selectRaw('count(*)')->whereColumn('store_id', 'stores.id')])
+                ->orderBy('pv_count', $order)
+                ->orderBy('updated_at', 'desc');
+            $stores = $query->paginate($request->input('per_page', 20));
+        } else {
+            $stores = $this->applyListSort($query, $request, ['created_at', 'updated_at'], 'updated_at')
+                ->paginate($request->input('per_page', 20));
+        }
 
         return response()->json(PaginatorWithResource::map($stores, StoreResource::class));
     }

@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
  * 並び替え方向はアイコンで示す (未選択=ArrowUpDown / 昇順=ArrowUp / 降順=ArrowDown)。
  * backend は ?sort=created_at|updated_at & ?order=asc|desc を受ける (SortsListByDate)。
  */
-export type SortField = "created_at" | "updated_at";
+export type SortField = "created_at" | "updated_at" | "access_rank";
 export type SortOrder = "asc" | "desc";
 export interface SortState {
   sort: SortField;
@@ -17,6 +17,7 @@ export interface SortState {
 const LABELS: Record<SortField, string> = {
   created_at: "登録日時",
   updated_at: "更新日時",
+  access_rank: "アクセス数",
 };
 
 export function SortControl({
