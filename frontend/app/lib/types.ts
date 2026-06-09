@@ -45,6 +45,8 @@ export interface AdminPersonRow {
   has_account: boolean;
   status: string | null;
   reviews_count: number | null;
+  /** この人 (line_user_id) の AIチャット利用数。アクティブ度の目安。 */
+  ai_chat_count: number;
   last_activity: string | null;
   kind: "talk" | "login_only";
 }

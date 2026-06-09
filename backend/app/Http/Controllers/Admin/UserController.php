@@ -10,6 +10,7 @@ use App\Http\Requests\Admin\UpdateUserStatusRequest;
 use App\Http\Resources\LineFriendResource;
 use App\Http\Resources\LineMessageResource;
 use App\Http\Resources\UserResource;
+use App\Models\AiChatLog;
 use App\Models\LineFriend;
 use App\Models\LineMessage;
 use App\Models\User;
@@ -131,6 +132,20 @@ class UserController extends Controller
         } else { // talk (default)
             $people = $friendQuery()->orderByDesc('updated_at')->paginate($perPage)->through($normFriend);
         }
+
+        // 各 people 行に AIチャット利用数を付与（line_user_id 基準、ページ分を 1 クエリで集計）。
+        // アクティブ度の目安になる（FB: アクティブユーザーは一斉送信頻度を上げる判断に使う）。
+        $lineIds = collect($people->items())->pluck('line_user_id')->filter()->unique()->values();
+        $chatCounts = $lineIds->isEmpty()
+            ? collect()
+            : AiChatLog::whereIn('line_user_id', $lineIds)
+                ->selectRaw('line_user_id, count(*) as c')
+                ->groupBy('line_user_id')
+                ->pluck('c', 'line_user_id');
+        $people->getCollection()->transform(function ($row) use ($chatCounts) {
+            $row['ai_chat_count'] = (int) ($chatCounts[$row['line_user_id'] ?? ''] ?? 0);
+            return $row;
+        });
 
         return response()->json([
             'people' => $people,

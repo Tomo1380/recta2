@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, ChevronRight as ChevronR } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, Bot, ChevronRight as ChevronR } from "lucide-react";
 import { api } from "~/lib/api";
 import type { AdminPersonRow, PeopleIndexResponse, Paginated } from "~/lib/types";
 
@@ -191,6 +191,7 @@ export function UsersPage() {
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">利用者</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">種別</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">メッセージ</th>
+                    <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">AIチャット</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">最終</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider"></th>
                   </tr>
@@ -209,6 +210,16 @@ export function UsersPage() {
                       </td>
                       <td className="py-2.5 px-4"><PersonBadges p={p} /></td>
                       <td className="py-2.5 px-4 text-muted-foreground">{p.messages_count}</td>
+                      <td className="py-2.5 px-4 text-muted-foreground">
+                        {p.ai_chat_count > 0 ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Bot className="w-3 h-3 text-indigo-500" />
+                            {p.ai_chat_count}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-4 text-muted-foreground">{formatDate(p.last_activity)}</td>
                       <td className="py-2.5 px-4">
                         <button onClick={() => openPerson(p)} className="text-[12px] text-indigo-600 hover:text-indigo-700 transition">
@@ -234,7 +245,9 @@ export function UsersPage() {
                       <span className="text-[13px] truncate">{personName(p)}</span>
                     </div>
                     <div className="mt-0.5"><PersonBadges p={p} /></div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">メッセージ {p.messages_count}件 · {formatDate(p.last_activity)}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      メッセージ {p.messages_count}件{p.ai_chat_count > 0 ? ` · AI ${p.ai_chat_count}回` : ""} · {formatDate(p.last_activity)}
+                    </p>
                   </div>
                   <ChevronR className="w-4 h-4 text-indigo-300" />
                 </div>
