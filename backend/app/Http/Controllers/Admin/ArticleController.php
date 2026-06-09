@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateArticleRequest;
 use App\Http\Requests\Admin\UploadArticleThumbnailRequest;
 use App\Http\Resources\ArticleResource;
 use App\Models\Article;
+use App\Models\SiteSetting;
 use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -134,6 +135,58 @@ class ArticleController extends Controller
         Cache::forget('industry_knowledges');
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * 大テーマ (section) 一覧 + 各テーマの記事使用数。管理 UI の編集用。
+     *
+     * @response array{sections: array<int, array{name: string, article_count: int}>}
+     */
+    public function sections(): JsonResponse
+    {
+        $sections = Article::sectionList();
+        $counts = Article::whereIn('section', $sections)
+            ->selectRaw('section, count(*) as c')
+            ->groupBy('section')
+            ->pluck('c', 'section');
+
+        return response()->json([
+            'sections' => collect($sections)->map(fn ($s) => [
+                'name' => $s,
+                'article_count' => (int) ($counts[$s] ?? 0),
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * 大テーマ (section) の一覧を保存（並び順そのまま）。
+     *
+     * 削除は「選択肢から外す」だけで既存記事の section 値は保持する（非破壊）。
+     * 外したテーマを使う記事はナビに出なくなるだけで、記事自体は壊れない。
+     */
+    public function updateSections(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'sections' => 'present|array|max:20',
+            'sections.*' => 'required|string|max:50',
+        ]);
+
+        // trim + 重複・空除去（順序は維持）
+        $list = [];
+        foreach ($data['sections'] as $s) {
+            $s = trim($s);
+            if ($s !== '' && !in_array($s, $list, true)) {
+                $list[] = $s;
+            }
+        }
+
+        SiteSetting::updateOrCreate(
+            ['key' => 'column_sections'],
+            ['value' => json_encode($list, JSON_UNESCAPED_UNICODE)],
+        );
+        Cache::forget('public_articles_index');
+
+        return $this->sections();
     }
 
     public function uploadThumbnail(UploadArticleThumbnailRequest $request, Article $article): JsonResponse

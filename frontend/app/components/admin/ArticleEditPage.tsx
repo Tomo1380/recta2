@@ -78,6 +78,20 @@ export function ArticleEditPage() {
   const [bodyHtml, setBodyHtml] = useState<string>("");
   // C4: この記事で紹介した店舗（手動紐付け）。
   const [relatedStores, setRelatedStores] = useState<RelatedStoreLite[]>([]);
+  // 大テーマ候補は管理画面で編集可能（SiteSetting）。初期は固定値、マウント時に最新を取得。
+  const [sectionOptions, setSectionOptions] = useState<string[]>(SECTIONS);
+  useEffect(() => {
+    let active = true;
+    api
+      .get<{ sections: { name: string }[] }>("/admin/columns/sections")
+      .then((r) => {
+        if (active) setSectionOptions(r.sections.map((s) => s.name));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -419,10 +433,17 @@ export function ArticleEditPage() {
               className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             >
               <option value="">（未設定）</option>
-              {SECTIONS.map((s) => (
+              {/* 現在の値がリストから削除済みでも編集中は選択肢に残す（値を失わない）。 */}
+              {(form.section && !sectionOptions.includes(form.section)
+                ? [form.section, ...sectionOptions]
+                : sectionOptions
+              ).map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+            <p className="text-[11px] text-muted-foreground">
+              大テーマの追加・削除は「コラム管理」画面の「大テーマを管理」から行えます。
+            </p>
           </div>
 
           {/* Related stores (C4): この記事で紹介した店舗 */}

@@ -199,6 +199,10 @@ Route::prefix('admin')->group(function () {
 
         // ── コラム記事管理（articles 権限）──
         Route::middleware('admin.perm:articles')->group(function () {
+            // 大テーマ (section) 管理。apiResource の {article} に飲まれないよう先に登録。
+            Route::get('columns/sections', [ArticleController::class, 'sections']);
+            Route::put('columns/sections', [ArticleController::class, 'updateSections']);
+
             Route::apiResource('articles', ArticleController::class);
             Route::post('articles/{article}/thumbnail', [ArticleController::class, 'uploadThumbnail']);
         });

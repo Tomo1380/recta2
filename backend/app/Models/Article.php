@@ -31,7 +31,32 @@ class Article extends Model
     }
 
     /** コラムTOP 上段ナビの大テーマ (C2)。 */
+    /** 大テーマの初期値（SiteSetting 未設定時のフォールバック）。 */
     public const SECTIONS = ['夜の始め方', 'エリア別比較', '地方から上京', 'Q&A'];
+
+    /**
+     * 公開コラムの大テーマ（上段ナビ）。SiteSetting('column_sections') で管理し、
+     * 未設定なら固定値 SECTIONS にフォールバックする（後方互換）。
+     *
+     * @return array<int, string>
+     */
+    public static function sectionList(): array
+    {
+        $raw = SiteSetting::where('key', 'column_sections')->value('value');
+        if ($raw) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $list = array_values(array_filter(
+                    $decoded,
+                    fn ($s) => is_string($s) && trim($s) !== '',
+                ));
+                if (!empty($list)) {
+                    return $list;
+                }
+            }
+        }
+        return self::SECTIONS;
+    }
 
     protected $fillable = [
         'slug',
