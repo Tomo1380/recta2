@@ -215,7 +215,7 @@ class AiChatController extends Controller
                     'mode' => 'agent',
                 ]);
 
-                $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
+                $recommendedStores = $this->buildStoreCards($toolCalls, $aiText);
                 // Strip [STORE:ID] markers + guard against fabricated store lines
                 $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
@@ -269,7 +269,7 @@ class AiChatController extends Controller
             'tool_calls' => count($toolCalls),
         ]);
 
-        $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls);
+        $recommendedStores = $this->buildStoreCards($toolCalls, '');
         $fallbackText = !empty($recommendedStores)
             ? 'ご希望に近いお店をいくつかご紹介します。気になるお店があれば、LINEから気軽にご相談くださいね。'
             : 'うまくお探しできませんでした。条件を変えて試すか、LINEから直接ご相談ください。スタッフが一緒にお店探しをお手伝いします。';
@@ -303,55 +303,87 @@ class AiChatController extends Controller
     }
 
     /**
-     * Extract store data from tool call results for inline cards.
+     * AI 本文の [STORE:ID|コメント] マーカーと tool 結果を突き合わせて、
+     * 表示用の店舗カード配列を作る。
+     *
+     * - 店舗データは search_stores / get_store_detail の結果から取得（実在保証）。
+     * - 並び順・1 店ごとの要約コメントはマーカーの記述順に従う。
+     * - マーカーが無い／壊れている場合は tool 結果の先頭から最大 3 件を
+     *   コメント無しで返すフォールバック。
      */
-    private function extractStoreIdsFromToolCalls(array $toolCalls, string $aiText = ''): array
+    private function buildStoreCards(array $toolCalls, string $aiText): array
     {
-        $stores = [];
-        $seenIds = [];
-
+        // id => 生の店舗データ (最初に出たものを採用)
+        $byId = [];
         foreach ($toolCalls as $call) {
             if ($call['name'] === 'search_stores' && isset($call['result']['stores'])) {
                 foreach ($call['result']['stores'] as $s) {
-                    if (!in_array($s['id'], $seenIds)) {
-                        $seenIds[] = $s['id'];
-                        $stores[] = $s;
+                    if (isset($s['id']) && !isset($byId[$s['id']])) {
+                        $byId[$s['id']] = $s;
                     }
                 }
             } elseif ($call['name'] === 'get_store_detail' && isset($call['result']['id'])) {
                 $s = $call['result'];
-                if (!in_array($s['id'], $seenIds)) {
-                    $seenIds[] = $s['id'];
-                    $stores[] = [
-                        'id' => $s['id'],
-                        'name' => $s['name'],
-                        'area' => $s['area'],
-                        'category' => $s['category'] ?? null,
-                        'nearest_station' => $s['nearest_station'] ?? null,
-                        'trial_hourly_min' => $s['trial_hourly_min'] ?? null,
-                        'trial_hourly_max' => $s['trial_hourly_max'] ?? null,
-                        'feature_tags' => $s['feature_tags'] ?? [],
-                        'description' => mb_substr($s['description'] ?? '', 0, 100),
-                        'images' => $s['images'] ?? [],
-                    ];
+                if (!isset($byId[$s['id']])) {
+                    $byId[$s['id']] = $s;
                 }
             }
         }
 
-        // Prioritize stores mentioned in AI text so cards match the response
-        if ($aiText && count($stores) > 1) {
-            usort($stores, function ($a, $b) use ($aiText) {
-                $aPos = mb_strpos($aiText, $a['name']);
-                $bPos = mb_strpos($aiText, $b['name']);
-                // Mentioned stores come first, in order of appearance
-                if ($aPos === false && $bPos === false) return 0;
-                if ($aPos === false) return 1;
-                if ($bPos === false) return -1;
-                return $aPos <=> $bPos;
-            });
+        if (empty($byId)) {
+            return [];
         }
 
-        return $stores;
+        // マーカー [STORE:ID] / [STORE:ID|コメント] を記述順に拾う
+        preg_match_all('/\[STORE:(\d+)(?:\|([^\]\n]*))?\]/u', $aiText, $matches, PREG_SET_ORDER);
+
+        $cards = [];
+        $seen = [];
+        foreach ($matches as $m) {
+            $id = (int) $m[1];
+            $comment = isset($m[2]) ? trim($m[2]) : '';
+            if (isset($byId[$id]) && !isset($seen[$id])) {
+                $seen[$id] = true;
+                $cards[] = $this->toStoreCard($byId[$id], $comment);
+            }
+        }
+
+        if (!empty($cards)) {
+            return $cards;
+        }
+
+        // フォールバック: マーカー無し。tool 結果の先頭から最大 3 件。
+        foreach ($byId as $s) {
+            $cards[] = $this->toStoreCard($s, '');
+            if (count($cards) >= 3) {
+                break;
+            }
+        }
+
+        return $cards;
+    }
+
+    /**
+     * 生の店舗データ + AI コメントから、フロントの店舗カード payload を作る。
+     */
+    private function toStoreCard(array $s, string $comment): array
+    {
+        return [
+            'id' => $s['id'],
+            'name' => $s['name'],
+            'area' => $s['area'] ?? null,
+            'category' => $s['category'] ?? null,
+            'nearest_station' => $s['nearest_station'] ?? null,
+            'trial_hourly_min' => $s['trial_hourly_min'] ?? null,
+            'trial_hourly_max' => $s['trial_hourly_max'] ?? null,
+            'feature_tags' => $s['feature_tags'] ?? [],
+            'average_rating' => $s['average_rating'] ?? null,
+            'reviews_count' => $s['reviews_count'] ?? null,
+            'description' => mb_substr($s['description'] ?? '', 0, 120),
+            'images' => $s['images'] ?? [],
+            // AI が生成した、その人向けの一言要約（カードに表示）
+            'comment' => $comment,
+        ];
     }
 
     /**
@@ -702,7 +734,7 @@ class AiChatController extends Controller
             if (empty($functionCalls)) {
                 // Final text reply — stream it as typewriter chunks.
                 $aiText = collect($parts)->filter(fn($p) => isset($p['text']))->pluck('text')->implode('');
-                $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls, $aiText);
+                $recommendedStores = $this->buildStoreCards($toolCalls, $aiText);
                 $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
 
                 $elapsed = round((microtime(true) - $startTime) * 1000);
@@ -765,7 +797,7 @@ class AiChatController extends Controller
             'tool_calls' => count($toolCalls),
         ]);
 
-        $recommendedStores = $this->extractStoreIdsFromToolCalls($toolCalls);
+        $recommendedStores = $this->buildStoreCards($toolCalls, '');
         $fallbackText = !empty($recommendedStores)
             ? 'ご希望に近いお店をいくつかご紹介します。気になるお店があれば、LINEから気軽にご相談くださいね。'
             : 'うまくお探しできませんでした。条件を変えて試すか、LINEから直接ご相談ください。スタッフが一緒にお店探しをお手伝いします。';

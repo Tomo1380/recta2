@@ -155,7 +155,12 @@ interface StoreCard {
   nearest_station?: string;
   trial_hourly_min?: number;
   trial_hourly_max?: number;
+  feature_tags?: string[];
+  average_rating?: number | null;
+  reviews_count?: number | null;
   description?: string;
+  /** AI がその人向けに生成した一言要約（カードに表示） */
+  comment?: string;
   images?: { url: string; order?: number }[];
 }
 
@@ -845,6 +850,9 @@ export default function AiChatPanel({
   // これがないと、ユーザーが画面遷移しても fetch が裏で生き続け、reader が
   // chunk を待ち続ける（memory leak + 不要な PHP-FPM ワーカ占有）。
   const abortRef = useRef<AbortController | null>(null);
+  // LINE CTA を毎回出すとしつこいので、店舗提案のタイミングだけ・連続では出さない。
+  // 初期値を大きくして「最初の店舗提案」では必ず出す。以降は store 提案 1 回おきに表示。
+  const lineCtaCooldownRef = useRef(99);
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -1015,6 +1023,9 @@ export default function AiChatPanel({
       // 毎 chunk フル文字列に対して regex を回すと O(n²) になるため、対象を絞ることが重要。
       const cleanText = (s: string) =>
         s
+          // [STORE:ID] / [STORE:ID|コメント] マーカーは店舗カードで表示するので本文から除去
+          // (通常はサーバ側で除去済みだが、ストリーミング途中の取りこぼし対策)
+          .replace(/\[STORE:\d+(?:\|[^\]\n]*)?\]/g, "")
           .replace(/\n*もっと詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
           .replace(/\n*より詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "");
 
@@ -1057,6 +1068,18 @@ export default function AiChatPanel({
             },
             onDone: ({ stores, follow_ups, meta }) => {
               const finalText = cleanText(accumulated).trim();
+              // LINE CTA は「店舗を提案したタイミング」だけ・連続では出さない。
+              // 情報質問だけの返信では出さない（毎回出てしつこいのを防ぐ）。
+              const hasStores = (stores ?? []).length > 0;
+              let showLineCta = false;
+              if (hasStores) {
+                if (lineCtaCooldownRef.current >= 2) {
+                  showLineCta = true;
+                  lineCtaCooldownRef.current = 0;
+                } else {
+                  lineCtaCooldownRef.current += 1;
+                }
+              }
               setMessages((prev) => {
                 const next = [...prev];
                 const last = next[next.length - 1];
@@ -1067,7 +1090,7 @@ export default function AiChatPanel({
                     stores,
                     follow_ups,
                     meta,
-                    showLineCta: true,
+                    showLineCta,
                     streaming: false,
                     streamingStatus: undefined,
                   };
@@ -1456,39 +1479,69 @@ export default function AiChatPanel({
                           </div>
 
                           {/* Info */}
-                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                            <div
-                              className="text-[13px] font-bold leading-tight truncate"
-                              style={{ color: "#1b2528" }}
-                            >
-                              {store.name}
+                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+                            {/* カテゴリ + 店名 */}
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {store.category && (
+                                <span
+                                  className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-white"
+                                  style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
+                                >
+                                  {store.category}
+                                </span>
+                              )}
+                              <span
+                                className="text-[13px] font-bold leading-tight truncate"
+                                style={{ color: "#1b2528" }}
+                              >
+                                {store.name}
+                              </span>
                             </div>
+
+                            {/* 体入時給 + 最寄り駅/エリア + 評価 */}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
                               {(store.trial_hourly_min != null || store.trial_hourly_max != null) && (
                                 <span className="font-medium" style={{ color: "#D4AF37" }}>
                                   体入 {formatWage(store.trial_hourly_min, store.trial_hourly_max)}
                                 </span>
                               )}
-                              {store.nearest_station && (
+                              {(store.nearest_station || store.area) && (
                                 <span className="flex items-center gap-0.5">
                                   <MapPin className="size-2.5 shrink-0" />
-                                  {store.nearest_station}
+                                  {store.nearest_station || store.area}
                                 </span>
                               )}
-                              {!store.nearest_station && store.area && (
+                              {store.average_rating != null && store.average_rating > 0 && (
                                 <span className="flex items-center gap-0.5">
-                                  <MapPin className="size-2.5 shrink-0" />
-                                  {store.area}
+                                  <Star className="size-2.5 shrink-0" style={{ color: "#D4AF37", fill: "#D4AF37" }} />
+                                  {store.average_rating.toFixed(1)}
                                 </span>
                               )}
                             </div>
-                            {store.description && (
+
+                            {/* AI のおすすめ一言（無ければ店舗説明） */}
+                            {(store.comment || store.description) && (
                               <p
-                                className="text-[10px] leading-snug mt-0.5 line-clamp-2"
-                                style={{ color: "rgba(27,37,40,0.55)" }}
+                                className="text-[11px] leading-snug line-clamp-2"
+                                style={{ color: store.comment ? "rgba(27,37,40,0.8)" : "rgba(27,37,40,0.55)" }}
                               >
-                                {store.description}
+                                {store.comment || store.description}
                               </p>
+                            )}
+
+                            {/* 特徴タグ（一覧カードに合わせたゴールドのピル） */}
+                            {store.feature_tags && store.feature_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {store.feature_tags.slice(0, 3).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded-full px-1.5 py-0.5 text-[9px]"
+                                    style={{ border: "1px solid rgba(212,175,55,0.3)", color: "#D4AF37" }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </Link>

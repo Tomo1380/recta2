@@ -6,7 +6,8 @@ namespace App\Support;
  * Recta AI の応答テキストを表示用に整える。
  *
  * 役割は 2 つ:
- *  1. [STORE:ID] マーカーを除去する（店舗カードは別途構造化データで表示するため）。
+ *  1. [STORE:ID] / [STORE:ID|コメント] マーカーを除去する
+ *     （店舗カードは別途構造化データで表示するため）。マーカー単独行は行ごと消す。
  *  2. 店舗ハルシネーションの安全網。実在店舗が 1 件も紐づいていない
  *     ($hasStores=false) のに、本文に店舗カード形式の行
  *     「店名（エリア/最寄り駅）時給◯◯円〜」が含まれる場合、それはモデルが
@@ -27,8 +28,15 @@ class AgentTextSanitizer
 
     public static function strip(string $aiText, bool $hasStores): string
     {
-        // 1. [STORE:ID] マーカー除去（従来動作）
-        $text = preg_replace('/\[STORE:\d+\]\s*/u', '', $aiText);
+        // 1a. マーカー単独行（前後が行頭/行末で、リスト記号「・- *」だけを伴う行）を
+        //     行ごと除去する。これで「・[STORE:5|...]」のような箇条書き残骸を防ぐ。
+        $text = preg_replace(
+            '/^[ \t　]*[・\-\*]?[ \t　]*\[STORE:\d+(?:\|[^\]\n]*)?\][ \t　]*$/um',
+            '',
+            $aiText
+        );
+        // 1b. 行内に埋め込まれたマーカー（[STORE:ID] / [STORE:ID|コメント]）も除去。
+        $text = preg_replace('/\[STORE:\d+(?:\|[^\]\n]*)?\]\s*/u', '', $text);
 
         // 2. 実店舗ゼロなのに店舗カード行があれば、それは創作 → 除去
         if (!$hasStores && preg_match(self::STORE_CARD_LINE, $text)) {
