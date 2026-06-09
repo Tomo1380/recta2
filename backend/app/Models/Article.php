@@ -31,7 +31,57 @@ class Article extends Model
     }
 
     /** コラムTOP 上段ナビの大テーマ (C2)。 */
+    /** 大テーマの初期値（SiteSetting 未設定時のフォールバック）。 */
     public const SECTIONS = ['夜の始め方', 'エリア別比較', '地方から上京', 'Q&A'];
+
+    /** カテゴリの初期値（SiteSetting 未設定時のフォールバック）。 */
+    public const CATEGORIES = ['業界解説', '店舗特集', '上京サポート', 'ノルマ・お給料', '面接対策', 'その他'];
+
+    /**
+     * カテゴリ候補。SiteSetting('column_categories') で管理し、未設定なら固定値に
+     * フォールバック。category は自由入力なので、これは「候補/管理リスト」として使う。
+     *
+     * @return array<int, string>
+     */
+    public static function categoryList(): array
+    {
+        return self::taxonomyFromSetting('column_categories', self::CATEGORIES);
+    }
+
+    /**
+     * SiteSetting に JSON 配列で保存された分類リストを読む。空・未設定なら fallback。
+     *
+     * @param  array<int, string>  $fallback
+     * @return array<int, string>
+     */
+    protected static function taxonomyFromSetting(string $key, array $fallback): array
+    {
+        $raw = SiteSetting::where('key', $key)->value('value');
+        if ($raw) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $list = array_values(array_filter(
+                    $decoded,
+                    fn ($s) => is_string($s) && trim($s) !== '',
+                ));
+                if (!empty($list)) {
+                    return $list;
+                }
+            }
+        }
+        return $fallback;
+    }
+
+    /**
+     * 公開コラムの大テーマ（上段ナビ）。SiteSetting('column_sections') で管理し、
+     * 未設定なら固定値 SECTIONS にフォールバックする（後方互換）。
+     *
+     * @return array<int, string>
+     */
+    public static function sectionList(): array
+    {
+        return self::taxonomyFromSetting('column_sections', self::SECTIONS);
+    }
 
     protected $fillable = [
         'slug',
@@ -99,7 +149,8 @@ class Article extends Model
 
         $byId = Store::whereIn('id', $ids)
             ->where('publish_status', 'published')
-            ->get(['id', 'name', 'slug', 'area', 'category', 'images'])
+            ->withAvg(['reviews as reviews_avg_rating' => fn ($q) => $q->where('status', 'published')], 'rating')
+            ->get(['id', 'name', 'slug', 'area', 'category', 'images', 'wage'])
             ->keyBy('id');
 
         return collect($ids)
@@ -109,6 +160,12 @@ class Article extends Model
                 $first = is_array($s->images) ? ($s->images[0] ?? null) : null;
                 $image = is_array($first) ? ($first['url'] ?? null) : (is_string($first) ? $first : null);
 
+                // 体入時給 (旧データ avg_hourly / hourly もフォールバック)。横スライドの
+                // 店舗カードを店舗詳細寄りにするため (FB: コラム①)。
+                $wage = is_array($s->wage) ? $s->wage : [];
+                $trial = $wage['trial'] ?? [];
+                $toInt = fn ($v) => is_numeric($v) ? (int) $v : (is_string($v) && $v !== '' ? (int) preg_replace('/[^\d]/', '', $v) : null);
+
                 return [
                     'id' => $s->id,
                     'name' => $s->name,
@@ -116,6 +173,9 @@ class Article extends Model
                     'area' => $s->area,
                     'category' => $s->category,
                     'image' => $image,
+                    'trial_hourly_min' => $toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
+                    'trial_hourly_max' => $toInt($trial['hourly_max'] ?? $trial['hourly'] ?? null),
+                    'average_rating' => $s->reviews_avg_rating !== null ? round((float) $s->reviews_avg_rating, 1) : null,
                 ];
             })
             ->values()

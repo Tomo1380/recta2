@@ -79,8 +79,8 @@ class PublicArticleController extends Controller
         return response()->json([
             'articles' => PaginatorWithResource::map($articles, ArticleSummaryResource::class),
             'categories' => $categories,
-            // C2: 上段ナビ（固定4テーマ）。
-            'sections' => Article::SECTIONS,
+            // C2: 上段ナビ（管理画面で編集可能。未設定時は固定値にフォールバック）。
+            'sections' => Article::sectionList(),
         ]);
     }
 

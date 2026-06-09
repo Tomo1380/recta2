@@ -24,7 +24,7 @@ class UpdateArticleRequest extends FormRequest
             'body_html' => 'sometimes|nullable|string',
             'thumbnail_url' => 'sometimes|nullable|string|max:2048',
             'category' => 'sometimes|nullable|string|max:50',
-            'section' => 'sometimes|nullable|in:夜の始め方,エリア別比較,地方から上京,Q&A',
+            'section' => 'sometimes|nullable|string|max:50',
             'related_store_ids' => 'sometimes|nullable|array',
             'related_store_ids.*' => 'integer|exists:stores,id',
             'tags' => 'sometimes|nullable|array',

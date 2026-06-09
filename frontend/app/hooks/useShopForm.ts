@@ -56,6 +56,8 @@ export type RectaEpisodeDraft = {
 export type HiringEntryDraft = {
   month: string;
   count: string;
+  /** ✖ で公開ページに出さない（人数は保持したまま非表示にする）。 */
+  hidden?: boolean;
 };
 
 export interface ShopForm {
@@ -149,6 +151,8 @@ export interface ShopForm {
   transferKm: string;
   transferZones: TransferZoneDraft[];
   relatedStoreIds: number[];
+  /** 採用基準が近い店舗 (回遊動線・系列とは別軸)。store.id の配列。 */
+  recruitmentSimilarStoreIds: number[];
   /** 上京ロゴ/バナーの表示 (D3)。東京・新地・ミナミ等のみ ON にする想定。 */
   showRelocateBadge: boolean;
   champagneDescription: string;
@@ -211,7 +215,7 @@ export const INITIAL_FORM: ShopForm = {
   interviewDialog: [], interviewQuestions: [],
   documents: [...DEFAULT_DOCUMENTS], docNote: "", shiftInfo: "",
   hiringEntries: [], hiringTotal: "", hiringExamples: [],
-  transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [],
+  transferDescription: "", transferKm: "", transferZones: [], relatedStoreIds: [], recruitmentSimilarStoreIds: [],
   showRelocateBadge: false,
   champagneDescription: "", champagnePrices: EMPTY_CHAMPAGNE(),
   dressCodeDescription: "", dressCodeOk: [], dressCodeNg: [], dressPhotos: [],
@@ -380,6 +384,11 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     ? rs.filter((n: unknown) => Number.isFinite(Number(n))).map((n: unknown) => Number(n))
     : [];
 
+  const rss = store.recruitment_similar_store_ids ?? [];
+  const recruitmentSimilarStoreIds: number[] = Array.isArray(rss)
+    ? rss.filter((n: unknown) => Number.isFinite(Number(n))).map((n: unknown) => Number(n))
+    : [];
+
   const cp = store.champagne_prices ?? {};
   const champagnePrices: Record<ChampagneKey, ChampagnePriceDraft> = {
     tequila: {
@@ -535,6 +544,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     hiringEntries: ((store.recent_hires as AnyStore[] | undefined) ?? []).map((h) => ({
       month: h.month ?? "",
       count: h.count?.toString() ?? "",
+      hidden: !!h.hidden,
     })),
     hiringTotal: store.recent_hires_summary ?? "",
     // 採用例はセクション単位。旧データ (各月 recent_hires[].examples) は flatten して移行。
@@ -547,6 +557,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     transferKm: store.transfer_km ?? "",
     transferZones,
     relatedStoreIds,
+    recruitmentSimilarStoreIds,
     showRelocateBadge: Boolean((store as AnyStore).show_relocate_badge ?? false),
     payrollSystemType: store.payroll_system_type ?? "",
     champagneDescription: store.champagne_description ?? "",
@@ -705,6 +716,8 @@ export function formToPayload(
       .map((h) => ({
         month: h.month,
         count: Number(h.count) || 0,
+        // ✖ で非表示にした月。人数は保持し、公開ページ側で除外する。
+        hidden: !!h.hidden,
       })),
     recent_hires_summary: form.hiringTotal,
     // 採用例はセクション単位。空文字は除外。
@@ -732,6 +745,8 @@ export function formToPayload(
       })),
     related_store_ids:
       form.relatedStoreIds.length > 0 ? form.relatedStoreIds : null,
+    recruitment_similar_store_ids:
+      form.recruitmentSimilarStoreIds.length > 0 ? form.recruitmentSimilarStoreIds : null,
     payroll_system_type: form.payrollSystemType || null,
     payroll_cycle: form.payrollCycle || null,
     payroll_pay_day: form.payrollPayDay.trim() || null,

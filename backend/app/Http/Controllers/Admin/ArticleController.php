@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateArticleRequest;
 use App\Http\Requests\Admin\UploadArticleThumbnailRequest;
 use App\Http\Resources\ArticleResource;
 use App\Models\Article;
+use App\Models\SiteSetting;
 use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -134,6 +135,83 @@ class ArticleController extends Controller
         Cache::forget('industry_knowledges');
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * コラムの分類（大テーマ section / カテゴリ category）一覧 + 各値の記事使用数。
+     * 管理 UI と編集画面の候補に使う。
+     *
+     * @response array{
+     *   sections: array<int, array{name: string, article_count: int}>,
+     *   categories: array<int, array{name: string, article_count: int}>
+     * }
+     */
+    public function taxonomies(): JsonResponse
+    {
+        return response()->json([
+            'sections' => $this->taxonomyWithCounts('section', Article::sectionList()),
+            'categories' => $this->taxonomyWithCounts('category', Article::categoryList()),
+        ]);
+    }
+
+    /**
+     * 分類リストを保存（並び順そのまま）。sections / categories のうち送られた方だけ更新。
+     *
+     * 削除は「選択肢から外す」だけで既存記事の値は保持する（非破壊）。外した値を使う
+     * 記事はナビ/候補に出なくなるだけで、記事自体は壊れない。
+     */
+    public function updateTaxonomies(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'sections' => 'sometimes|array|max:30',
+            'sections.*' => 'required|string|max:50',
+            'categories' => 'sometimes|array|max:30',
+            'categories.*' => 'required|string|max:50',
+        ]);
+
+        if (array_key_exists('sections', $data)) {
+            $this->saveTaxonomy('column_sections', $data['sections']);
+        }
+        if (array_key_exists('categories', $data)) {
+            $this->saveTaxonomy('column_categories', $data['categories']);
+        }
+        Cache::forget('public_articles_index');
+
+        return $this->taxonomies();
+    }
+
+    /**
+     * @param  array<int, string>  $names
+     * @return array<int, array{name: string, article_count: int}>
+     */
+    private function taxonomyWithCounts(string $column, array $names): array
+    {
+        $counts = Article::whereIn($column, $names)
+            ->selectRaw("{$column} as v, count(*) as c")
+            ->groupBy($column)
+            ->pluck('c', 'v');
+
+        return collect($names)->map(fn ($n) => [
+            'name' => $n,
+            'article_count' => (int) ($counts[$n] ?? 0),
+        ])->values()->all();
+    }
+
+    /**
+     * trim + 重複・空除去して SiteSetting に JSON 保存（順序維持）。
+     *
+     * @param  array<int, string>  $names
+     */
+    private function saveTaxonomy(string $key, array $names): void
+    {
+        $list = [];
+        foreach ($names as $n) {
+            $n = trim($n);
+            if ($n !== '' && !in_array($n, $list, true)) {
+                $list[] = $n;
+            }
+        }
+        SiteSetting::updateOrCreate(['key' => $key], ['value' => json_encode($list, JSON_UNESCAPED_UNICODE)]);
     }
 
     public function uploadThumbnail(UploadArticleThumbnailRequest $request, Article $article): JsonResponse

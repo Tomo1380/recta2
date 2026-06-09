@@ -11,7 +11,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import {
   Plus,
@@ -19,9 +18,6 @@ import {
   Save,
   Loader2,
   Zap,
-  BookOpen,
-  CheckCircle2,
-  AlertCircle,
   Pencil,
   Trash2,
   Eye,
@@ -35,8 +31,6 @@ import AiChatPanel, {
   type SuggestCategory,
   type SuggestDisplayMode,
 } from "~/components/user/AiChatPanel";
-import { FineTuningQaPage } from "./FineTuningQaPage";
-import { FineTuningQaEditPage } from "./FineTuningQaEditPage";
 
 // --- Tone mapping ---
 const TONE_TO_LABEL: Record<AiChatSetting["tone"], string> = {
@@ -52,12 +46,11 @@ const LABEL_TO_TONE: Record<string, AiChatSetting["tone"]> = {
 };
 
 // --- Tabs ---
-type TabKey = "basic" | "suggest" | "limit" | "qa" | "knowledge" | "stats" | "history";
+type TabKey = "basic" | "suggest" | "limit" | "knowledge" | "stats" | "history";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "基本設定" },
   { key: "suggest", label: "サジェスト" },
   { key: "limit", label: "利用制限" },
-  { key: "qa", label: "Fine-tuning Q&A" },
   { key: "knowledge", label: "業界ナレッジ" },
   { key: "stats", label: "統計" },
   { key: "history", label: "履歴" },
@@ -163,29 +156,7 @@ export function AIChatSettingsPage() {
     setActiveTabState(next);
     const params = new URLSearchParams(searchParams);
     params.set("tab", next);
-    // Drop the qa-edit id when switching tabs (the host owns it)
-    if (next !== "qa") params.delete("id");
     setSearchParams(params, { replace: true });
-  };
-
-  // QA edit-state lives in the URL (?tab=qa&id=N or &id=new) so it survives reloads
-  const qaEditIdParam = searchParams.get("id");
-  const qaEditing = activeTab === "qa" && qaEditIdParam !== null;
-  const qaEditingId =
-    qaEditIdParam && qaEditIdParam !== "new" ? Number(qaEditIdParam) : null;
-
-  const openQaEditor = (id: number | null) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("tab", "qa");
-    params.set("id", id === null ? "new" : String(id));
-    setSearchParams(params, { replace: false });
-  };
-
-  const closeQaEditor = () => {
-    const params = new URLSearchParams(searchParams);
-    params.delete("id");
-    params.set("tab", "qa");
-    setSearchParams(params, { replace: false });
   };
 
   const [loading, setLoading] = useState(true);
@@ -361,20 +332,6 @@ export function AIChatSettingsPage() {
 
   const KNOWLEDGE_CATEGORIES = ["用語解説", "働き方", "手続き", "比較", "マナー"];
 
-  // Fine-tuned model id (lives on the basic tab)
-  const [ftCurrentModel, setFtCurrentModel] = useState<string | null>(null);
-  const [ftOpenAIConfigured, setFtOpenAIConfigured] = useState(false);
-  const [ftStoreCount, setFtStoreCount] = useState(0);
-  const [ftModelInput, setFtModelInput] = useState("");
-  const [ftModelSaving, setFtModelSaving] = useState(false);
-  const [ftStatusFetched, setFtStatusFetched] = useState(false);
-  const [ftLastJob, setFtLastJob] = useState<{
-    id: string | null;
-    model: string | null;
-    finished_at: number | null;
-    created_at: number | null;
-  } | null>(null);
-
   const currentPrompt = promptConfigs[promptSubTab];
   const currentCategories = suggestCategories[suggestSubTab];
 
@@ -492,55 +449,6 @@ export function AIChatSettingsPage() {
       fetchLimits();
     }
   }, [activeTab, limitsFetched, fetchLimits]);
-
-  // --- Fine-tuning model status (used by basic tab) ---
-  const fetchFtStatus = useCallback(async () => {
-    try {
-      const data = await api.get<{
-        openai_configured: boolean;
-        current_model: string | null;
-        store_count: number;
-        last_trained_job?: {
-          id: string | null;
-          model: string | null;
-          finished_at: number | null;
-          created_at: number | null;
-        } | null;
-      }>("/admin/ai-chat/fine-tuning/status");
-      setFtCurrentModel(data.current_model);
-      setFtOpenAIConfigured(!!data.openai_configured);
-      setFtStoreCount(data.store_count ?? 0);
-      setFtLastJob(data.last_trained_job ?? null);
-    } catch {
-      // silent
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "basic" && !ftStatusFetched) {
-      setFtStatusFetched(true);
-      fetchFtStatus();
-    }
-  }, [activeTab, ftStatusFetched, fetchFtStatus]);
-
-  const handleSaveModelId = async () => {
-    if (!ftModelInput.trim()) return;
-    try {
-      setFtModelSaving(true);
-      await api.put<{ success: boolean }>("/admin/ai-chat/fine-tuning/model", {
-        model_id: ftModelInput.trim(),
-      });
-      setFtCurrentModel(ftModelInput.trim());
-      setFtModelInput("");
-      showToast("モデルIDを保存しました");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "モデルIDの保存に失敗しました";
-      setError(message);
-    } finally {
-      setFtModelSaving(false);
-    }
-  };
 
   // Knowledge fetch
   const fetchKnowledge = useCallback(async () => {
@@ -731,64 +639,18 @@ export function AIChatSettingsPage() {
   const monthlyTotal = stats?.monthly_total ?? 0;
   const monthlyTokens = stats?.monthly_tokens ?? 0;
 
-  // モデル別単価（USD per 1M tokens, 2026-05 基準）。
-  //   Agent モード:    Gemini 3.1 Flash-Lite    in $0.10 / out $0.40
-  //   Fine-tuned モード: GPT-4.1 Mini fine-tuned  in $0.80 / out $3.20
-  // USD→JPY は 1ドル=150円で換算。
-  const PRICE = {
-    agent: { input: 0.10, output: 0.40 },
-    finetuned: { input: 0.80, output: 3.20 },
-  };
+  // 単価（USD per 1M tokens, 2026-05 基準）。
+  //   Agent モード: Gemini 3.1 Flash-Lite  in $0.10 / out $0.40
+  // USD→JPY は 1ドル=150円で換算。トークン内訳が無いため
+  // 合計トークンを入力:出力=1:1 と仮定して概算する。
+  const PRICE = { input: 0.10, output: 0.40 };
   const USD_TO_JPY = 150;
-  const costYen = (input: number, output: number, mode: "agent" | "finetuned") => {
-    const usd = (input / 1_000_000) * PRICE[mode].input + (output / 1_000_000) * PRICE[mode].output;
+  const estimatedCost = (() => {
+    const half = monthlyTokens / 2;
+    const usd =
+      (half / 1_000_000) * PRICE.input + (half / 1_000_000) * PRICE.output;
     return Math.round(usd * USD_TO_JPY);
-  };
-
-  const modeStats = stats?.mode_stats ?? [];
-  const agentStats = modeStats.find((m) => m.mode === "agent");
-  const finetunedStats = modeStats.find((m) => m.mode === "finetuned");
-
-  // モード別の月次コスト（直近の集計区間で）
-  const agentCost = agentStats
-    ? costYen(agentStats.total_input_tokens ?? 0, agentStats.total_output_tokens ?? 0, "agent")
-    : 0;
-  const finetunedCost = finetunedStats
-    ? costYen(finetunedStats.total_input_tokens ?? 0, finetunedStats.total_output_tokens ?? 0, "finetuned")
-    : 0;
-  const estimatedCost = agentCost + finetunedCost;
-
-  const modeDailyMap = new Map<
-    string,
-    {
-      date: string;
-      agent_count: number;
-      finetuned_count: number;
-      agent_tokens: number;
-      finetuned_tokens: number;
-    }
-  >();
-  for (const d of stats?.mode_daily_stats ?? []) {
-    const dateKey = d.date.slice(5).replace("-", "/");
-    if (!modeDailyMap.has(dateKey)) {
-      modeDailyMap.set(dateKey, {
-        date: dateKey,
-        agent_count: 0,
-        finetuned_count: 0,
-        agent_tokens: 0,
-        finetuned_tokens: 0,
-      });
-    }
-    const entry = modeDailyMap.get(dateKey)!;
-    if (d.mode === "agent") {
-      entry.agent_count = d.count;
-      entry.agent_tokens = d.total_tokens;
-    } else {
-      entry.finetuned_count = d.count;
-      entry.finetuned_tokens = d.total_tokens;
-    }
-  }
-  const modeDailyData = Array.from(modeDailyMap.values());
+  })();
 
   // --- Loading state ---
   if (loading) {
@@ -943,146 +805,27 @@ export function AIChatSettingsPage() {
             </div>
           </div>
 
-          {/* Mode info + fine-tuned model id */}
+          {/* Mode info */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            {ftStatusFetched && !ftCurrentModel && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[12px] text-amber-900 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
-                <div className="space-y-0.5">
-                  <p className="font-semibold">
-                    Fine-tuned モデルIDが未設定です
-                  </p>
-                  <p>
-                    Fine-tuned モードはまだ利用できません（リクエストは Agent
-                    モードへフォールバックします）。下の入力欄に OpenAI
-                    のモデルIDを保存するか、{" "}
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("qa")}
-                      className="underline font-medium hover:text-amber-700"
-                    >
-                      Fine-tuning Q&amp;A タブ
-                    </button>{" "}
-                    から「OpenAI で再学習」ボタンで新規ジョブを起動してください。
-                  </p>
-                </div>
-              </div>
-            )}
             <div>
               <h3 className="text-sm font-medium">チャットモード</h3>
               <p className="text-[12px] text-muted-foreground mt-0.5">
-                ユーザーはチャットUI上で Agent モード（Function Callingで店舗検索）と
-                Fine-tuned モード（学習済みモデル）を切り替えられます。下の Fine-tuned
-                モデルIDを未設定のままにすると、Fine-tuned モードのリクエストは
-                自動的に Agent モードへフォールバックします。
+                AIチャットは Agent モード（Function Calling
+                で店舗検索）で動作します。ユーザーの質問に応じて DB
+                から店舗を検索し、業界ナレッジを参照して回答します。
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-lg border border-border p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Zap className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="text-[11px] text-muted-foreground">
-                    Agent モード
-                  </span>
-                </div>
-                <p className="text-[12px] text-foreground">
-                  メイン。DBから店舗検索して回答
-                </p>
+            <div className="rounded-lg border border-border p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Zap className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-[11px] text-muted-foreground">
+                  Agent モード
+                </span>
               </div>
-              <div className="rounded-lg border border-border p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="text-[11px] text-muted-foreground">
-                    Fine-tuned モード
-                  </span>
-                </div>
-                <p className="text-[12px] text-foreground">
-                  学習済みモデルで回答
-                  {ftStoreCount > 0 && (
-                    <span className="text-muted-foreground">
-                      （対象店舗 {ftStoreCount.toLocaleString()} 件）
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[12px] text-muted-foreground mb-1.5">
-                OpenAI Fine-tuned モデルID
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={ftModelInput}
-                  onChange={(e) => setFtModelInput(e.target.value)}
-                  placeholder={ftCurrentModel || "ft:gpt-4o-mini:..."}
-                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
-                />
-                <button
-                  onClick={handleSaveModelId}
-                  disabled={ftModelSaving || !ftModelInput.trim()}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
-                >
-                  {ftModelSaving ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  保存
-                </button>
-              </div>
-              {ftCurrentModel ? (
-                <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-mono break-all">
-                  <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  {ftCurrentModel}
-                </p>
-              ) : (
-                <p className="text-[11px] text-amber-600 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  未設定（Fine-tuned モードは Agent にフォールバック）
-                </p>
-              )}
-              {!ftOpenAIConfigured && (
-                <p className="text-[11px] text-amber-600 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  OPENAI_API_KEY が未設定です
-                </p>
-              )}
-
-              {ftLastJob?.finished_at && (
-                <div className="mt-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">最終学習日時</span>
-                    <span className="font-mono">
-                      {new Date(ftLastJob.finished_at * 1000).toLocaleString("ja-JP")}
-                    </span>
-                  </div>
-                  {ftLastJob.model && (
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">学習で生成されたモデル</span>
-                      <span className="font-mono break-all text-right">
-                        {ftLastJob.model}
-                      </span>
-                    </div>
-                  )}
-                  {ftLastJob.model &&
-                    ftCurrentModel &&
-                    ftLastJob.model !== ftCurrentModel && (
-                      <p className="text-amber-700 flex items-center gap-1 pt-1">
-                        <AlertCircle className="w-3 h-3" />
-                        最新の学習結果が本番に適用されていません（本番は古いモデル）
-                      </p>
-                    )}
-                  {ftLastJob.model && ftCurrentModel === ftLastJob.model && (
-                    <p className="text-emerald-600 flex items-center gap-1 pt-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      この学習結果が本番に適用済み
-                    </p>
-                  )}
-                </div>
-              )}
+              <p className="text-[12px] text-foreground">
+                メイン。DBから店舗検索して回答
+              </p>
             </div>
           </div>
         </div>
@@ -1465,35 +1208,15 @@ export function AIChatSettingsPage() {
         </div>
       )}
 
-      {/* Tab: Fine-tuning Q&A (DB-backed, embedded list/editor) */}
-      {activeTab === "qa" && (
-        <div>
-          {qaEditing ? (
-            <FineTuningQaEditPage
-              embedded
-              embeddedQaId={qaEditingId}
-              onBack={closeQaEditor}
-              onSaved={closeQaEditor}
-            />
-          ) : (
-            <FineTuningQaPage
-              embedded
-              onEdit={(id) => openQaEditor(id)}
-              onNew={() => openQaEditor(null)}
-            />
-          )}
-        </div>
-      )}
-
       {/* Tab: Knowledge */}
       {activeTab === "knowledge" && (
         <div className="space-y-4">
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900 flex items-start gap-2">
             <span className="inline-flex items-center rounded-md bg-amber-200/70 px-2 py-0.5 text-[11px] font-semibold text-amber-900 shrink-0 mt-[1px]">
-              推論時参照は Agent のみ
+              推論時に参照
             </span>
             <p className="leading-relaxed">
-              ここのナレッジは Agent モードでは推論時に <code className="rounded bg-amber-100 px-1 text-[11px]">get_industry_knowledge</code> ツール経由で動的に参照されます。Fine-tuned モードでは推論時に参照せず、<strong>同じ内容を Fine-tuning Q&amp;A の学習データに含めてモデル自身に記憶させる</strong>使い分けです。
+              ここのナレッジは Agent モードの推論時に <code className="rounded bg-amber-100 px-1 text-[11px]">get_industry_knowledge</code> ツール経由で動的に参照されます。業界知識の質問を受けると、AI がこのナレッジベースを検索して回答に利用します。
             </p>
           </div>
           <div className="flex items-center justify-between">
@@ -1761,155 +1484,9 @@ export function AIChatSettingsPage() {
             </div>
           ) : (
             <>
-              {/* モード別 KPI: Agent / Fine-tuned / 合計 の3列構造 */}
-              <div className="bg-card border border-border rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
-                  <h3 className="text-sm font-semibold">
-                    モード別サマリー（集計期間: 直近30日 / 月次総数は今月）
-                  </h3>
-                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                    Agent vs Fine-tuned
-                  </span>
-                </div>
-
-                <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/10">
-                      <th className="text-left py-2 px-4 text-muted-foreground text-[11px] uppercase tracking-wider w-1/4">
-                        指標
-                      </th>
-                      <th className="text-right py-2 px-4 text-amber-700 text-[11px] uppercase tracking-wider">
-                        <span className="inline-flex items-center gap-1">
-                          <Zap className="w-3 h-3" />
-                          Agent
-                        </span>
-                      </th>
-                      <th className="text-right py-2 px-4 text-indigo-700 text-[11px] uppercase tracking-wider">
-                        <span className="inline-flex items-center gap-1">
-                          <BookOpen className="w-3 h-3" />
-                          Fine-tuned
-                        </span>
-                      </th>
-                      <th className="text-right py-2 px-4 text-foreground text-[11px] uppercase tracking-wider">
-                        合計
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-border last:border-0">
-                      <td className="py-2.5 px-4 text-muted-foreground">
-                        利用数（直近30日）
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(agentStats?.count ?? 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(finetunedStats?.count ?? 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
-                        {(
-                          (agentStats?.count ?? 0) +
-                          (finetunedStats?.count ?? 0)
-                        ).toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-border last:border-0">
-                      <td className="py-2.5 px-4 text-muted-foreground">
-                        入力トークン
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(agentStats?.total_input_tokens ?? 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(
-                          finetunedStats?.total_input_tokens ?? 0
-                        ).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
-                        {(
-                          (agentStats?.total_input_tokens ?? 0) +
-                          (finetunedStats?.total_input_tokens ?? 0)
-                        ).toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-border last:border-0">
-                      <td className="py-2.5 px-4 text-muted-foreground">
-                        出力トークン
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(
-                          agentStats?.total_output_tokens ?? 0
-                        ).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(
-                          finetunedStats?.total_output_tokens ?? 0
-                        ).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
-                        {(
-                          (agentStats?.total_output_tokens ?? 0) +
-                          (finetunedStats?.total_output_tokens ?? 0)
-                        ).toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-border last:border-0">
-                      <td className="py-2.5 px-4 text-muted-foreground">
-                        合計トークン
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(agentStats?.total_tokens ?? 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">
-                        {(finetunedStats?.total_tokens ?? 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold">
-                        {(
-                          (agentStats?.total_tokens ?? 0) +
-                          (finetunedStats?.total_tokens ?? 0)
-                        ).toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr className="bg-muted/20">
-                      <td className="py-2.5 px-4 text-foreground font-medium">
-                        推定APIコスト
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono text-amber-700">
-                        &yen;{agentCost.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono text-indigo-700">
-                        &yen;{finetunedCost.toLocaleString()}
-                      </td>
-                      <td
-                        className="py-2.5 px-4 text-right font-mono font-bold text-foreground"
-                        style={{
-                          fontFamily: "'Plus Jakarta Sans', sans-serif",
-                        }}
-                      >
-                        &yen;{estimatedCost.toLocaleString()}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <div className="px-5 py-3 border-t border-border bg-muted/10 text-[11px] text-muted-foreground space-y-0.5">
-                  <p className="font-medium text-foreground">
-                    単価 (per 1M tokens)
-                  </p>
-                  <p>
-                    Agent (Gemini 3.1 Flash-Lite): 入力 $0.10 / 出力 $0.40
-                  </p>
-                  <p>
-                    Fine-tuned (GPT-4.1 Mini fine-tuned): 入力 $0.80 / 出力
-                    $3.20
-                  </p>
-                  <p>※ 1USD = 150 JPY 換算（概算）</p>
-                </div>
-              </div>
-
               <div className="bg-card border border-border rounded-xl p-5">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
-                  今月のチャット総数（全モード合計）
+                  今月のチャット総数
                 </p>
                 <p
                   className="text-3xl text-foreground mt-2"
@@ -1922,6 +1499,16 @@ export function AIChatSettingsPage() {
                   <span className="text-[12px] text-muted-foreground font-normal ml-2">
                     / トークン {monthlyTokens.toLocaleString()}
                   </span>
+                </p>
+                <p className="text-[12px] text-muted-foreground mt-3">
+                  推定APIコスト（今月）:{" "}
+                  <span className="font-mono text-foreground">
+                    &yen;{estimatedCost.toLocaleString()}
+                  </span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Agent (Gemini 3.1 Flash-Lite): 入力 $0.10 / 出力 $0.40 (per 1M
+                  tokens)・1USD = 150 JPY 換算（概算）
                 </p>
               </div>
 
@@ -2039,133 +1626,6 @@ export function AIChatSettingsPage() {
                       />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-5">
-                  <h3 className="text-sm font-semibold">
-                    モード別の日次推移
-                  </h3>
-                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                    Agent vs Fine-tuned
-                  </span>
-                  <span className="text-[10px] text-muted-foreground ml-auto">
-                    平均トークン: Agent{" "}
-                    {Math.round(agentStats?.avg_tokens ?? 0).toLocaleString()}{" "}
-                    / Fine-tuned{" "}
-                    {Math.round(
-                      finetunedStats?.avg_tokens ?? 0,
-                    ).toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  <div>
-                    <h4 className="text-[13px] text-muted-foreground mb-3">
-                      利用数推移（モード別）
-                    </h4>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={modeDailyData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#e7e5e4"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 10 }}
-                          stroke="#a8a29e"
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 10 }}
-                          stroke="#a8a29e"
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid #e7e5e4",
-                            fontSize: "11px",
-                          }}
-                        />
-                        <Legend
-                          iconSize={8}
-                          wrapperStyle={{ fontSize: "11px" }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="agent_count"
-                          stroke="#d4af37"
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
-                          name="Agent"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="finetuned_count"
-                          stroke="#6366f1"
-                          strokeWidth={2}
-                          dot={{ r: 2 }}
-                          name="Fine-tuned"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div>
-                    <h4 className="text-[13px] text-muted-foreground mb-3">
-                      トークン消費量（モード別）
-                    </h4>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={modeDailyData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="#e7e5e4"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 10 }}
-                          stroke="#a8a29e"
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 10 }}
-                          stroke="#a8a29e"
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid #e7e5e4",
-                            fontSize: "11px",
-                          }}
-                        />
-                        <Legend
-                          iconSize={8}
-                          wrapperStyle={{ fontSize: "11px" }}
-                        />
-                        <Bar
-                          dataKey="agent_tokens"
-                          fill="#d4af37"
-                          radius={[3, 3, 0, 0]}
-                          name="Agent"
-                        />
-                        <Bar
-                          dataKey="finetuned_tokens"
-                          fill="#6366f1"
-                          radius={[3, 3, 0, 0]}
-                          name="Fine-tuned"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
                 </div>
               </div>
             </>

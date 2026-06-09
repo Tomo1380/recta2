@@ -8,11 +8,13 @@ use App\Http\Resources\LineFriendResource;
 use App\Http\Resources\LineMessageResource;
 use App\Models\LineFriend;
 use App\Models\LineMessage;
+use App\Models\PersonProfile;
 use App\Models\User;
 use App\Services\LineMessagingService;
 use App\Support\PaginatorWithResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 class LineFriendController extends Controller
 {
     public function __construct(
@@ -181,6 +183,9 @@ class LineFriendController extends Controller
         $adminName = $friend?->admin_name;
         $displayName = $friend?->display_name ?: $user?->line_display_name;
 
+        // CRM 属性 (流入種別・気になるエリア・入店進捗・上京希望)。未登録なら既定値。
+        $profile = PersonProfile::firstOrNew(['line_user_id' => $lineUserId]);
+
         return response()->json([
             'person' => [
                 'line_user_id' => $lineUserId,
@@ -210,8 +215,41 @@ class LineFriendController extends Controller
                 'ai_chats_total' => $aiChatsTotal,
                 'messages' => LineMessageResource::collection($messages)->resolve(),
                 'messages_total' => $messagesTotal,
+                // CRM 属性
+                'profile' => [
+                    'placement_status' => $profile->placement_status ?? 'new',
+                    'interested_area' => $profile->interested_area,
+                    'wants_relocation' => (bool) $profile->wants_relocation,
+                    'referral_source' => $profile->referral_source,
+                ],
             ],
         ]);
+    }
+
+    /**
+     * CRM 属性 (流入種別・気になるエリア・入店進捗・上京希望) を upsert する。
+     * line_user_id 単位なので、トーク有無・ログイン有無に関わらず保存できる。
+     */
+    public function updateProfile(Request $request, string $lineUserId): JsonResponse
+    {
+        $data = $request->validate([
+            'placement_status' => ['nullable', Rule::in(PersonProfile::STATUSES)],
+            'interested_area' => ['nullable', 'string', 'max:100'],
+            'wants_relocation' => ['nullable', 'boolean'],
+            'referral_source' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        PersonProfile::updateOrCreate(
+            ['line_user_id' => $lineUserId],
+            [
+                'placement_status' => $data['placement_status'] ?? 'new',
+                'interested_area' => $data['interested_area'] ?? null,
+                'wants_relocation' => (bool) ($data['wants_relocation'] ?? false),
+                'referral_source' => $data['referral_source'] ?? null,
+            ],
+        );
+
+        return $this->show($lineUserId);
     }
 
     /**

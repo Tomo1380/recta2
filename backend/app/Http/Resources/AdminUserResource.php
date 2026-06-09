@@ -22,6 +22,9 @@ class AdminUserResource extends JsonResource
             'email' => $this->email,
             'role' => $this->role,
             'status' => $this->status,
+            // 割り当て済みの生の権限（編集UIのチェックボックス用）。super_admin は
+            // 実効的に全権限だが、ここでは割り当て値をそのまま返す（UI 側で full 扱い）。
+            'permissions' => $this->permissions ?? [],
             'last_login_at' => $this->last_login_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

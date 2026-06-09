@@ -151,26 +151,6 @@ class AiChatTest extends TestCase
         $this->assertStringNotContainsString('[STORE:', $message);
     }
 
-    // ===== chat (finetuned mode) =====
-
-    public function test_chat_finetuned_mode_returns_finetuned_meta(): void
-    {
-        $this->enableChat();
-        config(['services.gemini.api_key' => 'fake-key']);
-        $this->fakeGeminiTextResponse('FT mode 回答');
-
-        $response = $this->postJson('/api/chat', [
-            'message' => '質問',
-            'page_type' => 'top',
-            'mode' => 'finetuned',
-        ]);
-
-        $response->assertStatus(200)
-            ->assertJsonPath('meta.mode', 'finetuned');
-
-        $this->assertEquals('finetuned', AiChatLog::first()->mode);
-    }
-
     // ===== mock fallback (no API key) =====
 
     public function test_chat_returns_mock_response_when_api_key_missing(): void

@@ -7,6 +7,10 @@ import {
   Loader2,
   Plus,
   Search,
+  Tags,
+  X,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { api } from "~/lib/api";
 import type { Article, Paginated } from "~/lib/types";
@@ -36,6 +40,7 @@ export function ArticlesPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const [showSections, setShowSections] = useState(false);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -82,14 +87,24 @@ export function ArticlesPage() {
             業界解説・店舗紹介などのコラム記事
           </p>
         </div>
-        <button
-          onClick={() => navigate("/admin/articles/new")}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          新規作成
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSections(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 border border-border rounded-lg text-[13px] hover:bg-muted transition-all"
+          >
+            <Tags className="w-4 h-4" />
+            分類を管理
+          </button>
+          <button
+            onClick={() => navigate("/admin/articles/new")}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-lg text-[13px] hover:bg-indigo-700 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            新規作成
+          </button>
+        </div>
       </div>
+      {showSections && <TaxonomyManager onClose={() => setShowSections(false)} />}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -297,6 +312,183 @@ export function ArticlesPage() {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+type TaxonomyItem = { name: string; article_count: number };
+
+/** 1 つの分類リスト（大テーマ or カテゴリ）の編集 UI。追加・削除・並べ替え。 */
+function TaxonomyGroup({
+  title,
+  hint,
+  unusedNoun,
+  items,
+  setItems,
+}: {
+  title: string;
+  hint: string;
+  unusedNoun: string;
+  items: TaxonomyItem[];
+  setItems: (next: TaxonomyItem[]) => void;
+}) {
+  const [newName, setNewName] = useState("");
+  const add = () => {
+    const n = newName.trim();
+    if (!n || items.some((i) => i.name === n)) return;
+    setItems([...items, { name: n, article_count: 0 }]);
+    setNewName("");
+  };
+  const remove = (it: TaxonomyItem) => {
+    if (
+      it.article_count > 0 &&
+      !confirm(
+        `「${it.name}」は${it.article_count}件の記事で使われています。\n選択肢から外しても記事自体は消えませんが、${unusedNoun}には出なくなります。外しますか？`,
+      )
+    ) {
+      return;
+    }
+    setItems(items.filter((i) => i.name !== it.name));
+  };
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= items.length) return;
+    const next = [...items];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setItems(next);
+  };
+
+  return (
+    <div>
+      <h4 className="text-[13px] font-bold">{title}</h4>
+      <p className="text-[11px] text-muted-foreground mb-2">{hint}</p>
+      <ul className="space-y-1.5 mb-2">
+        {items.map((it, idx) => (
+          <li key={it.name} className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
+            <div className="flex flex-col">
+              <button onClick={() => move(idx, -1)} disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
+                <ArrowUp className="w-3 h-3" />
+              </button>
+              <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-20">
+                <ArrowDown className="w-3 h-3" />
+              </button>
+            </div>
+            <span className="flex-1 text-[13px]">{it.name}</span>
+            <span className="text-[11px] text-muted-foreground">{it.article_count}件</span>
+            <button onClick={() => remove(it)} className="p-1 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition" aria-label="削除">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </li>
+        ))}
+        {items.length === 0 && <li className="text-[12px] text-muted-foreground py-2 text-center">項目がありません</li>}
+      </ul>
+      <div className="flex gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder="新しい項目名"
+          className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        />
+        <button onClick={add} disabled={!newName.trim()} className="px-3 py-2 rounded-lg text-[13px] border border-border hover:bg-muted transition disabled:opacity-40">
+          追加
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * コラムの分類（大テーマ section / カテゴリ category）の管理。追加・削除・並べ替え。
+ * 削除は「候補/ナビから外す」だけで既存記事の値は保持する（非破壊）。使用件数を表示し、
+ * 使用中の項目を外すときは確認する。
+ */
+function TaxonomyManager({ onClose }: { onClose: () => void }) {
+  const [sections, setSections] = useState<TaxonomyItem[]>([]);
+  const [categories, setCategories] = useState<TaxonomyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ sections: TaxonomyItem[]; categories: TaxonomyItem[] }>("/admin/columns/taxonomies")
+      .then((r) => {
+        setSections(r.sections);
+        setCategories(r.categories);
+      })
+      .catch(() => setError("読み込みに失敗しました"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      const res = await api.put<{ sections: TaxonomyItem[]; categories: TaxonomyItem[] }>(
+        "/admin/columns/taxonomies",
+        { sections: sections.map((i) => i.name), categories: categories.map((i) => i.name) },
+      );
+      setSections(res.sections);
+      setCategories(res.categories);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl border border-border w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-foreground font-bold">コラムの分類を管理</h3>
+            <p className="text-[12px] text-muted-foreground mt-0.5">大テーマ・カテゴリの追加・削除・並べ替え。</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+          </div>
+        ) : (
+          <>
+            <div className="space-y-5">
+              <TaxonomyGroup
+                title="大テーマ"
+                hint="コラムTOP上段ナビ。"
+                unusedNoun="コラムTOPのナビ"
+                items={sections}
+                setItems={setSections}
+              />
+              <TaxonomyGroup
+                title="カテゴリ"
+                hint="記事のカテゴリ候補。記事作成時は自由入力もできます。"
+                unusedNoun="候補リスト"
+                items={categories}
+                setItems={setCategories}
+              />
+            </div>
+
+            {error && <p className="text-[12px] text-red-500 mt-3">{error}</p>}
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg text-[13px] border border-border hover:bg-muted transition">
+                キャンセル
+              </button>
+              <button onClick={save} disabled={saving} className="px-4 py-2 rounded-lg text-[13px] bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50">
+                {saving ? "保存中…" : "保存"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

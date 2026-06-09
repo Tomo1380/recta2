@@ -213,7 +213,7 @@ class StoreSeeder extends Seeder
 
     public function run(): void
     {
-        // Fixed seed for deterministic output (Fine-tuning data must match seeded stores)
+        // Fixed seed for deterministic output (同じダミー店舗が毎回再現されるように)
         mt_srand(12345);
 
         // Keep anchor stores (first 5) + generate 75 more

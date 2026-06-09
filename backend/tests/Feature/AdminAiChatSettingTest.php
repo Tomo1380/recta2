@@ -148,8 +148,6 @@ class AdminAiChatSettingTest extends TestCase
                 'top_users',
                 'monthly_total',
                 'monthly_tokens',
-                'mode_stats',
-                'mode_daily_stats',
             ]);
     }
 
@@ -222,17 +220,17 @@ class AdminAiChatSettingTest extends TestCase
     public function test_admin_can_list_ai_chat_logs_with_filters(): void
     {
         \App\Models\AiChatLog::create(['page_type' => 'top', 'mode' => 'agent', 'user_message' => '渋谷のお店ある？', 'ai_response' => 'ありますよ', 'input_tokens' => 10, 'output_tokens' => 20]);
-        \App\Models\AiChatLog::create(['page_type' => 'detail', 'mode' => 'finetuned', 'user_message' => 'ノルマは？', 'ai_response' => 'ノルマなし', 'input_tokens' => 5, 'output_tokens' => 8]);
+        \App\Models\AiChatLog::create(['page_type' => 'detail', 'mode' => 'agent', 'user_message' => 'ノルマは？', 'ai_response' => 'ノルマなし', 'input_tokens' => 5, 'output_tokens' => 8]);
 
         // 全件
         $all = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/ai-chat/logs');
-        $all->assertOk()->assertJsonStructure(['data' => [['id', 'user_message', 'ai_response', 'mode', 'total_tokens']], 'current_page', 'total']);
+        $all->assertOk()->assertJsonStructure(['data' => [['id', 'user_message', 'ai_response', 'page_type', 'total_tokens']], 'current_page', 'total']);
         $this->assertEquals(2, $all->json('total'));
 
-        // mode フィルタ
-        $agent = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/ai-chat/logs?mode=agent');
-        $this->assertEquals(1, $agent->json('total'));
-        $this->assertSame('渋谷のお店ある？', $agent->json('data.0.user_message'));
+        // page_type フィルタ
+        $top = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/ai-chat/logs?page_type=top');
+        $this->assertEquals(1, $top->json('total'));
+        $this->assertSame('渋谷のお店ある？', $top->json('data.0.user_message'));
 
         // 本文検索
         $search = $this->actingAs($this->admin, 'sanctum')->getJson('/api/admin/ai-chat/logs?q=' . urlencode('ノルマ'));

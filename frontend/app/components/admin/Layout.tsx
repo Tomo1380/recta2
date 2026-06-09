@@ -20,19 +20,47 @@ import {
 import { useState, useEffect } from "react";
 import { useAuth } from "~/lib/auth";
 
-const menuItems = [
-  { path: "/admin", label: "ダッシュボード", icon: LayoutDashboard },
-  { path: "/admin/analytics", label: "アクセス解析", icon: BarChart3 },
-  { path: "/admin/users", label: "ユーザー管理", icon: Users },
-  { path: "/admin/shops", label: "店舗管理", icon: Building2 },
-  { path: "/admin/reviews", label: "口コミ管理", icon: MessageSquare },
-  { path: "/admin/ai-chat", label: "AIチャット設定", icon: Bot },
-  { path: "/admin/articles", label: "コラム管理", icon: FileText },
-  { path: "/admin/content", label: "コンテンツ管理", icon: LayoutGrid },
-  { path: "/admin/area-category", label: "エリア・カテゴリ", icon: MapPin },
-  { path: "/admin/relocate-voices", label: "上京者の声", icon: Plane },
-  { path: "/admin/admin-users", label: "管理ユーザー", icon: KeyRound },
+// permission: 表示に必要な権限キー（AdminUser::PERMISSIONS と対応）。
+// superAdminOnly: super_admin のみ表示（管理ユーザー管理）。
+type MenuItem = {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  permission?: string;
+  superAdminOnly?: boolean;
+};
+
+const menuItems: MenuItem[] = [
+  { path: "/admin", label: "ダッシュボード", icon: LayoutDashboard, permission: "analytics" },
+  { path: "/admin/analytics", label: "アクセス解析", icon: BarChart3, permission: "analytics" },
+  { path: "/admin/users", label: "ユーザー管理", icon: Users, permission: "chat" },
+  { path: "/admin/shops", label: "店舗管理", icon: Building2, permission: "stores" },
+  { path: "/admin/reviews", label: "口コミ管理", icon: MessageSquare, permission: "reviews" },
+  { path: "/admin/ai-chat", label: "AIチャット設定", icon: Bot, permission: "ai_chat" },
+  { path: "/admin/articles", label: "コラム管理", icon: FileText, permission: "articles" },
+  { path: "/admin/content", label: "コンテンツ管理", icon: LayoutGrid, permission: "content" },
+  { path: "/admin/area-category", label: "エリア・カテゴリ", icon: MapPin, permission: "stores" },
+  { path: "/admin/relocate-voices", label: "上京者の声", icon: Plane, permission: "content" },
+  { path: "/admin/admin-users", label: "管理ユーザー", icon: KeyRound, superAdminOnly: true },
 ];
+
+/** その admin がメニュー項目を見られるか。 */
+function canSeeMenuItem(
+  item: MenuItem,
+  role: string | undefined,
+  permissions: string[] | undefined,
+): boolean {
+  if (item.superAdminOnly) return role === "super_admin";
+  if (!item.permission) return true;
+  return (permissions ?? []).includes(item.permission);
+}
+
+/** pathname に対応する（最長一致の）メニュー項目を返す。 */
+function sectionForPath(pathname: string): MenuItem | undefined {
+  return [...menuItems]
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((m) => pathname === m.path || pathname.startsWith(m.path + "/"));
+}
 
 const breadcrumbMap: Record<string, string> = {
   "/admin": "ダッシュボード",
@@ -106,6 +134,23 @@ export default function AdminLayout() {
     }
   }, [user, loading, navigate, hydrated]);
 
+  // 権限で見られるメニュー（super_admin は全部）。
+  const allowedMenuItems = user
+    ? menuItems.filter((item) => canSeeMenuItem(item, user.role, user.permissions))
+    : [];
+
+  // 権限ガード - 権限の無いセクションを開いたら、見られる最初のページへ退避。
+  useEffect(() => {
+    if (!hydrated || loading || !user) return;
+    const section = sectionForPath(location.pathname);
+    if (!section) return; // メニュー外（/admin/login 等）は触らない
+    if (canSeeMenuItem(section, user.role, user.permissions)) return;
+    const first = allowedMenuItems[0];
+    if (first && sectionForPath(location.pathname)?.path !== first.path) {
+      navigate(first.path, { replace: true });
+    }
+  }, [hydrated, loading, user, location.pathname, navigate, allowedMenuItems]);
+
   if (!hydrated || loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -165,7 +210,7 @@ export default function AdminLayout() {
 
           {/* Nav */}
           <nav className="flex-1 px-3 py-2 space-y-0.5">
-            {menuItems.map((item) => (
+            {allowedMenuItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}

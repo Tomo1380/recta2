@@ -6,7 +6,6 @@ import {
   Loader2,
   Star,
   MapPin,
-  Zap,
   BookOpen,
   Clock,
   Hash,
@@ -156,12 +155,16 @@ interface StoreCard {
   nearest_station?: string;
   trial_hourly_min?: number;
   trial_hourly_max?: number;
+  feature_tags?: string[];
+  average_rating?: number | null;
+  reviews_count?: number | null;
   description?: string;
+  /** AI がその人向けに生成した一言要約（カードに表示） */
+  comment?: string;
   images?: { url: string; order?: number }[];
 }
 
 interface MessageMeta {
-  mode: string;
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
@@ -173,6 +176,8 @@ interface MessageMeta {
 interface ChatMessage {
   role: "user" | "ai";
   content: string;
+  /** 店舗カードの「後ろ」に表示するテキスト（絞り込みを促す締めの一文など） */
+  contentAfter?: string;
   stores?: StoreCard[];
   follow_ups?: string[];
   meta?: MessageMeta;
@@ -183,8 +188,6 @@ interface ChatMessage {
   streamingStatus?: string;
 }
 
-type ChatMode = "agent" | "finetuned";
-
 interface ChatConfigResponse {
   enabled: boolean;
   suggest_categories: SuggestCategory[];
@@ -193,6 +196,8 @@ interface ChatConfigResponse {
 
 interface ChatApiResponse {
   message: string;
+  /** 店舗カードの「後ろ」に表示するテキスト（絞り込みを促す締めの一文など） */
+  after_text?: string;
   stores?: StoreCard[];
   follow_ups?: string[];
   meta?: MessageMeta;
@@ -218,7 +223,7 @@ interface LimitError {
 interface StreamHandlers {
   onStatus?: (label: string) => void;
   onDelta: (delta: string) => void;
-  onDone: (payload: Pick<ChatApiResponse, "stores" | "follow_ups" | "meta">) => void;
+  onDone: (payload: Pick<ChatApiResponse, "stores" | "follow_ups" | "meta" | "after_text">) => void;
 }
 
 /**
@@ -238,7 +243,6 @@ async function streamMessage(
   message: string,
   pageType: string,
   history: { role: string; content: string }[],
-  mode: ChatMode,
   storeId: number | undefined,
   signal: AbortSignal,
   handlers: StreamHandlers,
@@ -260,7 +264,6 @@ async function streamMessage(
       page_type: pageType,
       store_id: storeId,
       history,
-      mode,
     }),
     signal,
   });
@@ -270,6 +273,14 @@ async function streamMessage(
     const err = new Error(data.message) as Error & { limitType?: string };
     err.limitType = data.limit_type;
     throw err;
+  }
+  if (res.status === 422) {
+    // バリデーション（入力が長すぎる等）。サーバの日本語メッセージをそのまま見せる。
+    const data = await res.json().catch(() => null) as
+      | { message?: string; errors?: Record<string, string[]> }
+      | null;
+    const firstError = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
+    throw new Error(firstError || data?.message || "入力内容を確認してください。");
   }
   if (!res.ok || !res.body) {
     throw new Error("Failed to open chat stream");
@@ -315,6 +326,7 @@ async function streamMessage(
         terminated = true;
         handlers.onDone({
           stores: (payload.stores ?? []) as ChatApiResponse["stores"],
+          after_text: typeof payload.after_text === "string" ? payload.after_text : "",
           follow_ups: (payload.follow_ups ?? []) as ChatApiResponse["follow_ups"],
           meta: payload.meta as ChatApiResponse["meta"],
         });
@@ -361,12 +373,31 @@ async function streamMessage(
   }
 }
 
-function formatWage(min?: number, max?: number): string {
-  if (min == null && max == null) return "";
+// 入力1メッセージの最大文字数。コスト・濫用対策のためフロント/バックエンド双方で制限する。
+// （サーバ側 ChatRequest の max と揃えること）
+const MAX_INPUT_CHARS = 500;
+// Gemini に渡す会話履歴の最大件数（直近 N メッセージ）。毎ターン全履歴を再送すると
+// コストが会話長に対してほぼ二次関数的に増えるため、直近のみに絞る。
+const MAX_HISTORY_MESSAGES = 10;
+
+function formatWage(min?: number | string | null, max?: number | string | null): string {
+  // "6,000円" のような文字列で来ても数値化する（円・カンマ等を除去）。
+  const toNum = (v: number | string | null | undefined): number | null => {
+    if (v == null || v === "") return null;
+    const d = String(v).replace(/[^\d]/g, "");
+    return d === "" ? null : Number(d);
+  };
+  let lo = toNum(min);
+  let hi = toNum(max);
+  if (lo != null && hi != null && lo > hi) [lo, hi] = [hi, lo];
+
+  if (lo == null && hi == null) return "";
   const fmt = (n: number) => n.toLocaleString();
-  if (min != null && max != null) return `${fmt(min)}~${fmt(max)}円/h`;
-  if (min != null) return `${fmt(min)}円~/h`;
-  return `~${fmt(max!)}円/h`;
+  if (lo != null && hi != null) {
+    return lo === hi ? `${fmt(lo)}円/h` : `${fmt(lo)}~${fmt(hi)}円/h`;
+  }
+  if (lo != null) return `${fmt(lo)}円~/h`;
+  return `~${fmt(hi!)}円/h`;
 }
 
 // ---------------------------------------------------------------------------
@@ -496,25 +527,6 @@ function AiRelatedColumns({ text }: { text: string }) {
 function MetaBadge({ meta }: { meta: MessageMeta }) {
   return (
     <div className="mt-1.5 ml-8 flex flex-wrap items-center gap-1.5">
-      {/* Mode */}
-      <span
-        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
-        style={{
-          backgroundColor:
-            meta.mode === "agent"
-              ? "rgba(212,175,55,0.12)"
-              : "rgba(99,102,241,0.12)",
-          color: meta.mode === "agent" ? "#D4AF37" : "#6366f1",
-        }}
-      >
-        {meta.mode === "agent" ? (
-          <Zap className="size-2.5" />
-        ) : (
-          <BookOpen className="size-2.5" />
-        )}
-        {meta.mode === "agent" ? "Agent" : "Fine-tuned"}
-      </span>
-
       {/* Tokens */}
       <span
         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
@@ -849,7 +861,6 @@ export default function AiChatPanel({
     useState<SuggestDisplayMode>("categorized");
   const [followUpButtons, setFollowUpButtons] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
-  const [mode, setMode] = useState<ChatMode>("agent");
   const [limitReached, setLimitReached] = useState(false);
 
   // Intro animation state.
@@ -871,6 +882,9 @@ export default function AiChatPanel({
   // これがないと、ユーザーが画面遷移しても fetch が裏で生き続け、reader が
   // chunk を待ち続ける（memory leak + 不要な PHP-FPM ワーカ占有）。
   const abortRef = useRef<AbortController | null>(null);
+  // LINE CTA を毎回出すとしつこいので、店舗提案のタイミングだけ・連続では出さない。
+  // 初期値を大きくして「最初の店舗提案」では必ず出す。以降は store 提案 1 回おきに表示。
+  const lineCtaCooldownRef = useRef(99);
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -1041,22 +1055,29 @@ export default function AiChatPanel({
       // 毎 chunk フル文字列に対して regex を回すと O(n²) になるため、対象を絞ることが重要。
       const cleanText = (s: string) =>
         s
+          // [STORE:ID] / [STORE:ID|コメント] マーカーは店舗カードで表示するので本文から除去
+          // (通常はサーバ側で除去済みだが、ストリーミング途中の取りこぼし対策)
+          .replace(/\[STORE:\d+(?:\|[^\]\n]*)?\]/g, "")
           .replace(/\n*もっと詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "")
           .replace(/\n*より詳しく知りたい方は、?LINEで担当者に直接相談できます[！!]?\s*/g, "");
 
       let accumulated = "";
 
       try {
-        const history = [...messages, userMessage].map((m) => ({
-          role: m.role === "ai" ? "assistant" : "user",
-          content: m.content,
-        }));
+        // 直近 MAX_HISTORY_MESSAGES 件だけ送る（コスト抑制）。現在の入力(msg)は
+        // バックエンドが別途末尾に付けるので history には含めない（従来は二重送信だった）。
+        const history = messages
+          .filter((m) => m.content && !m.streaming)
+          .slice(-MAX_HISTORY_MESSAGES)
+          .map((m) => ({
+            role: m.role === "ai" ? "assistant" : "user",
+            content: m.content,
+          }));
 
         await streamMessage(
           msg,
           pageType,
           history,
-          mode,
           storeId,
           controller.signal,
           {
@@ -1082,8 +1103,21 @@ export default function AiChatPanel({
                 return next;
               });
             },
-            onDone: ({ stores, follow_ups, meta }) => {
+            onDone: ({ stores, follow_ups, meta, after_text }) => {
               const finalText = cleanText(accumulated).trim();
+              const afterText = (after_text ?? "").trim();
+              // LINE CTA は「店舗を提案したタイミング」だけ・連続では出さない。
+              // 情報質問だけの返信では出さない（毎回出てしつこいのを防ぐ）。
+              const hasStores = (stores ?? []).length > 0;
+              let showLineCta = false;
+              if (hasStores) {
+                if (lineCtaCooldownRef.current >= 2) {
+                  showLineCta = true;
+                  lineCtaCooldownRef.current = 0;
+                } else {
+                  lineCtaCooldownRef.current += 1;
+                }
+              }
               setMessages((prev) => {
                 const next = [...prev];
                 const last = next[next.length - 1];
@@ -1091,10 +1125,11 @@ export default function AiChatPanel({
                   next[next.length - 1] = {
                     ...last,
                     content: finalText,
+                    contentAfter: afterText || undefined,
                     stores,
                     follow_ups,
                     meta,
-                    showLineCta: true,
+                    showLineCta,
                     streaming: false,
                     streamingStatus: undefined,
                   };
@@ -1129,7 +1164,7 @@ export default function AiChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, messages, pageType, storeId, introPhase, mode, limitReached, preview],
+    [input, isLoading, messages, pageType, storeId, introPhase, limitReached, preview],
   );
 
   if (!enabled) return null;
@@ -1172,7 +1207,7 @@ export default function AiChatPanel({
     >
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between px-4 py-3">
-        {/* 左: 金縦バー + 見出し + NEW pill (+ dev用 mode toggle) */}
+        {/* 左: 金縦バー + 見出し + NEW pill */}
         <div className="flex items-center gap-2">
           <span
             aria-hidden
@@ -1205,19 +1240,6 @@ export default function AiChatPanel({
           >
             NEW
           </span>
-          {/* Mode toggle (Recta 固有の開発トグル / Figma には無い) */}
-          <button
-            type="button"
-            onClick={() => setMode(mode === "agent" ? "finetuned" : "agent")}
-            className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors"
-            style={{
-              backgroundColor: mode === "agent" ? "rgba(212,175,55,0.12)" : "rgba(99,102,241,0.12)",
-              color: mode === "agent" ? "#D4AF37" : "#6366f1",
-              border: `0.5px solid ${mode === "agent" ? "rgba(212,175,55,0.3)" : "rgba(99,102,241,0.3)"}`,
-            }}
-          >
-            {mode === "agent" ? "Agent" : "FT"}
-          </button>
         </div>
         {/* 右: Recta AI アバター + テキスト + オンラインドット */}
         <div className="flex shrink-0 items-center gap-1.5">
@@ -1496,44 +1518,93 @@ export default function AiChatPanel({
                           </div>
 
                           {/* Info */}
-                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                            <div
-                              className="text-[13px] font-bold leading-tight truncate"
-                              style={{ color: "#1b2528" }}
-                            >
-                              {store.name}
+                          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+                            {/* カテゴリ + 店名 */}
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {store.category && (
+                                <span
+                                  className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-white"
+                                  style={{ backgroundColor: "rgba(200,96,128,0.9)" }}
+                                >
+                                  {store.category}
+                                </span>
+                              )}
+                              <span
+                                className="text-[13px] font-bold leading-tight truncate"
+                                style={{ color: "#1b2528" }}
+                              >
+                                {store.name}
+                              </span>
                             </div>
+
+                            {/* 体入時給 + 最寄り駅/エリア + 評価 */}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]" style={{ color: "rgba(27,37,40,0.5)" }}>
                               {(store.trial_hourly_min != null || store.trial_hourly_max != null) && (
                                 <span className="font-medium" style={{ color: "#D4AF37" }}>
                                   体入 {formatWage(store.trial_hourly_min, store.trial_hourly_max)}
                                 </span>
                               )}
-                              {store.nearest_station && (
+                              {(store.nearest_station || store.area) && (
                                 <span className="flex items-center gap-0.5">
                                   <MapPin className="size-2.5 shrink-0" />
-                                  {store.nearest_station}
+                                  {store.nearest_station || store.area}
                                 </span>
                               )}
-                              {!store.nearest_station && store.area && (
+                              {store.average_rating != null && store.average_rating > 0 && (
                                 <span className="flex items-center gap-0.5">
-                                  <MapPin className="size-2.5 shrink-0" />
-                                  {store.area}
+                                  <Star className="size-2.5 shrink-0" style={{ color: "#D4AF37", fill: "#D4AF37" }} />
+                                  {store.average_rating.toFixed(1)}
                                 </span>
                               )}
                             </div>
-                            {store.description && (
+
+                            {/* AI のおすすめ一言（無ければ店舗説明） */}
+                            {(store.comment || store.description) && (
                               <p
-                                className="text-[10px] leading-snug mt-0.5 line-clamp-2"
-                                style={{ color: "rgba(27,37,40,0.55)" }}
+                                className="text-[11px] leading-snug line-clamp-2"
+                                style={{ color: store.comment ? "rgba(27,37,40,0.8)" : "rgba(27,37,40,0.55)" }}
                               >
-                                {store.description}
+                                {store.comment || store.description}
                               </p>
+                            )}
+
+                            {/* 特徴タグ（一覧カードに合わせたゴールドのピル） */}
+                            {store.feature_tags && store.feature_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {store.feature_tags.slice(0, 3).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded-full px-1.5 py-0.5 text-[9px]"
+                                    style={{ border: "1px solid rgba(212,175,55,0.3)", color: "#D4AF37" }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </Link>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* 店舗カードの「後ろ」に出すテキスト（絞り込みを促す締めの一文など）。
+                    AI 本文を「カード前 / カード後」に分割した後半部分。
+                    導入の吹き出しと同じスタイルで、チャットの続きとして見せる。 */}
+                {msg.role === "ai" && msg.contentAfter && (
+                  <div className="mt-2 ml-8">
+                    <div
+                      className="inline-block max-w-[80%] px-3.5 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed rounded-[18px]"
+                      style={{
+                        backgroundColor: "white",
+                        color: "#1b2528",
+                        border: "0.5px solid rgba(212,175,55,0.25)",
+                        boxShadow: "0px 2px 8px rgba(27,37,40,0.07)",
+                      }}
+                    >
+                      {msg.contentAfter}
+                    </div>
                   </div>
                 )}
 
@@ -1649,6 +1720,7 @@ export default function AiChatPanel({
               placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください…"}
               aria-label="AIチャットへのメッセージ入力"
               disabled={isLoading || limitReached}
+              maxLength={MAX_INPUT_CHARS}
               rows={1}
               // iOS Safari は font-size が 16px 未満だとフォーカス時に
               // 自動ズームしてしまう。16px 固定。
@@ -1661,6 +1733,15 @@ export default function AiChatPanel({
                 maxHeight: "96px",
               }}
             />
+            {/* 文字数カウンタ: 上限の8割を超えたら表示（残量を意識させ、急な弾きを防ぐ） */}
+            {input.length > MAX_INPUT_CHARS * 0.8 && (
+              <span
+                className="pointer-events-none absolute bottom-1 right-12 text-[10px]"
+                style={{ color: input.length >= MAX_INPUT_CHARS ? "#dc2626" : "rgba(27,37,40,0.45)" }}
+              >
+                {input.length}/{MAX_INPUT_CHARS}
+              </span>
+            )}
             <button
               type="submit"
               disabled={!input.trim() || isLoading || limitReached}

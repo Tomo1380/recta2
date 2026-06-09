@@ -23,7 +23,6 @@ class DatabaseSeeder extends Seeder
             ContentSeeder::class,
             ArticleSeeder::class,
             LineFriendSeeder::class,
-            FineTuningQaSeeder::class,
             IndustryKnowledgeSeeder::class,
             RelocateVoiceSeeder::class,
         ]);

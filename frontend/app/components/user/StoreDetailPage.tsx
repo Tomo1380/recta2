@@ -151,6 +151,8 @@ interface Schedule {
 interface RecentHire {
   month: string;
   count: number;
+  /** 管理画面で「非表示」にした月。公開ページには出さない（新店で実在しない月の表示防止）。 */
+  hidden?: boolean;
   /** @deprecated 採用例はセクション単位 (recent_hire_examples) に移行。旧データ互換のため残置。 */
   examples?: string[];
 }
@@ -350,6 +352,8 @@ export interface StoreDetailStore {
   related_store_ids?: number[] | null;
   /** Optional pre-resolved related stores (preferred over related_store_ids) */
   related_stores?: RelatedStoreLite[] | null;
+  /** 採用基準が近い店舗 (系列とは別軸の回遊動線)。 */
+  recruitment_similar_store_ids?: number[] | null;
   transfer_zones?: TransferZone[] | null;
   experience_guaranteed?: boolean | null;
   /** 上京ロゴ・バナーの表示 (D3)。東京・新地・ミナミ等のみ ON。 */
@@ -776,6 +780,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
 
   const { store, related_columns: relatedColumns } = data;
   const sortedImages = (store.images ?? []).slice().sort((a, b) => a.order - b.order);
+  // 採用実績で公開表示する月（管理画面で「非表示」にした月を除外）。
+  const visibleHires = (store.recent_hires ?? []).filter((h) => !h.hidden);
 
   return (
     <>
@@ -1025,8 +1031,8 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               {store.recent_hires_summary && (
                 <InfoRow
                   label={
-                    store.recent_hires && store.recent_hires.length > 0
-                      ? `直近${store.recent_hires.length}ヶ月での採用`
+                    visibleHires.length > 0
+                      ? `直近${visibleHires.length}ヶ月での採用`
                       : "直近の採用"
                   }
                   value={store.recent_hires_summary}
@@ -1034,15 +1040,15 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               )}
             </div>
 
-            {/* Recent hires chart */}
-            {store.recent_hires && store.recent_hires.length > 0 && (
+            {/* Recent hires chart — 「非表示」にした月は出さない (visibleHires)。 */}
+            {visibleHires.length > 0 && (
               <div className="mt-4 space-y-3">
                 <p className="text-sm font-semibold" style={{ color: "#1b2528" }}>
                   採用実績
                 </p>
                 <div className="flex items-end gap-2">
-                  {store.recent_hires.map((hire, i) => {
-                    const maxCount = Math.max(...store.recent_hires!.map((h) => h.count));
+                  {visibleHires.map((hire, i) => {
+                    const maxCount = Math.max(...visibleHires.map((h) => h.count));
                     const barHeight = Math.max(20, (hire.count / maxCount) * 80);
                     return (
                       <div key={i} className="flex flex-1 flex-col items-center gap-1">
@@ -1073,7 +1079,7 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
                   const examples =
                     store.recent_hire_examples && store.recent_hire_examples.length > 0
                       ? store.recent_hire_examples
-                      : store.recent_hires.flatMap((h) => h.examples ?? []);
+                      : visibleHires.flatMap((h) => h.examples ?? []);
                   if (examples.length === 0) return null;
                   return (
                     <div className="mt-2 space-y-1">
@@ -1787,6 +1793,16 @@ export default function StoreDetailPage({ id, previewData, initialData }: StoreD
               icon={<Building size={20} style={{ color: "#D4AF37" }} />}
               stores={store.related_stores}
               ids={store.related_store_ids}
+              currentId={store.id}
+            />
+          </div>
+
+          {/* 採用基準が近いお店 (系列とは別軸の回遊動線・比較動線) */}
+          <div data-preview-anchor="recruitment-similar">
+            <RelatedStoresSection
+              title="採用基準が近いお店"
+              icon={<Building size={20} style={{ color: "#D4AF37" }} />}
+              ids={store.recruitment_similar_store_ids}
               currentId={store.id}
             />
           </div>

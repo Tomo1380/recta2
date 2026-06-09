@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // auth:sanctum だけでは認証境界が成立しない。詳細は EnsureUserType 参照。
         $middleware->alias([
             'user.type' => \App\Http\Middleware\EnsureUserType::class,
+            // 管理ユーザーの granular 権限ガード（admin.perm:stores 等）
+            'admin.perm' => \App\Http\Middleware\EnsureAdminPermission::class,
         ]);
 
         // Authenticate ミドルウェアが未認証時に route('login') へ redirect

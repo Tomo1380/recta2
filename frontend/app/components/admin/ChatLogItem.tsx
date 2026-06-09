@@ -5,7 +5,6 @@ export interface ChatLogItemData {
   id: number;
   user_message: string;
   ai_response: string;
-  mode?: string | null;
   page_type?: string | null;
   total_tokens?: number;
   ip_address?: string | null;
@@ -13,7 +12,6 @@ export interface ChatLogItemData {
   created_at?: string | null;
 }
 
-const MODE_LABEL: Record<string, string> = { agent: "Agent", finetuned: "Fine-tuned" };
 const PAGE_TYPE_LABEL: Record<string, string> = { top: "トップ", list: "一覧", detail: "店舗詳細" };
 
 function formatTime(s?: string | null): string {
@@ -31,11 +29,6 @@ export function ChatLogItem({ log, showUser = true }: { log: ChatLogItemData; sh
   return (
     <div className="bg-card border border-border rounded-xl p-4">
       <div className="flex items-center gap-2 mb-2 text-[11px] text-muted-foreground flex-wrap">
-        {log.mode && (
-          <span className={`px-1.5 py-0.5 rounded ${log.mode === "finetuned" ? "bg-violet-50 text-violet-700" : "bg-indigo-50 text-indigo-700"}`}>
-            {MODE_LABEL[log.mode] ?? log.mode}
-          </span>
-        )}
         {log.page_type && <span className="px-1.5 py-0.5 rounded bg-muted">{PAGE_TYPE_LABEL[log.page_type] ?? log.page_type}</span>}
         {showUser && <span>{log.user_name ?? (log.ip_address ? `IP: ${log.ip_address}` : "匿名")}</span>}
         <span className="ml-auto">{formatTime(log.created_at)}{log.total_tokens != null ? ` ・ ${log.total_tokens} tokens` : ""}</span>

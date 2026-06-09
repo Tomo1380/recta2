@@ -29,9 +29,8 @@
 - Nginx リバースプロキシ（`/api/*` → Laravel, `/*` → React Router）
 
 ### AIチャット
-- **Gemini 3.1 Flash-Lite** (`gemini-3.1-flash-lite-preview`, 2モード切替)
-- **Agentモード（メイン）**: Function Calling で `search_stores` / `get_store_detail` 等のツールを呼び出し、DBから店舗を検索して回答
-- **Fine-tunedモード**: 全店舗データをシステムプロンプトに含めて回答（将来のチューニングモデル用）
+- **Gemini 3.1 Flash-Lite** (`gemini-3.1-flash-lite-preview`)
+- **Agentモード**: Function Calling で `search_stores` / `get_store_detail` 等のツールを呼び出し、DBから店舗を検索して回答
 - 位置情報: ブラウザGeolocation API + Nominatim逆ジオコーディングでユーザーエリア検出
 - LINE誘導: 全回答の末尾にLINE友だち追加CTAを表示（サイトの本質はLINEへの誘導）
 - フォローアップ: 質問返しではなく選択チップ（「体入できるお店」「日払いOKのお店」等）で提示
@@ -129,6 +128,11 @@ recta2/
 - Laravel: RESTful API設計、UseCase層でビジネスロジック分離
 - フロント→バックエンド通信: same-origin（Nginx経由）のためCORS不要
 - 認証: JWT
+- 管理者権限 (RBAC): AdminUser は role(super_admin/admin) + permissions(JSON配列)。
+  権限キーは `AdminUser::PERMISSIONS`（analytics/chat/stores/reviews/ai_chat/articles/content）。
+  super_admin は全権限＋管理ユーザー管理。admin は permissions で担当範囲を制御。
+  ルートは `admin.perm:KEY` middleware でセクション単位にゲートし、フロントは
+  `me`/login が返す実効 permissions でナビ・画面を出し分ける。
 - DB: マイグレーションで管理、JSONB活用
 
 ## DB Seeder の使い分け
@@ -137,7 +141,7 @@ recta2/
 
 | 用途 | コマンド | 中身 |
 |---|---|---|
-| **開発・QA・ローカル動作確認** | `php artisan migrate:fresh --seed` | DatabaseSeeder: stores 80 / users 11 / reviews 117 / pickup 10 / ai_chat_logs 80 / fine_tuning_qa 1000 等、全テーブル投入。完全に空の DB から QA したい場合は `migrate:fresh` (seed なし) で OK |
+| **開発・QA・ローカル動作確認** | `php artisan migrate:fresh --seed` | DatabaseSeeder: stores 80 / users 11 / reviews 117 / pickup 10 / ai_chat_logs 80 等、全テーブル投入。完全に空の DB から QA したい場合は `migrate:fresh` (seed なし) で OK |
 | **本番初回投入** | `php artisan db:seed --class=ProductionSeeder` | 管理者 + マスター + 設定 + AI 教材のみ。店舗/口コミ/ユーザーは入れない (運営が手動投入 or LINE 経由で自然蓄積)。**冪等** (既存データがあるテーブルはスキップ、再実行 OK) |
 
 Seeder を書くときの注意:

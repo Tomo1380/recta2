@@ -42,6 +42,9 @@ class AdminUserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // 管理ユーザー一覧は super_admin のみ閲覧可（権限管理 UI のため）。
+        $this->ensureSuperAdmin($request);
+
         $admins = AdminUser::orderBy('created_at', 'desc')
             ->paginate($request->input('per_page', 20));
 
@@ -51,14 +54,29 @@ class AdminUserController extends Controller
     public function store(StoreAdminUserRequest $request): AdminUserResource
     {
         $this->ensureSuperAdmin($request);
-        $admin = AdminUser::create($request->validated());
+        $data = $request->validated();
+        // super_admin は実効的に全権限なので permissions は保持しない。
+        if (($data['role'] ?? 'admin') === 'super_admin') {
+            $data['permissions'] = null;
+        }
+        $admin = AdminUser::create($data);
         return new AdminUserResource($admin);
     }
 
     public function update(UpdateAdminUserRequest $request, AdminUser $adminUser): AdminUserResource
     {
         $this->ensureSuperAdmin($request);
-        $adminUser->update($request->validated());
+        $data = $request->validated();
+        // パスワード未入力 (null/空) のときは既存パスワードを維持する。
+        if (empty($data['password'] ?? null)) {
+            unset($data['password']);
+        }
+        // super_admin は実効的に全権限なので permissions は保持しない。
+        $effectiveRole = $data['role'] ?? $adminUser->role;
+        if ($effectiveRole === 'super_admin' && array_key_exists('permissions', $data)) {
+            $data['permissions'] = null;
+        }
+        $adminUser->update($data);
         return new AdminUserResource($adminUser);
     }
 

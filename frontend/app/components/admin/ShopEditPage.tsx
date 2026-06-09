@@ -255,6 +255,83 @@ function parseSetFeeText(text: string): { label: string; amount: string; note: s
  *  運営は各月の採用人数だけ入れればよい (基本5ヶ月前まで、新店は3ヶ月前まで等)。 */
 const RELATIVE_HIRE_LABELS = ["1ヶ月前", "2ヶ月前", "3ヶ月前", "4ヶ月前", "5ヶ月前"];
 
+/**
+ * 他店舗を検索して複数選択するピッカー。掲載店舗が多いと従来の全件ドロップダウンは
+ * 選びづらいため、店名・エリアで絞り込む (FB: 店舗管理③)。候補は読込済みの
+ * storeCandidates をクライアント側でフィルタする。
+ */
+function StoreSearchSelect({
+  value,
+  onChange,
+  candidates,
+  placeholder = "店名・エリアで検索して追加",
+}: {
+  value: number[];
+  onChange: (next: number[]) => void;
+  candidates: { id: number; name: string; area: string | null }[];
+  placeholder?: string;
+}) {
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const matches = query
+    ? candidates
+        .filter(
+          (c) =>
+            !value.includes(c.id) &&
+            (c.name.toLowerCase().includes(query) || (c.area ?? "").toLowerCase().includes(query)),
+        )
+        .slice(0, 8)
+    : [];
+  const nameOf = (id: number) => candidates.find((c) => c.id === id)?.name ?? `店舗#${id}`;
+
+  return (
+    <div className="space-y-2">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+      />
+      {matches.length > 0 && (
+        <ul className="border border-border rounded-md divide-y divide-border max-h-48 overflow-y-auto">
+          {matches.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange([...value, c.id]);
+                  setQ("");
+                }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-muted"
+              >
+                {c.name}
+                {c.area ? `（${c.area}）` : ""}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {value.map((id) => (
+            <li key={id} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs">
+              <span>{nameOf(id)}</span>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((i) => i !== id))}
+                aria-label="削除"
+                className="text-muted-foreground hover:text-destructive"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function TextInput({
   placeholder = "",
   value = "",
@@ -901,7 +978,7 @@ export function ShopEditPage() {
   // 入ってしまう。新規作成では空にし、既存店舗を開いたときだけ
   // populateFromStore() で実データを流す。
   const [hiringEntries, setHiringEntries] = useState<
-    { month: string; count: string }[]
+    { month: string; count: string; hidden?: boolean }[]
   >([]);
   const [hiringTotal, setHiringTotal] = useState("");
   // 採用例はセクション単位 (各月には紐付けない)。
@@ -917,6 +994,8 @@ export function ShopEditPage() {
   >([]);
   // 系列店（管理者が明示的に紐づけた他店舗）。store.id の配列。
   const [relatedStoreIds, setRelatedStoreIds] = useState<number[]>([]);
+  // 採用基準が近い店舗（系列とは別軸の回遊動線）。store.id の配列。
+  const [recruitmentSimilarStoreIds, setRecruitmentSimilarStoreIds] = useState<number[]>([]);
   // 系列店セレクタの候補ソース — 現在の店舗以外の published 店舗一覧。
   const [storeCandidates, setStoreCandidates] = useState<
     Array<{ id: number; name: string; area: string | null }>
@@ -1129,6 +1208,7 @@ export function ShopEditPage() {
     if (f.showRelocateBadge !== undefined) setShowRelocateBadge(f.showRelocateBadge);
     if (f.transferZones !== undefined) setTransferZones(f.transferZones);
     if (f.relatedStoreIds !== undefined) setRelatedStoreIds(f.relatedStoreIds);
+    if (f.recruitmentSimilarStoreIds !== undefined) setRecruitmentSimilarStoreIds(f.recruitmentSimilarStoreIds);
     if (f.champagneDescription !== undefined) setChampagneDescription(f.champagneDescription);
     if (f.champagnePrices !== undefined) setChampagnePrices(f.champagnePrices);
     if (f.dressCodeDescription !== undefined) setDressCodeDescription(f.dressCodeDescription);
@@ -1240,7 +1320,7 @@ export function ShopEditPage() {
       dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
       interviewQuestions,
       documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
-      transferDescription, transferKm, transferZones, relatedStoreIds, showRelocateBadge,
+      transferDescription, transferKm, transferZones, relatedStoreIds, recruitmentSimilarStoreIds, showRelocateBadge,
       champagneDescription, champagnePrices,
       dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
       setFeeList, setFeeNotes, rectaEpisodes, qaItems,
@@ -1265,7 +1345,7 @@ export function ShopEditPage() {
     dressAdvice, dressTips, dressCode, hiringCriteria, interviewDialog,
     interviewQuestions,
     documents, docNote, shiftInfo, hiringEntries, hiringTotal, hiringExamples,
-    transferDescription, transferKm, transferZones, relatedStoreIds,
+    transferDescription, transferKm, transferZones, relatedStoreIds, recruitmentSimilarStoreIds,
     champagneDescription, champagnePrices,
     dressCodeDescription, dressCodeOk, dressCodeNg, dressPhotos,
     setFeeList, setFeeNotes, rectaEpisodes, qaItems,
@@ -1989,18 +2069,20 @@ export function ShopEditPage() {
                   採用例は月に紐付けずセクション単位で持つので、ここは人数だけ。 */}
               <div className="space-y-2">
                 {RELATIVE_HIRE_LABELS.map((relLabel, i) => {
-                  const entry = hiringEntries[i] ?? { month: relLabel, count: "" };
-                  const writeCount = (count: string) => {
+                  const entry = hiringEntries[i] ?? { month: relLabel, count: "", hidden: false };
+                  // スロット i を patch（他スロットの count/hidden は保持）。
+                  const updateSlot = (patch: Partial<{ count: string; hidden: boolean }>) => {
                     const next = RELATIVE_HIRE_LABELS.map((lbl, idx) => {
-                      const base = hiringEntries[idx] ?? { month: lbl, count: "" };
+                      const base = hiringEntries[idx] ?? { month: lbl, count: "", hidden: false };
                       return idx === i
-                        ? { month: lbl, count }
-                        : { month: lbl, count: base.count };
+                        ? { ...base, month: lbl, ...patch }
+                        : { ...base, month: lbl };
                     });
                     setHiringEntries(next);
                   };
+                  const hasCount = (Number(entry.count) || 0) > 0;
                   return (
-                    <div key={relLabel} className="flex items-center gap-3">
+                    <div key={relLabel} className={`flex items-center gap-3 ${entry.hidden ? "opacity-50" : ""}`}>
                       <span className="w-20 shrink-0 text-sm font-medium text-foreground/80">{relLabel}</span>
                       <div className="flex-1">
                         <TextInput
@@ -2009,15 +2091,32 @@ export function ShopEditPage() {
                           step={1}
                           min={0}
                           value={entry.count}
-                          onChange={(e) => writeCount(e.target.value.replace(/[^\d]/g, ""))}
+                          onChange={(e) => updateSlot({ count: e.target.value.replace(/[^\d]/g, "") })}
                           placeholder="採用人数（空欄=非表示）"
                         />
                       </div>
                       <span className="text-sm text-foreground/50">名</span>
+                      {/* ✖ で公開非表示（人数は保持）。新店が古い月を嘘にしないため。 */}
+                      <button
+                        type="button"
+                        onClick={() => updateSlot({ hidden: !entry.hidden })}
+                        disabled={!hasCount}
+                        title={entry.hidden ? "公開ページに表示する" : "公開ページで非表示にする"}
+                        className={`shrink-0 px-2 py-1 rounded-md text-[11px] border transition disabled:opacity-30 ${
+                          entry.hidden
+                            ? "border-red-300 text-red-500 bg-red-50"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {entry.hidden ? "非表示" : "表示"}
+                      </button>
                     </div>
                   );
                 })}
               </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                「非表示」にした月は人数を保持したまま公開ページに出しません（新店で実在しない月の表示を防ぐ用）。
+              </p>
             </Field>
           </div>
           <Field label="採用例（任意）" hint="このお店全体の採用例。月とは紐付きません。">
@@ -2730,51 +2829,25 @@ export function ShopEditPage() {
       <SectionCard title="系列店舗" icon={Building2} previewAnchor="related" onFocusEnter={handlePreviewFocus}>
         <Field
           label="紐づけ店舗"
-          hint="詳細ページで「系列店舗」として表示する他店舗を選択してください。"
+          hint="詳細ページで「系列店舗」として表示する他店舗を、店名・エリアで検索して選択してください。"
         >
-          <div className="space-y-2">
-            <select
-              value=""
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (!n || relatedStoreIds.includes(n)) return;
-                setRelatedStoreIds([...relatedStoreIds, n]);
-              }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
-              <option value="">+ 系列店を追加</option>
-              {storeCandidates
-                .filter((s) => !relatedStoreIds.includes(s.id))
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} {s.area ? `（${s.area}）` : ""}
-                  </option>
-                ))}
-            </select>
-            {relatedStoreIds.length > 0 && (
-              <ul className="flex flex-wrap gap-2">
-                {relatedStoreIds.map((rid) => {
-                  const c = storeCandidates.find((s) => s.id === rid);
-                  return (
-                    <li
-                      key={rid}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs"
-                    >
-                      <span>{c?.name ?? `店舗#${rid}`}</span>
-                      <button
-                        type="button"
-                        onClick={() => setRelatedStoreIds(relatedStoreIds.filter((i) => i !== rid))}
-                        aria-label="削除"
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        ×
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <StoreSearchSelect
+            value={relatedStoreIds}
+            onChange={setRelatedStoreIds}
+            candidates={storeCandidates}
+            placeholder="店名・エリアで検索して系列店を追加"
+          />
+        </Field>
+        <Field
+          label="採用基準が近い店舗"
+          hint="採用ハードル・客層が近い他店舗。系列とは別に「比較・回遊」用として詳細ページに表示します。"
+        >
+          <StoreSearchSelect
+            value={recruitmentSimilarStoreIds}
+            onChange={setRecruitmentSimilarStoreIds}
+            candidates={storeCandidates}
+            placeholder="店名・エリアで検索して追加"
+          />
         </Field>
       </SectionCard>
 

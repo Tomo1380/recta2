@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, ChevronRight as ChevronR } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, Bot, ChevronRight as ChevronR } from "lucide-react";
 import { api } from "~/lib/api";
-import type { AdminPersonRow, PeopleIndexResponse, Paginated } from "~/lib/types";
+import type { AdminPersonRow, PeopleIndexResponse, Paginated, PlacementStatus } from "~/lib/types";
+import { PLACEMENT_STATUS_LABELS } from "~/lib/types";
 
 /**
  * ユーザー管理 — LINE トーク (公式アカウント) 主役の「LINE利用者」一覧 (2026-06-06 FB)。
@@ -46,6 +47,17 @@ function PersonBadges({ p }: { p: AdminPersonRow }) {
       ) : (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">友だちのみ</span>
       )}
+      {p.needs_reply && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">未返信</span>
+      )}
+      {p.placement_status && p.placement_status !== "new" && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">
+          {PLACEMENT_STATUS_LABELS[p.placement_status]}
+        </span>
+      )}
+      {p.wants_relocation && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700">上京希望</span>
+      )}
     </div>
   );
 }
@@ -66,6 +78,9 @@ export function UsersPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mode, setMode] = useState<Mode>("talk");
+  const [placementFilter, setPlacementFilter] = useState<"all" | PlacementStatus>("all");
+  const [relocationOnly, setRelocationOnly] = useState(false);
+  const [needsReplyOnly, setNeedsReplyOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Paginated<AdminPersonRow> | null>(null);
@@ -81,7 +96,7 @@ export function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [mode]);
+  }, [mode, placementFilter, relocationOnly, needsReplyOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +105,9 @@ export function UsersPage() {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     params.set("mode", mode);
+    if (placementFilter !== "all") params.set("placement_status", placementFilter);
+    if (relocationOnly) params.set("wants_relocation", "1");
+    if (needsReplyOnly) params.set("needs_reply", "1");
     params.set("page", String(page));
 
     api
@@ -108,7 +126,7 @@ export function UsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, mode, page]);
+  }, [debouncedSearch, mode, placementFilter, relocationOnly, needsReplyOnly, page]);
 
   const people = data?.data ?? [];
   const currentPage = data?.current_page ?? 1;
@@ -169,6 +187,37 @@ export function UsersPage() {
             </button>
           ))}
         </div>
+        {/* 進捗で絞り込み（FB④の土台）。一斉送信のセグメント検討にも使う。 */}
+        <select
+          value={placementFilter}
+          onChange={(e) => setPlacementFilter(e.target.value as "all" | PlacementStatus)}
+          className="px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        >
+          <option value="all">進捗: 全て</option>
+          {(["consulting", "store_introduced", "trial_scheduled", "trial_done", "joined", "left", "lost"] as PlacementStatus[]).map((s) => (
+            <option key={s} value={s}>{PLACEMENT_STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+        {/* 未返信（最後が相手発言＝自分が返せていない）のみ。返信漏れ防止 (FB④)。 */}
+        <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={needsReplyOnly}
+            onChange={(e) => setNeedsReplyOnly(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          未返信のみ
+        </label>
+        {/* 上京希望のみ（上京者向け一斉送信のセグメント、FB⑦）。 */}
+        <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={relocationOnly}
+            onChange={(e) => setRelocationOnly(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          上京希望のみ
+        </label>
       </div>
 
       {/* List */}
@@ -191,6 +240,7 @@ export function UsersPage() {
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">利用者</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">種別</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">メッセージ</th>
+                    <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">AIチャット</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider">最終</th>
                     <th className="text-left py-2.5 px-4 text-muted-foreground text-[11px] uppercase tracking-wider"></th>
                   </tr>
@@ -209,6 +259,16 @@ export function UsersPage() {
                       </td>
                       <td className="py-2.5 px-4"><PersonBadges p={p} /></td>
                       <td className="py-2.5 px-4 text-muted-foreground">{p.messages_count}</td>
+                      <td className="py-2.5 px-4 text-muted-foreground">
+                        {p.ai_chat_count > 0 ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Bot className="w-3 h-3 text-indigo-500" />
+                            {p.ai_chat_count}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-4 text-muted-foreground">{formatDate(p.last_activity)}</td>
                       <td className="py-2.5 px-4">
                         <button onClick={() => openPerson(p)} className="text-[12px] text-indigo-600 hover:text-indigo-700 transition">
@@ -234,7 +294,9 @@ export function UsersPage() {
                       <span className="text-[13px] truncate">{personName(p)}</span>
                     </div>
                     <div className="mt-0.5"><PersonBadges p={p} /></div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">メッセージ {p.messages_count}件 · {formatDate(p.last_activity)}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      メッセージ {p.messages_count}件{p.ai_chat_count > 0 ? ` · AI ${p.ai_chat_count}回` : ""} · {formatDate(p.last_activity)}
+                    </p>
                   </div>
                   <ChevronR className="w-4 h-4 text-indigo-300" />
                 </div>

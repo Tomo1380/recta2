@@ -34,6 +34,7 @@ export function ShopsPage() {
   const [search, setSearch] = useState("");
   const [areaFilter, setAreaFilter] = useState("全て");
   const [statusFilter, setStatusFilter] = useState("全て");
+  const [notUpdatedMonths, setNotUpdatedMonths] = useState(0);
   const [sortState, setSortState] = useState<SortState>({ sort: "updated_at", order: "desc" });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,7 @@ export function ShopsPage() {
         const apiStatus = STATUS_REVERSE[statusFilter];
         if (apiStatus) params.set("publish_status", apiStatus);
       }
+      if (notUpdatedMonths > 0) params.set("not_updated_months", String(notUpdatedMonths));
       params.set("sort", sortState.sort);
       params.set("order", sortState.order);
       const res = await api.get<Paginated<Store>>(`/admin/stores?${params.toString()}`);
@@ -75,7 +77,7 @@ export function ShopsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, areaFilter, statusFilter, sortState]);
+  }, [page, search, areaFilter, statusFilter, notUpdatedMonths, sortState]);
 
   useEffect(() => {
     fetchStores();
@@ -84,7 +86,7 @@ export function ShopsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, areaFilter, statusFilter, sortState]);
+  }, [search, areaFilter, statusFilter, notUpdatedMonths, sortState]);
 
   const statusLabel = (s: Store) => STATUS_MAP[s.publish_status] || s.publish_status;
 
@@ -165,7 +167,18 @@ export function ShopsPage() {
         >
           {statuses.map((s) => <option key={s}>{s}</option>)}
         </select>
-        <SortControl value={sortState} onChange={setSortState} />
+        {/* 更新が滞っている店舗の洗い出し（口コミも更新扱い）。定期的な棚卸し用。 */}
+        <select
+          value={notUpdatedMonths}
+          onChange={(e) => setNotUpdatedMonths(Number(e.target.value))}
+          className="px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+        >
+          <option value={0}>更新状況: 全て</option>
+          <option value={1}>1ヶ月以上更新なし</option>
+          <option value={3}>3ヶ月以上更新なし</option>
+          <option value={6}>6ヶ月以上更新なし</option>
+        </select>
+        <SortControl value={sortState} onChange={setSortState} fields={["created_at", "updated_at", "access_rank"]} />
       </div>
 
       {/* Table */}

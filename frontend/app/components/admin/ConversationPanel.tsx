@@ -99,7 +99,9 @@ export function ConversationPanel({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-[420px]">
+    // 高さをビューポート基準で固定し、メッセージ一覧を内部スクロール・送信欄を
+    // 常に下部に固定する。これで携帯でも長い会話の末尾までスクロールせずに返信できる。
+    <div className="flex flex-col h-[65vh] lg:h-[calc(100vh-220px)] min-h-[360px]">
       {error && (
         <div className="bg-red-50 border-b border-red-200 px-3 py-2 text-[12px] text-red-700">{error}</div>
       )}
@@ -155,8 +157,9 @@ export function ConversationPanel({
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             placeholder="メッセージを入力..."
             rows={1}
-            className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-[#06C755]/20 focus:border-[#06C755] resize-none"
-            style={{ minHeight: "40px", maxHeight: "120px" }}
+            className="flex-1 px-3 py-2 rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-[#06C755]/20 focus:border-[#06C755] resize-none"
+            // iOS Safari は font-size<16px だとフォーカス時に自動ズームしてしまうので 16px 固定。
+            style={{ minHeight: "40px", maxHeight: "120px", fontSize: "16px" }}
           />
           <button
             onClick={handleSend}

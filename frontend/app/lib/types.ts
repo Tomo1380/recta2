@@ -45,6 +45,14 @@ export interface AdminPersonRow {
   has_account: boolean;
   status: string | null;
   reviews_count: number | null;
+  /** この人 (line_user_id) の AIチャット利用数。アクティブ度の目安。 */
+  ai_chat_count: number;
+  /** CRM 属性 (一覧表示・絞り込み用)。 */
+  placement_status: PlacementStatus;
+  wants_relocation: boolean;
+  interested_area: string | null;
+  /** 最後のメッセージが相手発言＝自分が未返信。 */
+  needs_reply: boolean;
   last_activity: string | null;
   kind: "talk" | "login_only";
 }
@@ -94,13 +102,43 @@ export interface AdminPerson {
   ai_chats_total: number;
   messages: LineMessage[];
   messages_total: number;
+  /** CRM 属性 (流入種別・気になるエリア・入店進捗・上京希望)。 */
+  profile: PersonProfile;
 }
+
+/** 入店進捗のキー (バックエンド PersonProfile::STATUSES と対応・ナイトワーク採用フロー)。 */
+export type PlacementStatus =
+  | "new"
+  | "consulting"
+  | "store_introduced"
+  | "trial_scheduled"
+  | "trial_done"
+  | "joined"
+  | "left"
+  | "lost";
+
+export interface PersonProfile {
+  placement_status: PlacementStatus;
+  interested_area: string | null;
+  wants_relocation: boolean;
+  referral_source: string | null;
+}
+
+export const PLACEMENT_STATUS_LABELS: Record<PlacementStatus, string> = {
+  new: "新規",
+  consulting: "相談中",
+  store_introduced: "店舗紹介済み",
+  trial_scheduled: "面接・体入予定",
+  trial_done: "体入済",
+  joined: "入店・在籍中",
+  left: "退店",
+  lost: "見送り・連絡途絶",
+};
 
 export interface AdminPersonChat {
   id: number;
   user_message: string;
   ai_response: string;
-  mode: string | null;
   page_type: string | null;
   total_tokens: number;
   created_at: string | null;
@@ -212,8 +250,9 @@ export type AiChatSetting = GeneratedAiChatSetting;
 
 // AdminUser は orval-generated 型 (AdminUserResource) を alias。
 // Phase 1-6 で手書き interface から移行。
+// permissions は RBAC 追加分。`npm run gen:api` で生成型に入るまでの間、手動で拡張しておく。
 import type { AdminUserResource as GeneratedAdminUserResource } from "../../orval/generated/api.schemas";
-export type AdminUser = GeneratedAdminUserResource;
+export type AdminUser = GeneratedAdminUserResource & { permissions?: string[] };
 
 export interface DashboardKpiWithDelta {
   value: number;
@@ -225,8 +264,6 @@ export interface DashboardKpiWithDelta {
 
 export interface DashboardChatTrendPoint {
   date: string;
-  agent: number;
-  finetuned: number;
   total: number;
 }
 
@@ -264,7 +301,6 @@ export interface DashboardRecentMessage {
 
 export interface DashboardRecentChat {
   id: number;
-  mode: string | null;
   page_type: string | null;
   user_message: string;
   total_tokens: number;
@@ -291,7 +327,6 @@ export interface DashboardData {
     new_reviews_7d: number;
     new_users_7d: number;
     published_articles: number;
-    fine_tuning_qa_active: number;
   };
   analytics_highlight: {
     stores: AnalyticsRankRow[];
@@ -461,19 +496,4 @@ export interface AiChatStats {
   top_users: { name: string; count: number }[];
   monthly_total: number;
   monthly_tokens: number;
-  mode_stats?: {
-    mode: string;
-    count: number;
-    total_input_tokens: number;
-    total_output_tokens: number;
-    total_tokens: number;
-    avg_tokens: number;
-  }[];
-  mode_daily_stats?: {
-    date: string;
-    mode: string;
-    count: number;
-    total_tokens: number;
-    avg_tokens: number;
-  }[];
 }
