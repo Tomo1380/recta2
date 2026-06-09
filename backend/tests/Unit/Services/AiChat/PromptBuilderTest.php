@@ -113,7 +113,9 @@ class PromptBuilderTest extends TestCase
 
         $this->assertStringContainsString('search_stores', $prompt);
         $this->assertStringContainsString('Recta AI', $prompt);
-        $this->assertStringContainsString('LINE誘導', $prompt);
+        // LINE 誘導は本文に書かせず UI ボタンに一本化したため、プロンプトは
+        // 「LINE への誘導文を本文に書かない」旨を含む（LINE への言及自体は残る）。
+        $this->assertStringContainsString('LINE', $prompt);
     }
 
     public function test_agent_system_prompt_uses_detail_rules_when_store_context_provided(): void
@@ -127,31 +129,6 @@ class PromptBuilderTest extends TestCase
         $this->assertStringNotContainsString('必ずsearch_storesを呼び出して', $prompt);
     }
 
-    public function test_openai_system_prompt_is_minimal(): void
-    {
-        $prompt = $this->builder->buildOpenAiSystemPrompt($this->setting(), '', '', 'top');
-
-        // FT model は短く ([STORE:ID] と LINE 誘導の reminder だけ)
-        $this->assertLessThan(500, mb_strlen($prompt));
-        $this->assertStringContainsString('STORE:ID', $prompt);
-        $this->assertStringContainsString('LINE誘導', $prompt);
-    }
-
-    public function test_openai_system_prompt_includes_store_context_only_on_detail(): void
-    {
-        $context = "店名: 詳細店舗";
-
-        $top = $this->builder->buildOpenAiSystemPrompt($this->setting(), $context, '', 'top');
-        $detail = $this->builder->buildOpenAiSystemPrompt($this->setting(), $context, '', 'detail');
-
-        $this->assertStringNotContainsString('詳細店舗', $top);
-        $this->assertStringContainsString('詳細店舗', $detail);
-    }
-
-    public function test_core_system_prompt_includes_user_area(): void
-    {
-        $prompt = $this->builder->buildCoreSystemPrompt($this->setting(), '', '渋谷', 'top');
-
-        $this->assertStringContainsString('渋谷', $prompt);
-    }
+    // Fine-tuned モード廃止に伴い buildOpenAiSystemPrompt / buildCoreSystemPrompt は
+    // 削除済み。関連テストも撤去した（Agent prompt のみ検証する）。
 }
