@@ -54,13 +54,13 @@ class UserController extends Controller
 
         // CRM 属性での絞り込み (進捗 / 上京希望)。person_profiles は line_user_id 軸
         // なので、該当する line_user_id 群を集めて両クエリを whereIn で制限する。
-        // ※「未対応(none)」は profile 行が無い人も含むため絞り込み対象外 (=全件扱い)。
+        // ※「新規(new)」は profile 行が無い人も含むため絞り込み対象外 (=全件扱い)。
         $placement = (string) $request->input('placement_status', '');
         $wantsReloc = $request->has('wants_relocation') ? $request->boolean('wants_relocation') : null;
         $profileFilterIds = null;
-        if (($placement !== '' && $placement !== 'none' && $placement !== 'all') || $wantsReloc === true) {
+        if (($placement !== '' && $placement !== 'new' && $placement !== 'all') || $wantsReloc === true) {
             $pq = PersonProfile::query();
-            if ($placement !== '' && $placement !== 'none' && $placement !== 'all') {
+            if ($placement !== '' && $placement !== 'new' && $placement !== 'all') {
                 $pq->where('placement_status', $placement);
             }
             if ($wantsReloc === true) {
@@ -68,6 +68,11 @@ class UserController extends Controller
             }
             $profileFilterIds = $pq->pluck('line_user_id');
         }
+
+        // 未返信 (未読中) 絞り込み: 最後のメッセージが相手発言 (inbound) =「自分が返せていない」人。
+        $needsReplyFilterIds = $request->boolean('needs_reply')
+            ? $this->needsReplyLineUserIds()
+            : null;
 
         // LineFriend → 正規化 people 行 (トーク主役)
         $normFriend = fn (LineFriend $f): array => [
@@ -101,12 +106,15 @@ class UserController extends Controller
             'kind' => 'login_only',
         ];
 
-        $friendQuery = function () use ($search, $profileFilterIds) {
+        $friendQuery = function () use ($search, $profileFilterIds, $needsReplyFilterIds) {
             $q = LineFriend::query()
                 ->with(['user' => fn ($u) => $u->withCount(['reviews' => fn ($r) => $r->where('status', 'published')])])
                 ->withCount('messages');
             if ($profileFilterIds !== null) {
                 $q->whereIn('line_user_id', $profileFilterIds);
+            }
+            if ($needsReplyFilterIds !== null) {
+                $q->whereIn('line_user_id', $needsReplyFilterIds);
             }
             if ($search !== '') {
                 $q->where(function ($w) use ($search) {
@@ -121,12 +129,15 @@ class UserController extends Controller
             return $q;
         };
 
-        $loginOnlyQuery = function () use ($search, $profileFilterIds) {
+        $loginOnlyQuery = function () use ($search, $profileFilterIds, $needsReplyFilterIds) {
             $q = User::query()
                 ->whereDoesntHave('lineFriend')
                 ->withCount(['reviews' => fn ($r) => $r->where('status', 'published')]);
             if ($profileFilterIds !== null) {
                 $q->whereIn('line_user_id', $profileFilterIds);
+            }
+            if ($needsReplyFilterIds !== null) {
+                $q->whereIn('line_user_id', $needsReplyFilterIds);
             }
             if ($search !== '') {
                 $q->where(function ($w) use ($search) {
@@ -170,13 +181,18 @@ class UserController extends Controller
         $profiles = $lineIds->isEmpty()
             ? collect()
             : PersonProfile::whereIn('line_user_id', $lineIds)->get()->keyBy('line_user_id');
-        $people->getCollection()->transform(function ($row) use ($chatCounts, $profiles) {
+        // 未返信 (最後が相手発言) の line_user_id 集合をページ分だけ算出してバッジに使う。
+        $needsReplySet = $lineIds->isEmpty()
+            ? collect()
+            : $this->needsReplyLineUserIds($lineIds)->flip();
+        $people->getCollection()->transform(function ($row) use ($chatCounts, $profiles, $needsReplySet) {
             $lid = $row['line_user_id'] ?? '';
             $profile = $profiles->get($lid);
             $row['ai_chat_count'] = (int) ($chatCounts[$lid] ?? 0);
-            $row['placement_status'] = $profile->placement_status ?? 'none';
+            $row['placement_status'] = $profile->placement_status ?? 'new';
             $row['wants_relocation'] = (bool) ($profile->wants_relocation ?? false);
             $row['interested_area'] = $profile->interested_area ?? null;
+            $row['needs_reply'] = $needsReplySet->has($lid);
             return $row;
         });
 
@@ -188,6 +204,30 @@ class UserController extends Controller
                 'total_users' => User::count(),
             ],
         ]);
+    }
+
+    /**
+     * 「未返信 (未読中)」= 最後のメッセージが相手発言 (inbound) の line_user_id 集合。
+     * id の昇順 ≒ 時系列順なので、line_user_id ごとの最新メッセージ id を取り、
+     * その direction が inbound のものを返す。$restrict 指定時はその範囲に限定。
+     *
+     * @param  iterable<int, string>|null  $restrict
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function needsReplyLineUserIds(?iterable $restrict = null): \Illuminate\Support\Collection
+    {
+        $latestIds = LineMessage::selectRaw('max(id) as id')
+            ->when($restrict !== null, fn ($q) => $q->whereIn('line_user_id', $restrict))
+            ->groupBy('line_user_id')
+            ->pluck('id');
+
+        if ($latestIds->isEmpty()) {
+            return collect();
+        }
+
+        return LineMessage::whereIn('id', $latestIds)
+            ->where('direction', 'inbound')
+            ->pluck('line_user_id');
     }
 
     /**

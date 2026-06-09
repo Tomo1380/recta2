@@ -10,14 +10,19 @@ use Illuminate\Database\Eloquent\Model;
  */
 class PersonProfile extends Model
 {
-    /** 入店進捗の取りうる値。 */
+    /**
+     * 入店進捗の取りうる値。ナイトワークの採用フロー
+     * (LINE相談 → 店舗紹介 → 面接・体入 → 本入店 → 在籍 → 退店/離脱) に対応。
+     */
     public const STATUSES = [
-        'none',            // 未対応
-        'consulting',      // 相談中
-        'trial_scheduled', // 体入予定
-        'trial_done',      // 体入済
-        'joined',          // 入店済
-        'passed',          // 見送り
+        'new',              // 新規（未対応）
+        'consulting',       // 相談中（ヒアリング）
+        'store_introduced', // 店舗紹介済み
+        'trial_scheduled',  // 面接・体入予定
+        'trial_done',       // 体入済
+        'joined',           // 入店・在籍中
+        'left',             // 退店
+        'lost',             // 見送り・連絡途絶
     ];
 
     protected $fillable = [

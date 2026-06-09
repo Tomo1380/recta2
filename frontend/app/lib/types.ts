@@ -51,6 +51,8 @@ export interface AdminPersonRow {
   placement_status: PlacementStatus;
   wants_relocation: boolean;
   interested_area: string | null;
+  /** 最後のメッセージが相手発言＝自分が未返信。 */
+  needs_reply: boolean;
   last_activity: string | null;
   kind: "talk" | "login_only";
 }
@@ -104,14 +106,16 @@ export interface AdminPerson {
   profile: PersonProfile;
 }
 
-/** 入店進捗のキー (バックエンド PersonProfile::STATUSES と対応)。 */
+/** 入店進捗のキー (バックエンド PersonProfile::STATUSES と対応・ナイトワーク採用フロー)。 */
 export type PlacementStatus =
-  | "none"
+  | "new"
   | "consulting"
+  | "store_introduced"
   | "trial_scheduled"
   | "trial_done"
   | "joined"
-  | "passed";
+  | "left"
+  | "lost";
 
 export interface PersonProfile {
   placement_status: PlacementStatus;
@@ -121,12 +125,14 @@ export interface PersonProfile {
 }
 
 export const PLACEMENT_STATUS_LABELS: Record<PlacementStatus, string> = {
-  none: "未対応",
+  new: "新規",
   consulting: "相談中",
-  trial_scheduled: "体入予定",
+  store_introduced: "店舗紹介済み",
+  trial_scheduled: "面接・体入予定",
   trial_done: "体入済",
-  joined: "入店済",
-  passed: "見送り",
+  joined: "入店・在籍中",
+  left: "退店",
+  lost: "見送り・連絡途絶",
 };
 
 export interface AdminPersonChat {

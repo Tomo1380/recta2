@@ -19,8 +19,9 @@ return new class extends Migration
         Schema::create('person_profiles', function (Blueprint $table) {
             $table->id();
             $table->string('line_user_id')->unique();
-            // 入店進捗: none/consulting/trial_scheduled/trial_done/joined/passed
-            $table->string('placement_status', 32)->default('none')->index();
+            // 入店進捗 (ナイトワーク採用フロー: 応募→面接→体入→本入店、退店/離脱まで)。
+            // new/consulting/store_introduced/trial_scheduled/trial_done/joined/left/lost
+            $table->string('placement_status', 32)->default('new')->index();
             // 気になるエリア (自由記述)
             $table->string('interested_area')->nullable();
             // 上京希望フラグ (上京診断・上京者向け一斉送信のセグメント用)

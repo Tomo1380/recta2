@@ -47,7 +47,10 @@ function PersonBadges({ p }: { p: AdminPersonRow }) {
       ) : (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">友だちのみ</span>
       )}
-      {p.placement_status && p.placement_status !== "none" && (
+      {p.needs_reply && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">未返信</span>
+      )}
+      {p.placement_status && p.placement_status !== "new" && (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">
           {PLACEMENT_STATUS_LABELS[p.placement_status]}
         </span>
@@ -77,6 +80,7 @@ export function UsersPage() {
   const [mode, setMode] = useState<Mode>("talk");
   const [placementFilter, setPlacementFilter] = useState<"all" | PlacementStatus>("all");
   const [relocationOnly, setRelocationOnly] = useState(false);
+  const [needsReplyOnly, setNeedsReplyOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Paginated<AdminPersonRow> | null>(null);
@@ -92,7 +96,7 @@ export function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [mode, placementFilter, relocationOnly]);
+  }, [mode, placementFilter, relocationOnly, needsReplyOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +107,7 @@ export function UsersPage() {
     params.set("mode", mode);
     if (placementFilter !== "all") params.set("placement_status", placementFilter);
     if (relocationOnly) params.set("wants_relocation", "1");
+    if (needsReplyOnly) params.set("needs_reply", "1");
     params.set("page", String(page));
 
     api
@@ -121,7 +126,7 @@ export function UsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, mode, placementFilter, relocationOnly, page]);
+  }, [debouncedSearch, mode, placementFilter, relocationOnly, needsReplyOnly, page]);
 
   const people = data?.data ?? [];
   const currentPage = data?.current_page ?? 1;
@@ -189,10 +194,20 @@ export function UsersPage() {
           className="px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
         >
           <option value="all">進捗: 全て</option>
-          {(["consulting", "trial_scheduled", "trial_done", "joined", "passed"] as PlacementStatus[]).map((s) => (
+          {(["consulting", "store_introduced", "trial_scheduled", "trial_done", "joined", "left", "lost"] as PlacementStatus[]).map((s) => (
             <option key={s} value={s}>{PLACEMENT_STATUS_LABELS[s]}</option>
           ))}
         </select>
+        {/* 未返信（最後が相手発言＝自分が返せていない）のみ。返信漏れ防止 (FB④)。 */}
+        <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={needsReplyOnly}
+            onChange={(e) => setNeedsReplyOnly(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          未返信のみ
+        </label>
         {/* 上京希望のみ（上京者向け一斉送信のセグメント、FB⑦）。 */}
         <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
           <input

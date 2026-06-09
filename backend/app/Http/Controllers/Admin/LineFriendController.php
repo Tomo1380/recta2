@@ -217,7 +217,7 @@ class LineFriendController extends Controller
                 'messages_total' => $messagesTotal,
                 // CRM 属性
                 'profile' => [
-                    'placement_status' => $profile->placement_status ?? 'none',
+                    'placement_status' => $profile->placement_status ?? 'new',
                     'interested_area' => $profile->interested_area,
                     'wants_relocation' => (bool) $profile->wants_relocation,
                     'referral_source' => $profile->referral_source,
@@ -242,7 +242,7 @@ class LineFriendController extends Controller
         PersonProfile::updateOrCreate(
             ['line_user_id' => $lineUserId],
             [
-                'placement_status' => $data['placement_status'] ?? 'none',
+                'placement_status' => $data['placement_status'] ?? 'new',
                 'interested_area' => $data['interested_area'] ?? null,
                 'wants_relocation' => (bool) ($data['wants_relocation'] ?? false),
                 'referral_source' => $data['referral_source'] ?? null,
