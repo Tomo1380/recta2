@@ -545,11 +545,58 @@ interface RelatedStoreSummary {
   area: string | null;
   category: string | null;
   image: string | null;
+  trial_hourly_min?: number | null;
+  trial_hourly_max?: number | null;
+  average_rating?: number | null;
+}
+
+/** 横スライド/単体で使う店舗カード（店舗詳細寄りのデザイン）。 */
+function RelatedStoreCard({ s, wide }: { s: RelatedStoreSummary; wide?: boolean }) {
+  const fmtWage = (min?: number | null, max?: number | null): string | null => {
+    const f = (n: number) => `¥${n.toLocaleString()}`;
+    if (min && max) return min === max ? f(min) : `${f(min)}〜${f(max)}`;
+    if (min) return `${f(min)}〜`;
+    if (max) return `〜${f(max)}`;
+    return null;
+  };
+  const w = fmtWage(s.trial_hourly_min, s.trial_hourly_max);
+  return (
+    <Link
+      to={`/stores/${s.slug ?? s.id}`}
+      className={`group block shrink-0 overflow-hidden rounded-2xl bg-white transition hover:shadow-md ${wide ? "w-full" : "w-[200px]"}`}
+      style={{ border: "1px solid rgba(27,37,40,.08)", textDecoration: "none", scrollSnapAlign: "start" }}
+    >
+      <div className="relative w-full" style={{ aspectRatio: "16 / 10", background: "#1b2528" }}>
+        {s.image ? (
+          <img src={s.image} alt={s.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center" style={{ color: GOLD, fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 28 }}>
+            {s.name.charAt(0)}
+          </div>
+        )}
+        {s.category && (
+          <span className="absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: "rgba(200,96,128,0.9)" }}>
+            {s.category}
+          </span>
+        )}
+        {w && <div className="absolute bottom-1.5 left-2 text-[12px] font-semibold text-white">体入 {w}</div>}
+      </div>
+      <div className="p-2.5">
+        <p className="truncate" style={{ fontFamily: J, fontWeight: 700, fontSize: "13.5px", color: DARK, margin: 0 }}>
+          {s.name}
+        </p>
+        <p className="truncate flex items-center gap-1.5" style={{ fontFamily: J, fontSize: "11.5px", color: "rgba(27,37,40,.5)", margin: "2px 0 0" }}>
+          {s.area}
+          {s.average_rating ? <span style={{ color: GOLD }}>★ {s.average_rating.toFixed(1)}</span> : null}
+        </p>
+      </div>
+    </Link>
+  );
 }
 
 /**
- * C4: 記事 → 店舗詳細 → LINE の回遊動線。
- * 管理者が手動で紐付けた related_stores を表示し、エリアの求人一覧へも誘導する。
+ * C4: 記事 → 店舗詳細 → LINE の回遊動線。管理者が紐付けた related_stores を、
+ * 2 店舗以上は横スライド、1 店舗はそのまま単体カードで表示する (FB: コラム①)。
  * （生成型では related_stores が string 扱いになるため unknown 経由で読む）
  */
 function RelatedStoresBlock({ article }: { article: Article }) {
@@ -562,47 +609,34 @@ function RelatedStoresBlock({ article }: { article: Article }) {
   );
 
   return (
-    <div className="px-5 pt-8">
-      <h2 style={{ fontFamily: J, fontWeight: 700, fontSize: "15px", color: DARK, margin: "0 0 12px" }}>
+    <div className="pt-8">
+      <h2 className="px-5" style={{ fontFamily: J, fontWeight: 700, fontSize: "15px", color: DARK, margin: "0 0 12px" }}>
         この記事で紹介したお店
       </h2>
-      <div className="space-y-2">
-        {stores.map((s) => (
-          <Link
-            key={s.id}
-            to={`/stores/${s.slug ?? s.id}`}
-            className="flex items-center gap-3 p-2.5 rounded-2xl bg-white hover:shadow-sm transition"
-            style={{ border: "1px solid rgba(27,37,40,.06)" }}
-          >
-            <div
-              className="w-14 h-14 rounded-xl bg-stone-100 shrink-0"
-              style={{
-                backgroundImage: s.image ? `url(${s.image})` : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate" style={{ fontFamily: J, fontWeight: 700, fontSize: "14px", color: DARK, margin: 0 }}>
-                {s.name}
-              </p>
-              <p className="truncate" style={{ fontFamily: J, fontSize: "11.5px", color: "rgba(27,37,40,.5)", margin: "2px 0 0" }}>
-                {[s.area, s.category].filter(Boolean).join(" / ")}
-              </p>
-            </div>
-            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: "rgba(27,37,40,.35)" }} />
-          </Link>
-        ))}
-      </div>
+      {stores.length === 1 ? (
+        <div className="px-5">
+          <RelatedStoreCard s={stores[0]} wide />
+        </div>
+      ) : (
+        // 2 店舗以上は横スライド。端を少し見切れさせて「まだある」と分かるようにする。
+        <div
+          className="flex gap-3 overflow-x-auto px-5 pb-2"
+          style={{ scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}
+        >
+          {stores.map((s) => (
+            <RelatedStoreCard key={s.id} s={s} />
+          ))}
+        </div>
+      )}
 
       {areas.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-3 px-5 flex flex-wrap gap-1.5">
           {areas.map((a) => (
             <Link
               key={a}
               to={`/stores?area=${encodeURIComponent(a)}`}
               className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px]"
-              style={{ fontFamily: J, fontWeight: 600, background: "#f5f4f0", color: DARK, border: "1px solid rgba(27,37,40,.1)" }}
+              style={{ fontFamily: J, fontWeight: 600, background: "#f5f4f0", color: DARK, border: "1px solid rgba(27,37,40,.1)", textDecoration: "none" }}
             >
               {a}の求人を見る →
             </Link>

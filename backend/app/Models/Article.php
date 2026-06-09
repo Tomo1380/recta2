@@ -99,7 +99,8 @@ class Article extends Model
 
         $byId = Store::whereIn('id', $ids)
             ->where('publish_status', 'published')
-            ->get(['id', 'name', 'slug', 'area', 'category', 'images'])
+            ->withAvg(['reviews as reviews_avg_rating' => fn ($q) => $q->where('status', 'published')], 'rating')
+            ->get(['id', 'name', 'slug', 'area', 'category', 'images', 'wage'])
             ->keyBy('id');
 
         return collect($ids)
@@ -109,6 +110,12 @@ class Article extends Model
                 $first = is_array($s->images) ? ($s->images[0] ?? null) : null;
                 $image = is_array($first) ? ($first['url'] ?? null) : (is_string($first) ? $first : null);
 
+                // 体入時給 (旧データ avg_hourly / hourly もフォールバック)。横スライドの
+                // 店舗カードを店舗詳細寄りにするため (FB: コラム①)。
+                $wage = is_array($s->wage) ? $s->wage : [];
+                $trial = $wage['trial'] ?? [];
+                $toInt = fn ($v) => is_numeric($v) ? (int) $v : (is_string($v) && $v !== '' ? (int) preg_replace('/[^\d]/', '', $v) : null);
+
                 return [
                     'id' => $s->id,
                     'name' => $s->name,
@@ -116,6 +123,9 @@ class Article extends Model
                     'area' => $s->area,
                     'category' => $s->category,
                     'image' => $image,
+                    'trial_hourly_min' => $toInt($trial['hourly_min'] ?? $trial['avg_hourly'] ?? null),
+                    'trial_hourly_max' => $toInt($trial['hourly_max'] ?? $trial['hourly'] ?? null),
+                    'average_rating' => $s->reviews_avg_rating !== null ? round((float) $s->reviews_avg_rating, 1) : null,
                 ];
             })
             ->values()
