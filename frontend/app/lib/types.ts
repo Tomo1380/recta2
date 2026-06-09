@@ -47,6 +47,10 @@ export interface AdminPersonRow {
   reviews_count: number | null;
   /** この人 (line_user_id) の AIチャット利用数。アクティブ度の目安。 */
   ai_chat_count: number;
+  /** CRM 属性 (一覧表示・絞り込み用)。 */
+  placement_status: PlacementStatus;
+  wants_relocation: boolean;
+  interested_area: string | null;
   last_activity: string | null;
   kind: "talk" | "login_only";
 }
@@ -96,7 +100,34 @@ export interface AdminPerson {
   ai_chats_total: number;
   messages: LineMessage[];
   messages_total: number;
+  /** CRM 属性 (流入種別・気になるエリア・入店進捗・上京希望)。 */
+  profile: PersonProfile;
 }
+
+/** 入店進捗のキー (バックエンド PersonProfile::STATUSES と対応)。 */
+export type PlacementStatus =
+  | "none"
+  | "consulting"
+  | "trial_scheduled"
+  | "trial_done"
+  | "joined"
+  | "passed";
+
+export interface PersonProfile {
+  placement_status: PlacementStatus;
+  interested_area: string | null;
+  wants_relocation: boolean;
+  referral_source: string | null;
+}
+
+export const PLACEMENT_STATUS_LABELS: Record<PlacementStatus, string> = {
+  none: "未対応",
+  consulting: "相談中",
+  trial_scheduled: "体入予定",
+  trial_done: "体入済",
+  joined: "入店済",
+  passed: "見送り",
+};
 
 export interface AdminPersonChat {
   id: number;

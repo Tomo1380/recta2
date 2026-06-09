@@ -137,6 +137,8 @@ Route::prefix('admin')->group(function () {
             Route::post('/line-friends/push', [LineFriendController::class, 'push']);
             Route::put('/line-friends/{lineUserId}/name', [LineFriendController::class, 'updateName']);
             Route::put('/line-friends/{lineUserId}/notes', [LineFriendController::class, 'updateNotes']);
+            // CRM 属性 (流入種別・気になるエリア・入店進捗・上京希望)
+            Route::put('/line-friends/{lineUserId}/profile', [LineFriendController::class, 'updateProfile']);
         });
 
         // 汎用画像アップロード (StaffPhotosEditor / DressCode OK・NG / TipTap 本文 等)。

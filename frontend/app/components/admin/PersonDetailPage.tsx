@@ -14,7 +14,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { api } from "~/lib/api";
-import type { AdminPerson, PersonShowResponse } from "~/lib/types";
+import type { AdminPerson, PersonShowResponse, PersonProfile, PlacementStatus } from "~/lib/types";
+import { PLACEMENT_STATUS_LABELS } from "~/lib/types";
 import { ConversationPanel } from "~/components/admin/ConversationPanel";
 import { ChatLogItem } from "~/components/admin/ChatLogItem";
 
@@ -41,6 +42,10 @@ export function PersonDetailPage() {
   const [chatsExpanded, setChatsExpanded] = useState(false);
   const CHATS_COLLAPSED = 3;
 
+  // CRM 属性 (流入種別・気になるエリア・入店進捗・上京希望) の編集ドラフト。
+  const [profileDraft, setProfileDraft] = useState<PersonProfile | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+
   const fetchPerson = useCallback(async () => {
     if (!lineUserId) return;
     try {
@@ -49,6 +54,7 @@ export function PersonDetailPage() {
       setPerson(res.person);
       setNotesDraft(res.person.admin_notes ?? "");
       setNotesDirty(false);
+      setProfileDraft(res.person.profile);
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
@@ -74,6 +80,28 @@ export function PersonDetailPage() {
       setError(err instanceof Error ? err.message : "表示名の保存に失敗しました");
     } finally {
       setSavingName(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!lineUserId || savingProfile || !profileDraft) return;
+    try {
+      setSavingProfile(true);
+      const res = await api.put<PersonShowResponse>(
+        `/admin/line-friends/${encodeURIComponent(lineUserId)}/profile`,
+        {
+          placement_status: profileDraft.placement_status,
+          interested_area: profileDraft.interested_area || null,
+          wants_relocation: profileDraft.wants_relocation,
+          referral_source: profileDraft.referral_source || null,
+        },
+      );
+      setPerson(res.person);
+      setProfileDraft(res.person.profile);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "プロフィールの保存に失敗しました");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -192,6 +220,67 @@ export function PersonDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* 左 */}
         <div className="space-y-4">
+          {/* 対応状況・属性 (CRM) */}
+          {profileDraft && (
+            <section className="bg-card border border-border rounded-xl p-4">
+              <h3 className="text-[13px] font-bold mb-3">対応状況・属性</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[12px] text-muted-foreground mb-1">入店進捗</label>
+                  <select
+                    value={profileDraft.placement_status}
+                    onChange={(e) =>
+                      setProfileDraft({ ...profileDraft, placement_status: e.target.value as PlacementStatus })
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    {(Object.keys(PLACEMENT_STATUS_LABELS) as PlacementStatus[]).map((s) => (
+                      <option key={s} value={s}>{PLACEMENT_STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12px] text-muted-foreground mb-1">気になるエリア</label>
+                    <input
+                      type="text"
+                      value={profileDraft.interested_area ?? ""}
+                      onChange={(e) => setProfileDraft({ ...profileDraft, interested_area: e.target.value })}
+                      placeholder="例: 六本木 / 銀座"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] text-muted-foreground mb-1">流入種別</label>
+                    <input
+                      type="text"
+                      value={profileDraft.referral_source ?? ""}
+                      onChange={(e) => setProfileDraft({ ...profileDraft, referral_source: e.target.value })}
+                      placeholder="例: コラム / SNS / 紹介"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={profileDraft.wants_relocation}
+                    onChange={(e) => setProfileDraft({ ...profileDraft, wants_relocation: e.target.checked })}
+                    className="accent-indigo-600"
+                  />
+                  上京希望
+                </label>
+                <button
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="px-3 py-1.5 rounded-lg text-[13px] bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50"
+                >
+                  {savingProfile ? "保存中…" : "保存"}
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* 管理メモ */}
           <section className="bg-card border border-border rounded-xl p-4">
             <h3 className="text-[13px] font-bold mb-2">管理メモ</h3>

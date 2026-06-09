@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Search, ChevronLeft, ChevronRight, Users, Loader2, MessageCircle, Bot, ChevronRight as ChevronR } from "lucide-react";
 import { api } from "~/lib/api";
-import type { AdminPersonRow, PeopleIndexResponse, Paginated } from "~/lib/types";
+import type { AdminPersonRow, PeopleIndexResponse, Paginated, PlacementStatus } from "~/lib/types";
+import { PLACEMENT_STATUS_LABELS } from "~/lib/types";
 
 /**
  * ユーザー管理 — LINE トーク (公式アカウント) 主役の「LINE利用者」一覧 (2026-06-06 FB)。
@@ -46,6 +47,14 @@ function PersonBadges({ p }: { p: AdminPersonRow }) {
       ) : (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">友だちのみ</span>
       )}
+      {p.placement_status && p.placement_status !== "none" && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">
+          {PLACEMENT_STATUS_LABELS[p.placement_status]}
+        </span>
+      )}
+      {p.wants_relocation && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700">上京希望</span>
+      )}
     </div>
   );
 }
@@ -66,6 +75,8 @@ export function UsersPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mode, setMode] = useState<Mode>("talk");
+  const [placementFilter, setPlacementFilter] = useState<"all" | PlacementStatus>("all");
+  const [relocationOnly, setRelocationOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Paginated<AdminPersonRow> | null>(null);
@@ -81,7 +92,7 @@ export function UsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [mode]);
+  }, [mode, placementFilter, relocationOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +101,8 @@ export function UsersPage() {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     params.set("mode", mode);
+    if (placementFilter !== "all") params.set("placement_status", placementFilter);
+    if (relocationOnly) params.set("wants_relocation", "1");
     params.set("page", String(page));
 
     api
@@ -108,7 +121,7 @@ export function UsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, mode, page]);
+  }, [debouncedSearch, mode, placementFilter, relocationOnly, page]);
 
   const people = data?.data ?? [];
   const currentPage = data?.current_page ?? 1;
@@ -169,6 +182,27 @@ export function UsersPage() {
             </button>
           ))}
         </div>
+        {/* 進捗で絞り込み（FB④の土台）。一斉送信のセグメント検討にも使う。 */}
+        <select
+          value={placementFilter}
+          onChange={(e) => setPlacementFilter(e.target.value as "all" | PlacementStatus)}
+          className="px-3 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        >
+          <option value="all">進捗: 全て</option>
+          {(["consulting", "trial_scheduled", "trial_done", "joined", "passed"] as PlacementStatus[]).map((s) => (
+            <option key={s} value={s}>{PLACEMENT_STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+        {/* 上京希望のみ（上京者向け一斉送信のセグメント、FB⑦）。 */}
+        <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={relocationOnly}
+            onChange={(e) => setRelocationOnly(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          上京希望のみ
+        </label>
       </div>
 
       {/* List */}

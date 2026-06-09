@@ -13,6 +13,7 @@ use App\Http\Resources\UserResource;
 use App\Models\AiChatLog;
 use App\Models\LineFriend;
 use App\Models\LineMessage;
+use App\Models\PersonProfile;
 use App\Models\User;
 use App\Services\LineMessagingService;
 use App\Support\PaginatorWithResource;
@@ -51,6 +52,23 @@ class UserController extends Controller
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 20);
 
+        // CRM 属性での絞り込み (進捗 / 上京希望)。person_profiles は line_user_id 軸
+        // なので、該当する line_user_id 群を集めて両クエリを whereIn で制限する。
+        // ※「未対応(none)」は profile 行が無い人も含むため絞り込み対象外 (=全件扱い)。
+        $placement = (string) $request->input('placement_status', '');
+        $wantsReloc = $request->has('wants_relocation') ? $request->boolean('wants_relocation') : null;
+        $profileFilterIds = null;
+        if (($placement !== '' && $placement !== 'none' && $placement !== 'all') || $wantsReloc === true) {
+            $pq = PersonProfile::query();
+            if ($placement !== '' && $placement !== 'none' && $placement !== 'all') {
+                $pq->where('placement_status', $placement);
+            }
+            if ($wantsReloc === true) {
+                $pq->where('wants_relocation', true);
+            }
+            $profileFilterIds = $pq->pluck('line_user_id');
+        }
+
         // LineFriend → 正規化 people 行 (トーク主役)
         $normFriend = fn (LineFriend $f): array => [
             'line_user_id' => $f->line_user_id,
@@ -83,10 +101,13 @@ class UserController extends Controller
             'kind' => 'login_only',
         ];
 
-        $friendQuery = function () use ($search) {
+        $friendQuery = function () use ($search, $profileFilterIds) {
             $q = LineFriend::query()
                 ->with(['user' => fn ($u) => $u->withCount(['reviews' => fn ($r) => $r->where('status', 'published')])])
                 ->withCount('messages');
+            if ($profileFilterIds !== null) {
+                $q->whereIn('line_user_id', $profileFilterIds);
+            }
             if ($search !== '') {
                 $q->where(function ($w) use ($search) {
                     $w->where('display_name', 'ilike', "%{$search}%")
@@ -100,10 +121,13 @@ class UserController extends Controller
             return $q;
         };
 
-        $loginOnlyQuery = function () use ($search) {
+        $loginOnlyQuery = function () use ($search, $profileFilterIds) {
             $q = User::query()
                 ->whereDoesntHave('lineFriend')
                 ->withCount(['reviews' => fn ($r) => $r->where('status', 'published')]);
+            if ($profileFilterIds !== null) {
+                $q->whereIn('line_user_id', $profileFilterIds);
+            }
             if ($search !== '') {
                 $q->where(function ($w) use ($search) {
                     $w->where('line_display_name', 'ilike', "%{$search}%")
@@ -133,8 +157,9 @@ class UserController extends Controller
             $people = $friendQuery()->orderByDesc('updated_at')->paginate($perPage)->through($normFriend);
         }
 
-        // 各 people 行に AIチャット利用数を付与（line_user_id 基準、ページ分を 1 クエリで集計）。
-        // アクティブ度の目安になる（FB: アクティブユーザーは一斉送信頻度を上げる判断に使う）。
+        // 各 people 行に、ページ分の付随情報をまとめて付与 (line_user_id 基準・各1クエリ)。
+        //  - ai_chat_count: AIチャット利用数 (アクティブ度の目安)
+        //  - placement_status / wants_relocation / interested_area: CRM 属性 (進捗・上京・エリア)
         $lineIds = collect($people->items())->pluck('line_user_id')->filter()->unique()->values();
         $chatCounts = $lineIds->isEmpty()
             ? collect()
@@ -142,8 +167,16 @@ class UserController extends Controller
                 ->selectRaw('line_user_id, count(*) as c')
                 ->groupBy('line_user_id')
                 ->pluck('c', 'line_user_id');
-        $people->getCollection()->transform(function ($row) use ($chatCounts) {
-            $row['ai_chat_count'] = (int) ($chatCounts[$row['line_user_id'] ?? ''] ?? 0);
+        $profiles = $lineIds->isEmpty()
+            ? collect()
+            : PersonProfile::whereIn('line_user_id', $lineIds)->get()->keyBy('line_user_id');
+        $people->getCollection()->transform(function ($row) use ($chatCounts, $profiles) {
+            $lid = $row['line_user_id'] ?? '';
+            $profile = $profiles->get($lid);
+            $row['ai_chat_count'] = (int) ($chatCounts[$lid] ?? 0);
+            $row['placement_status'] = $profile->placement_status ?? 'none';
+            $row['wants_relocation'] = (bool) ($profile->wants_relocation ?? false);
+            $row['interested_area'] = $profile->interested_area ?? null;
             return $row;
         });
 
