@@ -901,7 +901,7 @@ export function ShopEditPage() {
   // 入ってしまう。新規作成では空にし、既存店舗を開いたときだけ
   // populateFromStore() で実データを流す。
   const [hiringEntries, setHiringEntries] = useState<
-    { month: string; count: string }[]
+    { month: string; count: string; hidden?: boolean }[]
   >([]);
   const [hiringTotal, setHiringTotal] = useState("");
   // 採用例はセクション単位 (各月には紐付けない)。
@@ -1989,18 +1989,20 @@ export function ShopEditPage() {
                   採用例は月に紐付けずセクション単位で持つので、ここは人数だけ。 */}
               <div className="space-y-2">
                 {RELATIVE_HIRE_LABELS.map((relLabel, i) => {
-                  const entry = hiringEntries[i] ?? { month: relLabel, count: "" };
-                  const writeCount = (count: string) => {
+                  const entry = hiringEntries[i] ?? { month: relLabel, count: "", hidden: false };
+                  // スロット i を patch（他スロットの count/hidden は保持）。
+                  const updateSlot = (patch: Partial<{ count: string; hidden: boolean }>) => {
                     const next = RELATIVE_HIRE_LABELS.map((lbl, idx) => {
-                      const base = hiringEntries[idx] ?? { month: lbl, count: "" };
+                      const base = hiringEntries[idx] ?? { month: lbl, count: "", hidden: false };
                       return idx === i
-                        ? { month: lbl, count }
-                        : { month: lbl, count: base.count };
+                        ? { ...base, month: lbl, ...patch }
+                        : { ...base, month: lbl };
                     });
                     setHiringEntries(next);
                   };
+                  const hasCount = (Number(entry.count) || 0) > 0;
                   return (
-                    <div key={relLabel} className="flex items-center gap-3">
+                    <div key={relLabel} className={`flex items-center gap-3 ${entry.hidden ? "opacity-50" : ""}`}>
                       <span className="w-20 shrink-0 text-sm font-medium text-foreground/80">{relLabel}</span>
                       <div className="flex-1">
                         <TextInput
@@ -2009,15 +2011,32 @@ export function ShopEditPage() {
                           step={1}
                           min={0}
                           value={entry.count}
-                          onChange={(e) => writeCount(e.target.value.replace(/[^\d]/g, ""))}
+                          onChange={(e) => updateSlot({ count: e.target.value.replace(/[^\d]/g, "") })}
                           placeholder="採用人数（空欄=非表示）"
                         />
                       </div>
                       <span className="text-sm text-foreground/50">名</span>
+                      {/* ✖ で公開非表示（人数は保持）。新店が古い月を嘘にしないため。 */}
+                      <button
+                        type="button"
+                        onClick={() => updateSlot({ hidden: !entry.hidden })}
+                        disabled={!hasCount}
+                        title={entry.hidden ? "公開ページに表示する" : "公開ページで非表示にする"}
+                        className={`shrink-0 px-2 py-1 rounded-md text-[11px] border transition disabled:opacity-30 ${
+                          entry.hidden
+                            ? "border-red-300 text-red-500 bg-red-50"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {entry.hidden ? "非表示" : "表示"}
+                      </button>
                     </div>
                   );
                 })}
               </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                「非表示」にした月は人数を保持したまま公開ページに出しません（新店で実在しない月の表示を防ぐ用）。
+              </p>
             </Field>
           </div>
           <Field label="採用例（任意）" hint="このお店全体の採用例。月とは紐付きません。">

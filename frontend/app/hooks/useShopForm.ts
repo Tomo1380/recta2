@@ -56,6 +56,8 @@ export type RectaEpisodeDraft = {
 export type HiringEntryDraft = {
   month: string;
   count: string;
+  /** ✖ で公開ページに出さない（人数は保持したまま非表示にする）。 */
+  hidden?: boolean;
 };
 
 export interface ShopForm {
@@ -535,6 +537,7 @@ export function storeToForm(rawStore: Store): Partial<ShopForm> {
     hiringEntries: ((store.recent_hires as AnyStore[] | undefined) ?? []).map((h) => ({
       month: h.month ?? "",
       count: h.count?.toString() ?? "",
+      hidden: !!h.hidden,
     })),
     hiringTotal: store.recent_hires_summary ?? "",
     // 採用例はセクション単位。旧データ (各月 recent_hires[].examples) は flatten して移行。
@@ -705,6 +708,8 @@ export function formToPayload(
       .map((h) => ({
         month: h.month,
         count: Number(h.count) || 0,
+        // ✖ で非表示にした月。人数は保持し、公開ページ側で除外する。
+        hidden: !!h.hidden,
       })),
     recent_hires_summary: form.hiringTotal,
     // 採用例はセクション単位。空文字は除外。

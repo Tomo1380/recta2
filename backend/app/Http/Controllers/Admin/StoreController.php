@@ -134,6 +134,10 @@ class StoreController extends Controller
             'analysis' => 'nullable|array',
             'required_documents' => 'nullable|array',
             'recent_hires' => 'nullable|array',
+            'recent_hires.*.month' => 'nullable|string|max:20',
+            'recent_hires.*.count' => 'nullable|integer|min:0',
+            // ✖（公開非表示）フラグ。人数は保持しつつ公開ページから隠す。
+            'recent_hires.*.hidden' => 'nullable|boolean',
             'recent_hire_examples' => 'nullable|array',
             'recent_hire_examples.*' => 'string|max:255',
             'qa' => 'nullable|array',
