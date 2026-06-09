@@ -274,6 +274,14 @@ async function streamMessage(
     err.limitType = data.limit_type;
     throw err;
   }
+  if (res.status === 422) {
+    // バリデーション（入力が長すぎる等）。サーバの日本語メッセージをそのまま見せる。
+    const data = await res.json().catch(() => null) as
+      | { message?: string; errors?: Record<string, string[]> }
+      | null;
+    const firstError = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined;
+    throw new Error(firstError || data?.message || "入力内容を確認してください。");
+  }
   if (!res.ok || !res.body) {
     throw new Error("Failed to open chat stream");
   }
@@ -364,6 +372,13 @@ async function streamMessage(
     }
   }
 }
+
+// 入力1メッセージの最大文字数。コスト・濫用対策のためフロント/バックエンド双方で制限する。
+// （サーバ側 ChatRequest の max と揃えること）
+const MAX_INPUT_CHARS = 500;
+// Gemini に渡す会話履歴の最大件数（直近 N メッセージ）。毎ターン全履歴を再送すると
+// コストが会話長に対してほぼ二次関数的に増えるため、直近のみに絞る。
+const MAX_HISTORY_MESSAGES = 10;
 
 function formatWage(min?: number | string | null, max?: number | string | null): string {
   // "6,000円" のような文字列で来ても数値化する（円・カンマ等を除去）。
@@ -1049,10 +1064,15 @@ export default function AiChatPanel({
       let accumulated = "";
 
       try {
-        const history = [...messages, userMessage].map((m) => ({
-          role: m.role === "ai" ? "assistant" : "user",
-          content: m.content,
-        }));
+        // 直近 MAX_HISTORY_MESSAGES 件だけ送る（コスト抑制）。現在の入力(msg)は
+        // バックエンドが別途末尾に付けるので history には含めない（従来は二重送信だった）。
+        const history = messages
+          .filter((m) => m.content && !m.streaming)
+          .slice(-MAX_HISTORY_MESSAGES)
+          .map((m) => ({
+            role: m.role === "ai" ? "assistant" : "user",
+            content: m.content,
+          }));
 
         await streamMessage(
           msg,
@@ -1700,6 +1720,7 @@ export default function AiChatPanel({
               placeholder={limitReached ? "利用上限に達しました" : "何でも聞いてください…"}
               aria-label="AIチャットへのメッセージ入力"
               disabled={isLoading || limitReached}
+              maxLength={MAX_INPUT_CHARS}
               rows={1}
               // iOS Safari は font-size が 16px 未満だとフォーカス時に
               // 自動ズームしてしまう。16px 固定。
@@ -1712,6 +1733,15 @@ export default function AiChatPanel({
                 maxHeight: "96px",
               }}
             />
+            {/* 文字数カウンタ: 上限の8割を超えたら表示（残量を意識させ、急な弾きを防ぐ） */}
+            {input.length > MAX_INPUT_CHARS * 0.8 && (
+              <span
+                className="pointer-events-none absolute bottom-1 right-12 text-[10px]"
+                style={{ color: input.length >= MAX_INPUT_CHARS ? "#dc2626" : "rgba(27,37,40,0.45)" }}
+              >
+                {input.length}/{MAX_INPUT_CHARS}
+              </span>
+            )}
             <button
               type="submit"
               disabled={!input.trim() || isLoading || limitReached}

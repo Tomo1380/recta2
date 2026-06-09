@@ -186,8 +186,16 @@ class PromptBuilder
      * @param  array<int, array<string, mixed>>  $history
      * @return array<int, array{role: string, parts: array<int, array{text: string}>}>
      */
+    /** Gemini に渡す会話履歴の最大件数（直近 N メッセージ）。コスト・濫用対策。 */
+    public const MAX_HISTORY = 10;
+
     public function buildGeminiHistory(array $history): array
     {
+        // クライアントが何件送ってきても、prompt に載せるのは直近 N 件だけにする。
+        if (count($history) > self::MAX_HISTORY) {
+            $history = array_slice($history, -self::MAX_HISTORY);
+        }
+
         $geminiHistory = [];
         foreach ($history as $msg) {
             $role = ($msg['role'] ?? '') === 'user' ? 'user' : 'model';
