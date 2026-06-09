@@ -25,6 +25,9 @@ class UpdateAdminUserRequest extends FormRequest
             'status' => 'sometimes|in:active,inactive',
             // 編集画面からのパスワード変更 (任意)。空のときは update() 側で除外する。
             'password' => 'sometimes|nullable|string|min:8',
+            // 付与権限（admin 用）。送られたときだけ更新する。
+            'permissions' => 'sometimes|nullable|array',
+            'permissions.*' => ['string', \Illuminate\Validation\Rule::in(\App\Models\AdminUser::PERMISSIONS)],
         ];
     }
 }

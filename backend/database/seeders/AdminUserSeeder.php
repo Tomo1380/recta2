@@ -17,12 +17,15 @@ class AdminUserSeeder extends Seeder
             'status' => 'active',
         ]);
 
+        // 一般管理者のサンプル。権限の組み合わせ例として「チャット担当 + コラム担当」
+        // （ユーザー対応とコラム作成のみ）を付与しておく。
         AdminUser::create([
             'name' => '田中 太郎',
             'email' => 'tanaka@recta2.jp',
             'password' => 'password',
             'role' => 'admin',
             'status' => 'active',
+            'permissions' => ['chat', 'articles'],
         ]);
     }
 }

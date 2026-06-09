@@ -14,6 +14,8 @@ export interface AdminUser {
   email: string;
   role: "super_admin" | "admin";
   status: "active" | "inactive";
+  /** 実効権限キー（super_admin は全権限が入る）。ナビ/ルートゲートに使用。 */
+  permissions?: string[];
   last_login_at: string | null;
   created_at: string;
   updated_at: string;

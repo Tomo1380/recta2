@@ -107,116 +107,132 @@ Route::prefix('admin')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
 
-        // ダッシュボード
-        Route::get('/dashboard', [DashboardController::class, 'index']);
+        // ── ダッシュボード・アクセス解析・計測リンク（analytics 権限）──
+        Route::middleware('admin.perm:analytics')->group(function () {
+            Route::get('/dashboard', [DashboardController::class, 'index']);
 
-        // アクセス解析（店舗/エリア/コラム ランキング・LINE経路）
-        Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
-        Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown']);
+            Route::get('/analytics/overview', [AnalyticsController::class, 'overview']);
+            Route::get('/analytics/breakdown', [AnalyticsController::class, 'breakdown']);
 
-        // 計測リンク（アフィリエイト/店舗別LINE導線/SNS）発行・管理
-        Route::get('/tracking-links', [TrackingLinkController::class, 'index']);
-        Route::post('/tracking-links', [TrackingLinkController::class, 'store']);
-        Route::put('/tracking-links/{trackingLink}', [TrackingLinkController::class, 'update']);
-        Route::delete('/tracking-links/{trackingLink}', [TrackingLinkController::class, 'destroy']);
+            // 計測リンク（アフィリエイト/店舗別LINE導線/SNS）発行・管理
+            Route::get('/tracking-links', [TrackingLinkController::class, 'index']);
+            Route::post('/tracking-links', [TrackingLinkController::class, 'store']);
+            Route::put('/tracking-links/{trackingLink}', [TrackingLinkController::class, 'update']);
+            Route::delete('/tracking-links/{trackingLink}', [TrackingLinkController::class, 'destroy']);
+        });
 
-        // ユーザー管理
-        Route::get('/users', [UserController::class, 'index']);
-        Route::get('/users/{user}', [UserController::class, 'show']);
-        Route::put('/users/{user}/status', [UserController::class, 'updateStatus']);
-        Route::put('/users/{user}/notes', [UserController::class, 'updateNotes']);
-        Route::post('/users/{user}/line-message', [UserController::class, 'sendLineMessage']);
-        Route::get('/users/{user}/messages', [UserController::class, 'messages']);
+        // ── ユーザー管理・LINE対応（chat 権限）──
+        Route::middleware('admin.perm:chat')->group(function () {
+            Route::get('/users', [UserController::class, 'index']);
+            Route::get('/users/{user}', [UserController::class, 'show']);
+            Route::put('/users/{user}/status', [UserController::class, 'updateStatus']);
+            Route::put('/users/{user}/notes', [UserController::class, 'updateNotes']);
+            Route::post('/users/{user}/line-message', [UserController::class, 'sendLineMessage']);
+            Route::get('/users/{user}/messages', [UserController::class, 'messages']);
 
-        // LINE 友だち (line_user_id 基準のトーク)。アプリ User 未連携の相手でも
-        // トーク・送信・名前編集ができるようにする (2026-06-06 FB)。
-        Route::get('/line-friends/{lineUserId}/messages', [LineFriendController::class, 'messages']);
-        Route::get('/line-friends/{lineUserId}', [LineFriendController::class, 'show']);
-        Route::post('/line-friends/push', [LineFriendController::class, 'push']);
-        Route::put('/line-friends/{lineUserId}/name', [LineFriendController::class, 'updateName']);
-        Route::put('/line-friends/{lineUserId}/notes', [LineFriendController::class, 'updateNotes']);
-
-        // 店舗管理
-        // 住所 → 緯度経度 (Google Geocoding) — apiResource の {store} に飲まれないよう先に登録。
-        Route::post('/stores/geocode', [StoreController::class, 'geocode']);
-        Route::apiResource('/stores', StoreController::class);
-        Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
-        Route::put('/stores/{store}/images/reorder', [StoreController::class, 'reorderImages']);
-        Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);
+            // LINE 友だち (line_user_id 基準のトーク)。アプリ User 未連携の相手でも
+            // トーク・送信・名前編集ができるようにする (2026-06-06 FB)。
+            Route::get('/line-friends/{lineUserId}/messages', [LineFriendController::class, 'messages']);
+            Route::get('/line-friends/{lineUserId}', [LineFriendController::class, 'show']);
+            Route::post('/line-friends/push', [LineFriendController::class, 'push']);
+            Route::put('/line-friends/{lineUserId}/name', [LineFriendController::class, 'updateName']);
+            Route::put('/line-friends/{lineUserId}/notes', [LineFriendController::class, 'updateNotes']);
+        });
 
         // 汎用画像アップロード (StaffPhotosEditor / DressCode OK・NG / TipTap 本文 等)。
-        // 親モデルに紐付けず URL だけ返すので、フロントが form 側で URL を保持し、
-        // save 時に親モデルと一緒に保存する設計。
+        // 店舗編集・コラム編集の両方で使うため、特定権限ではゲートしない (auth のみ)。
+        // URL を返すだけで親モデルには紐付かないので副作用は小さい。
         Route::post('/uploads/{kind}', [\App\Http\Controllers\Admin\MediaUploadController::class, 'store'])
             ->where('kind', '[a-z0-9-]+');
 
-        // 口コミ管理
-        Route::get('/reviews', [ReviewController::class, 'index']);
-        Route::post('/reviews', [ReviewController::class, 'store']);
-        Route::get('/reviews/{review}', [ReviewController::class, 'show']);
-        Route::put('/reviews/{review}/status', [ReviewController::class, 'updateStatus']);
-        Route::put('/reviews/{review}', [ReviewController::class, 'update']);
+        // ── 店舗管理・エリア/カテゴリ（stores 権限）──
+        Route::middleware('admin.perm:stores')->group(function () {
+            // 住所 → 緯度経度 (Google Geocoding) — apiResource の {store} に飲まれないよう先に登録。
+            Route::post('/stores/geocode', [StoreController::class, 'geocode']);
+            Route::apiResource('/stores', StoreController::class);
+            Route::post('/stores/{store}/images', [StoreController::class, 'uploadImage']);
+            Route::put('/stores/{store}/images/reorder', [StoreController::class, 'reorderImages']);
+            Route::delete('/stores/{store}/images/{index}', [StoreController::class, 'deleteImage']);
 
-        // AIチャット設定
-        Route::get('/ai-chat/settings', [AiChatSettingController::class, 'index']);
-        Route::put('/ai-chat/settings/{ai_chat_setting}', [AiChatSettingController::class, 'update']);
-        Route::get('/ai-chat/stats', [AiChatSettingController::class, 'stats']);
-        Route::get('/ai-chat/logs', [AiChatSettingController::class, 'logs']);
-        Route::get('/ai-chat/limits', [AiChatSettingController::class, 'limits']);
-        Route::put('/ai-chat/limits', [AiChatSettingController::class, 'updateLimits']);
+            // Area & Category management
+            Route::get('areas', [AreaCategoryController::class, 'areas']);
+            Route::post('areas', [AreaCategoryController::class, 'storeArea']);
+            Route::put('areas/{area}', [AreaCategoryController::class, 'updateArea']);
+            Route::delete('areas/{area}', [AreaCategoryController::class, 'destroyArea']);
+            Route::post('areas/reorder', [AreaCategoryController::class, 'reorderAreas']);
 
-        // 管理ユーザー
+            Route::get('categories', [AreaCategoryController::class, 'categories']);
+            Route::post('categories', [AreaCategoryController::class, 'storeCategory']);
+            Route::put('categories/{category}', [AreaCategoryController::class, 'updateCategory']);
+            Route::delete('categories/{category}', [AreaCategoryController::class, 'destroyCategory']);
+            Route::post('categories/reorder', [AreaCategoryController::class, 'reorderCategories']);
+            Route::post('categories/{category}/image', [AreaCategoryController::class, 'uploadCategoryImage']);
+        });
+
+        // ── 口コミ管理（reviews 権限）──
+        Route::middleware('admin.perm:reviews')->group(function () {
+            Route::get('/reviews', [ReviewController::class, 'index']);
+            Route::post('/reviews', [ReviewController::class, 'store']);
+            Route::get('/reviews/{review}', [ReviewController::class, 'show']);
+            Route::put('/reviews/{review}/status', [ReviewController::class, 'updateStatus']);
+            Route::put('/reviews/{review}', [ReviewController::class, 'update']);
+        });
+
+        // ── AIチャット設定・業界ナレッジ（ai_chat 権限）──
+        Route::middleware('admin.perm:ai_chat')->group(function () {
+            Route::get('/ai-chat/settings', [AiChatSettingController::class, 'index']);
+            Route::put('/ai-chat/settings/{ai_chat_setting}', [AiChatSettingController::class, 'update']);
+            Route::get('/ai-chat/stats', [AiChatSettingController::class, 'stats']);
+            Route::get('/ai-chat/logs', [AiChatSettingController::class, 'logs']);
+            Route::get('/ai-chat/limits', [AiChatSettingController::class, 'limits']);
+            Route::put('/ai-chat/limits', [AiChatSettingController::class, 'updateLimits']);
+
+            // 業界ナレッジ管理
+            Route::get('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'index']);
+            Route::post('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'store']);
+            Route::put('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'update']);
+            Route::delete('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'destroy']);
+            Route::post('/ai-chat/knowledge/reorder', [IndustryKnowledgeController::class, 'reorder']);
+        });
+
+        // ── コラム記事管理（articles 権限）──
+        Route::middleware('admin.perm:articles')->group(function () {
+            Route::apiResource('articles', ArticleController::class);
+            Route::post('articles/{article}/thumbnail', [ArticleController::class, 'uploadThumbnail']);
+        });
+
+        // ── コンテンツ・上京者の声（content 権限）──
+        Route::middleware('admin.perm:content')->group(function () {
+            // Relocate voices (上京した先輩の声)
+            Route::get('relocate-voices', [RelocateVoiceController::class, 'index']);
+            Route::post('relocate-voices', [RelocateVoiceController::class, 'store']);
+            Route::put('relocate-voices/{relocateVoice}', [RelocateVoiceController::class, 'update']);
+            Route::delete('relocate-voices/{relocateVoice}', [RelocateVoiceController::class, 'destroy']);
+            Route::post('relocate-voices/reorder', [RelocateVoiceController::class, 'reorder']);
+
+            // Content management
+            Route::get('pickup-shops', [ContentController::class, 'pickupShops']);
+            Route::post('pickup-shops', [ContentController::class, 'storePickupShop']);
+            Route::put('pickup-shops/{pickupShop}', [ContentController::class, 'updatePickupShop']);
+            Route::delete('pickup-shops/{pickupShop}', [ContentController::class, 'destroyPickupShop']);
+            Route::post('pickup-shops/reorder', [ContentController::class, 'reorderPickupShops']);
+
+            Route::get('consultations', [ContentController::class, 'consultations']);
+            Route::post('consultations', [ContentController::class, 'storeConsultation']);
+            Route::put('consultations/{consultation}', [ContentController::class, 'updateConsultation']);
+            Route::delete('consultations/{consultation}', [ContentController::class, 'destroyConsultation']);
+
+            Route::get('banner-settings', [ContentController::class, 'bannerSettings']);
+            Route::put('banner-settings', [ContentController::class, 'updateBannerSettings']);
+        });
+
+        // ── 管理ユーザー（作成・更新・削除は super_admin のみ。
+        //    AdminUserController 内 ensureSuperAdmin で強制。閲覧も含め権限ゲートは
+        //    付けず、フロント側で super_admin にのみメニュー表示する）──
         Route::get('/admin-users', [AdminUserController::class, 'index']);
         Route::post('/admin-users', [AdminUserController::class, 'store']);
         Route::put('/admin-users/{admin_user}', [AdminUserController::class, 'update']);
         Route::put('/admin-users/{admin_user}/reset-password', [AdminUserController::class, 'resetPassword']);
         Route::delete('/admin-users/{admin_user}', [AdminUserController::class, 'destroy']);
-
-        // Area & Category management
-        Route::get('areas', [AreaCategoryController::class, 'areas']);
-        Route::post('areas', [AreaCategoryController::class, 'storeArea']);
-        Route::put('areas/{area}', [AreaCategoryController::class, 'updateArea']);
-        Route::delete('areas/{area}', [AreaCategoryController::class, 'destroyArea']);
-        Route::post('areas/reorder', [AreaCategoryController::class, 'reorderAreas']);
-
-        Route::get('categories', [AreaCategoryController::class, 'categories']);
-        Route::post('categories', [AreaCategoryController::class, 'storeCategory']);
-        Route::put('categories/{category}', [AreaCategoryController::class, 'updateCategory']);
-        Route::delete('categories/{category}', [AreaCategoryController::class, 'destroyCategory']);
-        Route::post('categories/reorder', [AreaCategoryController::class, 'reorderCategories']);
-        Route::post('categories/{category}/image', [AreaCategoryController::class, 'uploadCategoryImage']);
-
-        // Relocate voices (上京した先輩の声)
-        Route::get('relocate-voices', [RelocateVoiceController::class, 'index']);
-        Route::post('relocate-voices', [RelocateVoiceController::class, 'store']);
-        Route::put('relocate-voices/{relocateVoice}', [RelocateVoiceController::class, 'update']);
-        Route::delete('relocate-voices/{relocateVoice}', [RelocateVoiceController::class, 'destroy']);
-        Route::post('relocate-voices/reorder', [RelocateVoiceController::class, 'reorder']);
-
-        // Content management
-        Route::get('pickup-shops', [ContentController::class, 'pickupShops']);
-        Route::post('pickup-shops', [ContentController::class, 'storePickupShop']);
-        Route::put('pickup-shops/{pickupShop}', [ContentController::class, 'updatePickupShop']);
-        Route::delete('pickup-shops/{pickupShop}', [ContentController::class, 'destroyPickupShop']);
-        Route::post('pickup-shops/reorder', [ContentController::class, 'reorderPickupShops']);
-
-        Route::get('consultations', [ContentController::class, 'consultations']);
-        Route::post('consultations', [ContentController::class, 'storeConsultation']);
-        Route::put('consultations/{consultation}', [ContentController::class, 'updateConsultation']);
-        Route::delete('consultations/{consultation}', [ContentController::class, 'destroyConsultation']);
-
-        Route::get('banner-settings', [ContentController::class, 'bannerSettings']);
-        Route::put('banner-settings', [ContentController::class, 'updateBannerSettings']);
-
-        // コラム記事管理
-        Route::apiResource('articles', ArticleController::class);
-        Route::post('articles/{article}/thumbnail', [ArticleController::class, 'uploadThumbnail']);
-
-        // 業界ナレッジ管理
-        Route::get('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'index']);
-        Route::post('/ai-chat/knowledge', [IndustryKnowledgeController::class, 'store']);
-        Route::put('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'update']);
-        Route::delete('/ai-chat/knowledge/{industry_knowledge}', [IndustryKnowledgeController::class, 'destroy']);
-        Route::post('/ai-chat/knowledge/reorder', [IndustryKnowledgeController::class, 'reorder']);
     });
 });

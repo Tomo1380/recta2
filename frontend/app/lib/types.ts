@@ -211,8 +211,9 @@ export type AiChatSetting = GeneratedAiChatSetting;
 
 // AdminUser は orval-generated 型 (AdminUserResource) を alias。
 // Phase 1-6 で手書き interface から移行。
+// permissions は RBAC 追加分。`npm run gen:api` で生成型に入るまでの間、手動で拡張しておく。
 import type { AdminUserResource as GeneratedAdminUserResource } from "../../orval/generated/api.schemas";
-export type AdminUser = GeneratedAdminUserResource;
+export type AdminUser = GeneratedAdminUserResource & { permissions?: string[] };
 
 export interface DashboardKpiWithDelta {
   value: number;

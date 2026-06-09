@@ -128,6 +128,11 @@ recta2/
 - Laravel: RESTful API設計、UseCase層でビジネスロジック分離
 - フロント→バックエンド通信: same-origin（Nginx経由）のためCORS不要
 - 認証: JWT
+- 管理者権限 (RBAC): AdminUser は role(super_admin/admin) + permissions(JSON配列)。
+  権限キーは `AdminUser::PERMISSIONS`（analytics/chat/stores/reviews/ai_chat/articles/content）。
+  super_admin は全権限＋管理ユーザー管理。admin は permissions で担当範囲を制御。
+  ルートは `admin.perm:KEY` middleware でセクション単位にゲートし、フロントは
+  `me`/login が返す実効 permissions でナビ・画面を出し分ける。
 - DB: マイグレーションで管理、JSONB活用
 
 ## DB Seeder の使い分け

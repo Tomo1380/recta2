@@ -31,7 +31,10 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'admin' => $admin,
+            // 実効権限（super_admin は全権限）をフロントのナビ表示用に同梱する。
+            'admin' => array_merge($admin->toArray(), [
+                'permissions' => $admin->effectivePermissions(),
+            ]),
         ]);
     }
 
@@ -52,6 +55,8 @@ class AuthController extends Controller
             'email' => $admin->email,
             'role' => $admin->role,
             'status' => $admin->status,
+            // 実効権限（super_admin は全権限）。フロントのナビ/ルートゲートに使う。
+            'permissions' => $admin->effectivePermissions(),
             'last_login_at' => $admin->last_login_at,
             'created_at' => $admin->created_at,
             'updated_at' => $admin->updated_at,

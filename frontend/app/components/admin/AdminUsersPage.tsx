@@ -16,6 +16,71 @@ const formatDate = (dateStr: string | null) => {
   return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// 付与できる権限（バックエンド AdminUser::PERMISSIONS と対応）。
+const PERMISSION_OPTIONS: { key: string; label: string }[] = [
+  { key: "analytics", label: "ダッシュボード・解析" },
+  { key: "chat", label: "ユーザー対応・チャット" },
+  { key: "stores", label: "店舗管理・エリア/カテゴリ" },
+  { key: "reviews", label: "口コミ管理" },
+  { key: "ai_chat", label: "AIチャット設定" },
+  { key: "articles", label: "コラム管理" },
+  { key: "content", label: "コンテンツ・上京者の声" },
+];
+
+// FB で挙がった「担当」をワンタップで設定できるプリセット。
+const PERMISSION_PRESETS: { label: string; keys: string[] }[] = [
+  { label: "チャット担当", keys: ["chat"] },
+  { label: "店舗担当", keys: ["stores"] },
+  { label: "コラム担当", keys: ["articles"] },
+  { label: "全機能", keys: PERMISSION_OPTIONS.map((p) => p.key) },
+];
+
+const permissionLabel = (key: string) =>
+  PERMISSION_OPTIONS.find((p) => p.key === key)?.label ?? key;
+
+/** 権限の付与 UI（プリセット + 個別チェック）。一般管理者の作成/編集で使う。 */
+function PermissionPicker({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const toggle = (key: string) =>
+    onChange(value.includes(key) ? value.filter((k) => k !== key) : [...value, key]);
+
+  return (
+    <div>
+      <label className="block text-[13px] mb-1.5">権限（担当範囲）</label>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {PERMISSION_PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => onChange(p.keys)}
+            className="px-2 py-1 rounded-md text-[11px] border border-border hover:bg-muted transition"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {PERMISSION_OPTIONS.map((opt) => (
+          <label key={opt.key} className="flex items-center gap-2 text-[12px] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={value.includes(opt.key)}
+              onChange={() => toggle(opt.key)}
+              className="accent-indigo-600"
+            />
+            {opt.label}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AdminUsersPage() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +90,7 @@ export function AdminUsersPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePassword, setInvitePassword] = useState("password123");
   const [inviteRole, setInviteRole] = useState("一般管理者");
+  const [invitePermissions, setInvitePermissions] = useState<string[]>(["chat"]);
   const [submitting, setSubmitting] = useState(false);
   // 編集モーダル
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
@@ -33,6 +99,7 @@ export function AdminUsersPage() {
   const [editRole, setEditRole] = useState<AdminUser["role"]>("admin");
   const [editStatus, setEditStatus] = useState<AdminUser["status"]>("active");
   const [editPassword, setEditPassword] = useState("");
+  const [editPermissions, setEditPermissions] = useState<string[]>([]);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const openEdit = (admin: AdminUser) => {
@@ -42,6 +109,7 @@ export function AdminUsersPage() {
     setEditRole(admin.role);
     setEditStatus(admin.status);
     setEditPassword("");
+    setEditPermissions(admin.permissions ?? []);
   };
 
   const fetchAdmins = useCallback(async () => {
@@ -65,17 +133,21 @@ export function AdminUsersPage() {
     if (!inviteName || !inviteEmail || !invitePassword) return;
     try {
       setSubmitting(true);
+      const role = inviteRole === "スーパー管理者" ? "super_admin" : "admin";
       await api.post("/admin/admin-users", {
         name: inviteName,
         email: inviteEmail,
         password: invitePassword,
-        role: inviteRole === "スーパー管理者" ? "super_admin" : "admin",
+        role,
+        // super_admin は全権限なので permissions は送らない
+        ...(role === "admin" ? { permissions: invitePermissions } : {}),
       });
       setShowModal(false);
       setInviteName("");
       setInviteEmail("");
       setInvitePassword("password123");
       setInviteRole("一般管理者");
+      setInvitePermissions(["chat"]);
       await fetchAdmins();
     } catch (e) {
       alert(e instanceof Error ? e.message : "作成に失敗しました");
@@ -98,7 +170,7 @@ export function AdminUsersPage() {
     if (!editTarget || !editName || !editEmail) return;
     try {
       setEditSubmitting(true);
-      const payload: Record<string, string> = {
+      const payload: Record<string, unknown> = {
         name: editName,
         email: editEmail,
         role: editRole,
@@ -106,6 +178,8 @@ export function AdminUsersPage() {
       };
       // パスワードは入力があったときだけ送る (空なら現状維持)
       if (editPassword) payload.password = editPassword;
+      // super_admin は全権限なので permissions は送らない
+      if (editRole === "admin") payload.permissions = editPermissions;
       await api.put(`/admin/admin-users/${editTarget.id}`, payload);
       setEditTarget(null);
       setEditPassword("");
@@ -186,6 +260,24 @@ export function AdminUsersPage() {
                       {admin.role === "super_admin" && <Shield className="w-3 h-3" />}
                       {roleLabel(admin.role)}
                     </span>
+                    {admin.role === "super_admin" ? (
+                      <div className="mt-1 text-[10px] text-muted-foreground">全機能</div>
+                    ) : (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {(admin.permissions ?? []).length === 0 ? (
+                          <span className="text-[10px] text-amber-600">権限なし</span>
+                        ) : (
+                          (admin.permissions ?? []).map((p) => (
+                            <span
+                              key={p}
+                              className="px-1.5 py-0.5 rounded bg-muted text-[10px] text-muted-foreground"
+                            >
+                              {permissionLabel(p)}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2.5 px-4 text-muted-foreground">{formatDate(admin.last_login_at)}</td>
                   <td className="py-2.5 px-4">
@@ -315,7 +407,13 @@ export function AdminUsersPage() {
                   <option>スーパー管理者</option>
                   <option>一般管理者</option>
                 </select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  スーパー管理者は全機能＋管理ユーザー管理が可能です。
+                </p>
               </div>
+              {inviteRole === "一般管理者" && (
+                <PermissionPicker value={invitePermissions} onChange={setInvitePermissions} />
+              )}
             </div>
 
             <div className="flex justify-end gap-2 mt-6">
@@ -400,6 +498,13 @@ export function AdminUsersPage() {
                   </select>
                 </div>
               </div>
+              {editRole === "admin" ? (
+                <PermissionPicker value={editPermissions} onChange={setEditPermissions} />
+              ) : (
+                <p className="text-[12px] text-muted-foreground">
+                  スーパー管理者は全機能＋管理ユーザー管理が可能です。
+                </p>
+              )}
               <div>
                 <label className="block text-[13px] mb-1.5">
                   新しいパスワード
