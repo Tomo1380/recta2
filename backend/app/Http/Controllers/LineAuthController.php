@@ -18,6 +18,9 @@ class LineAuthController extends Controller
     /** OAuth state を載せる HttpOnly cookie 名。 */
     private const STATE_COOKIE = 'line_oauth_state';
 
+    /** 交換コードをブラウザに紐づける HttpOnly cookie 名 (コード窃取対策)。 */
+    private const EXCHANGE_COOKIE = 'line_oauth_exchange';
+
     public function __construct(
         private LineLoginService $lineLoginService,
     ) {}
@@ -119,11 +122,33 @@ class LineAuthController extends Controller
             // トークンを URL クエリに直接載せるとブラウザ履歴・Referer・アクセスログに
             // 残り漏洩しうる。代わりに単回使用・60秒有効の交換コードを発行し、フロントは
             // /api/auth/line/exchange で実トークンを受け取る。
+            //
+            // さらに、URL に載る交換コード自体が Referer / 履歴経由で漏れた場合でも
+            // 第三者が引き換えられないよう、コードを HttpOnly cookie のシークレットに
+            // 紐づける。exchange 時に「URL のコード」と「cookie のシークレット」の両方が
+            // 揃っていなければ実トークンを返さない (コード単体では無価値にする)。
             $exchangeCode = Str::random(64);
-            Cache::put("line_oauth_exchange:{$exchangeCode}", $token, 60);
+            $exchangeSecret = Str::random(64);
+            Cache::put("line_oauth_exchange:{$exchangeCode}", [
+                'token' => $token,
+                'secret' => $exchangeSecret,
+            ], 60);
+
+            $exchangeCookie = cookie(
+                self::EXCHANGE_COOKIE,
+                $exchangeSecret,
+                1,            // minutes (交換コードと同じ 60 秒寿命)
+                '/',
+                null,
+                app()->environment('production'), // secure
+                true,         // httpOnly
+                false,
+                'lax'
+            );
 
             return redirect(config('app.url') . "/auth/callback?code={$exchangeCode}{$returnQuery}")
-                ->withCookie(Cookie::forget(self::STATE_COOKIE));
+                ->withCookie(Cookie::forget(self::STATE_COOKIE))
+                ->withCookie($exchangeCookie);
         } catch (\Exception $e) {
             Log::error('LINE OAuth callback failed', [
                 'error' => $e->getMessage(),
@@ -146,12 +171,21 @@ class LineAuthController extends Controller
             return response()->json(['message' => 'コードが指定されていません。'], 422);
         }
 
-        $token = Cache::pull("line_oauth_exchange:{$code}");
+        // pull で単回使用を保証 (成否に関わらずコードは即無効化)。
+        $entry = Cache::pull("line_oauth_exchange:{$code}");
 
-        if (! is_string($token) || $token === '') {
+        if (! is_array($entry) || ! isset($entry['token'], $entry['secret'])) {
             return response()->json(['message' => 'コードが無効または期限切れです。'], 422);
         }
 
-        return response()->json(['token' => $token]);
+        // URL 経由で漏れたコードを第三者が引き換えるのを防ぐため、callback で発行した
+        // HttpOnly cookie のシークレットと timing-safe 比較する。cookie が無い/不一致は拒否。
+        $cookieSecret = $request->cookie(self::EXCHANGE_COOKIE);
+        if (! is_string($cookieSecret) || $cookieSecret === '' || ! hash_equals((string) $entry['secret'], $cookieSecret)) {
+            return response()->json(['message' => 'コードが無効または期限切れです。'], 422);
+        }
+
+        return response()->json(['token' => $entry['token']])
+            ->withCookie(Cookie::forget(self::EXCHANGE_COOKIE));
     }
 }

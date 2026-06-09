@@ -196,7 +196,7 @@ class OgImageRenderer
         ]));
 
         foreach ($candidates as $url) {
-            if (!is_string($url) || $url === '') {
+            if (!is_string($url) || $url === '' || !$this->isSafePublicUrl($url)) {
                 continue;
             }
             try {
@@ -221,6 +221,73 @@ class OgImageRenderer
         }
 
         return null;
+    }
+
+    /**
+     * SSRF 対策: hero_image_url は管理画面から任意に設定できるため、外部 HTTP 取得を
+     * 公開ネットワーク宛の http(s) URL に限定する。スキームが http(s) 以外、または
+     * 解決先がループバック/プライベート/リンクローカル (例: クラウドメタデータ
+     * 169.254.169.254、内部サービス) の場合は取得しない。
+     */
+    private function isSafePublicUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+
+        $host = $parts['host'];
+
+        // ホストが IP リテラルなら直接判定。ドメインなら解決して全 A/AAAA を検査。
+        $ips = filter_var($host, FILTER_VALIDATE_IP)
+            ? [$host]
+            : $this->resolveHostIps($host);
+
+        if (empty($ips)) {
+            return false;
+        }
+
+        foreach ($ips as $ip) {
+            if (! filter_var(
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            )) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return string[] */
+    private function resolveHostIps(string $host): array
+    {
+        $ips = [];
+        $records = @dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
+        foreach ($records as $r) {
+            if (! empty($r['ip'])) {
+                $ips[] = $r['ip'];
+            }
+            if (! empty($r['ipv6'])) {
+                $ips[] = $r['ipv6'];
+            }
+        }
+
+        // dns_get_record が空でも gethostbyname で IPv4 を拾えることがある。
+        if (empty($ips)) {
+            $resolved = gethostbyname($host);
+            if ($resolved !== $host && filter_var($resolved, FILTER_VALIDATE_IP)) {
+                $ips[] = $resolved;
+            }
+        }
+
+        return $ips;
     }
 
     /** 視認性確保の下重ダークグラデを overlay する。 */

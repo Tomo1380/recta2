@@ -47,6 +47,8 @@ export default function AuthCallbackPage() {
     fetch("/api/auth/line/exchange", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
+      // 交換コードに紐づく HttpOnly cookie を必ず送る (同一オリジンだが明示)。
+      credentials: "same-origin",
       body: JSON.stringify({ code }),
     })
       .then(async (res) => {

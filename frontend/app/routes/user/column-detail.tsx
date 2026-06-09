@@ -174,8 +174,54 @@ function ColumnNotFound() {
   );
 }
 
+// 記事本文の iframe 埋め込みは信頼できる動画/SNS ホストのみ許可する。
+// DOMPurify は javascript: や onload は除去するが、任意 src の iframe 自体は
+// 通してしまうため (攻撃者オリジンの iframe による clickjacking / フィッシング、
+// srcdoc によるスクリプト実行が可能)、src ホストを allowlist で絞り srcdoc を禁止する。
+const ALLOWED_IFRAME_HOSTS = [
+  "www.youtube.com",
+  "youtube.com",
+  "www.youtube-nocookie.com",
+  "youtube-nocookie.com",
+  "player.vimeo.com",
+  "www.tiktok.com",
+  "tiktok.com",
+  "www.instagram.com",
+  "instagram.com",
+  "platform.twitter.com",
+  "twitter.com",
+  "x.com",
+];
+
+function isAllowedIframeSrc(src: string | null): boolean {
+  if (!src) return false;
+  try {
+    const url = new URL(src, "https://example.invalid");
+    if (url.protocol !== "https:") return false;
+    return ALLOWED_IFRAME_HOSTS.includes(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+// hook はグローバルなので import 時に一度だけ登録する。許可ホスト以外の iframe や
+// srcdoc 付き iframe はノード自体を除去する。
+let iframeHookRegistered = false;
+function ensureIframeHook(): void {
+  if (iframeHookRegistered) return;
+  DOMPurify.addHook("uponSanitizeElement", (node, data) => {
+    if (data.tagName !== "iframe") return;
+    const el = node as Element;
+    if (el.hasAttribute("srcdoc") || !isAllowedIframeSrc(el.getAttribute("src"))) {
+      el.parentNode?.removeChild(el);
+    }
+  });
+  iframeHookRegistered = true;
+}
+
 function transformBodyHtml(html: string): { html: string; needsTikTokScript: boolean } {
   if (!html) return { html: "", needsTikTokScript: false };
+  ensureIframeHook();
 
   let needsTikTokScript = false;
   const transformed = html.replace(

@@ -48,10 +48,12 @@ Route::get('/glossary', [\App\Http\Controllers\PublicGlossaryController::class, 
 Route::get('/glossary/{slug}', [\App\Http\Controllers\PublicGlossaryController::class, 'show']);
 Route::get('/relocate-voices', [PublicRelocateController::class, 'voices']);
 Route::get('/chat/config', [AiChatController::class, 'config']);
-Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:30,1');
+// 無認証エンドポイント。Gemini API コスト濫用を抑えるため per-IP throttle を絞る
+// (人間の対話には 15/min で十分)。日次/全体上限は ai_chat_limits で別途管理。
+Route::post('/chat', [AiChatController::class, 'chat'])->middleware('throttle:15,1');
 // SSE 版 — 同じ payload を受けて Server-Sent Events で逐次返す。
 // Function Calling 中は status イベント、最終回答は text 差分イベント、完了時に done イベント。
-Route::post('/chat/stream', [AiChatController::class, 'chatStream'])->middleware('throttle:30,1');
+Route::post('/chat/stream', [AiChatController::class, 'chatStream'])->middleware('throttle:15,1');
 
 // ========== コラム記事（公開） ==========
 Route::get('/columns', [PublicArticleController::class, 'index']);

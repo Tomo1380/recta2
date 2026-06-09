@@ -201,4 +201,46 @@ class AdminAdminUserTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+    public function test_cannot_demote_last_super_admin(): void
+    {
+        // setUp の super@test.com が唯一の super_admin。降格は締め出しになるので拒否。
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/admin-users/{$this->admin->id}", [
+                'role' => 'admin',
+            ]);
+
+        $response->assertStatus(409);
+        $this->assertEquals('super_admin', $this->admin->fresh()->role);
+    }
+
+    public function test_cannot_deactivate_last_super_admin(): void
+    {
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/admin-users/{$this->admin->id}", [
+                'status' => 'inactive',
+            ]);
+
+        $response->assertStatus(409);
+        $this->assertEquals('active', $this->admin->fresh()->status);
+    }
+
+    public function test_can_demote_super_admin_when_another_exists(): void
+    {
+        $other = AdminUser::create([
+            'name' => 'Second Super',
+            'email' => 'super2@test.com',
+            'password' => 'password',
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/admin-users/{$other->id}", [
+                'role' => 'admin',
+            ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('admin', $other->fresh()->role);
+    }
 }

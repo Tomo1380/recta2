@@ -76,6 +76,23 @@ class AdminUserController extends Controller
         if ($effectiveRole === 'super_admin' && array_key_exists('permissions', $data)) {
             $data['permissions'] = null;
         }
+
+        // 最後の有効な super_admin を降格 / 無効化すると組織が締め出される。
+        // 対象が現在 super_admin かつ active で、この更新で super_admin/active から
+        // 外れる場合、他に active な super_admin が居なければ拒否する。
+        $losingSuperAdmin = $adminUser->role === 'super_admin'
+            && $adminUser->status === 'active'
+            && ($effectiveRole !== 'super_admin' || ($data['status'] ?? $adminUser->status) !== 'active');
+        if ($losingSuperAdmin) {
+            $otherActiveSuperAdmins = AdminUser::where('role', 'super_admin')
+                ->where('status', 'active')
+                ->where('id', '!=', $adminUser->id)
+                ->exists();
+            if (! $otherActiveSuperAdmins) {
+                throw new HttpException(409, '最後の super_admin を降格・無効化することはできません。');
+            }
+        }
+
         $adminUser->update($data);
         return new AdminUserResource($adminUser);
     }

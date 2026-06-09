@@ -110,6 +110,12 @@ class LineMessagingService
      */
     public function verifySignature(string $body, string $signature): bool
     {
+        // チャネルシークレット未設定 (空文字) の状態で検証を通すと、空鍵で計算した
+        // 署名を誰でも偽造できてしまう。設定ミス時は必ず fail-closed にする。
+        if ($this->channelSecret === '' || $signature === '') {
+            return false;
+        }
+
         $hash = base64_encode(
             hash_hmac('sha256', $body, $this->channelSecret, true)
         );
