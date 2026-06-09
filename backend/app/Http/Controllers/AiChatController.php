@@ -18,9 +18,6 @@ use App\Services\AiChat\UsageLimitGuard;
 use App\Support\AgentTextSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\RateLimiter;
 
 class AiChatController extends Controller
 {
@@ -61,8 +58,7 @@ class AiChatController extends Controller
     }
 
     /**
-     * Handle chat message — supports agent mode (Function Calling) and
-     * fine-tuned mode, selectable via `mode` parameter.
+     * Handle chat message — Gemini agent mode (Function Calling) のみ。
      */
     public function chat(ChatRequest $request): JsonResponse
     {
@@ -71,7 +67,6 @@ class AiChatController extends Controller
         $userMessage = $request->input('message');
         $storeId = $request->input('store_id');
         $history = $request->input('history', []);
-        $mode = $request->input('mode', 'agent');
         $userArea = $request->input('user_area') ?? '';
 
         // Resolve authenticated user (optional auth — no middleware required)
@@ -102,11 +97,11 @@ class AiChatController extends Controller
                     'message' => 'ただいまAIチャットをご利用いただけません。お手数ですがLINEから直接ご相談ください。',
                     'stores' => [],
                     'follow_ups' => [],
-                    'meta' => ['mode' => $mode, 'model' => 'unavailable'],
+                    'meta' => ['mode' => 'agent', 'model' => 'unavailable'],
                 ], 503);
             }
             \Log::warning('AiChat: GEMINI_API_KEY not set, returning mock response (non-production)');
-            return $this->mockResponse($userMessage, $pageType, $storeId, $mode);
+            return $this->mockResponse($userMessage, $pageType, $storeId);
         }
 
         $startTime = microtime(true);
@@ -114,19 +109,15 @@ class AiChatController extends Controller
         $userId = $user?->id;
 
         try {
-            if ($mode === 'finetuned') {
-                return $this->handleFinetunedMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea, $userId);
-            }
-
             return $this->handleAgentMode($apiKey, $setting, $userMessage, $history, $pageType, $storeId, $ip, $startTime, $userArea, $userId);
         } catch (\Exception $e) {
-            \Log::error('AiChat error', ['mode' => $mode, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            \Log::error('AiChat error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'ただいま混み合っております。少し時間を置いてから再度お試しください。',
                 'stores' => [],
                 'follow_ups' => [],
                 'meta' => [
-                    'mode' => $mode,
+                    'mode' => 'agent',
                     'model' => 'error',
                     'input_tokens' => 0,
                     'output_tokens' => 0,
@@ -363,247 +354,10 @@ class AiChatController extends Controller
         return $stores;
     }
 
-    // -----------------------------------------------------------------------
-    // Fine-tuned mode: Simple prompt with tuned model
-    // -----------------------------------------------------------------------
-
-    private function handleFinetunedMode(
-        string $apiKey,
-        AiChatSetting $setting,
-        string $userMessage,
-        array $history,
-        string $pageType,
-        ?int $storeId,
-        string $ip,
-        float $startTime,
-        string $userArea = '',
-        ?int $userId = null,
-    ): JsonResponse {
-        // OpenAI Fine-tuned model — read from DB first, fallback to .env
-        $openaiKey = trim(config('services.openai.api_key') ?? '');
-        $openaiModel = trim($setting->openai_finetuned_model ?? '');
-
-        if (!$openaiKey || !$openaiModel) {
-            // Fallback to Gemini prompt-embedding mode if OpenAI not configured
-            return $this->handleFinetunedModeFallback(
-                $apiKey, $setting, $userMessage, $history,
-                $pageType, $storeId, $ip, $startTime, $userArea, $userId
-            );
-        }
-
-        $storeContext = $this->prompt->buildStoreContext($pageType, $storeId);
-        $systemPrompt = $this->prompt->buildOpenAiSystemPrompt($setting, $storeContext, $userArea, $pageType);
-
-        // Build OpenAI messages array
-        $messages = [['role' => 'system', 'content' => $systemPrompt]];
-        foreach ($history as $msg) {
-            $role = ($msg['role'] ?? '') === 'user' ? 'user' : 'assistant';
-            $messages[] = ['role' => $role, 'content' => $msg['content'] ?? ''];
-        }
-        $messages[] = ['role' => 'user', 'content' => $userMessage];
-
-        $response = Http::timeout(30)
-            ->withHeaders([
-                'Authorization' => "Bearer {$openaiKey}",
-                'Content-Type' => 'application/json',
-            ])
-            ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $openaiModel,
-                'messages' => $messages,
-                'temperature' => 0.4,
-                'max_tokens' => 2048,
-            ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('OpenAI API error: ' . $response->status() . ' ' . $response->body());
-        }
-
-        $data = $response->json();
-        $aiText = $data['choices'][0]['message']['content'] ?? '';
-        $inputTokens = $data['usage']['prompt_tokens'] ?? 0;
-        $outputTokens = $data['usage']['completion_tokens'] ?? 0;
-        $elapsed = round((microtime(true) - $startTime) * 1000);
-
-        // Log
-        AiChatLog::create([
-            'user_id' => $userId,
-            'ip_address' => $ip,
-            'page_type' => $pageType,
-            'user_message' => $userMessage,
-            'ai_response' => $aiText,
-            'input_tokens' => $inputTokens,
-            'output_tokens' => $outputTokens,
-            'mode' => 'finetuned',
-        ]);
-
-        $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
-
-        return response()->json([
-            'message' => $displayText,
-            'stores' => $recommendedStores,
-            'follow_ups' => [],
-            'meta' => [
-                'mode' => 'finetuned',
-                'model' => $openaiModel,
-                'input_tokens' => $inputTokens,
-                'output_tokens' => $outputTokens,
-                'total_tokens' => $inputTokens + $outputTokens,
-                'response_ms' => $elapsed,
-                'tool_calls' => 0,
-            ],
-        ]);
-    }
-
-    /**
-     * Fallback: Gemini prompt-embedding mode (when OpenAI not configured)
-     */
-    private function handleFinetunedModeFallback(
-        string $apiKey,
-        AiChatSetting $setting,
-        string $userMessage,
-        array $history,
-        string $pageType,
-        ?int $storeId,
-        string $ip,
-        float $startTime,
-        string $userArea = '',
-        ?int $userId = null,
-    ): JsonResponse {
-        $storeContext = $this->prompt->buildStoreContext($pageType, $storeId);
-        $systemPrompt = $this->prompt->buildCoreSystemPrompt($setting, $storeContext, $userArea, $pageType);
-        $geminiHistory = $this->prompt->buildGeminiHistory($history);
-
-        $model = config('services.gemini.model');
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-
-        $payload = [
-            'contents' => [
-                ...$geminiHistory,
-                ['role' => 'user', 'parts' => [['text' => $userMessage]]],
-            ],
-            'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
-            'generationConfig' => [
-                'temperature' => 0.5,
-                'maxOutputTokens' => 2048,
-            ],
-        ];
-
-        $response = $this->gemini->generate($apiKey, $payload);
-
-        $data = $response->json();
-        $aiText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-        $inputTokens = $data['usageMetadata']['promptTokenCount'] ?? 0;
-        $outputTokens = $data['usageMetadata']['candidatesTokenCount'] ?? 0;
-        $elapsed = round((microtime(true) - $startTime) * 1000);
-
-        AiChatLog::create([
-            'user_id' => $userId,
-            'ip_address' => $ip,
-            'page_type' => $pageType,
-            'user_message' => $userMessage,
-            'ai_response' => $aiText,
-            'input_tokens' => $inputTokens,
-            'output_tokens' => $outputTokens,
-            'mode' => 'finetuned',
-        ]);
-
-        $recommendedStores = $this->extractStoreRecommendations($aiText);
-        $displayText = AgentTextSanitizer::strip($aiText, !empty($recommendedStores));
-
-        return response()->json([
-            'message' => $displayText,
-            'stores' => $recommendedStores,
-            'follow_ups' => [],
-            'meta' => [
-                'mode' => 'finetuned',
-                'model' => $model,
-                'input_tokens' => $inputTokens,
-                'output_tokens' => $outputTokens,
-                'total_tokens' => $inputTokens + $outputTokens,
-                'response_ms' => $elapsed,
-                'tool_calls' => 0,
-            ],
-        ]);
-    }
-
-
-    private function extractStoreRecommendations(string $text): array
-    {
-        // Try [STORE:ID] markers first
-        preg_match_all('/\[STORE:(\d+)\]/', $text, $matches);
-        if (!empty($matches[1])) {
-            $ids = array_values(array_unique(array_map('intval', $matches[1])));
-
-            // Validate against the live DB: only keep IDs that exist AND are published.
-            // Hallucinated / archived / draft IDs are silently dropped (debug-logged).
-            $validIds = Store::whereIn('id', $ids)
-                ->where('publish_status', 'published')
-                ->pluck('id')
-                ->all();
-
-            $dropped = array_values(array_diff($ids, $validIds));
-            if (!empty($dropped)) {
-                \Log::debug('[ai-chat] dropped non-existent or unpublished STORE ids', [
-                    'dropped' => $dropped,
-                    'kept' => $validIds,
-                ]);
-            }
-
-            if (empty($validIds)) {
-                return [];
-            }
-
-            // Preserve marker order from the model's response.
-            $byId = Store::whereIn('id', $validIds)->get()->keyBy('id');
-            $ordered = [];
-            foreach ($ids as $id) {
-                if ($byId->has($id)) {
-                    $ordered[] = $this->storeToCard($byId->get($id));
-                }
-            }
-            return $ordered;
-        }
-
-        // Fallback: match store names in text (for FT mode where markers may be missing)
-        $stores = Store::where('publish_status', 'published')->get();
-        $matched = $stores->filter(fn($s) => str_contains($text, $s->name));
-
-        if ($matched->isNotEmpty()) {
-            return $matched->take(5)
-                ->map(fn($s) => $this->storeToCard($s))
-                ->values()
-                ->toArray();
-        }
-
-        return [];
-    }
-
-    private function storeToCard(Store $s): array
-    {
-        $wage    = is_array($s->wage) ? $s->wage : [];
-        $trial   = $wage['trial'] ?? [];
-
-        return [
-            'id' => $s->id,
-            'name' => $s->name,
-            'area' => $s->area,
-            'category' => $s->category,
-            'nearest_station' => $s->nearest_station,
-            // 通常時給は廃止。給与は体入時給 (trial_hourly_*) に一本化。
-            'trial_hourly_min' => $trial['hourly_min'] ?? $trial['avg_hourly'] ?? null,
-            'trial_hourly_max' => $trial['hourly_max'] ?? $trial['hourly'] ?? null,
-            'description' => $s->description,
-            'feature_tags' => $s->feature_tags,
-            'images' => $s->images,
-            'average_rating' => round($s->averageRating(), 1),
-        ];
-    }
-
     /**
      * Fallback response when Gemini API key is not configured.
      */
-    private function mockResponse(string $message, string $pageType, ?int $storeId, string $mode, ?int $userId = null): JsonResponse
+    private function mockResponse(string $message, string $pageType, ?int $storeId, ?int $userId = null): JsonResponse
     {
         $startTime = microtime(true);
 
@@ -721,7 +475,7 @@ class AiChatController extends Controller
             'ai_response' => $response,
             'input_tokens' => 0,
             'output_tokens' => 0,
-            'mode' => $mode,
+            'mode' => 'agent',
         ]);
 
         return response()->json([
@@ -729,7 +483,7 @@ class AiChatController extends Controller
             'stores' => $storeCards,
             'follow_ups' => [],
             'meta' => [
-                'mode' => $mode,
+                'mode' => 'agent',
                 'model' => 'mock',
                 'input_tokens' => 0,
                 'output_tokens' => 0,
@@ -803,7 +557,6 @@ class AiChatController extends Controller
         $userMessage = $request->input('message');
         $storeId = $request->input('store_id');
         $history = $request->input('history', []);
-        $mode = $request->input('mode', 'agent');
         $userArea = $request->input('user_area') ?? '';
 
         $user = auth('sanctum')->user();
@@ -818,7 +571,7 @@ class AiChatController extends Controller
         $callback = function () use (
             $self, $usageLimits, $tools, $gemini,
             $request, $user, $ip, $pageType, $userMessage,
-            $storeId, $history, $mode, $userArea, $userId
+            $storeId, $history, $userArea, $userId
         ) {
             // Disable output buffering so each echo flushes immediately.
             // (php-fpm + nginx with proxy_buffering off — see nginx.conf changes.)
@@ -855,22 +608,11 @@ class AiChatController extends Controller
                         return;
                     }
                     // Dev fallback — stream a mock so the UI can be exercised offline.
-                    $self->streamMock($send, $userMessage, $pageType, $storeId, $mode);
+                    $self->streamMock($send, $userMessage, $pageType, $storeId);
                     return;
                 }
 
                 $startTime = microtime(true);
-
-                if ($mode === 'finetuned') {
-                    // Finetuned mode is single-shot; just send progress + final text.
-                    $send('status', ['label' => 'AIが回答を作成中…']);
-                    $jsonResp = $self->handleFinetunedMode(
-                        $apiKey, $setting, $userMessage, $history,
-                        $pageType, $storeId, $ip, $startTime, $userArea, $userId
-                    );
-                    $self->streamJsonResponseAsSse($send, $jsonResp);
-                    return;
-                }
 
                 $self->streamAgentMode(
                     $send, $apiKey, $setting, $userMessage, $history,
@@ -1057,23 +799,6 @@ class AiChatController extends Controller
     }
 
     /**
-     * Convert a one-shot JsonResponse from the existing non-stream code path
-     * into a typewriter SSE stream. Used for fine-tuned mode where the loop
-     * isn't iterative.
-     */
-    private function streamJsonResponseAsSse(callable $send, JsonResponse $resp): void
-    {
-        $payload = $resp->getData(true);
-        $message = is_string($payload['message'] ?? null) ? $payload['message'] : '';
-        $this->streamTextAsTypewriter($send, $message);
-        $send('done', [
-            'stores' => $payload['stores'] ?? [],
-            'follow_ups' => $payload['follow_ups'] ?? [],
-            'meta' => $payload['meta'] ?? [],
-        ]);
-    }
-
-    /**
      * Emit the AI text as small chunks so the client gets a typewriter feel.
      * Chunk size and delay are tuned for Japanese (multi-byte safe via mb_*).
      */
@@ -1104,7 +829,7 @@ class AiChatController extends Controller
     /**
      * Mock SSE stream for local development without GEMINI_API_KEY.
      */
-    private function streamMock(callable $send, string $userMessage, string $pageType, ?int $storeId, string $mode): void
+    private function streamMock(callable $send, string $userMessage, string $pageType, ?int $storeId): void
     {
         $send('status', ['label' => '（モック）店舗を検索しています…']);
         usleep(400_000);
@@ -1116,7 +841,7 @@ class AiChatController extends Controller
             'stores' => [],
             'follow_ups' => ['未経験OKのお店', '高時給のお店', '体入できるお店'],
             'meta' => [
-                'mode' => $mode,
+                'mode' => 'agent',
                 'model' => 'mock',
                 'input_tokens' => 0,
                 'output_tokens' => 0,

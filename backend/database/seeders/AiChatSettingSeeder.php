@@ -20,14 +20,11 @@ class AiChatSettingSeeder extends Seeder
 {
     public function run(): void
     {
-        $ftModel = 'ft:gpt-4o-mini-2024-07-18:personal:recta-advisor-v3:DNBJ6U7S';
-
         AiChatSetting::create([
             'page_type' => 'top',
             'enabled' => true,
             'system_prompt' => 'あなたはナイトワーク求人サイト「Recta」のAIアシスタントです。求職者の不安を解消し、最適なお店を提案してください。丁寧でフレンドリーな口調で対応してください。',
             'tone' => 'friendly',
-            'openai_finetuned_model' => $ftModel,
             'suggest_display_mode' => 'categorized',
             'suggest_categories' => [
                 [
@@ -86,7 +83,6 @@ class AiChatSettingSeeder extends Seeder
             'enabled' => true,
             'system_prompt' => 'あなたはナイトワーク求人サイト「Recta」のAIアシスタントです。一覧画面でユーザーが店舗を絞り込む手助けをしてください。条件に合ったお店をおすすめしてください。',
             'tone' => 'friendly',
-            'openai_finetuned_model' => $ftModel,
             // 店舗一覧では chips_only: L1 タブを出さずフラットなチップで素早く絞り込ませる。
             // chips_only は label/sub を描画せず chips だけをフラット表示するため、
             // 1 カテゴリに絞り込み意図の高いチップを厳選して入れている。
@@ -113,7 +109,6 @@ class AiChatSettingSeeder extends Seeder
             'enabled' => true,
             'system_prompt' => 'あなたはナイトワーク求人サイト「Recta」のAIアシスタントです。この店舗の詳細について質問に答えてください。店舗情報を元に正確に回答してください。',
             'tone' => 'friendly',
-            'openai_finetuned_model' => $ftModel,
             // 店舗詳細でも chips_only: その店について気になる点をフラットなチップで即タップ。
             // chips_only は label/sub を描画しないため、1 カテゴリに集約している。
             'suggest_display_mode' => 'chips_only',

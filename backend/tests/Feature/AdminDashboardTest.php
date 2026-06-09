@@ -82,7 +82,6 @@ class AdminDashboardTest extends TestCase
                     'new_reviews_7d',
                     'new_users_7d',
                     'published_articles',
-                    'fine_tuning_qa_active',
                 ],
                 'analytics_highlight' => [
                     'stores',

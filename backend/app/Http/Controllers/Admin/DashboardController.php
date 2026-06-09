@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AiChatLog;
 use App\Models\Article;
-use App\Models\FineTuningQa;
 use App\Models\LineFriend;
 use App\Models\LineMessage;
 use App\Models\Review;
@@ -98,15 +97,14 @@ class DashboardController extends Controller
         ];
 
         // ----------------------------------------------------------------
-        // 30-day time series: AI chat usage by mode
+        // 30-day time series: AI chat usage
         // ----------------------------------------------------------------
         $chatByDay = AiChatLog::select(
                 DB::raw('DATE(created_at) as date'),
-                'mode',
                 DB::raw('COUNT(*) as count')
             )
             ->where('created_at', '>=', $thirtyDaysAgo)
-            ->groupBy(DB::raw('DATE(created_at)'), 'mode')
+            ->groupBy(DB::raw('DATE(created_at)'))
             ->get();
 
         $chatTrend = $this->fillDailySeries($thirtyDaysAgo, $now, function (string $date) use ($chatByDay) {
@@ -116,8 +114,6 @@ class DashboardController extends Controller
 
             return [
                 'date' => $date,
-                'agent' => (int) ($forDate->firstWhere('mode', 'agent')->count ?? 0),
-                'finetuned' => (int) ($forDate->firstWhere('mode', 'finetuned')->count ?? 0),
                 'total' => (int) $forDate->sum('count'),
             ];
         });
@@ -243,7 +239,6 @@ class DashboardController extends Controller
                 ->count(),
             'new_users_7d' => User::where('created_at', '>=', $now->copy()->subDays(7))->count(),
             'published_articles' => Article::where('status', 'published')->count(),
-            'fine_tuning_qa_active' => FineTuningQa::where('status', FineTuningQa::STATUS_ACTIVE)->count(),
         ];
 
         // 「効いてるコンテンツ」ハイライト: 直近30日でアクセス上位の店舗/コラム TOP3。

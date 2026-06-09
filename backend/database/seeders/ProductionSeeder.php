@@ -27,7 +27,6 @@ use Illuminate\Database\Seeder;
  *   - consultations (TOP の「みんなの相談」)
  *   - site_settings (hero 文言)
  *   - industry_knowledges (AI が参照する業界用語)
- *   - fine_tuning_qa (FT モデル教材)
  *   - relocate_voices (上京した先輩の声)
  *
  * 含まないもの (本番では運営が手動投入):
@@ -74,11 +73,6 @@ class ProductionSeeder extends Seeder
         // 業界ナレッジ (AI チャットの参照元)
         if (\App\Models\IndustryKnowledge::count() === 0) {
             $this->call(IndustryKnowledgeSeeder::class);
-        }
-
-        // Fine-tuning Q&A 教材
-        if (\App\Models\FineTuningQa::count() === 0) {
-            $this->call(FineTuningQaSeeder::class);
         }
 
         // 上京した先輩の声 (LP コンテンツ)

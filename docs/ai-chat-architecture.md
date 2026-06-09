@@ -1,5 +1,8 @@
 # AIチャット アーキテクチャ
 
+AI チャットは **Gemini の Agent モード（Function Calling）のみ** で動作する。
+店舗データはプロンプトに同梱せず、ツール経由で都度 PostgreSQL から取得する。
+
 ## システム概要
 
 ```
@@ -13,18 +16,14 @@
            │
            ├─ 利用制限チェック (checkUsageLimits)
            │
-           ├─→ Agent mode ──→ Gemini API (Function Calling)
-           │                      │
-           │                      └─ ツールループ (max 5回)
-           │                           ├─ search_stores → PostgreSQL
-           │                           ├─ get_store_detail → PostgreSQL
-           │                           ├─ get_areas → PostgreSQL
-           │                           └─ get_categories → PostgreSQL
-           │
-           └─→ Finetuned mode
+           └─→ Gemini API (Function Calling)
                   │
-                  ├─ OpenAI設定あり → OpenAI API (ft:gpt-4o-mini)
-                  └─ OpenAI設定なし → Gemini API (プロンプト埋め込み)
+                  └─ ツールループ (max 5回)
+                       ├─ search_stores → PostgreSQL
+                       ├─ get_store_detail → PostgreSQL
+                       ├─ get_areas → PostgreSQL
+                       ├─ get_categories → PostgreSQL
+                       └─ get_industry_knowledge → PostgreSQL
 ```
 
 ---
@@ -52,7 +51,7 @@ sequenceDiagram
     FE->>FE: サジェストボタン表示
 ```
 
-### 2. Agent mode (メインフロー)
+### 2. チャットフロー (Agent / Function Calling)
 
 ```mermaid
 sequenceDiagram
@@ -66,7 +65,7 @@ sequenceDiagram
     U->>FE: メッセージ入力 or サジェストクリック
     FE->>FE: ユーザーメッセージをチャットに追加
     FE->>API: POST /api/chat
-    Note right of FE: { message, page_type, mode:"agent",<br/>store_id, history[], user_area }
+    Note right of FE: { message, page_type,<br/>store_id, history[], user_area }
 
     API->>LIM: checkUsageLimits()
     alt 制限超過
@@ -96,6 +95,9 @@ sequenceDiagram
             else get_areas / get_categories
                 API->>DB: Area::all() / Category::all()
                 DB-->>API: エリア/カテゴリ一覧
+            else get_industry_knowledge
+                API->>DB: IndustryKnowledge::query()
+                DB-->>API: 業界ナレッジ記事
             end
             API->>API: ツール結果をcontentsに追加
         else テキスト応答のみ
@@ -112,63 +114,6 @@ sequenceDiagram
     FE->>FE: 店舗カード表示 (max 3枚)
     FE->>FE: LINE CTA表示
     FE->>FE: フォローアップチップ表示
-```
-
-### 3. Finetuned mode (OpenAI)
-
-```mermaid
-sequenceDiagram
-    participant U as ユーザー
-    participant FE as AiChatPanel
-    participant API as AiChatController
-    participant OAI as OpenAI API
-    participant DB as PostgreSQL
-
-    U->>FE: メッセージ入力
-    FE->>API: POST /api/chat
-    Note right of FE: { message, mode:"finetuned", ... }
-
-    API->>API: checkUsageLimits()
-    API->>API: buildOpenAiSystemPrompt()
-    Note right of API: 軽量プロンプト<br/>(店舗データ不要、<br/>モデルが学習済み)
-
-    API->>OAI: POST /v1/chat/completions
-    Note right of API: model: ft:gpt-4o-mini:recta-advisor<br/>messages: [system, ...history, user]<br/>temperature: 0.4
-
-    OAI-->>API: { choices[0].message.content }
-
-    API->>API: extractStoreRecommendations(aiText)
-    Note right of API: [STORE:ID] マーカーを<br/>正規表現で抽出
-    API->>DB: Store::whereIn(ids)->get()
-    API->>API: preg_replace で [STORE:ID] 除去
-    API->>DB: AiChatLog::create()
-    API->>API: generateFollowUps()
-
-    API-->>FE: { message, stores[], follow_ups[], meta }
-    FE->>FE: 通常と同じUI表示
-```
-
-### 4. Finetuned mode フォールバック (Gemini)
-
-```mermaid
-sequenceDiagram
-    participant API as AiChatController
-    participant GEM as Gemini API
-    participant DB as PostgreSQL
-
-    Note over API: OpenAI未設定時
-
-    API->>DB: Store::all() → 全店舗詳細データ取得
-    Note right of API: Cache 10分 (key: public_stores_full_json_v1)
-    API->>API: buildSystemPrompt()
-    Note right of API: 全店舗詳細JSONを<br/>システムプロンプトに埋め込み<br/>(~18Kトークン)
-
-    API->>GEM: POST generateContent
-    Note right of API: ツールなし<br/>temp:0.5, maxTokens:2048
-
-    GEM-->>API: テキスト応答 ([STORE:ID]マーカー含む)
-    API->>API: extractStoreRecommendations()
-    API->>API: [STORE:ID] strip → 表示用テキスト
 ```
 
 ---
@@ -207,7 +152,7 @@ sequenceDiagram
 
 ---
 
-## ツール定義 (Agent mode)
+## ツール定義
 
 | ツール名 | 説明 | 主要パラメータ |
 |---------|------|--------------|
@@ -256,7 +201,6 @@ sequenceDiagram
   ],
   "follow_ups": ["体入できるお店", "ノルマなしのお店"],
   "meta": {
-    "mode": "agent",
     "model": "gemini-3.1-flash-lite-preview",
     "input_tokens": 1234,
     "output_tokens": 567,
@@ -273,27 +217,14 @@ sequenceDiagram
 
 ### 全体構造
 
-各モードのプロンプトは **固定部分（コード内ハードコード）** と **可変部分（管理画面 or 実行時データ）** で構成される。
+プロンプトは **固定部分（コード内ハードコード）** と **可変部分（管理画面 or 実行時データ）** で構成される。
+店舗データは同梱せず、ツール経由で都度 DB 検索する。
 
 ```
-システムプロンプト = 固定ペルソナ + 管理画面プロンプト + ユーザー現在地 + 店舗コンテキスト + 固定ルール群
+システムプロンプト = 固定ペルソナ + 管理画面プロンプト + ユーザー現在地 + ページ別ルール + ツール使用ルール + 回答フォーマット + 禁止事項
 ```
 
-### モード別のビルダー関数対応
-
-| モード | API | ビルダー関数 | 店舗データ同梱 | ツール |
-|---|---|---|---|---|
-| Agent | Gemini 3.1 Flash-Lite | `buildAgentSystemPrompt()` | **なし**（ツール経由でDB検索） | search_stores, get_store_detail, get_areas, get_categories, get_industry_knowledge |
-| FT (OpenAI) | OpenAI gpt-4o-mini (ft) | `buildOpenAiSystemPrompt()` | **あり**（パイプ区切り全店舗） | なし |
-| FT (Geminiフォールバック) | Gemini 3.1 Flash-Lite | `buildSystemPrompt()` → `buildCoreSystemPrompt()` | **あり**（パイプ区切り全店舗） | なし |
-
-店舗データは `buildPipeDelimitedStoreData()` で生成され、Cache key `public_stores_pipe_v3` で10分共有。
-形式: `ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|開始時刻|終了時刻|日払い体系|体入|保証|ノルマ|ランク|わいわい度|ゆるさ度|ドレスコード|送り|特徴タグ|説明` のヘッダー + 1行1店舗。
-JSONではなくパイプ区切りを採用したのは、JSONの `{`, `"`, カンマ等の構造トークンを排除してトークン消費を約60%削減するため。
-
----
-
-### 1. Agent mode プロンプト (`buildAgentSystemPrompt`)
+### Agent mode プロンプト (`buildAgentSystemPrompt`)
 
 Gemini API の `system_instruction` として送信される。店舗データは同梱せず、ツール経由で都度取得する方針。ページ種別 (`top` / `list` / `detail`) で分岐する。
 
@@ -309,7 +240,7 @@ Gemini API の `system_instruction` として送信される。店舗データ�
 6. **【禁止事項】** — 質問返し・マーカー省略・LINE省略・未成年・性的サービス店
 7. **【給与の表現】** — 時給フォーマット・バック率注釈・保証言及
 
-**実プロンプト本文**（`backend/app/Http/Controllers/AiChatController.php:1167-1230` から抽出・top/list時）:
+**実プロンプト本文**（`backend/app/Http/Controllers/AiChatController.php` から抽出・top/list時）:
 
 ````
 【ペルソナ】
@@ -387,7 +318,8 @@ Gemini API の `system_instruction` として送信される。店舗データ�
       { "name": "search_stores", "description": "...", "parameters": { /* 11パラメータ */ } },
       { "name": "get_store_detail", "description": "...", "parameters": { "store_id": ... } },
       { "name": "get_areas", "description": "...", "parameters": {} },
-      { "name": "get_categories", "description": "...", "parameters": {} }
+      { "name": "get_categories", "description": "...", "parameters": {} },
+      { "name": "get_industry_knowledge", "description": "...", "parameters": { "topic": ... } }
     ]
   }],
   "generationConfig": { "temperature": 0.4, "maxOutputTokens": 2048 }
@@ -396,300 +328,30 @@ Gemini API の `system_instruction` として送信される。店舗データ�
 
 ---
 
-### 2. Fine-tuned mode プロンプト (OpenAI) (`buildOpenAiSystemPrompt`)
-
-OpenAI Chat Completions API の `system` メッセージとして送信。
-**FTモデルは訓練データで口調・回答スタイル・ペルソナを学習済み** の前提で、runtime プロンプトは極限まで軽量化されている。
-店舗データ（毎回変わる）とマーカー要件のみを渡す。
-
-**セクション構成:**
-1. **【掲載店舗データ】** — パイプ区切りの全店舗（または詳細ページの単一店舗）
-2. **【ユーザーの現在地】** — Geolocation許可時のみ
-3. **【詳細ページ】** — `pageType=detail` 時のみ
-4. **【運営からの追加指示】** — 管理画面編集（空なら省略）
-5. **末尾リマインダー** — マーカーとLINE誘導CTAの1行リマインド
-
-**実プロンプト本文**（`backend/app/Http/Controllers/AiChatController.php:898-920` から抽出）:
-
-````
-【掲載店舗データ】
-{パイプ区切り全店舗データ または buildStoreContext() の出力}
-
-【ユーザーの現在地】{userArea}付近。エリア指定がない場合はこの地域周辺を優先。
-
-【詳細ページ】上記の店舗に関する質問に回答する。他店舗は紹介しない。   ← detail時のみ
-
-【運営からの追加指示】
-{setting.system_prompt}
-
-店舗を紹介する時は必ず[STORE:ID]マーカーを付けること。LINE誘導CTAを回答の末尾に必ず付けること。
-````
-
-**設計ポイント**: このプロンプトが Agent mode より遥かに短いのは、ペルソナ・口調・禁止事項・雰囲気解釈などをすべてFine-tuningで学習済みと想定しているため。
-ただし Recta の Fine-tuningモデルは現状 `openai_finetuned_model` 未設定のケースが多く、その場合は下記 3. のフォールバックが動く。
-
-**OpenAI API payload:**
-
-```json
-{
-  "model": "ft:gpt-4o-mini-2024-07-18:personal:recta-advisor:XXXXXXXX",
-  "messages": [
-    { "role": "system", "content": "上記プロンプト全文（店舗JSON含む）" },
-    { "role": "user", "content": "前の会話1" },
-    { "role": "assistant", "content": "前の回答1" },
-    { "role": "user", "content": "今回のメッセージ" }
-  ],
-  "temperature": 0.4,
-  "max_tokens": 2048
-}
-```
-
-**設計方針:** Fine-tuned モデルは訓練データで回答パターン・口調を学習済み。
-店舗データは毎回JSONで渡すことで、店舗追加・変更時に再Fine-tuningが不要。
-Fine-tuningの役割は「業界知識・回答スタイルの学習」に限定し、店舗データは常にリアルタイム。
-
----
-
-### 3. Fine-tuned mode フォールバック (Gemini) (`buildSystemPrompt` → `buildCoreSystemPrompt`)
-
-OpenAI未設定時のフォールバック。Gemini API にツールなしで送信。
-**全店舗データをプロンプト内に埋め込む** ため、Agent mode より遥かにトークン消費が大きい。
-FTモデルがないため、ペルソナ・口調・禁止事項・回答例など全ルールをプロンプトに含める必要がある（実質「フル装備プロンプト」）。
-
-**セクション構成（`buildCoreSystemPrompt()` の順序通り）:**
-
-1. 【ペルソナ】
-2. 【運営からの追加指示】（空なら省略）
-3. 【ユーザーの現在地】（Geolocation許可時のみ）
-4. 【店舗詳細ページ（最優先）】（detail時のみ）
-5. 【掲載店舗データ】（パイプ区切り全店舗）
-6. 【店舗データのカラム定義】
-7. 【店舗データの参照方法】
-8. 【4ブロック回答構成（店舗紹介時）】
-9. 【LINE誘導（必須）】
-10. 【絶対ルール（禁止事項）】
-11. 【給与・待遇に関する詳細ルール】
-12. 【よくある質問への対応ルール】
-13. 【雰囲気・ニュアンスの解釈】
-14. 【ナイトワーク以外の質問】
-15. 【センシティブ・法令関連】
-16. 【回答の長さ・フォーマット】
-17. 【回答例】
-18. 【NG例（絶対に避ける）】
-
-**実プロンプト本文**（`backend/app/Http/Controllers/AiChatController.php:926-1060` から抽出）:
-
-````
-【ペルソナ】
-あなたは「Recta AI（採用アシスタントAI）」です。ナイトワーク業界（キャバクラ・ラウンジ・ガールズバー・コンカフェ・クラブ）の求人に詳しい、フレンドリーなキャリアアドバイザーです。求人マッチングプラットフォーム「Recta」の公式AIアシスタントとして、求職者の不安を解消し、最適なお店選びをサポートします。
-口調: {toneDesc}
-一人称は使わない。「おすすめは〜」「ご紹介します」のような表現を使う。
-
-【運営からの追加指示】
-{setting.system_prompt}
-
-【ユーザーの現在地】{userArea}付近にいます。エリア指定がない質問の場合、この地域周辺のお店を優先的に紹介してください。
-
-【店舗詳細ページ（最優先）】   ← pageType=detail時のみ
-ユーザーは閲覧中の店舗の詳細ページにいます。質問はすべてこの店舗に関するものとして回答すること。
-この店舗のデータのみを使って回答する。他の店舗を紹介しない。
-
-【掲載店舗データ】
-{パイプ区切り全店舗データ — 約75店舗}
-
-【店舗データのカラム定義】
-パイプ区切り（|）で各店舗の情報が並んでいます。カラムの意味:
-- ID: 店舗ID（[STORE:ID]マーカーに使用）
-- 店名/エリア/最寄り駅/カテゴリ: 基本情報
-- 時給MIN/時給MAX: 時給範囲（円）。「高時給」「稼ぎたい」→ 時給MAXが高い店を優先
-- 開始時刻/終了時刻: 営業時間。「○時まで働きたい」→ 終了時刻が条件を満たす店のみ紹介。LASTは閉店時刻不定（深夜対応）
-- 日払い体系: 給与支払い方法（全額日払い/日払い可/月2回等）。「日払い」→ 全額日払いか日払い可の店
-- 体入: 体入の可否と時給（当日OK/体入○○円等）
-- 保証: 保証期間（1ヶ月/3ヶ月等）。「安心して始めたい」→ 保証ありの店を優先
-- ノルマ: ノルマの有無・内容。「ノルマなし」→ 「ノルマなし」記載の店
-- ランク: S/A/B/C（内部評価、回答では言及しない）
-- わいわい度: 0-100。高いほど賑やか・アットホーム。「わいわい系」→ 70以上を優先
-- ゆるさ度: 0-100。高いほどプレッシャーなし・自由。「ゆるく働きたい」→ 70以上を優先
-- ドレスコード: 服装規定（ドレス貸出あり/服装自由等）。服装の質問に直接回答できる
-- 送り: 送りの距離・有無。「送りあり？」→ この欄を確認して回答
-- 特徴タグ: カンマ区切りのタグ
-- 説明: 店舗の特徴テキスト（先頭80文字）
-
-【店舗データの参照方法】
-- 店舗を紹介する時は、必ず[STORE:ID]マーカーを店名の直前に付ける
-- 例: [STORE:12] Club Lumière（六本木/六本木駅）時給5,000円〜
-- マーカーがあると、ユーザーの画面に店舗カードが自動表示される
-- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）
-- 店舗データに載っていないお店は紹介してはいけない
-
-【4ブロック回答構成（店舗紹介時）】
-①ユーザーの状況に共感する1文（例: 「未経験でも安心して始められるお店、探してみました！」）
-②店舗カード（2〜3件、[STORE:ID]マーカー付き）
-③比較ポイントor選び方のヒント（「体入で雰囲気を確かめるのがおすすめです」等）
-④LINE誘導CTA（必須、最後に必ず付ける）
-
-【LINE誘導（必須）】
-回答の最後に必ず改行2つの後に以下を付ける（省略禁止）:
-もっと詳しく知りたい方は、LINEで担当者に直接相談できます！
-
-LINE誘導の価値として以下を必要に応じて言及する:
-- 時給・待遇の確定スカウト（面接前に時給・日払い条件を確定交渉できる）
-- スタッフ同行体入（初回体入にスタッフが同席・サポートできる）
-- 内部情報・非公開求人（Rectaに未掲載の優良店も紹介可能）
-
-【絶対ルール（禁止事項）】
-1. ユーザーに質問を返してはいけない。「どのエリアですか？」「どんな条件ですか？」等は禁止。条件が曖昧でも推測して店舗データから選ぶ
-2. 必ず店舗データから2〜3件を紹介する。データにない店舗を紹介してはいけない
-3. 絵文字は使わない
-4. 日本語のみで回答する
-5. 風俗店・デリヘル・ソープ等の性的サービスを伴う店舗は紹介しない。ただし風俗店で働いていると言うユーザーへの転向相談には応じる
-6. 未成年（18歳未満）の就労を案内しない。年齢確認が必要なケースでは「18歳以上が対象です」と明記する
-7. 枕営業・性的サービスへの誘導と受け取られる回答は禁止
-
-【給与・待遇に関する詳細ルール】
-- 時給は必ず「○,○○○円〜」の形式で表示（確定値のように書かない）
-- バック率・日給は「目安」「実績による」等の注釈を付ける
-- 保証期間がある場合は積極的に言及する（安心材料になる）
-- 体入の有無と体入時給も重要情報として紹介する
-- 還元率の質問: バック率は店舗により25〜50%と幅広い。具体的な確定額はLINE相談を促す
-- 保証の質問: 保証期間・保証額は店舗ごとに異なる。データにある情報のみ伝え、詳細はLINE相談
-
-【よくある質問への対応ルール】
-- 出勤調整: 「シフトの自由度が高いお店も多く、週1〜2日から始めた方も多いです。お店ごとに違うのでLINEで相談するのがおすすめです」
-- 面接・体入の服装: 「清潔感があれば普段着でOKなお店がほとんど。体入時はお店のドレスコードに合わせて」。詳細はLINE誘導
-- 矯正中・ピアス・タトゥー: 「お店によって対応が異なります。非公開情報もあるのでLINEで確認するのがスムーズです」
-- 新店舗: 「オープン直後はルール・スタッフが変わりやすい。体入で確認してから決めるのがベター」
-- 移籍時期: 「在籍中のお店との契約・同伴状況を確認してから動くのが安全。詳しくはLINEで」
-- 週◯日の出勤: 「週1〜週5まで幅広く対応可能なお店があります。希望条件をLINEで伝えれば合うお店を探します」
-- 身分証: 「年齢確認のため、体入・入店時には身分証（マイナンバーカード/免許証/保険証）が必要です」
-- 風俗転向（キャバクラ等への転職相談）: 「キャバクラ・ラウンジへの転向は珍しくないです。まずは体入で雰囲気を確かめてみては」。詳細な過去職歴は聞かない
-- スペック・外見の不安: 「ルックスより雰囲気・明るさ・清潔感を重視する店が多いです。未経験でも活躍している方がたくさんいます」
-
-【雰囲気・ニュアンスの解釈】
-ユーザーが曖昧な表現を使った場合、店舗の説明文・特徴から雰囲気を読み取って最適な店舗を選ぶ:
-- 「わいわい系」「にぎやか」「楽しい」→ アットホーム、明るい雰囲気、スタッフ同士の仲が良い等
-- 「落ち着いた」「大人っぽい」「上品」→ 高級、会員制、落ち着いた雰囲気等
-- 「ゆるい」「気楽」「プレッシャーなし」→ ノルマなし、自由シフト、未経験歓迎等
-- 「稼ぎたい」「ガッツリ」→ 高時給、バック充実、経験者優遇等
-- 「初めて」「不安」→ 未経験歓迎、研修充実、アットホーム等
-
-【ナイトワーク以外の質問】
-「申し訳ありませんが、Recta AIはナイトワーク求人の相談専門です。お仕事探しについてお気軽にご質問ください！」と返す
-
-【センシティブ・法令関連】
-- 違法行為・風営法違反に関する質問には応じない
-- 「詳しくはLINEで担当者にご相談ください」と誘導する
-- 個人情報（本名・住所・学校名等）をユーザーから聞き出すことは禁止。必要情報はLINE面談で収集
-
-【回答の長さ・フォーマット】
-- 店舗紹介は1店舗あたり1〜2行で簡潔に
-- 全体で300〜500文字程度が目安
-- 各店舗は以下の形式で紹介:
-  ・[STORE:ID] 店名（エリア/最寄り駅）時給○,○○○円〜
-    [1行で特徴やおすすめポイント]
-
-【回答例】
-ユーザー: 未経験で働けるお店ある？
-
-回答: 未経験でも安心して始められるお店を探してみました！
-
-・[STORE:5] Lounge Étoile（六本木/六本木駅）時給4,000円〜
-  研修制度が充実していて未経験でも安心。保証期間もあります
-
-・[STORE:8] Lounge Brilliance（銀座/銀座駅）時給3,500円〜
-  ノルマなしで気楽に働ける環境。体験確約OK・全額日払いです
-
-体入で雰囲気を確かめてから決めるのがおすすめです！
-
-もっと詳しく知りたい方は、LINEで担当者に直接相談できます！
-
-【NG例（絶対に避ける）】
-「どのエリアがご希望ですか？」← 質問返しは禁止
-[STORE:ID]マーカーなしで店舗を紹介する ← 禁止
-LINE誘導CTAを省略する ← 禁止
-````
-
-**Gemini API payload（ツールなし）:**
-
-```json
-{
-  "system_instruction": { "parts": [{ "text": "上記プロンプト全文（店舗データ含む）" }] },
-  "contents": [ /* 会話履歴 + ユーザーメッセージ */ ],
-  "generationConfig": { "temperature": 0.5, "maxOutputTokens": 2048 }
-}
-```
-
----
-
-### 4. Fine-tuning 訓練データのシステムプロンプト
-
-OpenAI にアップロードする JSONL の各行に含まれる `system` メッセージ。
-`FineTuningController::buildTrainingSystemPrompt()` で生成され、全訓練ペアで共通。
-
-**重要:** 訓練プロンプトにも `getStoreJson()` で生成した **パイプ区切り全店舗データ** が含まれている。
-これにより FT モデルは「店舗データを読む → 条件に合うものを選ぶ → [STORE:ID] マーカー付きで回答する」というパターンを学習する。
-
-**実プロンプト本文**（`backend/app/Http/Controllers/Admin/FineTuningController.php:408-433` から抽出）:
-
-````
-あなたは「Recta AI」、ナイトワーク（キャバクラ・ラウンジ・ガールズバー・コンカフェ）専門のキャリアアドバイザーです。
-
-【回答ルール】
-- 求職者に寄り添い、親しみやすく丁寧に回答する
-- 店舗を紹介する際は [STORE:店舗ID] マーカーを必ず店名の前に付ける（例: [STORE:1]【Club Lumière】）
-- 1回の回答で2〜3店舗を紹介する（5件以上の羅列はNG）
-- ユーザーに質問を返さない（条件が曖昧でも推測して店舗を選ぶ）
-- ナイトワーク以外の質問は丁寧にお断り
-- 下記の店舗データから情報を読み取って回答すること。データにない店舗を紹介してはいけない
-- 300〜500文字程度で簡潔に
-
-【雰囲気の解釈】
-「わいわい系」→アットホーム・明るい雰囲気の店
-「落ち着いた」→高級・会員制
-「ゆるい」→ノルマなし・自由シフト
-
-【ページ別の振る舞い】
-- トップページ: 幅広い提案。エリアやカテゴリの希望がなければ人気店から紹介
-- 店舗一覧ページ: 条件を絞り込む手伝い。エリア・カテゴリ・タグで提案
-- 店舗詳細ページ: その店舗のみについて回答。他店舗は紹介しない
-
-【全店舗データ】
-{パイプ区切り全店舗データ — ヘッダー: ID|店名|エリア|最寄り駅|カテゴリ|時給MIN|時給MAX|日払い体系|体入|保証|ノルマ|ランク|特徴タグ|説明|詳細}
-````
-
-**注意**: Runtime の `buildOpenAiSystemPrompt()` は訓練プロンプトと **違う**（訓練プロンプトは全ルール含む、runtime は軽量）。
-これは runtime では「訓練で学習した振る舞い」を引き出すだけで十分という想定。
-
----
-
 ### 管理画面で編集可能な部分まとめ
 
-| 項目 | 管理画面の場所 | 影響するモード | 影響する箇所 |
-|------|---------------|---------------|-------------|
-| **システムプロンプト** | AIチャット設定 > プロンプトタブ | Agent / FT(OpenAI) / FT(Gemini) | `setting.system_prompt` → 「運営からの追加指示」セクション |
-| **口調 (tone)** | AIチャット設定 > プロンプトタブ | Agent / FT(Gemini) | `toneDesc` → ペルソナの口調指定 |
-| **有効/無効** | AIチャット設定 > プロンプトタブ | 全モード | `setting.enabled` → チャット自体のON/OFF |
-| **サジェストボタン** | AIチャット設定 > サジェストタブ | 全モード（UI側） | 初期表示のボタンテキスト |
-| **利用制限** | AIチャット設定 > 利用制限タブ | 全モード | 日次/月次/IP制限値 |
-| **訓練データ** | AIチャット設定 > 学習タブ | FT(OpenAI) のみ | 次回Fine-tuning時に反映。編集/追加/削除可 |
+| 項目 | 管理画面の場所 | 影響する箇所 |
+|------|---------------|-------------|
+| **システムプロンプト** | AIチャット設定 > プロンプトタブ | `setting.system_prompt` → 「運営からの追加指示」セクション |
+| **口調 (tone)** | AIチャット設定 > プロンプトタブ | `toneDesc` → ペルソナの口調指定 |
+| **有効/無効** | AIチャット設定 > プロンプトタブ | `setting.enabled` → チャット自体のON/OFF |
+| **サジェストボタン** | AIチャット設定 > サジェストタブ | 初期表示のボタンテキスト |
+| **利用制限** | AIチャット設定 > 利用制限タブ | 日次/月次/IP制限値 |
 
 ### コード内固定値（変更にはデプロイが必要）
 
 | 項目 | 定義場所 (AiChatController.php) |
 |------|-------------------------------|
-| ペルソナ定義 | `buildAgentSystemPrompt()` / `buildSystemPrompt()` / `buildOpenAiSystemPrompt()` |
-| 絶対ルール（質問返し禁止等） | `buildAgentSystemPrompt()` / `buildSystemPrompt()` / `buildOpenAiSystemPrompt()` |
+| ペルソナ定義 | `buildAgentSystemPrompt()` |
+| 絶対ルール（質問返し禁止等） | `buildAgentSystemPrompt()` |
 | 検索のコツ（キーワード→パラメータ変換） | `buildAgentSystemPrompt()` |
-| 雰囲気・曖昧表現の検索方法 | `buildAgentSystemPrompt()` (Agent) / `buildSystemPrompt()` + `buildOpenAiSystemPrompt()` (FT) |
-| 給与・待遇ルール | `buildAgentSystemPrompt()` / `buildSystemPrompt()` |
-| 回答フォーマット | `buildAgentSystemPrompt()` / `buildSystemPrompt()` |
-| LINE誘導文 | `buildAgentSystemPrompt()` / `buildSystemPrompt()` / `buildOpenAiSystemPrompt()` |
-| 回答例（2パターン） | `buildAgentSystemPrompt()` / `buildSystemPrompt()` |
-| ツール定義（4ツール） | `getToolDeclarations()` |
+| 雰囲気・曖昧表現の検索方法 | `buildAgentSystemPrompt()` |
+| 給与・待遇ルール | `buildAgentSystemPrompt()` |
+| 回答フォーマット | `buildAgentSystemPrompt()` |
+| LINE誘導文 | `buildAgentSystemPrompt()` |
+| ツール定義（5ツール） | `getToolDeclarations()` |
 | keyword検索（OR分割） | `toolSearchStores()` — スペース/全角スペース/カンマ区切りでOR検索 |
-| 全店舗詳細JSON生成 | `buildSystemPrompt()` / `buildOpenAiSystemPrompt()` — Cache共有 |
-| 訓練データのシステムプロンプト | `FineTuningController::convertToOpenAiFormat()` / `addTrainingPair()` |
-| temperature / maxOutputTokens | Agent: 0.4/2048, FT(OpenAI): 0.4/2048, FT(Gemini): 0.5/2048 |
+| temperature / maxOutputTokens | 0.4 / 2048 |
 
 ---
 
@@ -730,32 +392,7 @@ OpenAI にアップロードする JSONL の各行に含まれる `system` メ�
 | `backend/app/Models/AiChatLimit.php` | 利用制限 |
 | `backend/app/Models/IndustryKnowledge.php` | 業界ナレッジ記事 |
 | `backend/app/Http/Controllers/Admin/IndustryKnowledgeController.php` | ナレッジ管理API (CRUD) |
-| `backend/app/Console/Commands/GenerateFineTuningData.php` | 訓練データ生成 (10パターン) |
-| `backend/app/Http/Controllers/Admin/FineTuningController.php` | Fine-tuning管理API (全店舗JSON含む訓練データ) |
-| `backend/config/services.php` | API設定 (gemini, openai) |
-
----
-
-## モード比較
-
-| | Agent mode | Finetuned mode (OpenAI) | Finetuned mode (Gemini fallback) |
-|---|---|---|---|
-| **API** | Gemini 3.1 Flash-Lite | OpenAI gpt-4o-mini (ft) | Gemini 3.1 Flash-Lite |
-| **ツール** | Function Calling (5ツール) | なし | なし |
-| **店舗データ** | ツール経由でDB検索 | 全店舗JSON埋め込み | 全店舗JSON埋め込み |
-| **店舗抽出** | ツール結果から直接 | [STORE:ID]マーカーで抽出 | [STORE:ID]マーカーで抽出 |
-| **雰囲気解釈** | 類義語ガイド→keyword検索 | JSON内のdescription等から直接解釈 | JSON内のdescription等から直接解釈 |
-| **Temperature** | 0.4 | 0.4 | 0.5 |
-| **トークン消費** | ~5,800/回 | ~17,000/回 (全店舗JSON) | ~16,700/回 (全店舗JSON) |
-| **レイテンシ** | 2〜4秒 (ツールループ1〜2回) | 4〜14秒 | 4〜8秒 |
-| **精度** | 高 (リアルタイムDB + 雰囲気検索) | 中 (全データ読めるがルール遵守が弱い) | 中 (全データ読めるがルール遵守が弱い) |
-| **スケーラビリティ** | 店舗増でもコスト不変 | 店舗増でトークン増 | 店舗増でトークン増 |
-
-### モード使い分け方針
-
-- **Agent mode（推奨）**: メインモード。DB検索による正確なデータ取得 + 類義語ガイドによる雰囲気解釈。コスト効率が最も良い
-- **Fine-tuned mode**: Agentモードのフォールバック。または業界一般知識（「ノルマって何？」「体入の流れは？」等）への回答に特化させる将来設計
-- **ハイブリッド案（不採用）**: FTで雰囲気解釈→Agentで検索は、2モデル直列呼び出しでレイテンシ・コスト増。Agent単体の類義語ガイドで同等効果が得られるため不採用
+| `backend/config/services.php` | API設定 (gemini) |
 
 ---
 

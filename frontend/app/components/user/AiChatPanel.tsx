@@ -6,7 +6,6 @@ import {
   Loader2,
   Star,
   MapPin,
-  Zap,
   BookOpen,
   Clock,
   Hash,
@@ -161,7 +160,6 @@ interface StoreCard {
 }
 
 interface MessageMeta {
-  mode: string;
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
@@ -182,8 +180,6 @@ interface ChatMessage {
   /** ストリーミング中に Function Calling 等の中間ステータスを出す（"店舗を検索しています…" 等） */
   streamingStatus?: string;
 }
-
-type ChatMode = "agent" | "finetuned";
 
 interface ChatConfigResponse {
   enabled: boolean;
@@ -238,7 +234,6 @@ async function streamMessage(
   message: string,
   pageType: string,
   history: { role: string; content: string }[],
-  mode: ChatMode,
   storeId: number | undefined,
   signal: AbortSignal,
   handlers: StreamHandlers,
@@ -260,7 +255,6 @@ async function streamMessage(
       page_type: pageType,
       store_id: storeId,
       history,
-      mode,
     }),
     signal,
   });
@@ -496,25 +490,6 @@ function AiRelatedColumns({ text }: { text: string }) {
 function MetaBadge({ meta }: { meta: MessageMeta }) {
   return (
     <div className="mt-1.5 ml-8 flex flex-wrap items-center gap-1.5">
-      {/* Mode */}
-      <span
-        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
-        style={{
-          backgroundColor:
-            meta.mode === "agent"
-              ? "rgba(212,175,55,0.12)"
-              : "rgba(99,102,241,0.12)",
-          color: meta.mode === "agent" ? "#D4AF37" : "#6366f1",
-        }}
-      >
-        {meta.mode === "agent" ? (
-          <Zap className="size-2.5" />
-        ) : (
-          <BookOpen className="size-2.5" />
-        )}
-        {meta.mode === "agent" ? "Agent" : "Fine-tuned"}
-      </span>
-
       {/* Tokens */}
       <span
         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
@@ -849,7 +824,6 @@ export default function AiChatPanel({
     useState<SuggestDisplayMode>("categorized");
   const [followUpButtons, setFollowUpButtons] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
-  const [mode, setMode] = useState<ChatMode>("agent");
   const [limitReached, setLimitReached] = useState(false);
 
   // Intro animation state.
@@ -1056,7 +1030,6 @@ export default function AiChatPanel({
           msg,
           pageType,
           history,
-          mode,
           storeId,
           controller.signal,
           {
@@ -1129,7 +1102,7 @@ export default function AiChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, messages, pageType, storeId, introPhase, mode, limitReached, preview],
+    [input, isLoading, messages, pageType, storeId, introPhase, limitReached, preview],
   );
 
   if (!enabled) return null;
@@ -1172,7 +1145,7 @@ export default function AiChatPanel({
     >
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between px-4 py-3">
-        {/* 左: 金縦バー + 見出し + NEW pill (+ dev用 mode toggle) */}
+        {/* 左: 金縦バー + 見出し + NEW pill */}
         <div className="flex items-center gap-2">
           <span
             aria-hidden
@@ -1205,19 +1178,6 @@ export default function AiChatPanel({
           >
             NEW
           </span>
-          {/* Mode toggle (Recta 固有の開発トグル / Figma には無い) */}
-          <button
-            type="button"
-            onClick={() => setMode(mode === "agent" ? "finetuned" : "agent")}
-            className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold transition-colors"
-            style={{
-              backgroundColor: mode === "agent" ? "rgba(212,175,55,0.12)" : "rgba(99,102,241,0.12)",
-              color: mode === "agent" ? "#D4AF37" : "#6366f1",
-              border: `0.5px solid ${mode === "agent" ? "rgba(212,175,55,0.3)" : "rgba(99,102,241,0.3)"}`,
-            }}
-          >
-            {mode === "agent" ? "Agent" : "FT"}
-          </button>
         </div>
         {/* 右: Recta AI アバター + テキスト + オンラインドット */}
         <div className="flex shrink-0 items-center gap-1.5">

@@ -100,7 +100,6 @@ export interface AdminPersonChat {
   id: number;
   user_message: string;
   ai_response: string;
-  mode: string | null;
   page_type: string | null;
   total_tokens: number;
   created_at: string | null;
@@ -225,8 +224,6 @@ export interface DashboardKpiWithDelta {
 
 export interface DashboardChatTrendPoint {
   date: string;
-  agent: number;
-  finetuned: number;
   total: number;
 }
 
@@ -264,7 +261,6 @@ export interface DashboardRecentMessage {
 
 export interface DashboardRecentChat {
   id: number;
-  mode: string | null;
   page_type: string | null;
   user_message: string;
   total_tokens: number;
@@ -291,7 +287,6 @@ export interface DashboardData {
     new_reviews_7d: number;
     new_users_7d: number;
     published_articles: number;
-    fine_tuning_qa_active: number;
   };
   analytics_highlight: {
     stores: AnalyticsRankRow[];
@@ -461,19 +456,4 @@ export interface AiChatStats {
   top_users: { name: string; count: number }[];
   monthly_total: number;
   monthly_tokens: number;
-  mode_stats?: {
-    mode: string;
-    count: number;
-    total_input_tokens: number;
-    total_output_tokens: number;
-    total_tokens: number;
-    avg_tokens: number;
-  }[];
-  mode_daily_stats?: {
-    date: string;
-    mode: string;
-    count: number;
-    total_tokens: number;
-    avg_tokens: number;
-  }[];
 }

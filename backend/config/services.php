@@ -45,10 +45,6 @@ return [
         'server_key' => env('GOOGLE_MAPS_SERVER_KEY'),
     ],
 
-    'openai' => [
-        'api_key' => env('OPENAI_API_KEY'),
-    ],
-
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

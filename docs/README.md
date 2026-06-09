@@ -10,7 +10,7 @@
 | ファイル | 内容 |
 |---|---|
 | [admin-panel-requirements.md](admin-panel-requirements.md) | 管理画面全 10 ページの機能要件・ページ別仕様 |
-| [ai-chat-architecture.md](ai-chat-architecture.md) | AI チャット 3 モード (Agent / FT-OpenAI / FT-Gemini) のアーキテクチャ・プロンプト構造・ツール定義 |
+| [ai-chat-architecture.md](ai-chat-architecture.md) | AI チャット (Gemini Agent / Function Calling) のアーキテクチャ・プロンプト構造・ツール定義 |
 
 ### アーキテクチャ・設計パターン
 
@@ -26,7 +26,6 @@
 |---|---|
 | [deploy-aws.md](deploy-aws.md) | AWS EC2 シングルインスタンス構成 + Terraform + デプロイフロー |
 | [line-setup-checklist.md](line-setup-checklist.md) | LINE Login / Messaging API のチャネル設定・ENV・Webhook + トラブル履歴 |
-| [ai-finetuning.md](ai-finetuning.md) | OpenAI Fine-tuning の v1〜v4 履歴・モデル ID 管理・訓練データの作り方 |
 
 ### テスト
 

@@ -54,9 +54,6 @@ export default [
     route("admin/articles", "routes/admin/articles.tsx"),
     route("admin/articles/new", "routes/admin/article-new.tsx"),
     route("admin/articles/:id/edit", "routes/admin/article-edit.tsx"),
-    route("admin/fine-tuning-qa", "routes/admin/fine-tuning-qa.tsx"),
-    route("admin/fine-tuning-qa/new", "routes/admin/fine-tuning-qa-new.tsx"),
-    route("admin/fine-tuning-qa/:id/edit", "routes/admin/fine-tuning-qa-edit.tsx"),
     route("admin/people/:lineUserId", "routes/admin/person-detail.tsx"),
   ]),
 ] satisfies RouteConfig;

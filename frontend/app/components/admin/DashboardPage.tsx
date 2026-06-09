@@ -49,10 +49,6 @@ function getDelta(kpi: DashboardKpiWithDelta): number | null {
   return null;
 }
 
-const modeLabels: Record<string, string> = {
-  agent: "Agent",
-  finetuned: "Fine-tuned",
-};
 
 const reviewStatusLabels: Record<string, { label: string; className: string }> = {
   published: { label: "公開", className: "bg-emerald-50 text-emerald-700" },
@@ -599,15 +595,6 @@ export function DashboardPage() {
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-md shrink-0 ${
-                          c.mode === "finetuned"
-                            ? "bg-violet-50 text-violet-700"
-                            : "bg-indigo-50 text-indigo-700"
-                        }`}
-                      >
-                        {modeLabels[c.mode ?? ""] ?? c.mode ?? "?"}
-                      </span>
                       <span className="text-[11px] text-muted-foreground truncate">
                         {c.user_name}
                       </span>

@@ -14,7 +14,6 @@ type AiChatLogRow = ChatLogItemData & { user_id: number | null };
 export function AiChatHistoryTab() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [mode, setMode] = useState("");
   const [pageType, setPageType] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -25,13 +24,12 @@ export function AiChatHistoryTab() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [mode, pageType]);
+  useEffect(() => { setPage(1); }, [pageType]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (debounced) params.set("q", debounced);
-    if (mode) params.set("mode", mode);
     if (pageType) params.set("page_type", pageType);
     params.set("page", String(page));
     try {
@@ -42,7 +40,7 @@ export function AiChatHistoryTab() {
     } finally {
       setLoading(false);
     }
-  }, [debounced, mode, pageType, page]);
+  }, [debounced, pageType, page]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
@@ -67,11 +65,6 @@ export function AiChatHistoryTab() {
             className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
         </div>
-        <select value={mode} onChange={(e) => setMode(e.target.value)} className={selectClass}>
-          <option value="">モード: 全て</option>
-          <option value="agent">Agent</option>
-          <option value="finetuned">Fine-tuned</option>
-        </select>
         <select value={pageType} onChange={(e) => setPageType(e.target.value)} className={selectClass}>
           <option value="">画面: 全て</option>
           <option value="top">トップ</option>

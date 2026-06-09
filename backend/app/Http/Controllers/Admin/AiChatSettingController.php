@@ -55,43 +55,16 @@ class AiChatSettingController extends Controller
         $monthlyTokens = AiChatLog::where('created_at', '>=', now()->startOfMonth())
             ->sum(DB::raw('input_tokens + output_tokens'));
 
-        // Mode comparison stats
-        $modeStats = AiChatLog::select(
-                'mode',
-                DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(input_tokens) as total_input_tokens'),
-                DB::raw('SUM(output_tokens) as total_output_tokens'),
-                DB::raw('SUM(input_tokens + output_tokens) as total_tokens'),
-                DB::raw('AVG(input_tokens + output_tokens) as avg_tokens'),
-            )
-            ->where('created_at', '>=', now()->subDays($days))
-            ->groupBy('mode')
-            ->get();
-
-        $modeDailyStats = AiChatLog::select(
-                DB::raw("DATE(created_at) as date"),
-                'mode',
-                DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(input_tokens + output_tokens) as total_tokens'),
-                DB::raw('AVG(input_tokens + output_tokens) as avg_tokens'),
-            )
-            ->where('created_at', '>=', now()->subDays($days))
-            ->groupBy('date', 'mode')
-            ->orderBy('date')
-            ->get();
-
         return response()->json([
             'daily_stats' => $dailyStats,
             'top_users' => $topUsers,
             'monthly_total' => $monthlyTotal,
             'monthly_tokens' => $monthlyTokens,
-            'mode_stats' => $modeStats,
-            'mode_daily_stats' => $modeDailyStats,
         ]);
     }
 
     /**
-     * AIチャット履歴 (個別の質問/回答ログ)。mode / page_type / 本文検索で絞り込み。
+     * AIチャット履歴 (個別の質問/回答ログ)。page_type / 本文検索で絞り込み。
      *
      * @response array{data: array<int, mixed>, current_page: int, last_page: int, per_page: int, total: int}
      */
@@ -99,9 +72,6 @@ class AiChatSettingController extends Controller
     {
         $query = AiChatLog::with('user:id,line_display_name,nickname')->latest();
 
-        if ($mode = $request->input('mode')) {
-            $query->where('mode', $mode);
-        }
         if ($pageType = $request->input('page_type')) {
             $query->where('page_type', $pageType);
         }
@@ -116,7 +86,6 @@ class AiChatSettingController extends Controller
             'id' => $log->id,
             'user_message' => $log->user_message,
             'ai_response' => $log->ai_response,
-            'mode' => $log->mode,
             'page_type' => $log->page_type,
             'input_tokens' => $log->input_tokens,
             'output_tokens' => $log->output_tokens,

@@ -28,7 +28,6 @@ class ChatRequest extends FormRequest
             'page_type' => 'required|in:top,list,detail',
             'store_id' => 'nullable|integer',
             'history' => 'nullable|array|max:20',
-            'mode' => 'nullable|in:agent,finetuned',
             'user_area' => 'nullable|string|max:100',
         ];
     }
