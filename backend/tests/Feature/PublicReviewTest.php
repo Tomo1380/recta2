@@ -72,8 +72,9 @@ class PublicReviewTest extends TestCase
         ])->assertStatus(401);
     }
 
-    public function test_cannot_post_duplicate_review_for_same_store(): void
+    public function test_can_post_multiple_reviews_for_same_store(): void
     {
+        // 1店舗1口コミ制限は 2026-06-12 FB で撤廃。同一店舗への再投稿を許可する。
         $user = $this->createUser();
         $store = $this->createStore();
 
@@ -91,8 +92,8 @@ class PublicReviewTest extends TestCase
                 'body' => '2回目の十分な長さの本文サンプル',
             ]);
 
-        $response->assertStatus(422)
-            ->assertJson(['message' => 'この店舗には既に口コミを投稿済みです']);
+        $response->assertStatus(201);
+        $this->assertSame(2, Review::where('user_id', $user->id)->where('store_id', $store->id)->count());
     }
 
     public function test_invalid_tweet_url_returns_422(): void

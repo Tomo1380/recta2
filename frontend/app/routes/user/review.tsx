@@ -110,7 +110,7 @@ export default function ReviewPage() {
       // slug があれば slug へ戻す。
       navigate(`/stores/${store?.slug ?? storeId}`);
     } catch (err) {
-      // サーバが返す message (「既に投稿済みです」等の 422) はそのまま見せる。
+      // サーバが返す message (422 バリデーションエラー等) はそのまま見せる。
       // 無ければステータスコード付きの汎用文言にフォールバック (原因調査用)。
       if (err instanceof ApiError && typeof err.data.message === "string" && err.data.message) {
         setError(err.data.message);
