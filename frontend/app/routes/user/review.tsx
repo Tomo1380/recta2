@@ -4,7 +4,7 @@ import { Star, ChevronLeft, Loader2, Lock } from "lucide-react";
 import XPostEmbed from "~/components/user/shared/XPostEmbed";
 import { Breadcrumb } from "~/components/user/shared/Breadcrumb";
 import { useUserAuth } from "~/lib/user-auth";
-import { userApi } from "~/lib/api";
+import { ApiError, userApi } from "~/lib/api";
 import { buildMetaTags } from "~/lib/seo";
 import type { Store } from "~/lib/types";
 
@@ -109,8 +109,16 @@ export default function ReviewPage() {
       // 店舗詳細の canonical は slug 版。ID で戻ると 301 で二重遷移するので
       // slug があれば slug へ戻す。
       navigate(`/stores/${store?.slug ?? storeId}`);
-    } catch {
-      setError("投稿に失敗しました。もう一度お試しください。");
+    } catch (err) {
+      // サーバが返す message (「既に投稿済みです」等の 422) はそのまま見せる。
+      // 無ければステータスコード付きの汎用文言にフォールバック (原因調査用)。
+      if (err instanceof ApiError && typeof err.data.message === "string" && err.data.message) {
+        setError(err.data.message);
+      } else if (err instanceof ApiError) {
+        setError(`投稿に失敗しました（HTTP ${err.status}）。もう一度お試しください。`);
+      } else {
+        setError("投稿に失敗しました。もう一度お試しください。");
+      }
     } finally {
       setSubmitting(false);
     }

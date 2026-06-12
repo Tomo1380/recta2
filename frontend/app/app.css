@@ -10,3 +10,18 @@
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-heading: "Outfit", "Noto Sans JP", sans-serif;
 }
+
+/*
+ * iOS Safari は font-size が 16px 未満の input/textarea/select にフォーカス
+ * すると画面全体を自動ズームする。ユーザー向けページ (.user-shell 配下) では
+ * タッチデバイスに限り 16px を強制してこれを防ぐ。
+ * (unlayered なので Tailwind の text-[14px] 等の utility より優先される。
+ *  管理画面は PC 前提のため対象外。)
+ */
+@media (hover: none) and (pointer: coarse) {
+  .user-shell input,
+  .user-shell textarea,
+  .user-shell select {
+    font-size: 16px;
+  }
+}

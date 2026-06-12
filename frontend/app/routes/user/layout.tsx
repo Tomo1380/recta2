@@ -19,7 +19,7 @@ export default function UserLayout() {
   return (
     <UserAuthProvider>
       <div
-        className="relative min-h-screen flex justify-center"
+        className="user-shell relative min-h-screen flex justify-center"
         style={{ fontFamily: LUXE.fontFamily }}
       >
         <AmbientBackground />
